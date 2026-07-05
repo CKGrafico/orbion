@@ -68,9 +68,10 @@ export function LogViewer(props: { instance: Instance; loopId: string }): React.
   };
 
   return (
-    <div>
-      <div className="log-section-header">
-        <span className="title">Logs</span>
+    <div className="card">
+      <div className="card-header">
+        <span className="overline">Logs</span>
+        <span className="spacer" />
         <button className={`toggle${follow ? " on" : ""}`} onClick={() => setFollow((f) => !f)}>
           {follow ? "● Following" : "Follow"}
         </button>

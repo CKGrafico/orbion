@@ -1,9 +1,10 @@
 import type { Section } from "../types";
+import { Icon, type IconName } from "./Icon";
 
-const SECTIONS: { key: Section; label: string; glyph: string }[] = [
-  { key: "loops", label: "Loops", glyph: "↻" },
-  { key: "tasks", label: "Tasks", glyph: "≔" },
-  { key: "projects", label: "Projects", glyph: "▣" },
+const SECTIONS: { key: Section; label: string; icon: IconName }[] = [
+  { key: "loops", label: "Loops", icon: "rotate" },
+  { key: "tasks", label: "Tasks", icon: "list" },
+  { key: "projects", label: "Projects", icon: "folder" },
 ];
 
 /** Segmented pill switcher for the sections within an instance. */
@@ -22,7 +23,7 @@ export function SegmentedTabs(props: {
           className={`segment${section.key === active ? " active" : ""}`}
           onClick={() => !disabled && onChange(section.key)}
         >
-          <span className="glyph">{section.glyph}</span>
+          <Icon name={section.icon} size={13} />
           <span>{section.label}</span>
         </button>
       ))}

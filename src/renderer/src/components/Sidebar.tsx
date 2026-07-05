@@ -1,9 +1,10 @@
 import type { Instance, InstanceHealth } from "../types";
+import { Icon } from "./Icon";
 
 const HEALTH_COLORS: Record<InstanceHealth, string> = {
-  ok: "#4ade80",
-  offline: "#f87171",
-  unknown: "#8a877f",
+  ok: "#a9d95c",
+  offline: "#ff8484",
+  unknown: "#64718c",
 };
 
 export function Sidebar(props: {
@@ -19,13 +20,13 @@ export function Sidebar(props: {
   return (
     <div className="sidebar">
       <button className="sidebar-action" onClick={onAdd}>
-        <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+        <Icon name="plus" size={14} />
         <span>Add instance</span>
       </button>
 
       <div className="sidebar-section">
-        <span>Instances</span>
-        <span>{instances.length || ""}</span>
+        <span className="overline">Instances</span>
+        <span className="overline">{instances.length || ""}</span>
       </div>
 
       <div className="sidebar-list">
@@ -57,7 +58,7 @@ export function Sidebar(props: {
                   }
                 }}
               >
-                ✕
+                <Icon name="x" size={12} />
               </span>
             </button>
           ))

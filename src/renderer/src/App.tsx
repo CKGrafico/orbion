@@ -9,6 +9,7 @@ import { LoopsView } from "./components/LoopsView";
 import { LoopDetail } from "./components/LoopDetail";
 import { TasksView } from "./components/TasksView";
 import { ProjectsView } from "./components/ProjectsView";
+import { Icon } from "./components/Icon";
 import { hostLabel, timeAgo } from "./format";
 
 type View = { kind: "list" } | { kind: "loop"; loopId: string };
@@ -29,6 +30,7 @@ export function App(): React.ReactNode {
   const [health, setHealth] = useState<Record<string, InstanceHealth>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const filterRef = useRef<HTMLInputElement | null>(null);
 
   const selected: Instance | null = instances.find((i) => i.id === selectedId) ?? null;
@@ -38,7 +40,8 @@ export function App(): React.ReactNode {
   }, []);
 
   // Poll loops for the selected instance (the daemon's /api/events SSE is not
-  // fed server-side, so polling is the reliable option).
+  // fed server-side, so polling is the reliable option). refreshTick allows a
+  // manual refresh from the prompt bar's action button.
   useEffect(() => {
     if (!selected) {
       setLoops([]);
@@ -64,7 +67,7 @@ export function App(): React.ReactNode {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selected?.id, selected?.baseUrl, markHealth]);
+  }, [selected?.id, selected?.baseUrl, markHealth, refreshTick]);
 
   // Background health checks for non-selected instances.
   useEffect(() => {
@@ -131,14 +134,14 @@ export function App(): React.ReactNode {
           title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
           onClick={() => setSidebarOpen((v) => !v)}
         >
-          ▤
+          <Icon name="panelLeft" size={15} />
         </button>
         <button
           className="icon-btn"
           title="Search (focus filter)"
           onClick={() => filterRef.current?.focus()}
         >
-          ⌕
+          <Icon name="search" size={15} />
         </button>
         <button
           className="icon-btn"
@@ -147,10 +150,10 @@ export function App(): React.ReactNode {
           style={!inDetail ? { opacity: 0.35, cursor: "default" } : undefined}
           onClick={goBack}
         >
-          ←
+          <Icon name="arrowLeft" size={15} />
         </button>
-        <span className="titlebar-brand">Loop Task App</span>
-        {isMock ? <span className="chip">mock</span> : null}
+        <span className="titlebar-brand">Loop Task</span>
+        <span className="titlebar-tag">{isMock ? "mock" : "preview"}</span>
       </div>
 
       <div className="body">
@@ -184,7 +187,9 @@ export function App(): React.ReactNode {
           <div className="content">
             {!selected ? (
               <div className="empty">
-                <div className="glyph">↻</div>
+                <span className="glyph">
+                  <Icon name="rotate" size={30} strokeWidth={1.2} />
+                </span>
                 <h3>No instance selected</h3>
                 <p>
                   Add a loop-task instance by its API URL (for example{" "}
@@ -229,9 +234,16 @@ export function App(): React.ReactNode {
                   <span className="prompt-chip">{SECTION_LABELS[section]}</span>
                   <span className="prompt-meta">{hostLabel(selected.baseUrl)}</span>
                   <span style={{ flex: 1 }} />
-                  <span className="prompt-meta">
-                    {section === "loops" ? `${loops.length} loops` : ""}
-                  </span>
+                  {section === "loops" ? (
+                    <span className="prompt-meta mono">{loops.length} loops</span>
+                  ) : null}
+                  <button
+                    className="prompt-action"
+                    title="Refresh now"
+                    onClick={() => setRefreshTick((n) => n + 1)}
+                  >
+                    <Icon name="rotate" size={14} strokeWidth={1.8} />
+                  </button>
                 </div>
               </div>
             </div>

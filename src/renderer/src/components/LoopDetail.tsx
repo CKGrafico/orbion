@@ -3,6 +3,7 @@ import type { Instance, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil } from "../format";
 import { LogViewer } from "./LogViewer";
+import { Icon } from "./Icon";
 
 export function LoopDetail(props: {
   instance: Instance;
@@ -28,27 +29,34 @@ export function LoopDetail(props: {
     };
   }, [instance.id, instance.baseUrl, loopId]);
 
-  const title = loop?.description?.trim() || (loop ? commandLine(loop.command, loop.commandArgs) : loopId);
+  const title =
+    loop?.description?.trim() || (loop ? commandLine(loop.command, loop.commandArgs) : loopId);
   const failed = loop && loop.lastExitCode !== null && loop.lastExitCode !== 0;
 
   return (
     <div className="content-inner">
-        <div className="detail-header">
-          <button className="icon-btn" title="Back to loops" onClick={onBack}>
-            ‹
-          </button>
-          <span className="detail-title">{title}</span>
-          {loop ? (
-            <span
-              className="chip"
-              style={{ color: STATUS_COLORS[loop.status] ?? "var(--text-secondary)" }}
-            >
-              ● {loop.status}
-            </span>
-          ) : null}
-        </div>
-
+      <div className="detail-header">
+        <button className="icon-btn" title="Back to loops" onClick={onBack}>
+          <Icon name="arrowLeft" size={15} />
+        </button>
+        <span className="detail-title">{title}</span>
         {loop ? (
+          <span
+            className="chip"
+            style={{ color: STATUS_COLORS[loop.status] ?? "var(--text-secondary)" }}
+          >
+            ● {loop.status}
+          </span>
+        ) : null}
+      </div>
+
+      {loop ? (
+        <div className="card">
+          <div className="card-header">
+            <span className="overline">Overview</span>
+            <span className="spacer" />
+            <span className="card-stat">{loop.id}</span>
+          </div>
           <div className="meta-grid">
             <div className="meta-item">
               <div className="label">Interval</div>
@@ -88,9 +96,10 @@ export function LoopDetail(props: {
               <div className="value mono">{commandLine(loop.command, loop.commandArgs)}</div>
             </div>
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        <LogViewer instance={instance} loopId={loopId} />
+      <LogViewer instance={instance} loopId={loopId} />
     </div>
   );
 }
