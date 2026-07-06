@@ -82,7 +82,7 @@ HTTP + SSE. It is **read-only** in v1.
 - **[target] Styling via Tailwind + shadcn** (`@tailwind-shadcn`) for new UI;
   the current plain-CSS token system (`theme.css`) is the reference palette to
   carry over, not to extend ad-hoc.
-- **[target] Follow `@plain-engineering-conventions`** for structure, error
+- **[target] Follow for structure, error
   handling, and readability; follow `@typescript-eslint` lint rules.
 
 ## Testing
@@ -91,8 +91,7 @@ HTTP + SSE. It is **read-only** in v1.
   the only automated correctness gate (`tsc --noEmit` over the node + web
   project references).
 - **[enforced] There is no test suite yet.** When adding tests, co-locate them
-  with the code they cover and follow `@typescript-eslint` /
-  `@plain-engineering-conventions`. Do not claim coverage that does not exist.
+  with the code they cover and follow `@typescript-eslint`  Do not claim coverage that does not exist.
 - **[enforced] Verify UI without a daemon** using the mock adapter
   (`pnpm dev:web`, backed by `src/renderer/src/mock.ts`) before shipping UI
   changes.
@@ -145,7 +144,7 @@ HTTP + SSE. It is **read-only** in v1.
   an explicit, reviewed upgrade.
 - **[target] Additional agent skills are provided via the `npx-skills` provider.**
   The team stack references `@react-nextjs-patterns`, `@tailwind-shadcn`,
-  `@feature-sliced-design`, `@inversify-hooks`, `@plain-engineering-conventions`,
+  `@feature-sliced-design`, `@inversify-hooks`,
   `@web-i18n-next-intl`, and `@typescript-eslint` — install them before relying
   on their guidance.
 

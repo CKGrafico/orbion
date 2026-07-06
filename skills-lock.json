@@ -43,6 +43,12 @@
       "skillPath": ".agents/skills/code-review/SKILL.md",
       "computedHash": "c4c32606791960835bca1d542882778ca75c8d91ba6d4f07b90e34ad44799484"
     },
+    "feature-sliced-design": {
+      "source": "feature-sliced/skills",
+      "sourceType": "github",
+      "skillPath": "feature-sliced-design/SKILL.md",
+      "computedHash": "d4eaefe92df4439ffa8c6c06762047f0fc3aeb5ffc620d5239dce8d95592fe60"
+    },
     "fix-pr-issues": {
       "source": "basicmachines-co/basic-memory",
       "sourceType": "github",
@@ -54,6 +60,12 @@
       "sourceType": "github",
       "skillPath": ".agents/skills/infographics/SKILL.md",
       "computedHash": "bab6b1fa457282d87d30a8dccff5c5bd2070422d7bcdd66022570ac1c1f85282"
+    },
+    "inversify-hooks": {
+      "source": "ckgrafico/inversify-hooks",
+      "sourceType": "github",
+      "skillPath": "skills/inversify-hooks/SKILL.md",
+      "computedHash": "e67131906d824b0169153c999dd68fb490ecd59dc8991fba6420a92b3357114e"
     },
     "memory-capture": {
       "source": "basicmachines-co/basic-memory",
@@ -144,6 +156,30 @@
       "sourceType": "github",
       "skillPath": ".agents/skills/pr-create/SKILL.md",
       "computedHash": "11c454b9653f76cc3e53be2228e50b29483c14fce398f5b6ee201f22d337bb10"
+    },
+    "react-nextjs-patterns": {
+      "source": "duyet/claude-plugins",
+      "sourceType": "github",
+      "skillPath": "team-agents/skills/react-nextjs-patterns/SKILL.md",
+      "computedHash": "facf696c55d45d3b6dc974400c6c4a469abedfe1f76476112d3bf538b53064ea"
+    },
+    "tailwind-v4-shadcn": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tailwind-v4-shadcn/skills/tailwind-v4-shadcn/SKILL.md",
+      "computedHash": "4eb905e229fce4220feecbc03b93c957a0b027a7200777c73f3925137d6c1c59"
+    },
+    "typescript-eslint": {
+      "source": "claude-dev-suite/claude-dev-suite",
+      "sourceType": "github",
+      "skillPath": "skills/quality/typescript-eslint/SKILL.md",
+      "computedHash": "343170faaf7490cc16e466629cfcdfcae84ba3679ca2f1c99141aa632d6deee9"
+    },
+    "web-i18n-next-intl": {
+      "source": "agents-inc/skills",
+      "sourceType": "github",
+      "skillPath": "src/skills/web-i18n-next-intl/SKILL.md",
+      "computedHash": "1b8a1602a6f21b75eae14efea59cc14b728cde1012abf1a212852c6b6005ac11"
     }
   }
 }
