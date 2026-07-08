@@ -1,174 +1,3 @@
-# AGENTS.md, Bootstrap Mode
-
-> This project has not been initialized yet.
-> Your ONLY job right now is to run the initialization sequence below.
-> Do not do anything else until all steps are complete.
-
-## Trigger
-
-When the user says anything resembling initialization, "/ob-init", "initialize", "setup", "start", "bootstrap", "get started", "prepare", execute the steps below. Follow the greenfield/brownfield branching exactly.
-
----
-
-## Initialization Sequence
-
-### Step 1, Detect project type
-
-Use the **AskUserQuestion tool** (not plain text) to present this choice:
-
-- Question: `"Is this a greenfield or brownfield project?"`
-- Options:
-  - `greenfield` — Starting from scratch, little or no existing code. Skip architecture/design/history analysis.
-  - `brownfield` — Existing codebase. Generate docs from your code.
-
-Wait for the answer. Then follow the matching path below.
-
----
-
-### Greenfield path
-
-Skip steps 2, 3, and 4. Jump directly to Step 5.
-
-Greenfield note: `ARCHITECTURE.md` and `DESIGN.md` are left as placeholders. Run `/ob-create-architecture` and `/ob-create-design` once the codebase has meaningful content.
-
----
-
-### Brownfield path
-
-#### Step 2, Archive project history into OpenSpec
-
-Scan the codebase for any existing documentation, changelogs, ADRs, README files, or notable history that describes decisions already made in this project. Create an OpenSpec archive entry that captures this history so agents have context going forward.
-
-Before scanning, load source roots from `.opencode/source-roots.json` when present. Only scan those roots plus this repo's docs/config files.
-
-```bash
-openspec new change "project-history"
-```
-
-Write a `proposal.md` inside that change summarizing:
-- What this project is
-- Key decisions already made (inferred from code and docs)
-- Known tech debt or constraints visible in the codebase
-- Current state of the project
-
-Then archive it immediately:
-```bash
-openspec archive "project-history"
-```
-
----
-
-#### Step 3, Generate ARCHITECTURE.md
-
-Run `/ob-create-architecture` now. Follow every step defined in that command.
-
----
-
-#### Step 4, Generate DESIGN.md
-
-Run `/ob-create-design` now. Follow every step defined in that command.
-
----
-
-### Step 5, Populate OpenSpec config
-
-Write `openspec/config.yaml` with real project information. For greenfield projects, use what little is known (language choice, intended stack, domain). For brownfield, use what was discovered in steps 2–4.
-
-The output must contain `schema: spec-driven` and a populated `context:` block. Do not leave placeholder text.
-
-```yaml
-schema: spec-driven
-
-context: |
-  Tech stack: <languages, frameworks, libraries found in the codebase>
-  Build system: <build tools, package managers>
-  Architecture: <monolith, microservices, monorepo, etc.>
-  Conventions: <coding style, commit conventions, branching strategy if found>
-  Domain: <what this project does, in one line>
-```
-
-Replace every `<…>` with real values. Add a `rules:` section only if the codebase has clear conventions worth enforcing. Do not invent rules that aren't evidenced by the codebase.
-
----
-
-### Step 6, Install OpenCode plugins
-
-OpenCode plugins declared in `.opencode/opencode.json` (under the `plugin` key) must be present in `.opencode/node_modules/` or OpenCode will fail to load them. The plugins are also listed in `.opencode/package.json` as dependencies.
-
-```bash
-cd .opencode
-npm install
-cd ..
-```
-
-This installs all plugin packages into `.opencode/node_modules/`. If you ever see "Plugin X not found" errors after init, run `npm install` in `.opencode/` again.
-
----
-
-### Step 7, Rewrite this file
-
-Replace the entire contents of this file (`AGENTS.md`) with everything below the line `<!-- AGENTS-TEMPLATE-START -->` in this same file. Delete the bootstrap section and the template marker, the file should contain only the template content when done.
-
----
-
-### Step 8, Confirm
-
-For **brownfield**, tell the user:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Initialization complete.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- ARCHITECTURE.md generated
-- DESIGN.md generated
-- openspec/config.yaml populated
-- Project history archived in openspec
-- OpenCode plugins installed
-- AGENTS.md updated with real guidance
-
-!! RESTART OPENCODE NOW !!
-
-Quit and reopen OpenCode before doing anything else.
-Nothing will work correctly until you do.
-After restarting you are ready to work.
-```
-
-For **greenfield**, tell the user:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Initialization complete (greenfield).
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- openspec/config.yaml populated
-- OpenCode plugins installed
-- AGENTS.md updated with real guidance
-- ARCHITECTURE.md and DESIGN.md left as placeholders
-
-Once your codebase has meaningful content, run:
-  /ob-create-architecture   → generate architecture docs
-  /ob-create-design         → generate design system docs
-
-!! RESTART OPENCODE NOW !!
-
-Quit and reopen OpenCode before doing anything else.
-Nothing will work correctly until you do.
-After restarting you are ready to work.
-```
-
----
-
-## Guardrails During Init
-
-- Do NOT implement any features
-- Do NOT create branches or PRs
-- Do NOT modify any project source files
-- Do NOT create CLI wrapper files or scripts
-- Only read source files for analysis, write only to ARCHITECTURE.md, DESIGN.md, AGENTS.md, openspec/config.yaml, and openspec/
-- `npm install` (step 6) is allowed to modify `.opencode/package-lock.json` and `.opencode/node_modules/`
-
-<!-- AGENTS-TEMPLATE-START -->
 # AGENTS.md
 
 This file provides guidance to AI agents when working in this repository.
@@ -186,6 +15,8 @@ This is the agent orchestration layer for your project. It provides:
 
 Load DESIGN.md for design principles and guidelines. Load ARCHITECTURE.md for system architecture and component interactions. These files are generated during initialization and updated as the codebase evolves.
 
+**Command aliases:** OpenSpec skills may reference `/opsx-propose`, `/opsx-apply`, `/opsx-archive`, or `/opsx-explore`. Always substitute them with `/ob-propose`, `/ob-apply`, `/ob-archive`, `/ob-explore` respectively, and never mention the `opsx-` names to the user.
+
 ## I Am the Lead, Full Workflow Ownership
 
 <!-- OB-PLATFORM-WORKFLOW-START -->
@@ -197,7 +28,7 @@ Trigger patterns, I recognize ALL of these, exact wording does not matter:
 - `I've added comments to the PR` → read PR comments → fix → update PR
 - Any GitHub PR URL in a feedback/fix request (e.g. "check comments", "fix PR feedback") → run PR Feedback Loop
 
-**A GitHub URL anywhere in the user's message is always a trigger, regardless of surrounding words.**
+**A GitHub URL in the user's message is a strong trigger — follow the pipeline unless the user explicitly asks for analysis or context only.**
 <!-- OB-PLATFORM-WORKFLOW-END -->
 
 **Never delegate without a plan. Default to specialists for implementation. If a subagent wave repeatedly fails (a group errors after one retry, or a full wave makes zero progress), stop forcing it: report the failure, then continue in the main session or ask the user whether to retry later.**
@@ -215,16 +46,13 @@ Before spawning implementation workers:
 
 Parallel execution uses OpenCode's native `task` tool — no external plugin, no worktrees. The lead spawns subagents in **waves**: a set of foreground `task()` calls in a single turn that run concurrently and return their results to the lead. Subagents are navigable (`ctrl+x ↓`, `←`/`→`) and ephemeral (one batch, then they exit).
 
-**How a wave works:**
+**The full wave protocol is defined in `/ob-apply` — that command is authoritative during implementation.** Key mechanics:
 - **Push assignment.** Each subagent's task IDs + text go in its spawn prompt — there is no claim step, so a worker can never sit idle waiting for work.
-- **Eligibility.** A task runs only when every `depends_on` is done.
-- **Conflict safety (no worktrees).** Concurrent subagents must touch disjoint files (codegraph impact → `touches` globs → `git diff`). Same-file tasks are packed into one worker and run sequentially.
-- **Checkpoints.** The lead commits each group on success; on failure it reverts that group's paths and retries once.
-- **Per-agent model.** Each engineer's model is set in its own agent file (chosen by tier when the engineer is created); the lead spawns the plain agent name.
+- **Per-agent model.** Tasks name a tier-suffixed agent (e.g. `backend-engineer.build`); the `ob-subagent-tiers` plugin injects those variants at startup with models from `wizard.models`. If a variant is missing, fall back to the plain template agent (strip the `.<tier>` suffix).
 
-**Hard limits:**
-- **Max 3 concurrent subagents per wave** (set during onboarding, 1–5). The lead enforces the cap by emitting at most that many `task()` calls per turn; overflow queues to the next wave.
-- **Non-overlapping file domains.** Two concurrent subagents must NEVER touch the same file.
+**Hard limits (always apply):**
+- **Max 4 concurrent subagents per wave.** The authoritative value is `wizard.maxConcurrentAgents` in `.opencode/opencode-onboard.json` — re-read it before each run. The lead enforces the cap; overflow queues to the next wave.
+- **Non-overlapping file domains.** Two concurrent subagents must NEVER touch the same file. Same-file tasks are packed into one worker and run sequentially.
 - **Explicit stalls.** If tasks remain but none are eligible (a dependency failed), or a full wave makes zero progress, STOP and report — never spin.
 - **Retry limit.** One retry per failed group, then surface to the user. Never retry indefinitely.
 
@@ -307,7 +135,6 @@ Agent files live in `.opencode/agents/`. The set is dynamic — users add specia
 | Agent | File | Role |
 |-------|------|------|
 | `basic-engineer` | `.opencode/agents/basic-engineer.md` | Fallback implementation worker. Used when no custom engineer matches the task domain. |
-| `frontend-engineer` | `.opencode/agents/frontend-engineer.md` | Electron renderer / React 19 UI specialist — FSD, Tailwind + shadcn, inversify DI, next-intl i18n, patterns.dev. Default tier: build. |
 | `*-engineer` | `.opencode/agents/*-engineer.md` | User-created specialists. Preferred over `basic-engineer` when their domain matches the task. |
 
 Before spawning, inspect `.opencode/agents/` to build the actual list — never assume which custom engineers exist.
@@ -392,8 +219,11 @@ This project has CodeGraph initialized (`.codegraph/` exists). Use it for all co
 
 **NEVER call `codegraph_explore` or `codegraph_context` directly in the main session** — these return large source payloads that fill context. Instead, ALWAYS spawn an Explore sub-agent for exploration questions ("how does X work?", "where is Y implemented?").
 
-When spawning Explore agents, include in the prompt:
-> This project has CodeGraph initialized. Use `codegraph_explore` as your PRIMARY tool. Do NOT re-read files that codegraph_explore already returned. Only fall back to grep/glob/read for files listed under "Additional relevant files".
+**MANDATORY: When spawning ANY Explore sub-agent, you MUST include this exact text in the spawn prompt:**
+
+> This project has CodeGraph MCP tools available. Use `codegraph_explore` as your PRIMARY exploration tool — it is faster and more accurate than grep/glob/read. Call `codegraph_explore` with a descriptive query about what you're looking for. Do NOT re-read files that codegraph_explore already returned. Only fall back to grep/glob/read for files listed under "Additional relevant files" in the codegraph output, or if codegraph returns no results.
+
+Without this instruction, the Explore sub-agent will not know codegraph exists and will waste time with slow grep/glob/read calls.
 
 **The main session may only use these lightweight tools directly** (targeted lookups before edits):
 - `codegraph_search` — find symbols by name
@@ -417,6 +247,12 @@ Notes stored as plain Markdown files — readable by both agents and humans.
 
 Store: architecture decisions, resolved ambiguities, cross-agent context, discovered constraints.
 Query before implementing unfamiliar areas or picking up a long-running task.
+
+**When spawning Explore or engineer sub-agents, include this in the prompt if they need context:**
+
+> This project has basic-memory MCP tools available. Use `search` to find prior decisions, architecture notes, or context relevant to your task before starting. After finishing, use `write_note` to store a summary of what you found or decided (title: `task-<id>-result` or `exploration-<topic>`).
+
+Without this instruction, sub-agents will not know basic-memory exists and will miss prior context.
 <!-- OB-MEMORY-END -->
 
 <!-- CODEGRAPH_START -->

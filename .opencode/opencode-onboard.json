@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "generatedAt": "2026-07-04T22:59:00.232Z",
-  "onboardVersion": "1.1.0",
-  "opencodeVersion": "1.16.2",
+  "generatedAt": "2026-07-08T19:27:28.990Z",
+  "onboardVersion": "1.2.3",
+  "opencodeVersion": "1.17.14",
   "wizard": {
     "platform": "github",
     "backlogPlatform": "github",
@@ -11,11 +11,11 @@
     "sourceRoots": [
       "C:\\Projects\\Personal\\loop-task-app"
     ],
-    "maxConcurrentAgents": 3,
+    "maxConcurrentAgents": 4,
     "preserved": {
-      "design": false,
-      "architecture": false,
-      "openspec": false
+      "design": true,
+      "architecture": true,
+      "openspec": true
     },
     "openspec": {
       "available": true,
