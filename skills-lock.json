@@ -43,6 +43,12 @@
       "skillPath": ".agents/skills/code-review/SKILL.md",
       "computedHash": "c4c32606791960835bca1d542882778ca75c8d91ba6d4f07b90e34ad44799484"
     },
+    "design-taste-frontend": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "899b84384f74f540ea5284d9b2e9234e050998b42eacc805410b518d4226c0b3"
+    },
     "feature-sliced-design": {
       "source": "feature-sliced/skills",
       "sourceType": "github",
