@@ -174,7 +174,7 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 600,
     show: false,
-    title: "Loop Task App",
+    title: "Orbion",
     backgroundColor: "#262624",
     titleBarStyle: "hidden",
     titleBarOverlay: {
@@ -231,7 +231,7 @@ app.on("second-instance", () => {
   }
 });
 
-app.setName("Loop Task App");
+app.setName("Orbion");
 
 app.whenReady().then(() => {
   ipcMain.handle("api:request", (_event, args: ApiRequestArgs) => handleApiRequest(args));

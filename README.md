@@ -1,6 +1,8 @@
-# Loop Task App
+# Orbion
 
-Desktop manager for [loop-task](https://github.com/CKGrafico/loop-task) instances.
+**The open-source control plane for Loop Engineering.**
+
+Desktop control plane for [loop-task](https://github.com/CKGrafico/loop-task) instances.
 Add one or more running loop-task daemons by their HTTP API URL (e.g.
 `http://127.0.0.1:8845`) and watch their loops, tasks, projects, and live logs
 from a single app.

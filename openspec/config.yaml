@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  Domain: Loop Task App — an Electron desktop manager for loop-task daemons
+  Domain: Orbion — an Electron desktop control plane for loop-task daemons
   (register instances by HTTP API URL; monitor loops, tasks, projects, and live
   logs). Read-only in v1.
 

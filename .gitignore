@@ -4,3 +4,6 @@ dist/
 *.log
 .DS_Store
 .vite/
+
+# Private notes
+SECRET_INSPIRATION.md

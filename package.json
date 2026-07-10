@@ -1,7 +1,7 @@
 {
-  "name": "loop-task-app",
+  "name": "orbion",
   "version": "0.1.0",
-  "description": "Loop Task App — desktop manager for loop-task instances (loops, logs, projects) over the loop-task HTTP API.",
+  "description": "Orbion — the open-source control plane for Loop Engineering. Manages loop-task instances (loops, logs, projects) over the loop-task HTTP API.",
   "type": "module",
   "main": "./out/main/index.js",
   "author": "Quique Fdez Guerra",

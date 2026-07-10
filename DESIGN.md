@@ -1,5 +1,5 @@
 ---
-name: Loop Task App
+name: Orbion
 description: >-
   Dark, terminal-adjacent monitoring UI for loop-task daemons. Navy panels
   floating on a near-black frame, hairline borders, a single lime-green accent,
@@ -120,11 +120,11 @@ components:
   scrollbar: "10px, thumb bg_active with transparent track (webkit)"
 ---
 
-# Loop Task App — Design System
+# Orbion — Design System
 
 ## Design Intent
 
-Loop Task App looks and feels like a **developer instrument**, not a consumer
+Orbion looks and feels like a **developer instrument**, not a consumer
 app. It borrows the visual language of terminal dashboards and security tooling:
 a very dark navy field, crisp hairline borders, dense-but-legible typography,
 and a single electric lime-green accent (`#9fef00`) that appears only where it

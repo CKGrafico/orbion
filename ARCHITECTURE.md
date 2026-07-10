@@ -1,8 +1,9 @@
-# Architecture — Loop Task App
+# Architecture — Orbion
 
 ## Architecture Overview
 
-**Loop Task App** is a cross-platform **desktop application** (Electron) that acts
+**Orbion** — the open-source control plane for Loop Engineering — is a
+cross-platform **desktop application** (Electron) that acts
 as a monitoring dashboard for one or more [loop-task](https://github.com/CKGrafico/loop-task)
 daemons. Each daemon exposes an HTTP + SSE API; the app registers daemons by
 their base URL and shows their loops, tasks, projects, and live logs from a
@@ -28,7 +29,7 @@ it (no pause/resume/trigger/edit/delete).
 ## 1. Project Structure
 
 ```
-loop-task-app/
+orbion/
 ├── src/
 │   ├── main/
 │   │   └── index.ts            # Electron main: window lifecycle, IPC handlers,
@@ -76,7 +77,7 @@ Two orthogonal build targets share `src/renderer`: the Electron renderer
 flowchart LR
   user([User])
 
-  subgraph app["Loop Task App (Electron)"]
+  subgraph app["Orbion (Electron)"]
     R["Renderer (React 19)\nsandboxed"]
     P["Preload\ncontextBridge → window.api"]
     M["Main process\nHTTP proxy + SSE client"]
@@ -354,7 +355,7 @@ and screenshots without a daemon. This is a notable gap (see §15).
 
 ## 17. Project Identification
 
-- **Name:** loop-task-app (Loop Task App)
+- **Name:** orbion (Orbion)
 - **Version:** 0.1.0
 - **Language:** TypeScript (strict)
 - **Type:** Electron desktop application (React renderer)

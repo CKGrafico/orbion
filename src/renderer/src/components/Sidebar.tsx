@@ -66,8 +66,8 @@ export function Sidebar(props: {
       </div>
 
       <div className="sidebar-footer">
-        <span className="avatar">LT</span>
-        <span>Loop Task App</span>
+        <span className="avatar">OB</span>
+        <span>Orbion</span>
       </div>
     </div>
   );
