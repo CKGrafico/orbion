@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Environment, EnvironmentAuthState } from "../types";
+import type { Environment, EnvironmentAuthState, OpenCodeEndpoint } from "../types";
 import type { TailscalePeer, TailscalePeersResponse, PairingCodeExchangeResponse } from "../types";
 import { apiRequest } from "../api";
 
@@ -33,8 +33,9 @@ export function AddEnvironmentModal(props: {
   onSubmit: (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale") => void;
   onCancel: () => void;
   repairEnvironmentId?: string | null;
+  onSetOpenCodeEndpoint?: (environmentId: string, url: string, password: string | null) => void;
 }): React.ReactNode {
-  const { onSubmit, onCancel, repairEnvironmentId } = props;
+  const { onSubmit, onCancel, repairEnvironmentId, onSetOpenCodeEndpoint } = props;
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("http://127.0.0.1:8845");
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,10 @@ export function AddEnvironmentModal(props: {
   const [pairingError, setPairingError] = useState<string | null>(null);
   const [pairingBusy, setPairingBusy] = useState(false);
   const [detectedAuthState, setDetectedAuthState] = useState<EnvironmentAuthState>("unknown");
+
+  const [openCodeUrl, setOpenCodeUrl] = useState("");
+  const [openCodePassword, setOpenCodePassword] = useState("");
+  const [showOpenCode, setShowOpenCode] = useState(false);
 
   useEffect(() => {
     if (!window.api?.tailscalePeers) return;
@@ -126,7 +131,7 @@ export function AddEnvironmentModal(props: {
     }
 
     setDetectedAuthState("unauthenticated");
-    onSubmit(trimmedName, trimmedUrl, kind);
+    onSubmit(trimmedName, trimmedUrl, kind, openCodeUrl || undefined, openCodePassword || undefined);
   };
 
   const submit = async (): Promise<void> => {
@@ -142,13 +147,13 @@ export function AddEnvironmentModal(props: {
       return;
     }
 
-    await submitWithUrl(trimmedName, trimmedUrl);
+    await submitWithUrl(trimmedName, trimmedUrl, undefined);
   };
 
   const forceSave = (): void => {
     const trimmedName = name.trim();
     const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
-    onSubmit(trimmedName, trimmedUrl, "direct");
+    onSubmit(trimmedName, trimmedUrl, "direct", openCodeUrl || undefined, openCodePassword || undefined);
   };
 
   const handlePair = async (): Promise<void> => {
@@ -176,7 +181,7 @@ export function AddEnvironmentModal(props: {
 
     setDetectedAuthState("paired");
     setPairingStep("done");
-    onSubmit(name.trim() || "Paired daemon", baseUrl.trim().replace(/\/+$/, ""), "direct");
+    onSubmit(name.trim() || "Paired daemon", baseUrl.trim().replace(/\/+$/, ""), "direct", openCodeUrl || undefined, openCodePassword || undefined);
   };
 
   if (pairingStep === "pairing") {
@@ -313,6 +318,33 @@ export function AddEnvironmentModal(props: {
             </div>
           </div>
         ) : null}
+
+        <div className="field">
+          <button
+            className="btn small"
+            onClick={() => setShowOpenCode((v) => !v)}
+            style={{ fontSize: 11, marginBottom: showOpenCode ? 8 : 0 }}
+          >
+            {showOpenCode ? "Hide" : "Show"} OpenCode server
+          </button>
+          {showOpenCode ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+              <input
+                placeholder="OpenCode server URL (e.g. http://127.0.0.1:13284)"
+                value={openCodeUrl}
+                onChange={(e) => setOpenCodeUrl(e.target.value)}
+                className="mono"
+              />
+              <input
+                type="password"
+                placeholder="Server password (optional)"
+                value={openCodePassword}
+                onChange={(e) => setOpenCodePassword(e.target.value)}
+                className="mono"
+              />
+            </div>
+          ) : null}
+        </div>
 
         <div className="modal-actions">
           <button className="btn" onClick={onCancel}>

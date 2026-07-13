@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Environment } from "./types";
+import type { Environment, OpenCodeEndpoint } from "./types";
 import { apiRequest, resolveBaseUrl } from "./api";
 
 async function probeUrl(url: string): Promise<boolean> {
@@ -23,6 +23,7 @@ export function useEnvironments(): {
   removeEndpoint: (environmentId: string, endpointId: string) => void;
   setActiveEndpoint: (environmentId: string, endpointId: string) => void;
   removeSessionToken: (environmentId: string) => void;
+  setOpenCodeEndpoint: (environmentId: string, url: string, password: string | null) => void;
 } {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -244,6 +245,27 @@ export function useEnvironments(): {
     [],
   );
 
+  const setOpenCodeEndpointFn = useCallback(
+    (environmentId: string, url: string, password: string | null) => {
+      if (window.api) {
+        const endpoint: OpenCodeEndpoint = { url: url.trim().replace(/\/+$/, ""), password };
+        void window.api.config.setOpenCodeEndpoint(environmentId, endpoint).then(async () => {
+          setEnvironments(await window.api.config.getEnvironments());
+        });
+      } else {
+        setEnvironments((prev) => {
+          const next = prev.map((env) => {
+            if (env.id !== environmentId) return env;
+            return { ...env, opencode: { url: url.trim().replace(/\/+$/, ""), password } };
+          });
+          localStorage.setItem("lta.environments.v1", JSON.stringify(next));
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
   if (!loaded) {
     return {
       environments: [],
@@ -255,6 +277,7 @@ export function useEnvironments(): {
       removeEndpoint: removeEndpointFn,
       setActiveEndpoint: setActiveEndpointFn,
       removeSessionToken: removeSessionTokenFn,
+      setOpenCodeEndpoint: setOpenCodeEndpointFn,
     };
   }
 
@@ -268,5 +291,6 @@ export function useEnvironments(): {
     removeEndpoint: removeEndpointFn,
     setActiveEndpoint: setActiveEndpointFn,
     removeSessionToken: removeSessionTokenFn,
+    setOpenCodeEndpoint: setOpenCodeEndpointFn,
   };
 }

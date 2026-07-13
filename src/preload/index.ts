@@ -9,6 +9,8 @@ import type {
   LoopTaskBridge,
   PairingCodeExchangeResponse,
   SessionScope,
+  OpenCodeConnectionStatus,
+  OpenCodeEndpoint,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -50,6 +52,8 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:exchangePairingCode", baseUrl, code, scope) as Promise<PairingCodeExchangeResponse>,
     removeSessionToken: (environmentId: string) =>
       ipcRenderer.invoke("config:removeSessionToken", environmentId),
+    setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) =>
+      ipcRenderer.invoke("config:setOpenCodeEndpoint", environmentId, endpoint) as Promise<void>,
   },
 
   connection: {
@@ -92,6 +96,26 @@ const bridge: LoopTaskBridge = {
 
   tailscalePeers: () =>
     ipcRenderer.invoke("tailscale:peers") as Promise<TailscalePeersResponse>,
+
+  opencode: {
+    getStatus: (environmentId: string) =>
+      ipcRenderer.invoke("opencode:getStatus", environmentId) as Promise<OpenCodeConnectionStatus>,
+    refreshStatus: (environmentId: string) =>
+      ipcRenderer.invoke("opencode:refreshStatus", environmentId) as Promise<OpenCodeConnectionStatus>,
+    onStatusChange: (cb: (environmentId: string, status: OpenCodeConnectionStatus) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        environmentId: string,
+        status: OpenCodeConnectionStatus,
+      ): void => {
+        cb(environmentId, status);
+      };
+      ipcRenderer.on("opencode:status", listener);
+      return () => {
+        ipcRenderer.removeListener("opencode:status", listener);
+      };
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld("api", bridge);

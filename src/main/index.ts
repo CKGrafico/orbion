@@ -7,6 +7,8 @@ import type {
   ConnectionStatus,
   EndpointHealth,
   StreamSubscribeArgs,
+  OpenCodeConnectionStatus,
+  OpenCodeEndpoint,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import {
@@ -26,6 +28,7 @@ import {
   storeSessionToken,
   removeSessionToken,
   exchangePairingCode,
+  setOpenCodeEndpoint,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -35,6 +38,7 @@ import {
   fetchFingerprint,
 } from "./connection-supervisor.js";
 import { fetchPeers } from "./tailscale.js";
+import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -295,6 +299,9 @@ function seedSupervisors(): void {
       getOrCreateSupervisor(env.id, url);
     }
     syncEndpointTracker(env.id);
+    if (env.opencode) {
+      void refreshOpenCodeStatus(env.id, env.opencode);
+    }
   }
 }
 
@@ -487,6 +494,28 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("tailscale:peers", () => fetchPeers());
+
+  ipcMain.handle("opencode:getStatus", (_event, environmentId: string): OpenCodeConnectionStatus => {
+    return getOpenCodeStatus(environmentId);
+  });
+
+  ipcMain.handle("opencode:refreshStatus", async (_event, environmentId: string): Promise<OpenCodeConnectionStatus> => {
+    const envs = getEnvironments();
+    const env = envs.find((e: Environment) => e.id === environmentId);
+    if (!env?.opencode) {
+      return getOpenCodeStatus(environmentId);
+    }
+    return refreshOpenCodeStatus(environmentId, env.opencode);
+  });
+
+  ipcMain.handle("config:setOpenCodeEndpoint", async (_event, environmentId: string, endpoint: OpenCodeEndpoint | null) => {
+    setOpenCodeEndpoint(environmentId, endpoint);
+    if (endpoint) {
+      await refreshOpenCodeStatus(environmentId, endpoint);
+    } else {
+      clearOpenCodeStatus(environmentId);
+    }
+  });
 
   seedSupervisors();
   createWindow();
