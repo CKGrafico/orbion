@@ -105,9 +105,11 @@ export function App(): React.ReactNode {
   };
 
   const handleAdd = (name: string, baseUrl: string): void => {
-    const instance = add(name, baseUrl);
-    handleSelect(instance.id);
-    setModalOpen(false);
+    void (async () => {
+      const instance = await add(name, baseUrl);
+      handleSelect(instance.id);
+      setModalOpen(false);
+    })();
   };
 
   const handleRemove = (id: string): void => {

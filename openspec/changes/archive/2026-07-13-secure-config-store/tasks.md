@@ -1,0 +1,11 @@
+- [x] Add `electron-store` dependency
+- [x] Create `src/main/config-store.ts` with electron-store typed schema + safeStorage wrapper
+- [x] Extend `src/shared/ipc.ts` with `Instance`, `ConfigBridge`, and `config` sub-bridge in `LoopTaskBridge`
+- [x] Register config IPC handlers in `src/main/index.ts`
+- [x] Update `src/preload/index.ts` to expose `config` sub-bridge
+- [x] Refactor `src/renderer/src/store.ts` to use IPC instead of localStorage (with mock fallback)
+- [x] Add localStorage migration in `store.ts` useEffect (read → migrate → clear)
+- [x] Update `App.tsx` for async `add` return
+- [x] Update `ARCHITECTURE.md` §2, §3.2, §5, §7, §9, §14
+- [x] Update `project-guardrails/SKILL.md` Data & State + Security sections
+- [x] Typecheck and build pass

@@ -6,6 +6,14 @@ import type {
   ApiResponse,
   StreamSubscribeArgs,
 } from "../shared/ipc.js";
+import {
+  getInstances,
+  addInstance,
+  removeInstance,
+  getSelectedInstanceId,
+  setSelectedInstanceId,
+  migrateFromLocalStorage,
+} from "./config-store.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -244,6 +252,21 @@ app.whenReady().then(() => {
     streams.get(subId)?.abort();
     streams.delete(subId);
   });
+
+  ipcMain.handle("config:getInstances", () => getInstances());
+  ipcMain.handle("config:addInstance", (_event, name: string, baseUrl: string) =>
+    addInstance(name, baseUrl),
+  );
+  ipcMain.handle("config:removeInstance", (_event, id: string) => removeInstance(id));
+  ipcMain.handle("config:getSelectedInstanceId", () => getSelectedInstanceId());
+  ipcMain.handle("config:setSelectedInstanceId", (_event, id: string | null) =>
+    setSelectedInstanceId(id),
+  );
+  ipcMain.handle(
+    "config:migrateFromLocalStorage",
+    (_event, rawInstances: string, rawSelectedId: string | null) =>
+      migrateFromLocalStorage(rawInstances, rawSelectedId),
+  );
 
   createWindow();
 

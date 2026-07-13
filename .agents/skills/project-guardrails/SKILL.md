@@ -56,9 +56,10 @@ HTTP + SSE. It is **read-only** in v1.
   `*.ts` (e.g. `format.ts`, `store.ts`).
 - **[enforced] Case must match imports exactly** — `forceConsistentCasingInFileNames`
   is on. A wrong-cased import will fail on case-sensitive systems.
-- **[enforced] Versioned persistence keys:** localStorage keys carry a `.vN`
-  suffix (`lta.instances.v1`, `lta.selectedInstance.v1`). Bump the version when
-  the stored shape changes.
+- **[enforced] Config store schema changes must be migrated.** When the
+  `electron-store` shape changes, add a migration in `config-store.ts`. The
+  old `localStorage` keys (`lta.instances.v1`, `lta.selectedInstance.v1`) are
+  only used in mock mode now — version them if their shape changes.
 - **[target] FSD slice/segment naming** — group by feature slice with
   `ui/ model/ api/ lib/` segments; keep names domain-oriented.
 
@@ -111,9 +112,19 @@ HTTP + SSE. It is **read-only** in v1.
 
 - **[enforced] The app owns no backend store.** Authoritative data lives in the
   loop-task daemons; treat daemon responses as the source of truth.
-- **[enforced] Local persistence is limited to** versioned `localStorage`
-  (renderer, via `store.ts`) and `window-bounds.json` in the Electron `userData`
-  dir (main). Version/migrate keys when their shape changes.
+- **[enforced] Instance config is stored in `electron-store`** (main process,
+  `src/main/config-store.ts`) — not in renderer `localStorage`. The renderer
+  accesses config only through the typed IPC contract (`window.api.config`).
+  `localStorage` is used only as a fallback in mock mode (browser-only dev with
+  no Electron).
+- **[enforced] Window bounds are persisted as `window-bounds.json`** in the
+  Electron `userData` dir (main process). This is non-sensitive and stays as-is.
+- **[enforced] `safeStorage` wrapper is available** in `config-store.ts`
+  (`encryptValue`/`decryptValue`) for future secrets — OS-native encryption
+  (DPAPI, Keychain, libsecret). No encryption call sites exist yet.
+- **[enforced] One-time migration** from `localStorage` keys (`lta.instances.v1`,
+  `lta.selectedInstance.v1`) to `electron-store` runs automatically on first
+  launch via `config:migrateFromLocalStorage` IPC.
 - **[enforced] Unwrap the loop-task envelope** (`{ ok, data }` /
   `{ ok, error: { message } }`) into the app's `ApiResponse` in the main process;
   the renderer consumes the unwrapped shape only.
@@ -126,13 +137,17 @@ HTTP + SSE. It is **read-only** in v1.
   `contextIsolation: true` and `nodeIntegration: false`. Do not expose Node,
   `ipcRenderer`, or filesystem access to the renderer — only the typed
   `window.api` bridge.
+- **[enforced] Instance config lives in the main process** via `electron-store`,
+  not in renderer `localStorage`. This eliminates the XSS surface from
+  localStorage access in the renderer.
 - **[enforced] Validate instance base URLs** as `http:`/`https:` in the main
   process before any request (see `isAllowedBaseUrl`).
 - **[enforced] External links open in the system browser** via
   `shell.openExternal` (`setWindowOpenHandler` denies in-app navigation). Never
   navigate the app window to arbitrary URLs.
 - **[enforced] No secrets in the repo.** The daemon API is unauthenticated/local;
-  do not add tokens or credentials to source or persisted config.
+  do not add tokens or credentials to source or persisted config. When secrets
+  need to be stored, use the `safeStorage` wrapper to encrypt at rest.
 
 ## Dependencies
 
