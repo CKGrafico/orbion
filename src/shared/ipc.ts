@@ -66,6 +66,7 @@ export interface Environment {
   endpoints: AccessEndpoint[];
   activeEndpointId: string | null;
   authState?: EnvironmentAuthState;
+  opencode?: OpenCodeEndpoint | null;
 }
 
 export interface ConfigBridge {
@@ -80,6 +81,7 @@ export interface ConfigBridge {
   migrateFromLocalStorage: (rawInstances: string, rawSelectedId: string | null) => Promise<boolean>;
   exchangePairingCode: (baseUrl: string, code: string, scope?: SessionScope) => Promise<PairingCodeExchangeResponse>;
   removeSessionToken: (environmentId: string) => Promise<void>;
+  setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) => Promise<void>;
 }
 
 // ── Connection supervisor ─────────────────────────────────────────────
@@ -123,6 +125,26 @@ export interface TailscalePeersResponse {
   error?: string;
 }
 
+// ── OpenCode server per-environment ──────────────────────────────────
+
+export type OpenCodeAuthState = "authenticated" | "unauthenticated" | "unknown";
+
+export type OpenCodeErrorKind = "unreachable" | "rejected" | "unauthenticated" | "version" | null;
+
+export interface OpenCodeConnectionStatus {
+  authState: OpenCodeAuthState;
+  errorKind: OpenCodeErrorKind;
+  errorMessage: string | null;
+  serverVersion: string | null;
+  connectedProviders: string[];
+  checkedAt: number | null;
+}
+
+export interface OpenCodeEndpoint {
+  url: string;
+  password: string | null;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -134,6 +156,12 @@ export interface ConnectionBridge {
   notifyNetworkChanged: (online: boolean) => void;
 }
 
+export interface OpenCodeBridge {
+  getStatus: (environmentId: string) => Promise<OpenCodeConnectionStatus>;
+  refreshStatus: (environmentId: string) => Promise<OpenCodeConnectionStatus>;
+  onStatusChange: (cb: (environmentId: string, status: OpenCodeConnectionStatus) => void) => () => void;
+}
+
 export interface LoopTaskBridge {
   request: <T = unknown>(args: ApiRequestArgs) => Promise<ApiResponse<T>>;
   subscribeStream: (args: StreamSubscribeArgs) => Promise<void>;
@@ -141,5 +169,6 @@ export interface LoopTaskBridge {
   onStreamEvent: (cb: (payload: StreamEventPayload) => void) => () => void;
   config: ConfigBridge;
   connection: ConnectionBridge;
+  opencode: OpenCodeBridge;
   tailscalePeers: () => Promise<TailscalePeersResponse>;
 }

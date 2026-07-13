@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint } from "../shared/ipc.js";
 
 interface LegacyInstance {
   id: string;
@@ -11,6 +11,7 @@ interface LegacyInstance {
 interface EnvironmentWithFingerprint extends Environment {
   fingerprintId?: string;
   authState?: EnvironmentAuthState;
+  opencode?: OpenCodeEndpoint | null;
 }
 
 interface EncryptedSessionToken {
@@ -256,6 +257,14 @@ export function removeSessionToken(environmentId: string): void {
   const tokens = store.get("sessionTokens", {});
   delete tokens[environmentId];
   store.set("sessionTokens", tokens);
+}
+
+export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
+  const envs = store.get("environments", []);
+  const env = envs.find((e) => e.id === environmentId);
+  if (!env) return;
+  env.opencode = endpoint;
+  store.set("environments", envs);
 }
 
 export async function exchangePairingCode(

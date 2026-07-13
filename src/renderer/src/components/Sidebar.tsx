@@ -1,5 +1,5 @@
 import type { ConnectionStatus, EndpointHealth } from "../../../shared/ipc";
-import type { Environment, EnvironmentHealth, AccessEndpoint, EnvironmentAuthState } from "../types";
+import type { Environment, EnvironmentHealth, AccessEndpoint, EnvironmentAuthState, OpenCodeConnectionStatus, OpenCodeAuthState } from "../types";
 import { Icon } from "./Icon";
 import { hostLabel } from "../format";
 
@@ -24,6 +24,23 @@ const ENDPOINT_PHASE_COLORS: Record<string, string> = {
   backoff: "#f08040",
   offline: "#ff8484",
 };
+
+const OPENCODE_AUTH_COLORS: Record<OpenCodeAuthState, string> = {
+  authenticated: "#a9d95c",
+  unauthenticated: "#f0c040",
+  unknown: "#64718c",
+};
+
+function openCodeStatusLabel(status: OpenCodeConnectionStatus): string {
+  if (status.errorKind === "version") return `OpenCode: ${status.errorMessage ?? "version too old"}`;
+  if (status.errorKind === "unreachable") return `OpenCode: unreachable`;
+  if (status.errorKind === "rejected") return `OpenCode: ${status.errorMessage ?? "rejected"}`;
+  switch (status.authState) {
+    case "authenticated": return `OpenCode: connected`;
+    case "unauthenticated": return "OpenCode: opencode auth login";
+    case "unknown": return "OpenCode: unknown";
+  }
+}
 
 const KIND_LABELS: Record<string, string> = {
   direct: "Direct",
@@ -54,14 +71,16 @@ export function Sidebar(props: {
   health: Record<string, EnvironmentHealth>;
   connectionStatus?: Record<string, ConnectionStatus>;
   endpointHealth?: Record<string, EndpointHealth[]>;
+  openCodeStatus?: Record<string, OpenCodeConnectionStatus>;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
   onRetry?: (id: string) => void;
   onSetEndpoint?: (environmentId: string, endpointId: string) => void;
   onRepair?: (id: string) => void;
+  onSetOpenCodeEndpoint?: (environmentId: string, url: string, password: string | null) => void;
 }): React.ReactNode {
-  const { environments, selectedId, health, connectionStatus, endpointHealth, onSelect, onAdd, onRemove, onRetry, onSetEndpoint, onRepair } = props;
+  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, onSelect, onAdd, onRemove, onRetry, onSetEndpoint, onRepair, onSetOpenCodeEndpoint } = props;
 
   return (
     <div className="sidebar">
@@ -123,6 +142,19 @@ export function Sidebar(props: {
                     {KIND_LABELS[activeEp.kind] ?? activeEp.kind}
                   </span>
                 ) : null}
+                {(() => {
+                  const ocStatus = openCodeStatus?.[env.id];
+                  if (!ocStatus || (!env.opencode && ocStatus.authState === "unknown")) return null;
+                  return (
+                    <span
+                      className="stat"
+                      style={{ fontSize: 10, color: OPENCODE_AUTH_COLORS[ocStatus.authState], marginRight: 2 }}
+                      title={openCodeStatusLabel(ocStatus)}
+                    >
+                      oc:{ocStatus.authState === "authenticated" ? "ok" : ocStatus.authState === "unauthenticated" ? "auth" : "?"}
+                    </span>
+                  );
+                })()}
                 {(h === "backoff" || h === "blocked") && onRetry ? (
                   <span
                     className="remove"

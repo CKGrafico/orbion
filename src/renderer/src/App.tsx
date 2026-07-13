@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ConnectionStatus, EndpointHealth } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Section } from "./types";
 import { useEnvironments } from "./store";
 import { fetchLoops, isMock } from "./api";
@@ -39,7 +39,7 @@ function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, select, add, remove, setActiveEndpoint } = useEnvironments();
+  const { environments, selectedId, select, add, remove, setActiveEndpoint, setOpenCodeEndpoint } = useEnvironments();
   const [section, setSection] = useState<Section>("loops");
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
@@ -49,6 +49,7 @@ export function App(): React.ReactNode {
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
   const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
+  const [openCodeStatus, setOpenCodeStatus] = useState<Record<string, OpenCodeConnectionStatus>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -83,6 +84,19 @@ export function App(): React.ReactNode {
           }
           return { ...prev, [environmentId]: health };
         });
+      },
+    );
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!window.api) return;
+
+    const unsub = window.api.opencode.onStatusChange(
+      (environmentId: string, status: OpenCodeConnectionStatus) => {
+        setOpenCodeStatus((prev) =>
+          prev[environmentId] === status ? prev : { ...prev, [environmentId]: status },
+        );
       },
     );
     return unsub;
@@ -125,7 +139,19 @@ export function App(): React.ReactNode {
       }
     };
 
+    const fetchOpenCode = async (): Promise<void> => {
+      for (const env of environments) {
+        if (!env.opencode) continue;
+        const status = await window.api!.opencode.getStatus(env.id);
+        if (cancelled) return;
+        setOpenCodeStatus((prev) =>
+          prev[env.id] === status ? prev : { ...prev, [env.id]: status },
+        );
+      }
+    };
+
     void fetchAll();
+    void fetchOpenCode();
     return () => { cancelled = true; };
   }, [environments]);
 
@@ -196,9 +222,12 @@ export function App(): React.ReactNode {
     setFilter("");
   };
 
-  const handleAdd = (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale"): void => {
+  const handleAdd = (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale", openCodeUrl?: string, openCodePassword?: string): void => {
     void (async () => {
       const env = await add(name, baseUrl, kind);
+      if (openCodeUrl && window.api) {
+        await window.api.config.setOpenCodeEndpoint(env.id, { url: openCodeUrl, password: openCodePassword ?? null });
+      }
       handleSelect(env.id);
       setModalOpen(false);
     })();
@@ -275,12 +304,14 @@ export function App(): React.ReactNode {
               health={health}
               connectionStatus={connectionStatus}
               endpointHealth={endpointHealth}
+              openCodeStatus={openCodeStatus}
               onSelect={handleSelect}
               onAdd={() => setModalOpen(true)}
               onRemove={handleRemove}
               onRetry={handleRetry}
               onSetEndpoint={handleSetEndpoint}
               onRepair={handleRepair}
+              onSetOpenCodeEndpoint={setOpenCodeEndpoint}
             />
           </aside>
         ) : null}
