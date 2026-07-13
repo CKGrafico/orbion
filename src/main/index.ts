@@ -19,7 +19,6 @@ import {
   getSelectedEnvironmentId,
   setSelectedEnvironmentId,
   migrateFromLocalStorage,
-  updateEndpointHealth,
   findEnvironmentByFingerprint,
   setEnvironmentFingerprintId,
 } from "./config-store.js";
@@ -98,6 +97,12 @@ let osOffline = false;
 function setOsOffline(value: boolean): void {
   if (osOffline === value) return;
   osOffline = value;
+  for (const supervisor of supervisors.values()) {
+    supervisor.setOsOffline(value);
+  }
+  for (const tracker of endpointTrackers.values()) {
+    tracker.setOsOffline(value);
+  }
   if (!osOffline) {
     wakeupAll();
   }
