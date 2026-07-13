@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import type { SshHost, VmWizardProgress, VmWizardStep } from "../../shared/ipc";
 import { ShieldCheck, X, Check } from "lucide-react";
+import { translateMessage } from "../i18n";
 
 const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   idle: "",
@@ -185,17 +186,17 @@ export function AddVmWizard(props: {
               {isError ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <X size={14} />
-                  {progress.message}
+                  {translateMessage(intl, progress.message)}
                 </span>
               ) : isDone ? (
                 <span style={{ color: "var(--accent)", display: "flex", alignItems: "center", gap: 6 }}>
                   <Check size={14} />
-                  {progress.message}
+                  {translateMessage(intl, progress.message)}
                 </span>
               ) : (
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="spinner" style={{ width: 12, height: 12, border: "2px solid var(--text-muted)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  {stepLabel(intl, currentStep)}: {progress.message}
+                  {stepLabel(intl, currentStep)}: {translateMessage(intl, progress.message)}
                 </span>
               )}
             </div>
@@ -227,7 +228,7 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
               <ShieldCheck size={16} />
               <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                {progress.consentPrompt}
+                {translateMessage(intl, progress.consentPrompt)}
               </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>

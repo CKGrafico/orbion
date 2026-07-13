@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import type { SshHost, VmWizardLaunchResult } from "../shared/ipc.js";
-import { buildSshArgs } from "./ssh-config.js";
 import { sshExec } from "./ssh-probe.js";
 import { msg } from "./i18n.js";
 

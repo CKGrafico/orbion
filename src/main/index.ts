@@ -31,7 +31,6 @@ import {
   removeSessionToken,
   exchangePairingCode,
   setOpenCodeEndpoint,
-  setInfraOpenCodeEndpoint,
   getMainVmId,
   getMainVm,
   setMainVm,
@@ -47,7 +46,6 @@ import {
 import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent } from "./vm-wizard.js";
-import type { VmWizardProgress } from "../shared/ipc.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -556,7 +554,6 @@ app.whenReady().then(() => {
     if (!url) {
       return { ok: false, error: "Main VM has no active endpoint" };
     }
-    const token = getSessionToken(mainVmEnv.id);
 
     switch (args.action) {
       case "machine-status": {
@@ -590,7 +587,6 @@ app.whenReady().then(() => {
         if (!targetUrl) {
           return { ok: false, error: "Target VM has no active endpoint" };
         }
-        const targetToken = getSessionToken(targetEnv.id);
         const cloneResult = await handleApiRequest({
           baseUrl: targetUrl,
           path: "/api/repos/clone",
@@ -608,7 +604,6 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("infra:getStatus", () => {
-    const mainVm = getMainVm();
     const mainVmId = getMainVmId();
     const connected = mainVmId !== null && supervisors.has(mainVmId)
       && supervisors.get(mainVmId)!.getStatus().phase === "connected";

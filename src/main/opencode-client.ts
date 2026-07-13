@@ -1,8 +1,6 @@
 import { createOpencodeClient, OpencodeClient } from "@opencode-ai/sdk";
 import type {
-  OpenCodeAuthState,
   OpenCodeConnectionStatus,
-  OpenCodeErrorKind,
   OpenCodeEndpoint,
 } from "../shared/ipc.js";
 import { BrowserWindow } from "electron";

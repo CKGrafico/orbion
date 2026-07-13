@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { SshHost, VmWizardTunnelResult } from "../shared/ipc.js";
-import { buildSshArgs } from "./ssh-config.js";
 import { msg } from "./i18n.js";
 
 const TUNNEL_CONNECT_TIMEOUT_MS = 15_000;

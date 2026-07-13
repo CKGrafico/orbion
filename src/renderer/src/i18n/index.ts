@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { createIntl, type IntlShape, type ResolvedIntlConfig } from "react-intl";
 import enMessages from "./en.json";
+import type { I18nMessage } from "../../../shared/ipc";
 
 export type Messages = typeof enMessages;
 
@@ -23,6 +24,11 @@ export const IntlContext = createContext<IntlShape>(standaloneIntl);
 
 export function useI18n(): IntlShape {
   return useContext(IntlContext);
+}
+
+export function translateMessage(intl: IntlShape, message: I18nMessage | null | undefined): string {
+  if (!message) return "";
+  return intl.formatMessage({ id: message.key }, message.params as Record<string, string | number | Date> | undefined);
 }
 
 export { enMessages };

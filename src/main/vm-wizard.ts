@@ -2,9 +2,9 @@ import { BrowserWindow } from "electron";
 import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, I18nMessage } from "../shared/ipc.js";
 import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
-import { launchOnVm, createPairingCodeOnRemote, hashForHost } from "./ssh-launch.js";
-import { openTunnel, closeTunnel, getTunnelId, findExistingTunnel } from "./ssh-tunnel.js";
-import { addEnvironment, addEndpoint, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint } from "./config-store.js";
+import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
+import { openTunnel, findExistingTunnel } from "./ssh-tunnel.js";
+import { addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint } from "./config-store.js";
 import { msg } from "./i18n.js";
 
 let wizardCancelled = false;
@@ -40,7 +40,6 @@ function emitProgress(progress: VmWizardProgress): void {
 }
 
 async function askConsent(
-  host: SshHost,
   prompt: I18nMessage,
   probe: VmWizardProbeResult,
 ): Promise<"install" | "skip"> {
@@ -104,7 +103,6 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   if (!probe.nodeFound) {
     const decision = await askConsent(
-      host,
       msg("vmWizard.mainConsentNodeNotFound"),
       probe,
     );
@@ -164,7 +162,6 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   if (probe.nodeVersion && probe.errorDetail) {
     const decision = await askConsent(
-      host,
       msg("vmWizard.mainConsentNodeOld", { detail: probe.errorDetail?.key ?? "" }),
       probe,
     );
@@ -261,7 +258,6 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   emitProgress({ step: "forwarding", message: msg("vmWizard.mainOpeningTunnel", { port: daemonPort }), probe, launch });
 
   const localPort = 18845;
-  const tunnelId = getTunnelId(host, daemonPort);
   const existing = findExistingTunnel(host, daemonPort);
 
   let tunnel;
@@ -325,7 +321,6 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   if (opencodePort) {
     const ocLocalPort = 23284;
-    const ocTunnelId = getTunnelId(host, opencodePort);
     const ocExisting = findExistingTunnel(host, opencodePort);
 
     if (ocExisting) {
