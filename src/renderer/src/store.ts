@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import type { Environment, OpenCodeEndpoint } from "./types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Environment, EnvironmentRole, OpenCodeEndpoint } from "./types";
 import { apiRequest, resolveBaseUrl } from "./api";
 
 async function probeUrl(url: string): Promise<boolean> {
@@ -16,6 +16,7 @@ async function probeUrl(url: string): Promise<boolean> {
 export function useEnvironments(): {
   environments: Environment[];
   selectedId: string | null;
+  mainVm: Environment | null;
   select: (id: string | null) => void;
   add: (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale") => Promise<Environment>;
   remove: (id: string) => void;
@@ -24,10 +25,13 @@ export function useEnvironments(): {
   setActiveEndpoint: (environmentId: string, endpointId: string) => void;
   removeSessionToken: (environmentId: string) => void;
   setOpenCodeEndpoint: (environmentId: string, url: string, password: string | null) => void;
+  setMainVm: (environmentId: string) => void;
 } {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  const mainVm = useMemo(() => environments.find((e) => e.role === "main-vm") ?? null, [environments]);
 
   useEffect(() => {
     if (!window.api) {
@@ -266,10 +270,31 @@ export function useEnvironments(): {
     [],
   );
 
+  const setMainVmFn = useCallback(
+    (environmentId: string) => {
+      if (window.api) {
+        void window.api.config.setMainVm(environmentId).then(async () => {
+          setEnvironments(await window.api.config.getEnvironments());
+        });
+      } else {
+        setEnvironments((prev) => {
+          const next = prev.map((env) => ({
+            ...env,
+            role: (env.id === environmentId ? "main-vm" : "coding") as EnvironmentRole,
+          }));
+          localStorage.setItem("lta.environments.v1", JSON.stringify(next));
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
   if (!loaded) {
     return {
       environments: [],
       selectedId: null,
+      mainVm: null,
       select,
       add,
       remove,
@@ -278,12 +303,14 @@ export function useEnvironments(): {
       setActiveEndpoint: setActiveEndpointFn,
       removeSessionToken: removeSessionTokenFn,
       setOpenCodeEndpoint: setOpenCodeEndpointFn,
+      setMainVm: setMainVmFn,
     };
   }
 
   return {
     environments,
     selectedId,
+    mainVm,
     select,
     add,
     remove,
@@ -292,5 +319,6 @@ export function useEnvironments(): {
     setActiveEndpoint: setActiveEndpointFn,
     removeSessionToken: removeSessionTokenFn,
     setOpenCodeEndpoint: setOpenCodeEndpointFn,
+    setMainVm: setMainVmFn,
   };
 }

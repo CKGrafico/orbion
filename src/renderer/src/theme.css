@@ -21,6 +21,7 @@
   --accent-hover: #bce47c;
   --accent-ink: #0d141f;
   --accent-task: #cf8dfb;
+  --accent-infra: #e8a24e;
   --chip-warm: #ffcc5c;
   --success: #a9d95c;
   --danger: #ff8484;
@@ -1795,4 +1796,103 @@ input {
 .question-freetext-submit:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── Infra chat panel ─────────────────────────────────────────────── */
+
+.infra-chat-panel {
+  border-top: 1px solid var(--border-subtle);
+  border-left: 3px solid #e8a24e;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  max-height: 50vh;
+  background: var(--bg-sidebar);
+}
+
+.infra-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #e8a24e;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.infra-chat-vm {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.infra-chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.infra-chat-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.infra-chat-empty p {
+  margin: 0;
+}
+
+.infra-user-avatar {
+  background: #e8a24e;
+  color: var(--bg-frame);
+}
+
+.infra-assistant-avatar {
+  background: #3d2e0a;
+  color: #e8a24e;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Pick main VM modal ───────────────────────────────────────────── */
+
+.pick-main-vm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pick-main-vm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 100%;
+}
+
+.pick-main-vm-item:hover {
+  background: var(--bg-hover);
+  border-color: #e8a24e;
+}
+
+.pick-main-vm-item .name {
+  font-weight: 500;
 }

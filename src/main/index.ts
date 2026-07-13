@@ -9,6 +9,8 @@ import type {
   StreamSubscribeArgs,
   OpenCodeConnectionStatus,
   OpenCodeEndpoint,
+  InfraActionArgs,
+  InfraActionResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import {
@@ -29,6 +31,11 @@ import {
   removeSessionToken,
   exchangePairingCode,
   setOpenCodeEndpoint,
+  setInfraOpenCodeEndpoint,
+  getMainVmId,
+  getMainVm,
+  setMainVm,
+  autoPromoteFirstEnvIfNeeded,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -408,6 +415,7 @@ app.whenReady().then(() => {
     if (fingerprint) {
       setEnvironmentFingerprintId(env.id, fingerprint.id);
     }
+    autoPromoteFirstEnvIfNeeded();
     const activeUrl = resolveActiveUrl(env.endpoints, env.activeEndpointId);
     if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
     syncEndpointTracker(env.id);
@@ -527,6 +535,80 @@ app.whenReady().then(() => {
     } else {
       clearOpenCodeStatus(environmentId);
     }
+  });
+
+  ipcMain.handle("config:setMainVm", (_event, environmentId: string) => {
+    setMainVm(environmentId);
+  });
+
+  ipcMain.handle("config:getMainVmId", () => getMainVmId());
+
+  ipcMain.handle("infra:executeAction", async (_event, args: InfraActionArgs): Promise<InfraActionResult> => {
+    const mainVmEnv = getMainVm();
+    if (!mainVmEnv) {
+      return { ok: false, error: "No main VM configured" };
+    }
+    const url = resolveActiveUrl(mainVmEnv.endpoints, mainVmEnv.activeEndpointId);
+    if (!url) {
+      return { ok: false, error: "Main VM has no active endpoint" };
+    }
+    const token = getSessionToken(mainVmEnv.id);
+
+    switch (args.action) {
+      case "machine-status": {
+        const envs = getEnvironments();
+        const results: Array<{ id: string; name: string; health: string; endpoints: Array<{ url: string; kind: string }> }> = [];
+        for (const env of envs) {
+          const supervisor = supervisors.get(env.id);
+          const phase = supervisor ? supervisor.getStatus().phase : "offline";
+          results.push({
+            id: env.id,
+            name: env.name,
+            health: phase,
+            endpoints: env.endpoints.map((ep) => ({ url: ep.url, kind: ep.kind })),
+          });
+        }
+        return { ok: true, data: results };
+      }
+      case "clone-repo": {
+        const repoUrl = args.params?.repoUrl as string | undefined;
+        const targetVmId = args.params?.targetVmId as string | undefined;
+        if (!repoUrl) {
+          return { ok: false, error: "repoUrl is required" };
+        }
+        const targetEnv = targetVmId
+          ? getEnvironments().find((e: Environment) => e.id === targetVmId)
+          : mainVmEnv;
+        if (!targetEnv) {
+          return { ok: false, error: "Target VM not found" };
+        }
+        const targetUrl = resolveActiveUrl(targetEnv.endpoints, targetEnv.activeEndpointId);
+        if (!targetUrl) {
+          return { ok: false, error: "Target VM has no active endpoint" };
+        }
+        const targetToken = getSessionToken(targetEnv.id);
+        const cloneResult = await handleApiRequest({
+          baseUrl: targetUrl,
+          path: "/api/repos/clone",
+          method: "POST",
+          body: { url: repoUrl },
+        });
+        if (!cloneResult.ok) {
+          return { ok: false, error: cloneResult.error ?? "Clone failed" };
+        }
+        return { ok: true, data: { vm: targetEnv.name, repoUrl, result: cloneResult.data } };
+      }
+      default:
+        return { ok: false, error: `Unknown infra action: ${args.action}` };
+    }
+  });
+
+  ipcMain.handle("infra:getStatus", () => {
+    const mainVm = getMainVm();
+    const mainVmId = getMainVmId();
+    const connected = mainVmId !== null && supervisors.has(mainVmId)
+      && supervisors.get(mainVmId)!.getStatus().phase === "connected";
+    return { mainVmId, connected };
   });
 
   seedSupervisors();

@@ -12,6 +12,8 @@ import { LoopDetail } from "./components/LoopDetail";
 import { TasksView } from "./components/TasksView";
 import { ProjectsView } from "./components/ProjectsView";
 import { Icon } from "./components/Icon";
+import { InfraChatPanel } from "./components/InfraChatPanel";
+import { PickMainVmModal } from "./components/PickMainVmModal";
 import { hostLabel, timeAgo } from "./format";
 import { TranscriptView } from "./chat/TranscriptView";
 import { generateMockSession, generateStreamingTurn } from "./chat/mock-session";
@@ -43,7 +45,7 @@ function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, select, add, remove, setActiveEndpoint, setOpenCodeEndpoint } = useEnvironments();
+  const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setOpenCodeEndpoint, setMainVm } = useEnvironments();
   const [section, setSection] = useState<Section>("loops");
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
@@ -51,6 +53,7 @@ export function App(): React.ReactNode {
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [repairEnvironmentId, setRepairEnvironmentId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [pickMainVmOpen, setPickMainVmOpen] = useState(false);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
   const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
@@ -242,12 +245,17 @@ export function App(): React.ReactNode {
   };
 
   const handleRemove = (id: string): void => {
+    const env = environments.find((e) => e.id === id);
+    const wasMainVm = env?.role === "main-vm";
     remove(id);
     setHealth((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
     });
+    if (wasMainVm && environments.filter((e) => e.id !== id).length > 0) {
+      setPickMainVmOpen(true);
+    }
   };
 
   const handleSetEndpoint = (environmentId: string, endpointId: string): void => {
@@ -327,6 +335,9 @@ export function App(): React.ReactNode {
               onRepair={handleRepair}
               onSetOpenCodeEndpoint={setOpenCodeEndpoint}
             />
+            {mainVm ? (
+              <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
+            ) : null}
           </aside>
         ) : null}
 
@@ -439,6 +450,17 @@ export function App(): React.ReactNode {
         <AddVmWizard
           onDone={handleVmWizardDone}
           onCancel={() => setVmWizardOpen(false)}
+        />
+      ) : null}
+
+      {pickMainVmOpen ? (
+        <PickMainVmModal
+          candidates={environments.filter((e) => e.role !== "main-vm")}
+          onPick={(id) => {
+            setMainVm(id);
+            setPickMainVmOpen(false);
+          }}
+          onSkip={() => setPickMainVmOpen(false)}
         />
       ) : null}
     </div>

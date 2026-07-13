@@ -41,6 +41,15 @@ const PATHS: Record<string, React.ReactNode> = {
     </>
   ),
   check: <path d="M4 8.5l3 3 5.5-7" />,
+  server: (
+    <>
+      <rect x="3" y="2.5" width="10" height="4" rx="1.5" />
+      <rect x="3" y="9.5" width="10" height="4" rx="1.5" />
+      <circle cx="5" cy="4.5" r="0.5" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="11.5" r="0.5" fill="currentColor" stroke="none" />
+    </>
+  ),
+  square: <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />,
 };
 
 export type IconName = keyof typeof PATHS;
