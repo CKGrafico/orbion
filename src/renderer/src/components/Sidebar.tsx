@@ -177,18 +177,23 @@ export function Sidebar(props: {
                   </span>
                 ) : null}
                 <span
-                  className="remove"
-                  role="button"
-                  title="Remove environment"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`Remove environment "${env.name}"?`)) {
-                      onRemove(env.id);
-                    }
-                  }}
-                >
-                  <Icon name="x" size={12} />
-                </span>
+                   className="remove"
+                   role="button"
+                   title="Remove environment"
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     if (window.confirm(`Remove environment "${env.name}"?`)) {
+                       onRemove(env.id);
+                     }
+                   }}
+                 >
+                   <Icon name="x" size={12} />
+                 </span>
+                 {env.role === "main-vm" ? (
+                   <span className="stat" style={{ fontSize: 9, color: "#e8a24e", marginRight: 2, fontWeight: 600 }}>
+                     main
+                   </span>
+                 ) : null}
               </button>
               {env.endpoints.length > 1 && env.id === selectedId ? (
                 <div style={{ paddingLeft: 12 }}>

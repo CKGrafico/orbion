@@ -14,6 +14,8 @@ import type {
   VmWizardProgress,
   VmWizardResult,
   SshHost,
+  InfraActionArgs,
+  InfraActionResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -57,6 +59,10 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:removeSessionToken", environmentId),
     setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) =>
       ipcRenderer.invoke("config:setOpenCodeEndpoint", environmentId, endpoint) as Promise<void>,
+    setMainVm: (environmentId: string) =>
+      ipcRenderer.invoke("config:setMainVm", environmentId) as Promise<void>,
+    getMainVmId: () =>
+      ipcRenderer.invoke("config:getMainVmId") as Promise<string | null>,
   },
 
   connection: {
@@ -139,6 +145,13 @@ const bridge: LoopTaskBridge = {
     },
     cancelWizard: () =>
       ipcRenderer.invoke("vmWizard:cancel") as Promise<void>,
+  },
+
+  infra: {
+    executeAction: (args: InfraActionArgs) =>
+      ipcRenderer.invoke("infra:executeAction", args) as Promise<InfraActionResult>,
+    getStatus: () =>
+      ipcRenderer.invoke("infra:getStatus") as Promise<{ mainVmId: string | null; connected: boolean }>,
   },
 };
 

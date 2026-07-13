@@ -60,13 +60,17 @@ export interface AccessEndpoint {
 
 export type EnvironmentAuthState = "unauthenticated" | "paired" | "blocked" | "unknown";
 
+export type EnvironmentRole = "coding" | "main-vm";
+
 export interface Environment {
   id: string;
   name: string;
+  role?: EnvironmentRole;
   endpoints: AccessEndpoint[];
   activeEndpointId: string | null;
   authState?: EnvironmentAuthState;
   opencode?: OpenCodeEndpoint | null;
+  infraOpenCode?: OpenCodeEndpoint | null;
 }
 
 export interface ConfigBridge {
@@ -82,6 +86,28 @@ export interface ConfigBridge {
   exchangePairingCode: (baseUrl: string, code: string, scope?: SessionScope) => Promise<PairingCodeExchangeResponse>;
   removeSessionToken: (environmentId: string) => Promise<void>;
   setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) => Promise<void>;
+  setMainVm: (environmentId: string) => Promise<void>;
+  getMainVmId: () => Promise<string | null>;
+}
+
+// ── Infra assistant ──────────────────────────────────────────────────
+
+export type InfraAction = "machine-status" | "clone-repo";
+
+export interface InfraActionArgs {
+  action: InfraAction;
+  params?: Record<string, unknown>;
+}
+
+export interface InfraActionResult {
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+}
+
+export interface InfraBridge {
+  executeAction: (args: InfraActionArgs) => Promise<InfraActionResult>;
+  getStatus: () => Promise<{ mainVmId: string | null; connected: boolean }>;
 }
 
 // ── Connection supervisor ─────────────────────────────────────────────
@@ -247,4 +273,5 @@ export interface LoopTaskBridge {
   opencode: OpenCodeBridge;
   tailscalePeers: () => Promise<TailscalePeersResponse>;
   vmWizard: VmWizardBridge;
+  infra: InfraBridge;
 }

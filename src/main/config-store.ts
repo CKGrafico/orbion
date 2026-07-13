@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint } from "../shared/ipc.js";
 
 interface LegacyInstance {
   id: string;
@@ -12,6 +12,8 @@ interface EnvironmentWithFingerprint extends Environment {
   fingerprintId?: string;
   authState?: EnvironmentAuthState;
   opencode?: OpenCodeEndpoint | null;
+  infraOpenCode?: OpenCodeEndpoint | null;
+  role?: EnvironmentRole;
 }
 
 interface EncryptedSessionToken {
@@ -265,6 +267,51 @@ export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEnd
   if (!env) return;
   env.opencode = endpoint;
   store.set("environments", envs);
+}
+
+export function setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
+  const envs = store.get("environments", []);
+  const env = envs.find((e) => e.id === environmentId);
+  if (!env) return;
+  env.infraOpenCode = endpoint;
+  store.set("environments", envs);
+}
+
+export function getMainVmId(): string | null {
+  ensureMigrated();
+  const envs = store.get("environments", []);
+  const mainVm = envs.find((e) => e.role === "main-vm");
+  return mainVm?.id ?? null;
+}
+
+export function getMainVm(): EnvironmentWithFingerprint | null {
+  ensureMigrated();
+  const envs = store.get("environments", []);
+  return envs.find((e) => e.role === "main-vm") ?? null;
+}
+
+export function setMainVm(environmentId: string): void {
+  const envs = store.get("environments", []);
+  for (const env of envs) {
+    if (env.role === "main-vm") {
+      env.role = "coding";
+    }
+  }
+  const target = envs.find((e) => e.id === environmentId);
+  if (target) {
+    target.role = "main-vm";
+  }
+  store.set("environments", envs);
+}
+
+export function autoPromoteFirstEnvIfNeeded(): void {
+  const envs = store.get("environments", []);
+  if (envs.length === 0) return;
+  const hasMainVm = envs.some((e) => e.role === "main-vm");
+  if (!hasMainVm) {
+    envs[0].role = "main-vm";
+    store.set("environments", envs);
+  }
 }
 
 export async function exchangePairingCode(
