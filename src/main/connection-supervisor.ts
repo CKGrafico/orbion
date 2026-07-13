@@ -30,7 +30,7 @@ const STABLE_MS = 30_000;
 const PROBE_TIMEOUT_MS = 5_000;
 const FINGERPRINT_TIMEOUT_MS = 3_000;
 
-function classifyError(
+export function classifyError(
   status: number,
   errorMessage: string | null,
 ): ErrorClass {
@@ -47,7 +47,7 @@ function classifyError(
   return "transient";
 }
 
-function isNetworkDownError(message: string): boolean {
+export function isNetworkDownError(message: string): boolean {
   const lower = message.toLowerCase();
   return (
     lower.includes("enetunreach") ||
@@ -75,6 +75,7 @@ export class ConnectionSupervisor {
   private stableCheckTimer: ReturnType<typeof setInterval> | null = null;
   private probeInFlight = false;
   private destroyed = false;
+  private osOffline = false;
 
   private readonly onChange: (status: ConnectionStatus) => void;
   private readonly probe: () => Promise<ProbeResult>;
@@ -98,8 +99,26 @@ export class ConnectionSupervisor {
     this.clearStableCheck();
   }
 
+  setOsOffline(value: boolean): void {
+    if (this.destroyed || this.osOffline === value) return;
+    this.osOffline = value;
+
+    if (value) {
+      this.clearRetryTimer();
+      if (this.phase !== "connected") {
+        this.connectedSince = null;
+        this.setPhase("offline");
+      }
+    } else {
+      if (this.phase !== "connected") {
+        this.scheduleConnect();
+      }
+    }
+  }
+
   wakeup(): void {
     if (this.destroyed) return;
+    if (this.osOffline) return;
 
     if (this.phase === "backoff") {
       this.clearRetryTimer();
@@ -124,6 +143,12 @@ export class ConnectionSupervisor {
 
   private scheduleConnect(): void {
     if (this.destroyed || this.probeInFlight) return;
+    if (this.osOffline) {
+      if (this.phase !== "offline") {
+        this.setPhase("offline");
+      }
+      return;
+    }
 
     this.setPhase("connecting");
     this.probeInFlight = true;
@@ -347,17 +372,21 @@ export function resolveActiveUrl(endpoints: AccessEndpoint[], activeEndpointId: 
   return endpoints[0].url;
 }
 
+interface EndpointHealthEntry {
+  lastError: string | null;
+  failureCount: number;
+  phase: ConnectionPhase;
+}
+
 export class EndpointHealthTracker {
-  private health = new Map<string, { lastError: string | null; failureCount: number }>();
+  private health = new Map<string, EndpointHealthEntry>();
   private supervisors = new Map<string, ConnectionSupervisor>();
-  private readonly environmentId: string;
   private readonly onHealthChange: (health: EndpointHealth[]) => void;
 
   constructor(
-    environmentId: string,
+    _environmentId: string,
     onHealthChange: (health: EndpointHealth[]) => void,
   ) {
-    this.environmentId = environmentId;
     this.onHealthChange = onHealthChange;
   }
 
@@ -381,6 +410,7 @@ export class EndpointHealthTracker {
             this.health.set(ep.id, {
               lastError: status.lastError,
               failureCount: status.failureCount,
+              phase: status.phase,
             });
             this.onHealthChange(this.getHealth());
           },
@@ -398,12 +428,24 @@ export class EndpointHealthTracker {
     for (const [id, h] of this.health) {
       result.push({
         endpointId: id,
-        phase: h.failureCount > 0 && h.lastError ? "backoff" : "connected",
+        phase: h.phase,
         lastError: h.lastError,
         failureCount: h.failureCount,
       });
     }
     return result;
+  }
+
+  setOsOffline(value: boolean): void {
+    for (const supervisor of this.supervisors.values()) {
+      supervisor.setOsOffline(value);
+    }
+  }
+
+  wakeup(): void {
+    for (const supervisor of this.supervisors.values()) {
+      supervisor.wakeup();
+    }
   }
 
   destroy(): void {

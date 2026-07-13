@@ -1,0 +1,6 @@
+- [x] Add `setOsOffline()` method to `ConnectionSupervisor` — skip probes when OS is offline
+- [x] Fix `EndpointHealthTracker` to use actual supervisor phase
+- [x] Propagate `osOffline` to all supervisors and trackers in main process
+- [x] Export `classifyError` and `isNetworkDownError` for testability
+- [x] Add 24 unit tests covering all acceptance criteria
+- [x] Typecheck passes (node config clean, web pre-existing unrelated)
