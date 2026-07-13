@@ -12,5 +12,5 @@ permission:
 
 ## Abilities
 - Guardrails: @ob-generic-guardrails, @project-guardrails
-- Development: @design-taste-frontend, @react-nextjs-patterns, @tailwind-v4-shadcn, @feature-sliced-design, @inversify-hooks, @web-i18n-next-intl
+- Development: @design-taste-frontend, @react-nextjs-patterns, @tailwind-v4-shadcn, @feature-sliced-design, @inversify-hooks, @web-i18n-next-intl, @humanizer
 - Testing: @typescript-eslint
