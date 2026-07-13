@@ -74,13 +74,14 @@ export function Sidebar(props: {
   openCodeStatus?: Record<string, OpenCodeConnectionStatus>;
   onSelect: (id: string) => void;
   onAdd: () => void;
+  onAddVm?: () => void;
   onRemove: (id: string) => void;
   onRetry?: (id: string) => void;
   onSetEndpoint?: (environmentId: string, endpointId: string) => void;
   onRepair?: (id: string) => void;
   onSetOpenCodeEndpoint?: (environmentId: string, url: string, password: string | null) => void;
 }): React.ReactNode {
-  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, onSelect, onAdd, onRemove, onRetry, onSetEndpoint, onRepair, onSetOpenCodeEndpoint } = props;
+  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, onSelect, onAdd, onAddVm, onRemove, onRetry, onSetEndpoint, onRepair, onSetOpenCodeEndpoint } = props;
 
   return (
     <div className="sidebar">
@@ -88,6 +89,13 @@ export function Sidebar(props: {
         <Icon name="plus" size={14} />
         <span>Add environment</span>
       </button>
+
+      {onAddVm ? (
+        <button className="sidebar-action" onClick={onAddVm} style={{ marginTop: 2 }}>
+          <Icon name="terminal" size={14} />
+          <span>Add VM wizard</span>
+        </button>
+      ) : null}
 
       <div className="sidebar-section">
         <span className="overline">Environments</span>

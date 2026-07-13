@@ -145,6 +145,81 @@ export interface OpenCodeEndpoint {
   password: string | null;
 }
 
+// ── Add-VM wizard ───────────────────────────────────────────────────
+
+export type VmWizardStep =
+  | "idle"
+  | "pick-target"
+  | "probing"
+  | "installing"
+  | "forwarding"
+  | "pairing"
+  | "done"
+  | "error";
+
+export interface SshHost {
+  host: string;
+  hostName: string;
+  user: string;
+  port: number;
+  identityFile?: string;
+  label: string;
+}
+
+export interface VmWizardProbeResult {
+  reachable: boolean;
+  authOk: boolean;
+  nodeFound: boolean;
+  nodeVersion: string | null;
+  daemonRunning: boolean;
+  daemonPort: number | null;
+  opencodeRunning: boolean;
+  opencodePort: number | null;
+  errorDetail: string | null;
+}
+
+export interface VmWizardLaunchResult {
+  started: boolean;
+  daemonPort: number | null;
+  opencodePort: number | null;
+  errorDetail: string | null;
+  logTail: string | null;
+}
+
+export interface VmWizardTunnelResult {
+  forwarded: boolean;
+  localPort: number | null;
+  errorDetail: string | null;
+}
+
+export interface VmWizardPairResult {
+  paired: boolean;
+  pairingCode: string | null;
+  errorDetail: string | null;
+}
+
+export interface VmWizardProgress {
+  step: VmWizardStep;
+  message: string;
+  probe?: VmWizardProbeResult | null;
+  launch?: VmWizardLaunchResult | null;
+  tunnel?: VmWizardTunnelResult | null;
+  pair?: VmWizardPairResult | null;
+}
+
+export interface VmWizardResult {
+  environmentId: string;
+  environmentName: string;
+  daemonUrl: string;
+}
+
+export interface VmWizardBridge {
+  listSshHosts: () => Promise<SshHost[]>;
+  startWizard: (target: string, name?: string) => Promise<VmWizardResult>;
+  onProgress: (cb: (progress: VmWizardProgress) => void) => () => void;
+  cancelWizard: () => void;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -171,4 +246,5 @@ export interface LoopTaskBridge {
   connection: ConnectionBridge;
   opencode: OpenCodeBridge;
   tailscalePeers: () => Promise<TailscalePeersResponse>;
+  vmWizard: VmWizardBridge;
 }

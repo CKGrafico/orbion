@@ -33,6 +33,14 @@ const PATHS: Record<string, React.ReactNode> = {
     </>
   ),
   chevronDown: <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />,
+  terminal: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="2" />
+      <path d="M5 7l2.5 2L5 11" />
+      <path d="M9 11h2.5" />
+    </>
+  ),
+  check: <path d="M4 8.5l3 3 5.5-7" />,
 };
 
 export type IconName = keyof typeof PATHS;

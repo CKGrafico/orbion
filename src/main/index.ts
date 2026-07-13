@@ -39,6 +39,8 @@ import {
 } from "./connection-supervisor.js";
 import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
+import { listSshHosts as vmListSshHosts, runWizard, cancelWizard } from "./vm-wizard.js";
+import type { VmWizardProgress } from "../shared/ipc.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -494,6 +496,16 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("tailscale:peers", () => fetchPeers());
+
+  ipcMain.handle("vmWizard:listSshHosts", () => vmListSshHosts());
+
+  ipcMain.handle("vmWizard:start", async (_event, target: string, name?: string) => {
+    return runWizard(target, name);
+  });
+
+  ipcMain.handle("vmWizard:cancel", () => {
+    cancelWizard();
+  });
 
   ipcMain.handle("opencode:getStatus", (_event, environmentId: string): OpenCodeConnectionStatus => {
     return getOpenCodeStatus(environmentId);

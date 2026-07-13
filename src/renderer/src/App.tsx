@@ -6,6 +6,7 @@ import { fetchLoops, isMock } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { SegmentedTabs } from "./components/SegmentedTabs";
 import { AddEnvironmentModal } from "./components/AddInstanceModal";
+import { AddVmWizard } from "./components/AddVmWizard";
 import { LoopsView } from "./components/LoopsView";
 import { LoopDetail } from "./components/LoopDetail";
 import { TasksView } from "./components/TasksView";
@@ -47,6 +48,7 @@ export function App(): React.ReactNode {
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [repairEnvironmentId, setRepairEnvironmentId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
@@ -257,6 +259,11 @@ export function App(): React.ReactNode {
     setModalOpen(true);
   };
 
+  const handleVmWizardDone = (_environmentId: string, _environmentName: string, _daemonUrl: string): void => {
+    setVmWizardOpen(false);
+    handleSelect(_environmentId);
+  };
+
   const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
   const goBack = (): void => setView({ kind: "list" });
 
@@ -313,6 +320,7 @@ export function App(): React.ReactNode {
               openCodeStatus={openCodeStatus}
               onSelect={handleSelect}
               onAdd={() => setModalOpen(true)}
+              onAddVm={() => setVmWizardOpen(true)}
               onRemove={handleRemove}
               onRetry={handleRetry}
               onSetEndpoint={handleSetEndpoint}
@@ -424,6 +432,13 @@ export function App(): React.ReactNode {
           onSubmit={handleAdd}
           onCancel={() => { setModalOpen(false); setRepairEnvironmentId(null); }}
           repairEnvironmentId={repairEnvironmentId}
+        />
+      ) : null}
+
+      {vmWizardOpen ? (
+        <AddVmWizard
+          onDone={handleVmWizardDone}
+          onCancel={() => setVmWizardOpen(false)}
         />
       ) : null}
     </div>

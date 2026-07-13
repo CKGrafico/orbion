@@ -11,6 +11,9 @@ import type {
   SessionScope,
   OpenCodeConnectionStatus,
   OpenCodeEndpoint,
+  VmWizardProgress,
+  VmWizardResult,
+  SshHost,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -115,6 +118,27 @@ const bridge: LoopTaskBridge = {
         ipcRenderer.removeListener("opencode:status", listener);
       };
     },
+  },
+
+  vmWizard: {
+    listSshHosts: () =>
+      ipcRenderer.invoke("vmWizard:listSshHosts") as Promise<SshHost[]>,
+    startWizard: (target: string, name?: string) =>
+      ipcRenderer.invoke("vmWizard:start", target, name) as Promise<VmWizardResult>,
+    onProgress: (cb: (progress: VmWizardProgress) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        progress: VmWizardProgress,
+      ): void => {
+        cb(progress);
+      };
+      ipcRenderer.on("vmWizard:progress", listener);
+      return () => {
+        ipcRenderer.removeListener("vmWizard:progress", listener);
+      };
+    },
+    cancelWizard: () =>
+      ipcRenderer.invoke("vmWizard:cancel") as Promise<void>,
   },
 };
 
