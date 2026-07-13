@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { useIntl } from "react-intl";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import type { ToolCall } from "./types";
@@ -27,6 +28,7 @@ function CodeBlock({
   className?: string;
   children?: React.ReactNode;
 }) {
+  const intl = useIntl();
   const [copied, setCopied] = useState(false);
   const lang = className?.replace("language-", "") ?? "";
   const codeStr = String(children).replace(/\n$/, "");
@@ -46,7 +48,7 @@ function CodeBlock({
       <div className="code-block-header">
         <span className="code-block-lang">{lang}</span>
         <button className="code-block-copy" onClick={handleCopy}>
-          {copied ? "Copied" : "Copy"}
+          {copied ? intl.formatMessage({ id: "chat.copied" }) : intl.formatMessage({ id: "chat.copy" })}
         </button>
       </div>
       <pre>
@@ -117,6 +119,7 @@ export function ToolCallRowView({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const intl = useIntl();
   const [copied, setCopied] = useState(false);
   const icon = KIND_ICONS[toolCall.kind] ?? "⚙️";
   const glyph = STATUS_GLYPHS[toolCall.status] ?? "·";
@@ -149,9 +152,9 @@ export function ToolCallRowView({
       {expanded && toolCall.output ? (
         <div className="tool-call-output">
           <div className="tool-call-output-header">
-            <span className="tool-call-output-label">Output</span>
+            <span className="tool-call-output-label">{intl.formatMessage({ id: "chat.output" })}</span>
             <button className="tool-call-copy" onClick={handleCopy}>
-              {copied ? "Copied" : "Copy"}
+              {copied ? intl.formatMessage({ id: "chat.copied" }) : intl.formatMessage({ id: "chat.copy" })}
             </button>
           </div>
           <pre>

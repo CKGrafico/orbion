@@ -1,7 +1,8 @@
+import { useIntl, type IntlShape } from "react-intl";
 import type { ConnectionStatus, EndpointHealth } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, AccessEndpoint, OpenCodeConnectionStatus, OpenCodeAuthState } from "../types";
 import type { FleetItemStatus } from "../fleet-status";
-import { Icon } from "./Icon";
+import { Terminal, RotateCw, X } from "lucide-react";
 import { StatusPill, UnreadDot } from "./StatusPill";
 import { hostLabel } from "../format";
 
@@ -26,38 +27,41 @@ const OPENCODE_AUTH_COLORS: Record<OpenCodeAuthState, string> = {
   unknown: "#64718c",
 };
 
-function openCodeStatusLabel(status: OpenCodeConnectionStatus): string {
-  if (status.errorKind === "version") return `OpenCode: ${status.errorMessage ?? "version too old"}`;
-  if (status.errorKind === "unreachable") return `OpenCode: unreachable`;
-  if (status.errorKind === "rejected") return `OpenCode: ${status.errorMessage ?? "rejected"}`;
+function openCodeStatusLabel(intl: IntlShape, status: OpenCodeConnectionStatus): string {
+  if (status.errorKind === "version") return intl.formatMessage({ id: "sidebar.ocVersionTooOld" }, { detail: status.errorMessage ?? "version too old" });
+  if (status.errorKind === "unreachable") return intl.formatMessage({ id: "sidebar.ocUnreachable" });
+  if (status.errorKind === "rejected") return intl.formatMessage({ id: "sidebar.ocRejected" }, { detail: status.errorMessage ?? "rejected" });
   switch (status.authState) {
-    case "authenticated": return `OpenCode: connected`;
-    case "unauthenticated": return "OpenCode: opencode auth login";
-    case "unknown": return "OpenCode: unknown";
+    case "authenticated": return intl.formatMessage({ id: "sidebar.ocConnected" });
+    case "unauthenticated": return intl.formatMessage({ id: "sidebar.ocAuthLogin" });
+    case "unknown": return intl.formatMessage({ id: "sidebar.ocUnknown" });
   }
 }
 
-const KIND_LABELS: Record<string, string> = {
-  direct: "Direct",
-  ssh: "SSH",
-  tailscale: "Tailscale",
-};
+function kindLabel(intl: IntlShape, kind: string): string {
+  switch (kind) {
+    case "direct": return intl.formatMessage({ id: "sidebar.kindDirect" });
+    case "ssh": return intl.formatMessage({ id: "sidebar.kindSsh" });
+    case "tailscale": return intl.formatMessage({ id: "sidebar.kindTailscale" });
+    default: return kind;
+  }
+}
 
-function healthTooltip(health: EnvironmentHealth, status?: ConnectionStatus | null): string {
+function healthTooltip(intl: IntlShape, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
   if (status) {
     switch (status.phase) {
-      case "connected": return "Connected";
-      case "connecting": return "Connecting…";
-      case "backoff": return `Retrying in ${Math.round(status.backoffMs / 1000)}s (${status.failureCount} failures)`;
-      case "blocked": return status.lastError ?? "Blocked";
-      case "offline": return status.lastError ?? "Offline — no network";
+      case "connected": return intl.formatMessage({ id: "sidebar.connected" });
+      case "connecting": return intl.formatMessage({ id: "sidebar.connecting" });
+      case "backoff": return intl.formatMessage({ id: "sidebar.retrying" }, { seconds: Math.round(status.backoffMs / 1000), failures: status.failureCount });
+      case "blocked": return status.lastError ?? intl.formatMessage({ id: "sidebar.blockedTooltip" });
+      case "offline": return status.lastError ?? intl.formatMessage({ id: "sidebar.offlineTooltip" });
     }
   }
   return health;
 }
 
-function endpointLabel(ep: AccessEndpoint): string {
-  return `${KIND_LABELS[ep.kind] ?? ep.kind}: ${hostLabel(ep.url)}`;
+function endpointLabel(intl: IntlShape, ep: AccessEndpoint): string {
+  return `${kindLabel(intl, ep.kind)}: ${hostLabel(ep.url)}`;
 }
 
 export function Sidebar(props: {
@@ -72,39 +76,30 @@ export function Sidebar(props: {
   mutedEnvs?: Set<string>;
   onToggleMute?: (environmentId: string) => void;
   onSelect: (id: string) => void;
-  onAdd: () => void;
   onAddVm?: () => void;
   onRemove: (id: string) => void;
   onRetry?: (id: string) => void;
   onSetEndpoint?: (environmentId: string, endpointId: string) => void;
-  onRepair?: (id: string) => void;
-  onSetOpenCodeEndpoint?: (environmentId: string, url: string, password: string | null) => void;
 }): React.ReactNode {
-  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, fleetStatus, unreadEnvs, mutedEnvs, onToggleMute, onSelect, onAdd, onAddVm, onRemove, onRetry, onSetEndpoint, onRepair } = props;
+  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, fleetStatus, unreadEnvs, mutedEnvs, onToggleMute, onSelect, onAddVm, onRemove, onRetry, onSetEndpoint } = props;
+  const intl = useIntl();
 
   return (
     <div className="sidebar">
-      <button className="sidebar-action" onClick={onAdd}>
-        <Icon name="plus" size={14} />
-        <span>Add environment</span>
+      <button className="sidebar-action" onClick={onAddVm}>
+        <Terminal size={14} />
+        <span>{intl.formatMessage({ id: "sidebar.addEnvironment" })}</span>
       </button>
 
-      {onAddVm ? (
-        <button className="sidebar-action" onClick={onAddVm} style={{ marginTop: 2 }}>
-          <Icon name="terminal" size={14} />
-          <span>Add VM wizard</span>
-        </button>
-      ) : null}
-
       <div className="sidebar-section">
-        <span className="overline">Environments</span>
+        <span className="overline">{intl.formatMessage({ id: "sidebar.environments" })}</span>
         <span className="overline">{environments.length || ""}</span>
       </div>
 
       <div className="sidebar-list">
         {environments.length === 0 ? (
           <div style={{ padding: "6px 10px", fontSize: 12.5, color: "var(--text-muted)" }}>
-            No environments yet
+            {intl.formatMessage({ id: "sidebar.noEnvironments" })}
           </div>
         ) : (
           environments.map((env) => {
@@ -123,7 +118,7 @@ export function Sidebar(props: {
               <button
                 className={`instance-item${env.id === selectedId ? " selected" : ""}`}
                 onClick={() => onSelect(env.id)}
-                title={healthTooltip(h, cs)}
+                title={healthTooltip(intl, h, cs)}
               >
                 <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
                   <span
@@ -136,25 +131,17 @@ export function Sidebar(props: {
                 {showPill ? <StatusPill status={fleetItem!} size="sm" /> : null}
                 {env.authState === "unauthenticated" ? (
                   <span className="stat" style={{ fontSize: 9, color: "var(--text-muted)", marginRight: 2, opacity: 0.7 }}>
-                    no auth
+                    {intl.formatMessage({ id: "sidebar.noAuth" })}
                   </span>
                 ) : null}
-                {env.authState === "blocked" && onRepair ? (
-                  <span
-                    className="repair-btn"
-                    role="button"
-                    title="Pair again"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRepair(env.id);
-                    }}
-                  >
-                    pair again
+                {env.authState === "blocked" ? (
+                  <span className="stat" style={{ fontSize: 9, color: "#e040e0", marginRight: 2 }}>
+                    {intl.formatMessage({ id: "sidebar.blocked" })}
                   </span>
                 ) : null}
                 {activeEp ? (
                   <span className="stat" style={{ fontSize: 10, color: "var(--text-muted)", marginRight: 2 }}>
-                    {KIND_LABELS[activeEp.kind] ?? activeEp.kind}
+                    {kindLabel(intl, activeEp.kind)}
                   </span>
                 ) : null}
                 {(() => {
@@ -164,9 +151,9 @@ export function Sidebar(props: {
                     <span
                       className="stat"
                       style={{ fontSize: 10, color: OPENCODE_AUTH_COLORS[ocStatus.authState], marginRight: 2 }}
-                      title={openCodeStatusLabel(ocStatus)}
+                      title={openCodeStatusLabel(intl, ocStatus)}
                     >
-                      oc:{ocStatus.authState === "authenticated" ? "ok" : ocStatus.authState === "unauthenticated" ? "auth" : "?"}
+                      oc:{ocStatus.authState === "authenticated" ? intl.formatMessage({ id: "sidebar.ocOk" }) : ocStatus.authState === "unauthenticated" ? intl.formatMessage({ id: "sidebar.ocAuth" }) : intl.formatMessage({ id: "sidebar.ocUnknownShort" })}
                     </span>
                   );
                 })()}
@@ -174,20 +161,20 @@ export function Sidebar(props: {
                   <span
                     className="remove"
                     role="button"
-                    title="Retry connection"
+                    title={intl.formatMessage({ id: "sidebar.retryConnection" })}
                     onClick={(e) => {
                       e.stopPropagation();
                       onRetry(env.id);
                     }}
                   >
-                    <Icon name="rotate" size={12} />
+                    <RotateCw size={12} />
                   </span>
                 ) : null}
                 {onToggleMute ? (
                   <span
                     className="remove"
                     role="button"
-                    title={isMuted ? "Unmute notifications" : "Mute notifications"}
+                    title={isMuted ? intl.formatMessage({ id: "sidebar.unmuteNotifications" }) : intl.formatMessage({ id: "sidebar.muteNotifications" })}
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleMute(env.id);
@@ -199,19 +186,19 @@ export function Sidebar(props: {
                 <span
                    className="remove"
                    role="button"
-                   title="Remove environment"
+                   title={intl.formatMessage({ id: "sidebar.removeEnvironment" })}
                    onClick={(e) => {
                      e.stopPropagation();
-                     if (window.confirm(`Remove environment "${env.name}"?`)) {
+                     if (window.confirm(intl.formatMessage({ id: "sidebar.removeConfirm" }, { name: env.name }))) {
                        onRemove(env.id);
                      }
                    }}
                  >
-                   <Icon name="x" size={12} />
+                   <X size={12} />
                  </span>
                  {env.role === "main-vm" ? (
                    <span className="stat" style={{ fontSize: 9, color: "#e8a24e", marginRight: 2, fontWeight: 600 }}>
-                     main
+                     {intl.formatMessage({ id: "sidebar.main" })}
                    </span>
                  ) : null}
               </button>
@@ -228,7 +215,7 @@ export function Sidebar(props: {
                         e.stopPropagation();
                         onSetEndpoint?.(env.id, ep.id);
                       }}
-                      title={epH?.lastError ? `${endpointLabel(ep)} — ${epH.lastError}` : endpointLabel(ep)}
+                      title={epH?.lastError ? `${endpointLabel(intl, ep)} — ${epH.lastError}` : endpointLabel(intl, ep)}
                     >
                       <span
                         className="dot"
@@ -238,10 +225,10 @@ export function Sidebar(props: {
                           height: 6,
                         }}
                       />
-                      <span className="name">{KIND_LABELS[ep.kind] ?? ep.kind}: {hostLabel(ep.url)}</span>
+                      <span className="name">{kindLabel(intl, ep.kind)}: {hostLabel(ep.url)}</span>
                       {epH && epH.failureCount > 0 ? (
                         <span className="stat" style={{ fontSize: 9, color: "var(--danger)", marginLeft: 4 }}>
-                          {epH.failureCount}err
+                          {intl.formatMessage({ id: "sidebar.errorsCount" }, { count: epH.failureCount })}
                         </span>
                       ) : null}
                     </button>
@@ -256,8 +243,8 @@ export function Sidebar(props: {
       </div>
 
       <div className="sidebar-footer">
-        <span className="avatar">OB</span>
-        <span>Orbion</span>
+        <span className="avatar">{intl.formatMessage({ id: "sidebar.orbionInitials" })}</span>
+        <span>{intl.formatMessage({ id: "sidebar.orbion" })}</span>
       </div>
     </div>
   );

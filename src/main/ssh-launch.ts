@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process";
 import crypto from "node:crypto";
 import type { SshHost, VmWizardLaunchResult } from "../shared/ipc.js";
 import { buildSshArgs } from "./ssh-config.js";
 import { sshExec } from "./ssh-probe.js";
+import { msg } from "./i18n.js";
 
 const DEFAULT_DAEMON_PORT = 8845;
 const DEFAULT_OPENCODE_PORT = 13284;
@@ -53,12 +53,12 @@ echo "Node: $NODE_BIN ($($NODE_BIN --version))"
 
 # Check if loop-task daemon is already running on the expected port
 DAEMON_PORT=__DAEMON_PORT__
-if ss -tlnp 2>/dev/null | grep -q ":''${DAEMON_PORT} "; then
-  EXISTING_PID="$(ss -tlnp 2>/dev/null | grep ":''${DAEMON_PORT} " | grep -oP 'pid=\\K[0-9]+' | head -1 || true)"
+if ss -tlnp 2>/dev/null | grep -q ":\${DAEMON_PORT} "; then
+  EXISTING_PID="$(ss -tlnp 2>/dev/null | grep ":\${DAEMON_PORT} " | grep -oP 'pid=\\K[0-9]+' | head -1 || true)"
   if [ -n "$EXISTING_PID" ] && [ -f "$LAUNCH_DIR/.managed" ]; then
-    echo "DAEMON_ALREADY_RUNNING|''${DAEMON_PORT}|''${EXISTING_PID}"
+    echo "DAEMON_ALREADY_RUNNING|\${DAEMON_PORT}|\${EXISTING_PID}"
   else
-    echo "DAEMON_PORT_BUSY|''${DAEMON_PORT}"
+    echo "DAEMON_PORT_BUSY|\${DAEMON_PORT}"
   fi
   # Skip daemon launch regardless — never kill/restart what we don't own
   DAEMON_SKIP=1
@@ -88,25 +88,25 @@ fi
 
 # Start loop-task daemon (bound to loopback)
 if [ -z "$DAEMON_SKIP" ]; then
-  echo "Starting loop-task daemon on port ''${DAEMON_PORT}..."
-  nohup loop-task serve --host 127.0.0.1 --port "''${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.log" 2>&1 &
+  echo "Starting loop-task daemon on port \${DAEMON_PORT}..."
+  nohup loop-task serve --host 127.0.0.1 --port "\${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.log" 2>&1 &
   DAEMON_PID=$!
   echo "$DAEMON_PID" > "$LAUNCH_DIR/daemon.pid"
-  echo "port=''${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.info"
-  echo "DAEMON_STARTED|''${DAEMON_PORT}|''${DAEMON_PID}"
+  echo "port=\${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.info"
+  echo "DAEMON_STARTED|\${DAEMON_PORT}|\${DAEMON_PID}"
 fi
 
 # Start opencode server (bound to loopback)
 OPENCODE_PORT=__OPENCODE_PORT__
-if ss -tlnp 2>/dev/null | grep -q ":''${OPENCODE_PORT} "; then
-  echo "OPENCODE_PORT_BUSY|''${OPENCODE_PORT}"
+if ss -tlnp 2>/dev/null | grep -q ":\${OPENCODE_PORT} "; then
+  echo "OPENCODE_PORT_BUSY|\${OPENCODE_PORT}"
 else
-  echo "Starting opencode server on port ''${OPENCODE_PORT}..."
-  nohup opencode serve --host 127.0.0.1 --port "''${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.log" 2>&1 &
+  echo "Starting opencode server on port \${OPENCODE_PORT}..."
+  nohup opencode serve --host 127.0.0.1 --port "\${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.log" 2>&1 &
   OPENCODE_PID=$!
   echo "$OPENCODE_PID" > "$LAUNCH_DIR/opencode.pid"
-  echo "port=''${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.info"
-  echo "OPENCODE_STARTED|''${OPENCODE_PORT}|''${OPENCODE_PID}"
+  echo "port=\${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.info"
+  echo "OPENCODE_STARTED|\${OPENCODE_PORT}|\${OPENCODE_PID}"
 fi
 
 echo "LAUNCH_DONE"
@@ -152,20 +152,20 @@ export async function launchOnVm(
     const tailScript = TAIL_LOG_SCRIPT.replace(/__HASH__/g, hash);
     const tailResult = await sshExec(host, tailScript);
     result.logTail = tailResult.stdout.trim() || null;
-    result.errorDetail = launchResult.stderr.trim() || `Launch script failed (exit ${launchResult.code})`;
+    result.errorDetail = msg("vmWizard.mainLaunchScriptFailed", { code: launchResult.code });
 
     for (const line of launchResult.stdout.split("\n")) {
       const trimmed = line.trim();
       if (trimmed === "INSTALL_NODE_FIRST") {
-        result.errorDetail = "Node.js not found on the VM. Install Node 18+ first.";
+        result.errorDetail = msg("vmWizard.mainNodeNotFoundOnVm");
       } else if (trimmed === "INSTALL_FAILED_LOOP_TASK") {
-        result.errorDetail = "Failed to install loop-task on the VM. Check the remote log for details.";
+        result.errorDetail = msg("vmWizard.mainInstallLoopTaskFailed");
       } else if (trimmed === "INSTALL_FAILED_OPENCODE") {
-        result.errorDetail = "Failed to install opencode on the VM. Check the remote log for details.";
+        result.errorDetail = msg("vmWizard.mainInstallOpenCodeFailed");
       } else if (trimmed.startsWith("DAEMON_PORT_BUSY|")) {
-        result.errorDetail = `Port ${daemonPort} is already in use by another process on the VM. The wizard will not restart a daemon it didn't start.`;
+        result.errorDetail = msg("vmWizard.mainDaemonPortBusy", { port: daemonPort });
       } else if (trimmed.startsWith("OPENCODE_PORT_BUSY|")) {
-        result.errorDetail = `Port ${opencodePort} is already in use by another process on the VM.`;
+        result.errorDetail = msg("vmWizard.mainOpenCodePortBusy", { port: opencodePort });
       }
     }
 

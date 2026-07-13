@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useIntl } from "react-intl";
 import type { AccessMode, ApprovalDecision, ApprovalRequest, ChatTurn, QuestionRequest } from "./types";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { QuestionPanel } from "./QuestionPanel";
-import { Icon } from "../components/Icon";
+import { Square, ArrowUp } from "lucide-react";
 
 interface ChatComposerProps {
   turns: ChatTurn[];
@@ -29,6 +30,7 @@ export function ChatComposer({
   drafts,
   onDraftChange,
 }: ChatComposerProps) {
+  const intl = useIntl();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localDraft, setLocalDraft] = useState("");
 
@@ -112,21 +114,23 @@ export function ChatComposer({
             <button
               className={`mode-chip ${accessMode === "supervised" ? "active" : ""}`}
               onClick={() => onAccessModeChange("supervised")}
-              title="Agent asks before commands and file changes"
+              title={intl.formatMessage({ id: "chat.supervisedTitle" })}
             >
-              Supervised
+              {intl.formatMessage({ id: "chat.supervised" })}
             </button>
             <button
               className={`mode-chip ${accessMode === "full" ? "active" : ""}`}
               onClick={() => onAccessModeChange("full")}
-              title="Agent runs without prompts"
+              title={intl.formatMessage({ id: "chat.fullAccessTitle" })}
             >
-              Full access
+              {intl.formatMessage({ id: "chat.fullAccess" })}
             </button>
           </div>
           <span className="spacer" />
           <span className={`composer-mode-indicator ${accessMode}`}>
-            {accessMode === "supervised" ? "Supervised" : "Full access"}
+            {accessMode === "supervised"
+              ? intl.formatMessage({ id: "chat.supervised" })
+              : intl.formatMessage({ id: "chat.fullAccess" })}
           </span>
         </div>
 
@@ -134,7 +138,7 @@ export function ChatComposer({
           <textarea
             ref={textareaRef}
             className="composer-textarea"
-            placeholder="Send a prompt…"
+            placeholder={intl.formatMessage({ id: "chat.sendPlaceholder" })}
             value={currentDraft}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
@@ -144,19 +148,19 @@ export function ChatComposer({
           {isRunning ? (
             <button
               className="composer-stop-btn"
-              title="Stop current turn"
+              title={intl.formatMessage({ id: "chat.stopTurn" })}
               onClick={() => activeTurnId && onInterrupt(activeTurnId)}
             >
-              <Icon name="square" size={12} />
+              <Square size={12} />
             </button>
           ) : (
             <button
               className="composer-send-btn"
-              title="Send prompt (Enter)"
+              title={intl.formatMessage({ id: "chat.sendPrompt" })}
               onClick={handleSend}
               disabled={!currentDraft.trim()}
             >
-              <Icon name="arrowUp" size={14} />
+              <ArrowUp size={14} />
             </button>
           )}
         </div>

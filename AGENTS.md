@@ -153,7 +153,28 @@ Every agent file declares an `## Abilities` section that maps roles to `@skill-n
 - Infrastructure: @ob-default
 ```
 
-`@ob-generic-guardrails` is mandatory in every agent's Guardrails line. Custom engineers replace `@ob-default` with real installed skills.
+`@ob-generic-guardrails` is mandatory in every agent's Guardrails line. `@humanizer` is mandatory in every agent's Development line. Custom engineers replace `@ob-default` with real installed skills.
+
+---
+
+## Humanizer, MANDATORY
+
+Every engineer already loads `@humanizer` via their Abilities. These rules apply to **all text the agent produces**: code comments, commit messages, PR descriptions, documentation, UI copy, user-facing strings.
+
+- **No em dashes (`—`) or en dashes (`–`).** This is a hard constraint, not "use sparingly." Replace with a period, comma, colon, parentheses, or restructure. Scan every output for `—` and `–` before returning it.
+- **No AI vocabulary.** Avoid: delve, tapestry, testament, underscore, vibrant, foster, pinnacle, intricate, landscape (abstract), pivotal, garner, showcase, boost, seamless, leverage, robust, cutting-edge, game-changer, revolutionize.
+- **No rule-of-three padding.** Don't force ideas into groups of three just to sound comprehensive.
+- **No promotional language.** Avoid "stunning," "breathtaking," "groundbreaking," "nestled," "rich heritage," "must-visit."
+- **No vague attributions.** Don't write "experts argue" or "industry reports suggest" without a source.
+- **No negative parallelisms.** Avoid "not only...but also," "it's not just X, it's Y," and tailing negations like "no guessing."
+- **No superficial -ing analyses.** Don't tack on "highlighting...", "emphasizing...", "reflecting..." to add fake depth.
+- **No false ranges.** Don't use "from X to Y" where X and Y aren't on a meaningful scale.
+- **Prefer active voice.** Rewrite "No config file needed" as "You don't need a config file."
+- **Use straight quotes** (`"..."`), not curly quotes (`"..."`).
+- **Don't overuse boldface.** Only bold when it genuinely helps scanning.
+- **No inline-header vertical lists.** Don't write `- **Label:** Description.` paragraphs; write prose.
+- **Sentence case in headings.** Not Title Case Every Word.
+- **No emojis** in any output unless the user explicitly requests them.
 
 ---
 
@@ -161,7 +182,7 @@ Every agent file declares an `## Abilities` section that maps roles to `@skill-n
 
 Skills live in `.agents/skills/`. Agents load them via `@skill-name` in their `## Abilities` section.
 
-Always installed: `@ob-default`, `@ob-generic-guardrails`, `@browser-automation`.
+Always installed: `@ob-default`, `@ob-generic-guardrails`, `@humanizer`, `@browser-automation`.
 
 <!-- OB-PLATFORM-SKILLS-GUIDE-START -->
 Platform skills (GitHub):

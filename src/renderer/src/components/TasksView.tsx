@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
+import { useIntl } from "react-intl";
 import type { Environment, TaskDefinition } from "../types";
 import { fetchTasks } from "../api";
 import { commandLine } from "../format";
-import { Icon } from "./Icon";
+import { List } from "lucide-react";
 
 export function TasksView(props: { instance: Environment; filter: string }): React.ReactNode {
   const { instance, filter } = props;
+  const intl = useIntl();
   const [tasks, setTasks] = useState<TaskDefinition[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -43,10 +45,10 @@ export function TasksView(props: { instance: Environment; filter: string }): Rea
       <div className="content-inner">
         <div className="empty">
           <span className="glyph">
-            <Icon name="list" size={30} strokeWidth={1.2} />
+            <List size={30} strokeWidth={1.2} />
           </span>
-          <h3>No tasks</h3>
-          <p>This environment has no reusable tasks yet.</p>
+          <h3>{intl.formatMessage({ id: "tasks.noTasks" })}</h3>
+          <p>{intl.formatMessage({ id: "tasks.noTasksDescription" })}</p>
         </div>
       </div>
     );
@@ -56,7 +58,7 @@ export function TasksView(props: { instance: Environment; filter: string }): Rea
     <div className="content-inner">
       <div className="card">
         <div className="card-header">
-          <span className="overline">Tasks ({tasks.length})</span>
+          <span className="overline">{intl.formatMessage({ id: "tasks.count" }, { count: tasks.length })}</span>
           <span className="spacer" />
         </div>
         <div className="card-body">
@@ -73,12 +75,12 @@ export function TasksView(props: { instance: Environment; filter: string }): Rea
                       {commandLine(task.command, task.commandArgs)}
                     </span>
                     {onOk ? (
-                      <span className="stat" title="on success" style={{ color: "var(--success)" }}>
+                      <span className="stat" title={intl.formatMessage({ id: "tasks.onSuccess" })} style={{ color: "var(--success)" }}>
                         ✓→{onOk}
                       </span>
                     ) : null}
                     {onFail ? (
-                      <span className="stat" title="on failure" style={{ color: "var(--danger)" }}>
+                      <span className="stat" title={intl.formatMessage({ id: "tasks.onFailure" })} style={{ color: "var(--danger)" }}>
                         ✗→{onFail}
                       </span>
                     ) : null}
@@ -87,7 +89,7 @@ export function TasksView(props: { instance: Environment; filter: string }): Rea
               );
             })}
             {q && visible.length === 0 ? (
-              <div className="row-empty">No tasks match "{filter}".</div>
+              <div className="row-empty">{intl.formatMessage({ id: "tasks.noMatch" }, { filter })}</div>
             ) : null}
           </div>
         </div>

@@ -180,8 +180,14 @@ export type VmWizardStep =
   | "installing"
   | "forwarding"
   | "pairing"
+  | "consent"
   | "done"
   | "error";
+
+export interface I18nMessage {
+  key: string;
+  params?: Record<string, string | number>;
+}
 
 export interface SshHost {
   host: string;
@@ -201,36 +207,37 @@ export interface VmWizardProbeResult {
   daemonPort: number | null;
   opencodeRunning: boolean;
   opencodePort: number | null;
-  errorDetail: string | null;
+  errorDetail: I18nMessage | null;
 }
 
 export interface VmWizardLaunchResult {
   started: boolean;
   daemonPort: number | null;
   opencodePort: number | null;
-  errorDetail: string | null;
+  errorDetail: I18nMessage | null;
   logTail: string | null;
 }
 
 export interface VmWizardTunnelResult {
   forwarded: boolean;
   localPort: number | null;
-  errorDetail: string | null;
+  errorDetail: I18nMessage | null;
 }
 
 export interface VmWizardPairResult {
   paired: boolean;
   pairingCode: string | null;
-  errorDetail: string | null;
+  errorDetail: I18nMessage | null;
 }
 
 export interface VmWizardProgress {
   step: VmWizardStep;
-  message: string;
+  message: I18nMessage;
   probe?: VmWizardProbeResult | null;
   launch?: VmWizardLaunchResult | null;
   tunnel?: VmWizardTunnelResult | null;
   pair?: VmWizardPairResult | null;
+  consentPrompt?: I18nMessage | null;
 }
 
 export interface VmWizardResult {
@@ -244,6 +251,7 @@ export interface VmWizardBridge {
   startWizard: (target: string, name?: string) => Promise<VmWizardResult>;
   onProgress: (cb: (progress: VmWizardProgress) => void) => () => void;
   cancelWizard: () => void;
+  respondConsent: (decision: "install" | "skip") => void;
 }
 
 // ── Full IPC bridge ─────────────────────────────────────────────────

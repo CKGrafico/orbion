@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { useIntl } from "react-intl";
 import type { Environment, LoopMeta, Project } from "../types";
 import { fetchProjects } from "../api";
-import { Icon } from "./Icon";
+import { Folder } from "lucide-react";
 
 export function ProjectsView(props: {
   instance: Environment;
@@ -9,6 +10,7 @@ export function ProjectsView(props: {
   filter: string;
 }): React.ReactNode {
   const { instance, loops, filter } = props;
+  const intl = useIntl();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -40,10 +42,10 @@ export function ProjectsView(props: {
       <div className="content-inner">
         <div className="empty">
           <span className="glyph">
-            <Icon name="folder" size={30} strokeWidth={1.2} />
+            <Folder size={30} strokeWidth={1.2} />
           </span>
-          <h3>No projects</h3>
-          <p>This environment has no projects yet.</p>
+          <h3>{intl.formatMessage({ id: "projects.noProjects" })}</h3>
+          <p>{intl.formatMessage({ id: "projects.noProjectsDescription" })}</p>
         </div>
       </div>
     );
@@ -53,7 +55,7 @@ export function ProjectsView(props: {
     <div className="content-inner">
       <div className="card">
         <div className="card-header">
-          <span className="overline">Projects ({projects.length})</span>
+          <span className="overline">{intl.formatMessage({ id: "projects.count" }, { count: projects.length })}</span>
           <span className="spacer" />
         </div>
         <div className="card-body">
@@ -63,14 +65,14 @@ export function ProjectsView(props: {
                 <span className="dot" style={{ background: project.color }} />
                 <span className="desc">{project.name}</span>
                 <span className="right">
-                  {project.isSystem ? <span className="overline">system</span> : null}
-                  <span className="stat">×{loopCount(project.id)} loops</span>
+                  {project.isSystem ? <span className="overline">{intl.formatMessage({ id: "projects.system" })}</span> : null}
+                  <span className="stat">{intl.formatMessage({ id: "projects.loopsCount" }, { count: loopCount(project.id) })}</span>
                   <span className="when">{project.createdAt.slice(0, 10)}</span>
                 </span>
               </div>
             ))}
             {q && visible.length === 0 ? (
-              <div className="row-empty">No projects match "{filter}".</div>
+              <div className="row-empty">{intl.formatMessage({ id: "projects.noMatch" }, { filter })}</div>
             ) : null}
           </div>
         </div>

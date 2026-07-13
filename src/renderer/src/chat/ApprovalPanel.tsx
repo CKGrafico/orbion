@@ -1,4 +1,5 @@
 import React, { useCallback } from "react";
+import { useIntl } from "react-intl";
 import type { ApprovalRequest, ApprovalDecision } from "./types";
 
 interface ApprovalPanelProps {
@@ -6,14 +7,15 @@ interface ApprovalPanelProps {
   onDecision: (approvalId: string, decision: ApprovalDecision) => void;
 }
 
-const DECISION_CONFIG: Array<{ value: ApprovalDecision; label: string; className: string }> = [
-  { value: "approve-once", label: "Approve once", className: "approval-btn approve" },
-  { value: "approve-always", label: "Always allow", className: "approval-btn always" },
-  { value: "decline", label: "Decline", className: "approval-btn decline" },
-  { value: "cancel", label: "Cancel turn", className: "approval-btn cancel" },
+const DECISION_CONFIG: Array<{ value: ApprovalDecision; labelKey: string; className: string }> = [
+  { value: "approve-once", labelKey: "chat.approveOnce", className: "approval-btn approve" },
+  { value: "approve-always", labelKey: "chat.alwaysAllow", className: "approval-btn always" },
+  { value: "decline", labelKey: "chat.decline", className: "approval-btn decline" },
+  { value: "cancel", labelKey: "chat.cancelTurn", className: "approval-btn cancel" },
 ];
 
 export function ApprovalPanel({ approval, onDecision }: ApprovalPanelProps) {
+  const intl = useIntl();
   const handleDecision = useCallback(
     (decision: ApprovalDecision) => {
       onDecision(approval.id, decision);
@@ -25,7 +27,7 @@ export function ApprovalPanel({ approval, onDecision }: ApprovalPanelProps) {
     <div className="approval-panel">
       <div className="approval-header">
         <span className="approval-icon">⚠</span>
-        <span className="approval-title">Approval required</span>
+        <span className="approval-title">{intl.formatMessage({ id: "chat.approvalRequired" })}</span>
       </div>
       <div className="approval-body">
         <span className="approval-description">{approval.description}</span>
@@ -43,7 +45,7 @@ export function ApprovalPanel({ approval, onDecision }: ApprovalPanelProps) {
             className={cfg.className}
             onClick={() => handleDecision(cfg.value)}
           >
-            {cfg.label}
+            {intl.formatMessage({ id: cfg.labelKey })}
           </button>
         ))}
       </div>

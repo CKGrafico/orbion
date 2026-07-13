@@ -1,3 +1,5 @@
+import { standaloneIntl } from "./i18n";
+
 export type FleetItemStatus =
   | "pending-approval"
   | "awaiting-input"
@@ -19,14 +21,18 @@ export const PRIORITY_RANK: Record<FleetItemStatus, number> = Object.fromEntries
   PRIORITY_ORDER.map((s, i) => [s, i]),
 ) as Record<FleetItemStatus, number>;
 
-export const PILL_LABELS: Record<FleetItemStatus, string> = {
-  "pending-approval": "approval",
-  "awaiting-input": "input",
-  working: "working",
-  completed: "done",
-  failed: "failed",
-  idle: "idle",
+const PILL_LABEL_KEYS: Record<FleetItemStatus, string> = {
+  "pending-approval": "fleet.approval",
+  "awaiting-input": "fleet.input",
+  working: "fleet.working",
+  completed: "fleet.done",
+  failed: "fleet.failed",
+  idle: "fleet.idle",
 };
+
+export function getPillLabel(status: FleetItemStatus): string {
+  return standaloneIntl.formatMessage({ id: PILL_LABEL_KEYS[status] });
+}
 
 export const PILL_COLORS: Record<FleetItemStatus, string> = {
   "pending-approval": "#ff8484",

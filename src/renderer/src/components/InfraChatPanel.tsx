@@ -1,10 +1,11 @@
 import React, { useCallback, useRef, useState } from "react";
+import { useIntl, type IntlShape } from "react-intl";
 import type { ChatTurn, AccessMode } from "../types";
 import type { InfraActionArgs } from "../../../shared/ipc";
 import { useTranscript } from "../chat/useTranscript";
 import { MarkdownContent } from "../chat/MarkdownContent";
 import { ChatComposer } from "../chat/ChatComposer";
-import { Icon } from "./Icon";
+import { Server } from "lucide-react";
 import type { ApprovalDecision, ApprovalRequest, QuestionRequest } from "../chat/types";
 
 interface InfraChatPanelProps {
@@ -12,9 +13,9 @@ interface InfraChatPanelProps {
   mainVmName: string;
 }
 
-function formatMachineStatusReport(data: unknown): string {
-  if (!Array.isArray(data)) return "No machine data available.";
-  const lines: string[] = ["## Fleet Status\n"];
+function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
+  if (!Array.isArray(data)) return intl.formatMessage({ id: "infra.noData" });
+  const lines: string[] = [`## ${intl.formatMessage({ id: "infra.fleetStatusHeader" })}\n`];
   for (const machine of data as Array<{ id: string; name: string; health: string; endpoints: Array<{ url: string; kind: string }> }>) {
     const icon = machine.health === "connected" ? "🟢" : machine.health === "offline" ? "🔴" : "🟡";
     lines.push(`**${machine.name}** ${icon} \`${machine.health}\``);
@@ -27,6 +28,7 @@ function formatMachineStatusReport(data: unknown): string {
 }
 
 export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): React.ReactNode {
+  const intl = useIntl();
   const {
     turns,
     rows,
@@ -91,14 +93,14 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           let responseText: string;
           if (result.ok) {
             if (action!.action === "machine-status") {
-              responseText = formatMachineStatusReport(result.data);
+              responseText = formatMachineStatusReport(intl, result.data);
             } else if (action!.action === "clone-repo") {
-              responseText = `## Clone initiated\n\n${JSON.stringify(result.data, null, 2)}`;
+              responseText = intl.formatMessage({ id: "infra.cloneInitiated" }, { data: JSON.stringify(result.data, null, 2) });
             } else {
               responseText = JSON.stringify(result.data, null, 2);
             }
           } else {
-            responseText = `**Error:** ${result.error ?? "Unknown error"}`;
+            responseText = intl.formatMessage({ id: "infra.errorMessage" }, { detail: result.error ?? intl.formatMessage({ id: "infra.unknownError" }) });
           }
           appendAssistantContent(turnId, responseText);
           finishTurn(turnId);
@@ -106,8 +108,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         });
       } else {
         const fallback = action
-          ? "Unable to reach the infrastructure runtime. Check that the main VM is connected."
-          : "I can help you with fleet operations. Try:\n- **machine-status** — get the health of all VMs\n- **clone repo** — clone a git repository on a VM";
+          ? intl.formatMessage({ id: "infra.unreachable" })
+          : intl.formatMessage({ id: "infra.helpText" });
         let idx = 0;
         const interval = setInterval(() => {
           const chunkSize = Math.floor(Math.random() * 6) + 3;
@@ -122,7 +124,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         }, 30);
       }
     },
-    [accessMode, addTurn, appendAssistantContent, finishTurn],
+    [intl, accessMode, addTurn, appendAssistantContent, finishTurn],
   );
 
   const handleInterrupt = useCallback(
@@ -168,15 +170,15 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   return (
     <div className="infra-chat-panel">
       <div className="infra-chat-title">
-        <Icon name="server" size={14} />
-        <span>Infrastructure</span>
+        <Server size={14} />
+        <span>{intl.formatMessage({ id: "infra.title" })}</span>
         <span className="infra-chat-vm">{mainVmName}</span>
       </div>
 
       <div className="infra-chat-scroll" ref={scrollRef}>
         {rows.length === 0 ? (
           <div className="infra-chat-empty">
-            <p>Ask about your fleet — machine status, clone repos, manage services.</p>
+            <p>{intl.formatMessage({ id: "infra.description" })}</p>
           </div>
         ) : (
           rows.map((row) => {
@@ -184,7 +186,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               case "user-message":
                 return (
                   <div key={row.id} className="transcript-user-msg">
-                    <div className="transcript-avatar infra-user-avatar">U</div>
+                    <div className="transcript-avatar infra-user-avatar">{intl.formatMessage({ id: "infra.userInitials" })}</div>
                     <div className="transcript-msg-body">
                       <MarkdownContent content={row.content} />
                     </div>
@@ -193,7 +195,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               case "assistant-message":
                 return (
                   <div key={row.id} className="transcript-assistant-msg">
-                    <div className="transcript-avatar infra-assistant-avatar">INF</div>
+                    <div className="transcript-avatar infra-assistant-avatar">{intl.formatMessage({ id: "infra.botInitials" })}</div>
                     <div className="transcript-msg-body">
                       <MarkdownContent content={row.content} streaming={row.streaming} />
                     </div>

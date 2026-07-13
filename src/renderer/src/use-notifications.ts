@@ -1,5 +1,6 @@
 import type { FleetItemStatus } from "./fleet-status";
 import { isNotifiableStatus } from "./fleet-status";
+import { standaloneIntl } from "./i18n";
 
 export interface NotificationOptions {
   environmentId: string;
@@ -51,7 +52,12 @@ function fireNotification(
   opts: NotificationOptions,
   onFocusItem?: (environmentId: string, itemId: string, itemType: "thread" | "loop") => void,
 ): void {
-  const n = new Notification(`[${opts.environmentName}] ${opts.itemType} needs attention`, {
+  const n = new Notification(
+    standaloneIntl.formatMessage(
+      { id: "app.notificationItemNeedsAttention" },
+      { envName: opts.environmentName, itemType: opts.itemType },
+    ),
+    {
     body: opts.message,
     tag: `${opts.environmentId}:${opts.itemId}`,
   });

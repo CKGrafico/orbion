@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useIntl } from "react-intl";
 import type { Environment, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil } from "../format";
 import { LogViewer } from "./LogViewer";
-import { Icon } from "./Icon";
+import { ArrowLeft } from "lucide-react";
 
 export function LoopDetail(props: {
   instance: Environment;
@@ -12,6 +13,7 @@ export function LoopDetail(props: {
   onBack: () => void;
 }): React.ReactNode {
   const { instance, loopId, initial, onBack } = props;
+  const intl = useIntl();
   const [loop, setLoop] = useState<LoopMeta | null>(initial);
 
   useEffect(() => {
@@ -35,8 +37,8 @@ export function LoopDetail(props: {
   return (
     <div className="content-inner">
       <div className="detail-header">
-        <button className="icon-btn" title="Back to loops" onClick={onBack}>
-          <Icon name="arrowLeft" size={15} />
+        <button className="icon-btn" title={intl.formatMessage({ id: "loopDetail.backToLoops" })} onClick={onBack}>
+          <ArrowLeft size={15} />
         </button>
         <span className="detail-title">{title}</span>
         {loop ? (
@@ -52,21 +54,21 @@ export function LoopDetail(props: {
       {loop ? (
         <div className="card">
           <div className="card-header">
-            <span className="overline">Overview</span>
+            <span className="overline">{intl.formatMessage({ id: "loopDetail.overview" })}</span>
             <span className="spacer" />
             <span className="card-stat">{loop.id}</span>
           </div>
           <div className="meta-grid">
             <div className="meta-item">
-              <div className="label">Interval</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.interval" })}</div>
               <div className="value">{loop.intervalHuman}</div>
             </div>
             <div className="meta-item">
-              <div className="label">Next run</div>
-              <div className="value">{loop.nextRunAt ? timeUntil(loop.nextRunAt) : "—"}</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.nextRun" })}</div>
+              <div className="value">{loop.nextRunAt ? timeUntil(loop.nextRunAt) : intl.formatMessage({ id: "loopDetail.emptyValue" })}</div>
             </div>
             <div className="meta-item">
-              <div className="label">Last run</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.lastRun" })}</div>
               <div className="value">{timeAgo(loop.lastRunAt)}</div>
             </div>
             <div className="meta-item">

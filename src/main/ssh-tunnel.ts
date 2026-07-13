@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { SshHost, VmWizardTunnelResult } from "../shared/ipc.js";
 import { buildSshArgs } from "./ssh-config.js";
+import { msg } from "./i18n.js";
 
 const TUNNEL_CONNECT_TIMEOUT_MS = 15_000;
 
@@ -82,7 +83,7 @@ export function openTunnel(
           resolve({
             forwarded: false,
             localPort: null,
-            errorDetail: "SSH tunnel auth failed. Check your key or password.",
+            errorDetail: msg("vmWizard.mainTunnelAuthFailed"),
           });
         } else if (lower.includes("channel_setup") || lower.includes("forwarding")) {
           resolved = true;
@@ -91,7 +92,7 @@ export function openTunnel(
           resolve({
             forwarded: false,
             localPort: null,
-            errorDetail: `Tunnel forwarding failed: ${stderrBuf.trim()}`,
+            errorDetail: msg("vmWizard.mainTunnelForwardingFailed", { detail: stderrBuf.trim() }),
           });
         }
       }
@@ -104,7 +105,7 @@ export function openTunnel(
         resolve({
           forwarded: false,
           localPort: null,
-          errorDetail: `Failed to start SSH tunnel: ${err.message}`,
+          errorDetail: msg("vmWizard.mainTunnelStartFailed", { detail: err.message }),
         });
       }
     });
@@ -117,7 +118,7 @@ export function openTunnel(
         resolve({
           forwarded: false,
           localPort: null,
-          errorDetail: `SSH tunnel exited with code ${code}. ${stderrBuf.trim()}`,
+          errorDetail: msg("vmWizard.mainTunnelExited", { code: code ?? -1, detail: stderrBuf.trim() }),
         });
       }
     });

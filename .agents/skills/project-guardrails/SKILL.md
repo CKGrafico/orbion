@@ -77,6 +77,10 @@ HTTP + SSE. It is **read-only** in v1.
   properties / design tokens defined in `DESIGN.md` / `theme.css`
   (`var(--accent)`, `STATUS_COLORS`, etc.). Loop status colors must stay matched
   to the loop-task TUI palette.
+- **[enforced] Use lucide-react for all icons.** No custom SVG icon components.
+  Import named icons directly from `lucide-react` (e.g.
+  `import { Search } from "lucide-react"`). Use the `@suggest-lucide-icons`
+  skill to find the right icon name when unsure.
 - **[target] No magic strings for user-facing text.** All UI copy goes through
   i18n keys via `@web-i18n-next-intl` (next-intl). English is the only locale
   for now, but strings still MUST be keyed — never hardcode display text in JSX.
@@ -159,8 +163,8 @@ HTTP + SSE. It is **read-only** in v1.
   an explicit, reviewed upgrade.
 - **[target] Additional agent skills are provided via the `npx-skills` provider.**
   The team stack references `@react-nextjs-patterns`, `@tailwind-shadcn`,
-  `@feature-sliced-design`, `@inversify-hooks`,
-  `@web-i18n-next-intl`, and `@typescript-eslint` — install them before relying
+  `@feature-sliced-design`, `@inversify-hooks`, `@web-i18n-next-intl`,
+  `@suggest-lucide-icons`, and `@typescript-eslint` — install them before relying
   on their guidance.
 
 ## Git Workflow

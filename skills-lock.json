@@ -181,6 +181,12 @@
       "skillPath": "team-agents/skills/react-nextjs-patterns/SKILL.md",
       "computedHash": "facf696c55d45d3b6dc974400c6c4a469abedfe1f76476112d3bf538b53064ea"
     },
+    "suggest-lucide-icons": {
+      "source": "nweii/agent-stuff",
+      "sourceType": "github",
+      "skillPath": "skills/suggest-lucide-icons/SKILL.md",
+      "computedHash": "b901f87f7b6616c6610f071e59139bca4c6cffd8559d538bcb5541d74e3fc911"
+    },
     "tailwind-v4-shadcn": {
       "source": "secondsky/claude-skills",
       "sourceType": "github",

@@ -1,12 +1,14 @@
 import { BrowserWindow } from "electron";
-import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult } from "../shared/ipc.js";
+import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, I18nMessage } from "../shared/ipc.js";
 import { listSshHosts, parseTarget } from "./ssh-config.js";
-import { probeVm } from "./ssh-probe.js";
+import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote, hashForHost } from "./ssh-launch.js";
 import { openTunnel, closeTunnel, getTunnelId, findExistingTunnel } from "./ssh-tunnel.js";
 import { addEnvironment, addEndpoint, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint } from "./config-store.js";
+import { msg } from "./i18n.js";
 
 let wizardCancelled = false;
+let consentResolver: ((decision: "install" | "skip") => void) | null = null;
 
 export function cancelWizard(): void {
   wizardCancelled = true;
@@ -18,6 +20,14 @@ export function isWizardCancelled(): boolean {
 
 export function resetWizardState(): void {
   wizardCancelled = false;
+  consentResolver = null;
+}
+
+export function respondConsent(decision: "install" | "skip"): void {
+  if (consentResolver) {
+    consentResolver(decision);
+    consentResolver = null;
+  }
 }
 
 export { listSshHosts };
@@ -27,6 +37,29 @@ function emitProgress(progress: VmWizardProgress): void {
   if (win && !win.isDestroyed()) {
     win.webContents.send("vmWizard:progress", progress);
   }
+}
+
+async function askConsent(
+  host: SshHost,
+  prompt: I18nMessage,
+  probe: VmWizardProbeResult,
+): Promise<"install" | "skip"> {
+  emitProgress({
+    step: "consent",
+    message: prompt,
+    probe,
+    consentPrompt: prompt,
+  });
+
+  const decision = await new Promise<"install" | "skip">((resolve) => {
+    consentResolver = resolve;
+  });
+
+  if (wizardCancelled) {
+    throw new Error("vmWizard.mainCancelled");
+  }
+
+  return decision;
 }
 
 export async function runWizard(target: string, name?: string): Promise<VmWizardResult> {
@@ -41,59 +74,161 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   if (!host) {
     emitProgress({
       step: "error",
-      message: `Invalid target "${target}". Use user@host format or a known SSH alias.`,
+      message: msg("vmWizard.mainInvalidTarget", { target }),
       probe: null,
     });
-    throw new Error(`Invalid target "${target}"`);
+    throw new Error("vmWizard.mainInvalidTarget");
   }
 
   const envName = name ?? host.hostName ?? host.host;
 
   // Step 1: Probe
-  emitProgress({ step: "probing", message: `Probing ${host.label}…` });
+  emitProgress({ step: "probing", message: msg("vmWizard.mainProbing", { label: host.label }) });
 
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: "Wizard cancelled." });
-    throw new Error("Cancelled");
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    throw new Error("vmWizard.mainCancelled");
   }
 
   const probe = await probeVm(host);
-  emitProgress({ step: "probing", message: "Probe complete.", probe });
+  emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe });
 
   if (!probe.reachable || !probe.authOk) {
     emitProgress({
       step: "error",
-      message: probe.errorDetail ?? "Cannot reach the target VM.",
+      message: probe.errorDetail ?? msg("vmWizard.mainCannotReach"),
       probe,
     });
-    throw new Error(probe.errorDetail ?? "Cannot reach the target VM.");
+    throw new Error("vmWizard.mainCannotReach");
   }
 
   if (!probe.nodeFound) {
+    const decision = await askConsent(
+      host,
+      msg("vmWizard.mainConsentNodeNotFound"),
+      probe,
+    );
+
+    if (decision === "skip") {
+      emitProgress({
+        step: "error",
+        message: msg("vmWizard.mainNodeNotFoundFinal"),
+        probe,
+      });
+      throw new Error("vmWizard.mainNodeNotFoundFinal");
+    }
+
+    emitProgress({ step: "installing", message: msg("vmWizard.mainInstallingMise"), probe });
+
+    const miseResult = await installNodeViaMise(host);
+
+    if (!miseResult.success) {
+      emitProgress({
+        step: "error",
+        message: miseResult.errorDetail ?? msg("vmWizard.mainMiseFailed"),
+        probe,
+      });
+      throw new Error("vmWizard.mainMiseFailed");
+    }
+
     emitProgress({
-      step: "error",
-      message: "Node.js not found on the VM. Install Node 18+ before running the wizard.",
+      step: "probing",
+      message: msg("vmWizard.mainNodeInstalledReprobing", { version: miseResult.nodeVersion ?? "" }),
       probe,
     });
-    throw new Error("Node.js not found on the VM.");
+
+    const reprobe = await probeVm(host);
+
+    if (!reprobe.nodeFound) {
+      emitProgress({
+        step: "error",
+        message: msg("vmWizard.mainMiseNodeStillMissing"),
+        probe: reprobe,
+      });
+      throw new Error("vmWizard.mainNodeStillNotFoundAfterMise");
+    }
+
+    if (reprobe.nodeVersion && reprobe.errorDetail) {
+      emitProgress({
+        step: "error",
+        message: reprobe.errorDetail,
+        probe: reprobe,
+      });
+      throw new Error("vmWizard.mainNodeStillNotFoundAfterMise");
+    }
+
+    probe.nodeFound = true;
+    probe.nodeVersion = reprobe.nodeVersion;
+    emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe: reprobe });
   }
 
   if (probe.nodeVersion && probe.errorDetail) {
+    const decision = await askConsent(
+      host,
+      msg("vmWizard.mainConsentNodeOld", { detail: probe.errorDetail?.key ?? "" }),
+      probe,
+    );
+
+    if (decision === "skip") {
+      emitProgress({
+        step: "error",
+        message: probe.errorDetail,
+        probe,
+      });
+      throw new Error("vmWizard.mainConsentNodeOld");
+    }
+
+    emitProgress({ step: "installing", message: msg("vmWizard.mainUpgradingViaMise"), probe });
+
+    const miseResult = await installNodeViaMise(host);
+
+    if (!miseResult.success) {
+      emitProgress({
+        step: "error",
+        message: miseResult.errorDetail ?? msg("vmWizard.mainMiseUpgradeFailed"),
+        probe,
+      });
+      throw new Error("vmWizard.mainMiseUpgradeFailed");
+    }
+
     emitProgress({
-      step: "error",
-      message: probe.errorDetail,
+      step: "probing",
+      message: msg("vmWizard.mainNodeInstalledReprobing", { version: miseResult.nodeVersion ?? "" }),
       probe,
     });
-    throw new Error(probe.errorDetail);
+
+    const reprobe = await probeVm(host);
+
+    if (!reprobe.nodeFound) {
+      emitProgress({
+        step: "error",
+        message: msg("vmWizard.mainMiseUpgradeStillMissing"),
+        probe: reprobe,
+      });
+      throw new Error("vmWizard.mainNodeStillNotFoundAfterUpgrade");
+    }
+
+    if (reprobe.nodeVersion && reprobe.errorDetail) {
+      emitProgress({
+        step: "error",
+        message: reprobe.errorDetail,
+        probe: reprobe,
+      });
+      throw new Error("vmWizard.mainNodeStillNotFoundAfterUpgrade");
+    }
+
+    probe.nodeVersion = reprobe.nodeVersion;
+    probe.errorDetail = null;
+    emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe: reprobe });
   }
 
   // Step 2: Install / Start
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: "Wizard cancelled." });
-    throw new Error("Cancelled");
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    throw new Error("vmWizard.mainCancelled");
   }
 
-  emitProgress({ step: "installing", message: "Installing and starting services…", probe });
+  emitProgress({ step: "installing", message: msg("vmWizard.mainInstallingServices"), probe });
 
   const launch = await launchOnVm(host, {
     daemonRunning: probe.daemonRunning,
@@ -102,16 +237,16 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     opencodePort: probe.opencodePort,
   });
 
-  emitProgress({ step: "installing", message: "Services ready.", probe, launch });
+  emitProgress({ step: "installing", message: msg("vmWizard.mainServicesReady"), probe, launch });
 
   if (!launch.started) {
     emitProgress({
       step: "error",
-      message: launch.errorDetail ?? "Failed to start services on the VM.",
+      message: launch.errorDetail ?? msg("vmWizard.mainFailedToStartServices"),
       probe,
       launch,
     });
-    throw new Error(launch.errorDetail ?? "Failed to start services on the VM.");
+    throw new Error("vmWizard.mainFailedToStartServices");
   }
 
   const daemonPort = launch.daemonPort ?? 8845;
@@ -119,11 +254,11 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   // Step 3: Forward tunnel
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: "Wizard cancelled." });
-    throw new Error("Cancelled");
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    throw new Error("vmWizard.mainCancelled");
   }
 
-  emitProgress({ step: "forwarding", message: `Opening SSH tunnel to port ${daemonPort}…`, probe, launch });
+  emitProgress({ step: "forwarding", message: msg("vmWizard.mainOpeningTunnel", { port: daemonPort }), probe, launch });
 
   const localPort = 18845;
   const tunnelId = getTunnelId(host, daemonPort);
@@ -136,28 +271,28 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     tunnel = await openTunnel(host, localPort, daemonPort);
   }
 
-  emitProgress({ step: "forwarding", message: "Tunnel open.", probe, launch, tunnel });
+  emitProgress({ step: "forwarding", message: msg("vmWizard.mainTunnelOpen"), probe, launch, tunnel });
 
   if (!tunnel.forwarded || !tunnel.localPort) {
     emitProgress({
       step: "error",
-      message: tunnel.errorDetail ?? "Failed to open SSH tunnel.",
+      message: tunnel.errorDetail ?? msg("vmWizard.mainFailedTunnel"),
       probe,
       launch,
       tunnel,
     });
-    throw new Error(tunnel.errorDetail ?? "Failed to open SSH tunnel.");
+    throw new Error("vmWizard.mainFailedTunnel");
   }
 
   const daemonUrl = `http://127.0.0.1:${tunnel.localPort}`;
 
   // Step 4: Pair
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: "Wizard cancelled." });
-    throw new Error("Cancelled");
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    throw new Error("vmWizard.mainCancelled");
   }
 
-  emitProgress({ step: "pairing", message: "Creating pairing code…", probe, launch, tunnel });
+  emitProgress({ step: "pairing", message: msg("vmWizard.mainCreatingPairing"), probe, launch, tunnel });
 
   const remoteCode = await createPairingCodeOnRemote(host, daemonPort);
   const pair: VmWizardPairResult = { paired: false, pairingCode: remoteCode, errorDetail: null };
@@ -168,13 +303,13 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     if (exchangeResult.ok && exchangeResult.token) {
       pair.paired = true;
     } else {
-      pair.errorDetail = exchangeResult.error ?? "Pairing code exchange failed.";
+      pair.errorDetail = msg("vmWizard.mainPairingExchangeFailed");
     }
   } else {
-    pair.errorDetail = "Could not create pairing code on the remote daemon. The daemon may not support pairing-create yet.";
+    pair.errorDetail = msg("vmWizard.mainNoPairingCode");
   }
 
-  emitProgress({ step: "pairing", message: pair.paired ? "Paired!" : (pair.errorDetail ?? "Pairing failed."), probe, launch, tunnel, pair });
+  emitProgress({ step: "pairing", message: pair.paired ? msg("vmWizard.mainPaired") : (pair.errorDetail ?? msg("vmWizard.mainPairingFailed")), probe, launch, tunnel, pair });
 
   // Step 5: Save environment
   const env = addEnvironment(envName, daemonUrl, "ssh");
@@ -211,7 +346,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   emitProgress({
     step: "done",
-    message: `Environment "${envName}" is ready at ${daemonUrl}.`,
+    message: msg("vmWizard.mainEnvReady", { name: envName, url: daemonUrl }),
     probe,
     launch,
     tunnel,

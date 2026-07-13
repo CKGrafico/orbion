@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIntl } from "react-intl";
 import type { Environment } from "../types";
 import { fetchLogs, subscribeLogs } from "../api";
 
@@ -14,6 +15,7 @@ function classifyLine(line: string): string | undefined {
 
 export function LogViewer(props: { instance: Environment; loopId: string }): React.ReactNode {
   const { instance, loopId } = props;
+  const intl = useIntl();
   const [lines, setLines] = useState<string[]>([]);
   const [follow, setFollow] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -68,18 +70,18 @@ export function LogViewer(props: { instance: Environment; loopId: string }): Rea
   return (
     <div className="card">
       <div className="card-header">
-        <span className="overline">Logs</span>
+        <span className="overline">{intl.formatMessage({ id: "logs.title" })}</span>
         <span className="spacer" />
         <button className={`toggle${follow ? " on" : ""}`} onClick={() => setFollow((f) => !f)}>
-          {follow ? "● Following" : "Follow"}
+          {follow ? `● ${intl.formatMessage({ id: "logs.following" })}` : intl.formatMessage({ id: "logs.follow" })}
         </button>
         <button className="toggle" onClick={() => void copyAll()}>
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? `${intl.formatMessage({ id: "logs.copied" })} ✓` : intl.formatMessage({ id: "logs.copy" })}
         </button>
       </div>
       <div className="log-viewer" ref={paneRef} onWheel={() => setFollow(false)}>
         {lines.length === 0 ? (
-          <span style={{ color: "var(--text-muted)" }}>No log output yet.</span>
+          <span style={{ color: "var(--text-muted)" }}>{intl.formatMessage({ id: "logs.noOutput" })}</span>
         ) : (
           lines.map((line, i) => {
             const cls = classifyLine(line);

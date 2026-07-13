@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useIntl } from "react-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AccessMode, ApprovalDecision, ChatTurn, TranscriptRow } from "./types";
 import { useTranscript } from "./useTranscript";
@@ -6,7 +7,7 @@ import { MarkdownContent, ToolCallRowView } from "./MarkdownContent";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { QuestionPanel } from "./QuestionPanel";
 import { ChatComposer } from "./ChatComposer";
-import { Icon } from "../components/Icon";
+import { ChevronDown, ArrowUp } from "lucide-react";
 
 interface TranscriptViewProps {
   initialTurns: ChatTurn[];
@@ -17,6 +18,7 @@ export function TranscriptView({
   initialTurns,
   streamingTurn,
 }: TranscriptViewProps) {
+  const intl = useIntl();
   const {
     turns,
     rows,
@@ -248,7 +250,7 @@ export function TranscriptView({
         case "user-message":
           return (
             <div className="transcript-user-msg">
-              <div className="transcript-avatar user-avatar">U</div>
+              <div className="transcript-avatar user-avatar">{intl.formatMessage({ id: "chat.userInitials" })}</div>
               <div className="transcript-msg-body">
                 <MarkdownContent content={row.content} />
               </div>
@@ -258,7 +260,7 @@ export function TranscriptView({
         case "assistant-message":
           return (
             <div className="transcript-assistant-msg">
-              <div className="transcript-avatar assistant-avatar">A</div>
+              <div className="transcript-avatar assistant-avatar">{intl.formatMessage({ id: "chat.assistantInitials" })}</div>
               <div className="transcript-msg-body">
                 <MarkdownContent
                   content={row.content}
@@ -283,8 +285,7 @@ export function TranscriptView({
               className="transcript-expander"
               onClick={() => handleToggleCollapse(row.turnId)}
             >
-              <Icon name="chevronDown" size={12} /> {row.count} earlier tool
-              calls
+              <ChevronDown size={12} /> {intl.formatMessage({ id: "chat.earlierToolCalls" }, { count: row.count })}
             </button>
           );
 
@@ -294,8 +295,7 @@ export function TranscriptView({
               className="transcript-turn-fold"
               onClick={() => handleToggleCollapse(row.turnId)}
             >
-              <Icon name="chevronDown" size={12} /> worked for {row.durationSec}
-              s · {row.toolCallCount} tool calls
+              <ChevronDown size={12} /> {intl.formatMessage({ id: "chat.workedFor" }, { seconds: row.durationSec, count: row.toolCallCount })}
             </button>
           );
 
@@ -322,15 +322,15 @@ export function TranscriptView({
   return (
     <div className="transcript-view">
       <div className="transcript-toolbar">
-        <span className="overline">Transcript</span>
+        <span className="overline">{intl.formatMessage({ id: "chat.transcript" })}</span>
         <span className="spacer" />
         <button className="toggle small" onClick={collapseAllFinishedTurns}>
-          Collapse all
+          {intl.formatMessage({ id: "chat.collapseAll" })}
         </button>
         <button className="toggle small" onClick={expandAllTurns}>
-          Expand all
+          {intl.formatMessage({ id: "chat.expandAll" })}
         </button>
-        <span className="transcript-row-count">{rows.length} rows</span>
+        <span className="transcript-row-count">{intl.formatMessage({ id: "chat.rowsCount" }, { count: rows.length })}</span>
       </div>
 
       <div
@@ -370,7 +370,7 @@ export function TranscriptView({
 
       {showJump && (
         <button className="transcript-jump-btn" onClick={scrollToBottom}>
-          <Icon name="arrowUp" size={13} /> Jump to latest
+          <ArrowUp size={13} /> {intl.formatMessage({ id: "chat.jumpToLatest" })}
         </button>
       )}
 

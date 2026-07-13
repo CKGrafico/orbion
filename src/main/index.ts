@@ -46,7 +46,7 @@ import {
 } from "./connection-supervisor.js";
 import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
-import { listSshHosts as vmListSshHosts, runWizard, cancelWizard } from "./vm-wizard.js";
+import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent } from "./vm-wizard.js";
 import type { VmWizardProgress } from "../shared/ipc.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -513,6 +513,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle("vmWizard:cancel", () => {
     cancelWizard();
+  });
+
+  ipcMain.handle("vmWizard:respondConsent", (_event, decision: "install" | "skip") => {
+    respondConsent(decision);
   });
 
   ipcMain.handle("opencode:getStatus", (_event, environmentId: string): OpenCodeConnectionStatus => {

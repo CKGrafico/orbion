@@ -145,6 +145,8 @@ const bridge: LoopTaskBridge = {
     },
     cancelWizard: () =>
       ipcRenderer.invoke("vmWizard:cancel") as Promise<void>,
+    respondConsent: (decision: "install" | "skip") =>
+      ipcRenderer.invoke("vmWizard:respondConsent", decision) as Promise<void>,
   },
 
   infra: {

@@ -1,36 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIntl } from "react-intl";
 import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus } from "../../shared/ipc";
-import type { Environment, EnvironmentHealth, LoopMeta, Section } from "./types";
+import type { Environment, EnvironmentHealth, LoopMeta } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
-import { rollUpEnvironmentStatus, isNotifiableStatus, PILL_LABELS } from "./fleet-status";
+import { rollUpEnvironmentStatus, isNotifiableStatus, getPillLabel } from "./fleet-status";
 import { loopStatusToFleetItem } from "./fleet-mapping";
 import { useEnvironments } from "./store";
 import { fetchLoops, isMock } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
+import { PanelLeft, Search, ArrowLeft, RotateCw } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
-import { SegmentedTabs } from "./components/SegmentedTabs";
-import { AddEnvironmentModal } from "./components/AddInstanceModal";
+import { InfraChatPanel } from "./components/InfraChatPanel";
 import { AddVmWizard } from "./components/AddVmWizard";
 import { LoopsView } from "./components/LoopsView";
 import { LoopDetail } from "./components/LoopDetail";
-import { TasksView } from "./components/TasksView";
-import { ProjectsView } from "./components/ProjectsView";
-import { Icon } from "./components/Icon";
-import { InfraChatPanel } from "./components/InfraChatPanel";
 import { PickMainVmModal } from "./components/PickMainVmModal";
 import { hostLabel, timeAgo } from "./format";
-import { TranscriptView } from "./chat/TranscriptView";
-import { generateMockSession, generateStreamingTurn } from "./chat/mock-session";
 
 type View = { kind: "list" } | { kind: "loop"; loopId: string };
-
-const SECTION_LABELS: Record<Section, string> = {
-  loops: "Loops",
-  tasks: "Tasks",
-  projects: "Projects",
-  chat: "Chat",
-};
 
 function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
   switch (phase) {
@@ -50,13 +38,11 @@ function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setOpenCodeEndpoint, setMainVm } = useEnvironments();
-  const [section, setSection] = useState<Section>("loops");
+  const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setMainVm } = useEnvironments();
+  const intl = useIntl();
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
-  const [repairEnvironmentId, setRepairEnvironmentId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pickMainVmOpen, setPickMainVmOpen] = useState(false);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
@@ -83,10 +69,8 @@ export function App(): React.ReactNode {
       const bridge = createNotificationBridge((envId, itemId, itemType) => {
         select(envId);
         if (itemType === "loop") {
-          setSection("loops");
           setView({ kind: "loop", loopId: itemId });
         } else {
-          setSection("chat");
           setView({ kind: "list" });
         }
       });
@@ -102,9 +86,6 @@ export function App(): React.ReactNode {
     },
     [select],
   );
-
-  const mockChatTurns = useMemo(() => generateMockSession(50, 12), []);
-  const mockStreamingTurn = useMemo(() => generateStreamingTurn(), []);
 
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
@@ -269,7 +250,7 @@ export function App(): React.ReactNode {
             itemId: env.id,
             itemType: "loop",
             status: current,
-            message: `${env.name} is ${PILL_LABELS[current]}`,
+            message: `${env.name} is ${getPillLabel(current)}`,
           });
         }
       }
@@ -323,7 +304,6 @@ export function App(): React.ReactNode {
   const handleSelect = (id: string): void => {
     select(id);
     markVisited(id);
-    setSection("loops");
     setView({ kind: "list" });
     setFilter("");
   };
@@ -333,23 +313,6 @@ export function App(): React.ReactNode {
       void window.api.connection.retry(id);
     }
   }, []);
-
-  const handleSection = (next: Section): void => {
-    setSection(next);
-    setView({ kind: "list" });
-    setFilter("");
-  };
-
-  const handleAdd = (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale", openCodeUrl?: string, openCodePassword?: string): void => {
-    void (async () => {
-      const env = await add(name, baseUrl, kind);
-      if (openCodeUrl && window.api) {
-        await window.api.config.setOpenCodeEndpoint(env.id, { url: openCodeUrl, password: openCodePassword ?? null });
-      }
-      handleSelect(env.id);
-      setModalOpen(false);
-    })();
-  };
 
   const handleRemove = (id: string): void => {
     const env = environments.find((e) => e.id === id);
@@ -367,11 +330,6 @@ export function App(): React.ReactNode {
 
   const handleSetEndpoint = (environmentId: string, endpointId: string): void => {
     setActiveEndpoint(environmentId, endpointId);
-  };
-
-  const handleRepair = (id: string): void => {
-    setRepairEnvironmentId(id);
-    setModalOpen(true);
   };
 
   const handleVmWizardDone = (_environmentId: string, _environmentName: string, _daemonUrl: string): void => {
@@ -397,35 +355,34 @@ export function App(): React.ReactNode {
       <div className="titlebar">
         <button
           className="icon-btn"
-          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          title={sidebarOpen ? intl.formatMessage({ id: "app.hideSidebar" }) : intl.formatMessage({ id: "app.showSidebar" })}
           onClick={() => setSidebarOpen((v) => !v)}
         >
-          <Icon name="panelLeft" size={15} />
+          <PanelLeft size={15} />
         </button>
         <button
           className="icon-btn"
-          title="Search (focus filter)"
+          title={intl.formatMessage({ id: "app.search" })}
           onClick={() => filterRef.current?.focus()}
         >
-          <Icon name="search" size={15} />
+          <Search size={15} />
         </button>
         <button
           className="icon-btn"
-          title="Back"
+          title={intl.formatMessage({ id: "app.back" })}
           disabled={!inDetail}
           style={!inDetail ? { opacity: 0.35, cursor: "default" } : undefined}
           onClick={goBack}
         >
-          <Icon name="arrowLeft" size={15} />
+          <ArrowLeft size={15} />
         </button>
-        <span className="titlebar-brand">Loop Task</span>
-        <span className="titlebar-tag">{isMock ? "mock" : "preview"}</span>
+        <span className="titlebar-brand">{intl.formatMessage({ id: "app.brand" })}</span>
+        <span className="titlebar-tag">{isMock ? intl.formatMessage({ id: "app.mock" }) : intl.formatMessage({ id: "app.preview" })}</span>
       </div>
 
       <div className="body">
         {sidebarOpen ? (
           <aside className="panel sidebar-panel">
-            <SegmentedTabs active={section} onChange={handleSection} disabled={!selected} />
             <Sidebar
               environments={environments}
               selectedId={selectedId}
@@ -438,13 +395,10 @@ export function App(): React.ReactNode {
               mutedEnvs={mutedEnvs}
               onToggleMute={handleToggleMute}
               onSelect={handleSelect}
-              onAdd={() => setModalOpen(true)}
               onAddVm={() => setVmWizardOpen(true)}
               onRemove={handleRemove}
               onRetry={handleRetry}
               onSetEndpoint={handleSetEndpoint}
-              onRepair={handleRepair}
-              onSetOpenCodeEndpoint={setOpenCodeEndpoint}
             />
             {mainVm ? (
               <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
@@ -464,12 +418,12 @@ export function App(): React.ReactNode {
                   const h = health[selected.id] ?? "unknown";
                   const cs = connectionStatus[selected.id];
                   if (cs && cs.phase === "blocked" && cs.lastError) {
-                    return `blocked: ${cs.lastError}`;
+                    return intl.formatMessage({ id: "app.blockedLabel" }, { detail: cs.lastError });
                   }
                   if (h === "offline" || h === "backoff" || h === "blocked" || h === "connecting") {
-                    return h;
+                    return intl.formatMessage({ id: `app.${h}` });
                   }
-                  return `updated ${updatedLabel}`;
+                  return intl.formatMessage({ id: "app.updatedLabel" }, { time: updatedLabel });
                 })()}
               </span>
             </div>
@@ -479,15 +433,14 @@ export function App(): React.ReactNode {
             {!selected ? (
               <div className="empty">
                 <span className="glyph">
-                  <Icon name="rotate" size={30} strokeWidth={1.2} />
+                  <RotateCw size={30} strokeWidth={1.2} />
                 </span>
-                <h3>No environment selected</h3>
+                <h3>{intl.formatMessage({ id: "app.noEnvironmentSelected" })}</h3>
                 <p>
-                  Add a loop-task environment by its API URL (for example{" "}
-                  <code>http://127.0.0.1:8845</code>) to see its loops, tasks, and projects.
+                  {intl.formatMessage({ id: "app.noEnvironmentDescription" })}
                 </p>
-                <button className="btn primary" onClick={() => setModalOpen(true)}>
-                  Add environment
+                <button className="btn primary" onClick={() => setVmWizardOpen(true)}>
+                  {intl.formatMessage({ id: "app.addEnvironment" })}
                 </button>
               </div>
             ) : inDetail ? (
@@ -497,23 +450,6 @@ export function App(): React.ReactNode {
                 initial={loops.find((l) => l.id === (view as { loopId: string }).loopId) ?? null}
                 onBack={goBack}
               />
-            ) : section === "loops" ? (
-              <LoopsView
-                instance={selected}
-                loops={loops}
-                filter={filter}
-                health={health[selected.id] ?? "unknown"}
-                onOpenLoop={openLoop}
-              />
-            ) : section === "tasks" ? (
-              <TasksView instance={selected} filter={filter} />
-            ) : section === "chat" ? (
-              <div className="content content-chat">
-                <TranscriptView
-                  initialTurns={mockChatTurns}
-                  streamingTurn={mockStreamingTurn}
-                />
-              </div>
             ) : (
               <ProjectsView instance={selected} loops={loops} filter={filter} />
             )}
@@ -524,23 +460,21 @@ export function App(): React.ReactNode {
               <div className="prompt-box">
                 <input
                   ref={filterRef}
-                  placeholder={`Filter ${SECTION_LABELS[section].toLowerCase()}…`}
+                  placeholder={intl.formatMessage({ id: "app.filterLoops" })}
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                 />
                 <div className="prompt-row">
-                  <span className="prompt-chip">{SECTION_LABELS[section]}</span>
+                  <span className="prompt-chip">{intl.formatMessage({ id: "app.loops" })}</span>
                   <span className="prompt-meta">{activeEndpoint ? hostLabel(activeEndpoint.url) : ""}</span>
                   <span style={{ flex: 1 }} />
-                  {section === "loops" ? (
-                    <span className="prompt-meta mono">{loops.length} loops</span>
-                  ) : null}
+                  <span className="prompt-meta mono">{intl.formatMessage({ id: "app.loopsCount" }, { count: loops.length })}</span>
                   <button
                     className="prompt-action"
-                    title="Refresh now"
+                    title={intl.formatMessage({ id: "app.refreshNow" })}
                     onClick={() => setRefreshTick((n) => n + 1)}
                   >
-                    <Icon name="rotate" size={14} strokeWidth={1.8} />
+                    <RotateCw size={14} strokeWidth={1.8} />
                   </button>
                 </div>
               </div>
@@ -548,14 +482,6 @@ export function App(): React.ReactNode {
           ) : null}
         </div>
       </div>
-
-      {modalOpen ? (
-        <AddEnvironmentModal
-          onSubmit={handleAdd}
-          onCancel={() => { setModalOpen(false); setRepairEnvironmentId(null); }}
-          repairEnvironmentId={repairEnvironmentId}
-        />
-      ) : null}
 
       {vmWizardOpen ? (
         <AddVmWizard

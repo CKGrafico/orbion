@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useIntl } from "react-intl";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { fetchProjects, resolveBaseUrl } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil } from "../format";
-import { Icon } from "./Icon";
+import { RotateCw } from "lucide-react";
 
 function loopLabel(loop: LoopMeta): string {
   return loop.description?.trim() || commandLine(loop.command, loop.commandArgs);
@@ -16,6 +17,7 @@ export function LoopsView(props: {
   onOpenLoop: (id: string) => void;
 }): React.ReactNode {
   const { instance, loops, filter, health, onOpenLoop } = props;
+  const intl = useIntl();
   const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
@@ -52,13 +54,13 @@ export function LoopsView(props: {
       <div className="content-inner">
         <div className="empty">
           <span className="glyph">
-            <Icon name="rotate" size={30} strokeWidth={1.2} />
+            <RotateCw size={30} strokeWidth={1.2} />
           </span>
-          <h3>{disconnected ? "Environment unreachable" : "No loops"}</h3>
+          <h3>{disconnected ? intl.formatMessage({ id: "loops.envUnreachable" }) : intl.formatMessage({ id: "loops.noLoops" })}</h3>
           <p>
             {disconnected
-              ? `Could not reach ${baseUrl}. Is the loop-task daemon running?`
-              : "This environment has no loops yet. Create one with the loop-task CLI or board."}
+              ? intl.formatMessage({ id: "loops.cannotReach" }, { url: baseUrl })
+              : intl.formatMessage({ id: "loops.noLoopsDescription" })}
           </p>
         </div>
       </div>
@@ -69,9 +71,9 @@ export function LoopsView(props: {
     <div className="content-inner">
       <div className="card">
         <div className="card-header">
-          <span className="overline">Loops ({loops.length})</span>
-          {running > 0 ? <span className="card-stat ok">{running} running</span> : null}
-          {failing > 0 ? <span className="card-stat bad">{failing} failing</span> : null}
+          <span className="overline">{intl.formatMessage({ id: "loops.count" }, { count: loops.length })}</span>
+          {running > 0 ? <span className="card-stat ok">{intl.formatMessage({ id: "loops.running" }, { count: running })}</span> : null}
+          {failing > 0 ? <span className="card-stat bad">{intl.formatMessage({ id: "loops.failing" }, { count: failing })}</span> : null}
           <span className="spacer" />
         </div>
         <div className="card-body">
@@ -89,7 +91,7 @@ export function LoopsView(props: {
                   {projectColor(loop) ? (
                     <span
                       className="dot"
-                      title="project"
+                      title={intl.formatMessage({ id: "loops.project" })}
                       style={{ background: projectColor(loop), width: 6, height: 6 }}
                     />
                   ) : null}
@@ -97,7 +99,7 @@ export function LoopsView(props: {
                     <span className="stat">{loop.intervalHuman}</span>
                     <span className="stat">×{loop.runCount}</span>
                     {failed ? (
-                      <span className="exit-bad" title={`last exit ${loop.lastExitCode}`}>
+                      <span className="exit-bad" title={intl.formatMessage({ id: "loops.lastExit" }, { code: loop.lastExitCode })}>
                         ✗{loop.lastExitCode}
                       </span>
                     ) : null}
@@ -119,7 +121,7 @@ export function LoopsView(props: {
               );
             })}
             {visible.length === 0 ? (
-              <div className="row-empty">No loops match "{filter}".</div>
+              <div className="row-empty">{intl.formatMessage({ id: "loops.noMatch" }, { filter })}</div>
             ) : null}
           </div>
         </div>

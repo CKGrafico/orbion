@@ -1,21 +1,29 @@
 import { useEffect, useState } from "react";
+import { useIntl, type IntlShape } from "react-intl";
 import type { SshHost, VmWizardProgress, VmWizardStep } from "../../shared/ipc";
-import { Icon } from "./Icon";
+import { ShieldCheck, X, Check } from "lucide-react";
 
-const STEP_LABELS: Record<VmWizardStep, string> = {
+const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   idle: "",
-  "pick-target": "Pick target",
-  probing: "Probing VM",
-  installing: "Installing services",
-  forwarding: "Opening tunnel",
-  pairing: "Pairing",
-  done: "Done",
-  error: "Error",
+  "pick-target": "vmWizard.stepPickTarget",
+  probing: "vmWizard.stepProbing",
+  installing: "vmWizard.stepInstalling",
+  forwarding: "vmWizard.stepForwarding",
+  pairing: "vmWizard.stepPairing",
+  consent: "vmWizard.stepConsent",
+  done: "vmWizard.stepDone",
+  error: "vmWizard.stepError",
 };
+
+function stepLabel(intl: IntlShape, step: VmWizardStep): string {
+  const key = STEP_LABEL_KEYS[step];
+  return key ? intl.formatMessage({ id: key }) : "";
+}
 
 const STEP_ORDER: VmWizardStep[] = [
   "pick-target",
   "probing",
+  "consent",
   "installing",
   "forwarding",
   "pairing",
@@ -32,6 +40,7 @@ export function AddVmWizard(props: {
   onCancel: () => void;
 }): React.ReactNode {
   const { onDone, onCancel } = props;
+  const intl = useIntl();
 
   const [target, setTarget] = useState("");
   const [envName, setEnvName] = useState("");
@@ -92,20 +101,21 @@ export function AddVmWizard(props: {
   const currentStep = progress?.step ?? "idle";
   const isDone = currentStep === "done";
   const isError = currentStep === "error";
+  const isConsent = currentStep === "consent";
 
   return (
     <div className="modal-backdrop" onClick={handleCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
-        <h2>Add VM wizard</h2>
+        <h2>{intl.formatMessage({ id: "vmWizard.title" })}</h2>
         <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: "4px 0 14px" }}>
-          Connect a fresh VM over SSH. Orbion will probe, install, forward, and pair automatically.
+          {intl.formatMessage({ id: "vmWizard.description" })}
         </p>
 
         <div className="field">
-          <label>Name</label>
+          <label>{intl.formatMessage({ id: "vmWizard.name" })}</label>
           <input
             autoFocus
-            placeholder="my-vm"
+            placeholder={intl.formatMessage({ id: "vmWizard.namePlaceholder" })}
             value={envName}
             onChange={(e) => setEnvName(e.target.value)}
             disabled={running}
@@ -113,9 +123,9 @@ export function AddVmWizard(props: {
         </div>
 
         <div className="field">
-          <label>Target (user@host)</label>
+          <label>{intl.formatMessage({ id: "vmWizard.target" })}</label>
           <input
-            placeholder="ubuntu@192.168.1.50"
+            placeholder={intl.formatMessage({ id: "vmWizard.targetPlaceholder" })}
             value={target}
             onChange={(e) => setTarget(e.target.value)}
             onKeyDown={(e) => {
@@ -124,11 +134,17 @@ export function AddVmWizard(props: {
             disabled={running}
             className="mono"
           />
+          <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginTop: 6, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            <ShieldCheck size={13} />
+            <span>
+              {intl.formatMessage({ id: "vmWizard.securityNote" })}
+            </span>
+          </div>
         </div>
 
         {hostsLoaded && hosts.length > 0 && !running ? (
           <div className="field">
-            <label>SSH config hosts</label>
+            <label>{intl.formatMessage({ id: "vmWizard.sshConfigHosts" })}</label>
             <div className="tailscale-peers" style={{ maxHeight: 160 }}>
               {hosts.map((h) => (
                 <div
@@ -168,28 +184,28 @@ export function AddVmWizard(props: {
             <div style={{ fontSize: 12.5, color: isError ? "var(--danger)" : "var(--text-secondary)" }}>
               {isError ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="x" size={14} />
+                  <X size={14} />
                   {progress.message}
                 </span>
               ) : isDone ? (
                 <span style={{ color: "var(--accent)", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="check" size={14} />
+                  <Check size={14} />
                   {progress.message}
                 </span>
               ) : (
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="spinner" style={{ width: 12, height: 12, border: "2px solid var(--text-muted)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  {STEP_LABELS[currentStep]}: {progress.message}
+                  {stepLabel(intl, currentStep)}: {progress.message}
                 </span>
               )}
             </div>
             {progress.probe && !isDone ? (
               <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--text-muted)" }}>
-                {progress.probe.nodeFound ? `Node ${progress.probe.nodeVersion ?? "found"}` : "Node: not found"}
+                {progress.probe.nodeFound ? intl.formatMessage({ id: "vmWizard.nodeFound" }, { version: progress.probe.nodeVersion ?? "found" }) : intl.formatMessage({ id: "vmWizard.nodeNotFound" })}
                 {" · "}
-                {progress.probe.daemonRunning ? `Daemon on :${progress.probe.daemonPort ?? "?"}` : "Daemon: not running"}
+                {progress.probe.daemonRunning ? intl.formatMessage({ id: "vmWizard.daemonOnPort" }, { port: progress.probe.daemonPort ?? "?" }) : intl.formatMessage({ id: "vmWizard.daemonNotRunning" })}
                 {" · "}
-                {progress.probe.opencodeRunning ? `OpenCode on :${progress.probe.opencodePort ?? "?"}` : "OpenCode: not running"}
+                {progress.probe.opencodeRunning ? intl.formatMessage({ id: "vmWizard.opencodeOnPort" }, { port: progress.probe.opencodePort ?? "?" }) : intl.formatMessage({ id: "vmWizard.opencodeNotRunning" })}
               </div>
             ) : null}
             {progress.launch?.logTail ? (
@@ -200,9 +216,40 @@ export function AddVmWizard(props: {
           </div>
         ) : null}
 
+        {isConsent && progress?.consentPrompt ? (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: "var(--bg-log)",
+            borderRadius: 8,
+            border: "1px solid var(--bg-active)",
+          }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
+              <ShieldCheck size={16} />
+              <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {progress.consentPrompt}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn primary"
+                onClick={() => window.api?.vmWizard.respondConsent("install")}
+              >
+                {intl.formatMessage({ id: "vmWizard.installViaMise" })}
+              </button>
+              <button
+                className="btn"
+                onClick={() => window.api?.vmWizard.respondConsent("skip")}
+              >
+                {intl.formatMessage({ id: "vmWizard.skip" })}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="modal-actions">
           <button className="btn" onClick={handleCancel} disabled={false}>
-            {running ? "Cancel" : "Close"}
+            {running ? intl.formatMessage({ id: "vmWizard.cancel" }) : intl.formatMessage({ id: "vmWizard.close" })}
           </button>
           {!isDone ? (
             <button
@@ -210,7 +257,7 @@ export function AddVmWizard(props: {
               onClick={() => void startWizard()}
               disabled={running || !target.trim()}
             >
-              {running ? "Running…" : "Start wizard"}
+              {running ? intl.formatMessage({ id: "vmWizard.running" }) : intl.formatMessage({ id: "vmWizard.startWizard" })}
             </button>
           ) : null}
         </div>

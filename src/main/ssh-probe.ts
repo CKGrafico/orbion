@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
-import type { SshHost, VmWizardProbeResult } from "../shared/ipc.js";
+import type { SshHost, VmWizardProbeResult, I18nMessage } from "../shared/ipc.js";
 import { buildSshArgs } from "./ssh-config.js";
+import { msg } from "./i18n.js";
 
 const NODE_VERSION_FLOOR = "18.0.0";
 
@@ -15,10 +16,10 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-function sshExec(host: SshHost, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
+function sshExec(host: SshHost, command: string, timeout = 30_000): Promise<{ stdout: string; stderr: string; code: number }> {
   const args = buildSshArgs(host, command);
   return new Promise((resolve) => {
-    execFile("ssh", args, { timeout: 30_000 }, (err, stdout, stderr) => {
+    execFile("ssh", args, { timeout }, (err, stdout, stderr) => {
       resolve({
         stdout: stdout ?? "",
         stderr: stderr ?? "",
@@ -58,7 +59,7 @@ if [ -z "\${node_path}" ]; then
   exit 0
 fi
 
-node_version="\$("\\${node_path}" --version 2>/dev/null || echo 'unknown')"
+node_version="\$("\${node_path}" --version 2>/dev/null || echo 'unknown')"
 echo "NODE_FOUND|\${node_path}|\${node_version}"
 `;
 
@@ -119,11 +120,14 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
   if (nodeResult.code !== 0) {
     const lower = nodeResult.stderr.toLowerCase();
     if (lower.includes("permission denied") || lower.includes("authentication failed")) {
-      result.errorDetail = "SSH authentication failed. Check your key or password.";
+      result.errorDetail = msg("vmWizard.mainSshAuthFailed");
     } else if (lower.includes("connection refused") || lower.includes("connection timed out")) {
-      result.errorDetail = `Cannot reach ${host.label}: ${lower.includes("refused") ? "connection refused" : "connection timed out"}.`;
+      result.errorDetail = msg("vmWizard.mainCannotReachHost", {
+        label: host.label,
+        reason: lower.includes("refused") ? "connection refused" : "connection timed out",
+      });
     } else {
-      result.errorDetail = nodeResult.stderr.trim() || `SSH failed (exit ${nodeResult.code})`;
+      result.errorDetail = msg("vmWizard.mainSshFailed", { code: nodeResult.code });
     }
     return result;
   }
@@ -162,10 +166,88 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
   }
 
   if (result.nodeVersion && compareSemver(result.nodeVersion, NODE_VERSION_FLOOR) < 0) {
-    result.errorDetail = `Node ${result.nodeVersion} found, but ${NODE_VERSION_FLOOR}+ is required. Update Node on the VM.`;
+    result.errorDetail = msg("vmWizard.mainNodeTooOld", {
+      version: result.nodeVersion,
+      floor: NODE_VERSION_FLOOR,
+    });
   }
 
   return result;
 }
 
 export { sshExec, compareSemver };
+
+const MISE_INSTALL_SCRIPT = `
+set -e
+
+MISE_BIN="\${HOME}/.local/bin/mise"
+
+# Install mise if not present
+if [ ! -x "\${MISE_BIN}" ]; then
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "MISE_INSTALL_FAILED|curl is required to install mise"
+    exit 0
+  fi
+  curl -fsSL https://mise.run | sh || {
+    echo "MISE_INSTALL_FAILED|mise install script failed"
+    exit 0
+  }
+fi
+
+# Activate mise and install Node LTS
+export PATH="\${HOME}/.local/bin:\${PATH}"
+"\${MISE_BIN}" use --global node@22 || {
+  echo "MISE_INSTALL_FAILED|mise could not install node@22"
+  exit 0
+}
+
+# Verify
+node_path="\$(\${MISE_BIN} exec node -- which node 2>/dev/null || echo '')"
+if [ -z "\${node_path}" ]; then
+  node_path="\$(command -v node 2>/dev/null || echo '')"
+fi
+node_version="\$(\\\${node_path}" --version 2>/dev/null || echo 'unknown')"
+
+if [ -z "\${node_path}" ]; then
+  echo "MISE_INSTALL_FAILED|node not found after mise install"
+  exit 0
+fi
+
+echo "MISE_NODE_INSTALLED|\${node_path}|\${node_version}"
+`;
+
+export interface MiseInstallResult {
+  success: boolean;
+  nodePath: string | null;
+  nodeVersion: string | null;
+  errorDetail: I18nMessage | null;
+}
+
+export async function installNodeViaMise(host: SshHost): Promise<MiseInstallResult> {
+  const result: MiseInstallResult = {
+    success: false,
+    nodePath: null,
+    nodeVersion: null,
+    errorDetail: null,
+  };
+
+  const installResult = await sshExec(host, MISE_INSTALL_SCRIPT, 120_000);
+
+  for (const line of installResult.stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("MISE_NODE_INSTALLED|")) {
+      const parts = trimmed.split("|");
+      result.success = true;
+      result.nodePath = parts[1] ?? null;
+      result.nodeVersion = parts[2] ?? null;
+    } else if (trimmed.startsWith("MISE_INSTALL_FAILED|")) {
+      result.errorDetail = msg("vmWizard.mainMiseInstallFailed");
+    }
+  }
+
+  if (!result.success && !result.errorDetail) {
+    result.errorDetail = msg("vmWizard.mainMiseInstallFailedNoOutput");
+  }
+
+  return result;
+}
