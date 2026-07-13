@@ -22,10 +22,34 @@
   --accent-ink: #0d141f;
   --accent-task: #cf8dfb;
   --accent-infra: #e8a24e;
+  --accent-blue: #5cb2ff;
   --chip-warm: #ffcc5c;
   --success: #a9d95c;
   --danger: #ff8484;
   --warning: #ffcc5c;
+  --status-running: #9fef00;
+  --status-waiting: #5cb2ff;
+  --status-paused: #ffcc5c;
+  --status-idle: #a4b1cd;
+  --status-stopped: #ff8484;
+  --health-ok: #a9d95c;
+  --health-offline: #ff8484;
+  --health-unknown: #64718c;
+  --health-connecting: #f0c040;
+  --health-backoff: #f08040;
+  --health-blocked: #e040e0;
+  --endpoint-connected: #a9d95c;
+  --endpoint-backoff: #f08040;
+  --endpoint-offline: #ff8484;
+  --opencode-authenticated: #a9d95c;
+  --opencode-unauthenticated: #f0c040;
+  --opencode-unknown: #64718c;
+  --pill-approval: #ff8484;
+  --pill-input: #ffcc5c;
+  --pill-working: #9ef000;
+  --pill-done: #a4b1cd;
+  --pill-failed: #ff8484;
+  --pill-idle: #64718c;
   --titlebar-height: 42px;
   --sidebar-width: 244px;
   --gutter: 8px;
@@ -1802,7 +1826,7 @@ input {
 
 .infra-chat-panel {
   border-top: 1px solid var(--border-subtle);
-  border-left: 3px solid #e8a24e;
+  border-left: 3px solid var(--accent-infra);
   display: flex;
   flex-direction: column;
   min-height: 180px;
@@ -1819,7 +1843,7 @@ input {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #e8a24e;
+  color: var(--accent-infra);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
@@ -1854,13 +1878,13 @@ input {
 }
 
 .infra-user-avatar {
-  background: #e8a24e;
+  background: var(--accent-infra);
   color: var(--bg-frame);
 }
 
 .infra-assistant-avatar {
   background: #3d2e0a;
-  color: #e8a24e;
+  color: var(--accent-infra);
   font-size: 9px;
   letter-spacing: 0.5px;
 }
@@ -1890,7 +1914,7 @@ input {
 
 .pick-main-vm-item:hover {
   background: var(--bg-hover);
-  border-color: #e8a24e;
+  border-color: var(--accent-infra);
 }
 
 .pick-main-vm-item .name {

@@ -3,11 +3,11 @@ import { standaloneIntl } from "./i18n";
 
 // Status palette matches the loop-task TUI theme so both products read the same.
 export const STATUS_COLORS: Record<LoopStatus, string> = {
-  running: "#9fef00",
-  waiting: "#5cb2ff",
-  paused: "#ffcc5c",
-  idle: "#a4b1cd",
-  stopped: "#ff8484",
+  running: "var(--status-running)",
+  waiting: "var(--status-waiting)",
+  paused: "var(--status-paused)",
+  idle: "var(--status-idle)",
+  stopped: "var(--status-stopped)",
 };
 
 export function timeAgo(isoDate: string | null): string {

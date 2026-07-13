@@ -57,6 +57,9 @@ export function AddVmWizard(props: {
       if (cancelled) return;
       setHosts(h);
       setHostsLoaded(true);
+    }).catch(() => {
+      if (cancelled) return;
+      setHostsLoaded(true);
     });
     return () => { cancelled = true; };
   }, []);

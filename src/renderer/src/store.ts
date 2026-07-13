@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Environment, EnvironmentRole, OpenCodeEndpoint } from "./types";
+import type { Environment, OpenCodeEndpoint } from "./types";
 import { apiRequest, resolveBaseUrl } from "./api";
 
 async function probeUrl(url: string): Promise<boolean> {
@@ -91,7 +91,7 @@ export function useEnvironments(): {
     (id: string | null) => {
       setSelectedId(id);
       if (window.api) {
-        void window.api.config.setSelectedEnvironmentId(id);
+        void window.api.config.setSelectedEnvironmentId(id).catch(() => {});
       } else {
         if (id) localStorage.setItem("lta.selectedEnvironment.v1", id);
         else localStorage.removeItem("lta.selectedEnvironment.v1");
@@ -149,7 +149,7 @@ export function useEnvironments(): {
         void window.api.config.removeEnvironment(id).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
           setSelectedId(await window.api.config.getSelectedEnvironmentId());
-        });
+        }).catch(() => {});
       } else {
         setEnvironments((prev) => {
           const next = prev.filter((e) => e.id !== id);
@@ -167,7 +167,7 @@ export function useEnvironments(): {
       if (window.api) {
         void window.api.config.addEndpoint(environmentId, url, kind).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
-        });
+        }).catch(() => {});
       } else {
         setEnvironments((prev) => {
           const next = prev.map((env) => {
@@ -196,7 +196,7 @@ export function useEnvironments(): {
       if (window.api) {
         void window.api.config.removeEndpoint(environmentId, endpointId).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
-        });
+        }).catch(() => {});
       } else {
         setEnvironments((prev) => {
           const next = prev.map((env) => {
@@ -223,7 +223,7 @@ export function useEnvironments(): {
       if (window.api) {
         void window.api.config.setActiveEndpoint(environmentId, endpointId).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
-        });
+        }).catch(() => {});
       } else {
         setEnvironments((prev) => {
           const next = prev.map((env) => {
@@ -243,7 +243,7 @@ export function useEnvironments(): {
       if (window.api) {
         void window.api.config.removeSessionToken(environmentId).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
-        });
+        }).catch(() => {});
       }
     },
     [],
@@ -255,7 +255,7 @@ export function useEnvironments(): {
         const endpoint: OpenCodeEndpoint = { url: url.trim().replace(/\/+$/, ""), password };
         void window.api.config.setOpenCodeEndpoint(environmentId, endpoint).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
-        });
+        }).catch(() => {});
       } else {
         setEnvironments((prev) => {
           const next = prev.map((env) => {
@@ -275,12 +275,12 @@ export function useEnvironments(): {
       if (window.api) {
         void window.api.config.setMainVm(environmentId).then(async () => {
           setEnvironments(await window.api.config.getEnvironments());
-        });
+        }).catch(() => {});
       } else {
         setEnvironments((prev) => {
           const next = prev.map((env) => ({
             ...env,
-            role: (env.id === environmentId ? "main-vm" : "coding") as EnvironmentRole,
+            role: env.id === environmentId ? "main-vm" : "coding",
           }));
           localStorage.setItem("lta.environments.v1", JSON.stringify(next));
           return next;

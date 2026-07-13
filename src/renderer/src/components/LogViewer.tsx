@@ -39,7 +39,7 @@ export function LogViewer(props: { instance: Environment; loopId: string }): Rea
       if (res.ok && typeof res.data === "string" && res.data.length > 0) {
         setLines(res.data.split(/\r?\n/));
       }
-    });
+    }).catch(() => { /* network error, will retry on next poll */ });
 
     const unsubscribe = subscribeLogs(instance, loopId, (line) => {
       if (!cancelled) appendLines([line]);

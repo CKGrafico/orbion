@@ -46,6 +46,7 @@ import {
 import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent } from "./vm-wizard.js";
+import { msg } from "./i18n.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -151,7 +152,7 @@ function findEnvironmentIdByUrl(baseUrl: string): string | null {
 
 async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   if (!isAllowedBaseUrl(args.baseUrl)) {
-    return { ok: false, status: 0, error: `Invalid environment URL: ${args.baseUrl}` };
+    return { ok: false, status: 0, error: msg("vmWizard.mainInvalidEnvUrl", { url: args.baseUrl }) };
   }
 
   const controller = new AbortController();
@@ -190,16 +191,16 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
       if (envelope.ok) {
         return { ok: true, status: res.status, data: envelope.data };
       }
-      return { ok: false, status: res.status, error: envelope.error?.message ?? `HTTP ${res.status}` };
+      return { ok: false, status: res.status, error: envelope.error?.message ?? msg("vmWizard.mainHttpError", { status: res.status }) };
     }
 
     if (!res.ok) {
-      return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+      return { ok: false, status: res.status, error: msg("vmWizard.mainHttpError", { status: res.status }) };
     }
     return { ok: true, status: res.status, data: parsed };
   } catch (err) {
     const message = err instanceof Error && err.name === "AbortError"
-      ? "Request timed out"
+      ? msg("vmWizard.mainRequestTimedOut")
       : err instanceof Error ? err.message : String(err);
     return { ok: false, status: 0, error: message };
   } finally {
@@ -497,10 +498,6 @@ app.whenReady().then(() => {
     setOsOffline(!online);
   });
 
-  ipcMain.handle("connection:fetchFingerprint", async (_event, baseUrl: string) => {
-    return fetchFingerprint(baseUrl);
-  });
-
   ipcMain.handle("tailscale:peers", () => fetchPeers());
 
   ipcMain.handle("vmWizard:listSshHosts", () => vmListSshHosts());
@@ -548,11 +545,11 @@ app.whenReady().then(() => {
   ipcMain.handle("infra:executeAction", async (_event, args: InfraActionArgs): Promise<InfraActionResult> => {
     const mainVmEnv = getMainVm();
     if (!mainVmEnv) {
-      return { ok: false, error: "No main VM configured" };
+      return { ok: false, error: msg("vmWizard.mainNoMainVm") };
     }
     const url = resolveActiveUrl(mainVmEnv.endpoints, mainVmEnv.activeEndpointId);
     if (!url) {
-      return { ok: false, error: "Main VM has no active endpoint" };
+      return { ok: false, error: msg("vmWizard.mainNoEndpoint") };
     }
 
     switch (args.action) {
@@ -575,17 +572,17 @@ app.whenReady().then(() => {
         const repoUrl = args.params?.repoUrl as string | undefined;
         const targetVmId = args.params?.targetVmId as string | undefined;
         if (!repoUrl) {
-          return { ok: false, error: "repoUrl is required" };
+          return { ok: false, error: msg("vmWizard.mainRepoUrlRequired") };
         }
         const targetEnv = targetVmId
           ? getEnvironments().find((e: Environment) => e.id === targetVmId)
           : mainVmEnv;
         if (!targetEnv) {
-          return { ok: false, error: "Target VM not found" };
+          return { ok: false, error: msg("vmWizard.mainTargetVmNotFound") };
         }
         const targetUrl = resolveActiveUrl(targetEnv.endpoints, targetEnv.activeEndpointId);
         if (!targetUrl) {
-          return { ok: false, error: "Target VM has no active endpoint" };
+          return { ok: false, error: msg("vmWizard.mainTargetVmNoEndpoint") };
         }
         const cloneResult = await handleApiRequest({
           baseUrl: targetUrl,
@@ -594,12 +591,12 @@ app.whenReady().then(() => {
           body: { url: repoUrl },
         });
         if (!cloneResult.ok) {
-          return { ok: false, error: cloneResult.error ?? "Clone failed" };
+          return { ok: false, error: cloneResult.error ?? msg("vmWizard.mainCloneFailed") };
         }
         return { ok: true, data: { vm: targetEnv.name, repoUrl, result: cloneResult.data } };
       }
       default:
-        return { ok: false, error: `Unknown infra action: ${args.action}` };
+        return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
   });
 

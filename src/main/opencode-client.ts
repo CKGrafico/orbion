@@ -4,6 +4,8 @@ import type {
   OpenCodeEndpoint,
 } from "../shared/ipc.js";
 import { BrowserWindow } from "electron";
+import { msg } from "./i18n.js";
+import { decryptValue } from "./config-store.js";
 
 const OPENCODE_MIN_VERSION = "1.0.0";
 
@@ -39,7 +41,8 @@ function makeClient(endpoint: OpenCodeEndpoint): OpencodeClient {
   const headers: Record<string, string> = {};
 
   if (endpoint.password) {
-    const encoded = Buffer.from(`admin:${endpoint.password}`).toString("base64");
+    const decrypted = decryptValue(endpoint.password) ?? endpoint.password;
+    const encoded = Buffer.from(`admin:${decrypted}`).toString("base64");
     headers["Authorization"] = `Basic ${encoded}`;
   }
 
@@ -75,8 +78,8 @@ async function probeWithClient(
           status.errorKind = "rejected";
           status.errorMessage =
             httpStatus === 401
-              ? "Wrong password for OpenCode server"
-              : "Access denied by OpenCode server";
+              ? msg("vmWizard.mainOpenCodeWrongPassword")
+              : msg("vmWizard.mainOpenCodeAccessDenied");
           status.checkedAt = Date.now();
           return status;
         }
@@ -87,7 +90,7 @@ async function probeWithClient(
         if (name === "ProviderAuthError") {
           status.authState = "unauthenticated";
           status.errorKind = "unauthenticated";
-          status.errorMessage = "Run `opencode auth login` on the VM to connect a provider";
+          status.errorMessage = msg("vmWizard.mainOpenCodeAuthLogin");
           status.checkedAt = Date.now();
           return status;
         }
@@ -97,7 +100,7 @@ async function probeWithClient(
       status.errorKind = "unreachable";
       status.errorMessage = errAny?.message
         ? String(errAny.message)
-        : "Could not reach OpenCode server";
+        : msg("vmWizard.mainOpenCodeUnreachable");
       status.checkedAt = Date.now();
       return status;
     }
@@ -123,7 +126,7 @@ async function probeWithClient(
 
     if (status.serverVersion && compareSemver(status.serverVersion, OPENCODE_MIN_VERSION) < 0) {
       status.errorKind = "version";
-      status.errorMessage = `OpenCode server version ${status.serverVersion} is below minimum ${OPENCODE_MIN_VERSION}. Update OpenCode on the VM.`;
+      status.errorMessage = msg("vmWizard.mainOpenCodeVersionTooOld", { version: status.serverVersion, min: OPENCODE_MIN_VERSION });
     }
 
     status.checkedAt = Date.now();
@@ -133,7 +136,7 @@ async function probeWithClient(
 
     const message =
       err instanceof Error && err.name === "AbortError"
-        ? "OpenCode server request timed out"
+        ? msg("vmWizard.mainOpenCodeTimeout")
         : err instanceof Error
           ? err.message
           : String(err);
@@ -146,10 +149,10 @@ async function probeWithClient(
       lower.includes("request timed out")
     ) {
       status.errorKind = "unreachable";
-      status.errorMessage = `Cannot reach OpenCode server: ${message}`;
+      status.errorMessage = msg("vmWizard.mainOpenCodeCannotReach", { message });
     } else if (lower.includes("401") || lower.includes("unauthorized")) {
       status.errorKind = "rejected";
-      status.errorMessage = "Wrong password for OpenCode server";
+      status.errorMessage = msg("vmWizard.mainOpenCodeWrongPassword");
     } else {
       status.errorKind = "unreachable";
       status.errorMessage = message;

@@ -2,35 +2,36 @@ import { useIntl, type IntlShape } from "react-intl";
 import type { ConnectionStatus, EndpointHealth } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, AccessEndpoint, OpenCodeConnectionStatus, OpenCodeAuthState } from "../types";
 import type { FleetItemStatus } from "../fleet-status";
-import { Terminal, RotateCw, X } from "lucide-react";
+import { Terminal, RotateCw, X, Bell, BellOff } from "lucide-react";
 import { StatusPill, UnreadDot } from "./StatusPill";
 import { hostLabel } from "../format";
+import { translateMessage } from "../i18n";
 
 const HEALTH_COLORS: Record<EnvironmentHealth, string> = {
-  ok: "#a9d95c",
-  offline: "#ff8484",
-  unknown: "#64718c",
-  connecting: "#f0c040",
-  backoff: "#f08040",
-  blocked: "#e040e0",
+  ok: "var(--health-ok)",
+  offline: "var(--health-offline)",
+  unknown: "var(--health-unknown)",
+  connecting: "var(--health-connecting)",
+  backoff: "var(--health-backoff)",
+  blocked: "var(--health-blocked)",
 };
 
 const ENDPOINT_PHASE_COLORS: Record<string, string> = {
-  connected: "#a9d95c",
-  backoff: "#f08040",
-  offline: "#ff8484",
+  connected: "var(--endpoint-connected)",
+  backoff: "var(--endpoint-backoff)",
+  offline: "var(--endpoint-offline)",
 };
 
 const OPENCODE_AUTH_COLORS: Record<OpenCodeAuthState, string> = {
-  authenticated: "#a9d95c",
-  unauthenticated: "#f0c040",
-  unknown: "#64718c",
+  authenticated: "var(--opencode-authenticated)",
+  unauthenticated: "var(--opencode-unauthenticated)",
+  unknown: "var(--opencode-unknown)",
 };
 
 function openCodeStatusLabel(intl: IntlShape, status: OpenCodeConnectionStatus): string {
-  if (status.errorKind === "version") return intl.formatMessage({ id: "sidebar.ocVersionTooOld" }, { detail: status.errorMessage ?? "version too old" });
+  if (status.errorKind === "version") return intl.formatMessage({ id: "sidebar.ocVersionTooOld" }, { detail: translateMessage(intl, status.errorMessage) || "version too old" });
   if (status.errorKind === "unreachable") return intl.formatMessage({ id: "sidebar.ocUnreachable" });
-  if (status.errorKind === "rejected") return intl.formatMessage({ id: "sidebar.ocRejected" }, { detail: status.errorMessage ?? "rejected" });
+  if (status.errorKind === "rejected") return intl.formatMessage({ id: "sidebar.ocRejected" }, { detail: translateMessage(intl, status.errorMessage) || "rejected" });
   switch (status.authState) {
     case "authenticated": return intl.formatMessage({ id: "sidebar.ocConnected" });
     case "unauthenticated": return intl.formatMessage({ id: "sidebar.ocAuthLogin" });
@@ -53,8 +54,8 @@ function healthTooltip(intl: IntlShape, health: EnvironmentHealth, status?: Conn
       case "connected": return intl.formatMessage({ id: "sidebar.connected" });
       case "connecting": return intl.formatMessage({ id: "sidebar.connecting" });
       case "backoff": return intl.formatMessage({ id: "sidebar.retrying" }, { seconds: Math.round(status.backoffMs / 1000), failures: status.failureCount });
-      case "blocked": return status.lastError ?? intl.formatMessage({ id: "sidebar.blockedTooltip" });
-      case "offline": return status.lastError ?? intl.formatMessage({ id: "sidebar.offlineTooltip" });
+      case "blocked": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.blockedTooltip" });
+      case "offline": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.offlineTooltip" });
     }
   }
   return health;
@@ -135,7 +136,7 @@ export function Sidebar(props: {
                   </span>
                 ) : null}
                 {env.authState === "blocked" ? (
-                  <span className="stat" style={{ fontSize: 9, color: "#e040e0", marginRight: 2 }}>
+                   <span className="stat" style={{ fontSize: 9, color: "var(--health-blocked)", marginRight: 2 }}>
                     {intl.formatMessage({ id: "sidebar.blocked" })}
                   </span>
                 ) : null}
@@ -180,7 +181,7 @@ export function Sidebar(props: {
                       onToggleMute(env.id);
                     }}
                   >
-                    <Icon name={isMuted ? "bellOff" : "bell"} size={12} />
+                    {isMuted ? <BellOff size={12} /> : <Bell size={12} />}
                   </span>
                 ) : null}
                 <span
@@ -197,7 +198,7 @@ export function Sidebar(props: {
                    <X size={12} />
                  </span>
                  {env.role === "main-vm" ? (
-                   <span className="stat" style={{ fontSize: 9, color: "#e8a24e", marginRight: 2, fontWeight: 600 }}>
+                    <span className="stat" style={{ fontSize: 9, color: "var(--accent-infra)", marginRight: 2, fontWeight: 600 }}>
                      {intl.formatMessage({ id: "sidebar.main" })}
                    </span>
                  ) : null}
@@ -215,12 +216,12 @@ export function Sidebar(props: {
                         e.stopPropagation();
                         onSetEndpoint?.(env.id, ep.id);
                       }}
-                      title={epH?.lastError ? `${endpointLabel(intl, ep)} — ${epH.lastError}` : endpointLabel(intl, ep)}
+                      title={epH?.lastError ? `${endpointLabel(intl, ep)} — ${translateMessage(intl, epH.lastError)}` : endpointLabel(intl, ep)}
                     >
                       <span
                         className="dot"
                         style={{
-                          background: ep.id === env.activeEndpointId ? "#5cb2ff" : (epH ? (ENDPOINT_PHASE_COLORS[epH.phase] ?? "#64718c") : "#64718c"),
+                          background: ep.id === env.activeEndpointId ? "var(--accent-blue)" : (epH ? (ENDPOINT_PHASE_COLORS[epH.phase] ?? "var(--text-muted)") : "var(--text-muted)"),
                           width: 6,
                           height: 6,
                         }}

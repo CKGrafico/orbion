@@ -35,12 +35,12 @@ export function getPillLabel(status: FleetItemStatus): string {
 }
 
 export const PILL_COLORS: Record<FleetItemStatus, string> = {
-  "pending-approval": "#ff8484",
-  "awaiting-input": "#ffcc5c",
-  failed: "#ff8484",
-  working: "#9fef00",
-  completed: "#a4b1cd",
-  idle: "#64718c",
+  "pending-approval": "var(--pill-approval)",
+  "awaiting-input": "var(--pill-input)",
+  failed: "var(--pill-failed)",
+  working: "var(--pill-working)",
+  completed: "var(--pill-done)",
+  idle: "var(--pill-idle)",
 };
 
 export function highestPriority(statuses: FleetItemStatus[]): FleetItemStatus {

@@ -1,5 +1,6 @@
-import type { AccessEndpoint, EndpointHealth } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointHealth, I18nMessage } from "../shared/ipc.js";
 import { getSessionToken, setEnvironmentAuthState, removeSessionToken } from "./config-store.js";
+import { msg } from "./i18n.js";
 
 export type ConnectionPhase =
   | "offline"
@@ -12,7 +13,7 @@ export type ErrorClass = "transient" | "blocking";
 
 export interface ConnectionStatus {
   phase: ConnectionPhase;
-  lastError: string | null;
+  lastError: string | I18nMessage | null;
   errorClass: ErrorClass | null;
   failureCount: number;
   backoffMs: number;
@@ -22,7 +23,7 @@ export interface ConnectionStatus {
 interface ProbeResult {
   ok: boolean;
   status: number;
-  error: string | null;
+  error: string | I18nMessage | null;
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
@@ -31,16 +32,24 @@ const STABLE_MS = 30_000;
 const PROBE_TIMEOUT_MS = 5_000;
 const FINGERPRINT_TIMEOUT_MS = 3_000;
 
+function errorText(message: string | I18nMessage | null): string | null {
+  if (!message) return null;
+  if (typeof message === "string") return message;
+  return message.key;
+}
+
 export function classifyError(
   status: number,
-  errorMessage: string | null,
+  errorMessage: string | I18nMessage | null,
 ): ErrorClass {
   if (status === 401 || status === 403) return "blocking";
-  if (errorMessage) {
-    const lower = errorMessage.toLowerCase();
+  const text = errorText(errorMessage);
+  if (text) {
+    const lower = text.toLowerCase();
     if (
       lower.includes("invalid environment url") ||
-      lower.includes("unsupported protocol")
+      lower.includes("unsupported protocol") ||
+      lower.includes("maininvalidenvurl")
     ) {
       return "blocking";
     }
@@ -48,8 +57,9 @@ export function classifyError(
   return "transient";
 }
 
-export function isNetworkDownError(message: string): boolean {
-  const lower = message.toLowerCase();
+export function isNetworkDownError(message: string | I18nMessage): boolean {
+  const text = typeof message === "string" ? message : message.key;
+  const lower = text.toLowerCase();
   return (
     lower.includes("enetunreach") ||
     lower.includes("econnrefused") ||
@@ -59,7 +69,8 @@ export function isNetworkDownError(message: string): boolean {
     lower.includes("net::err_internet_disconnected") ||
     lower.includes("net::err_name_not_resolved") ||
     lower.includes("net::err_connection_refused") ||
-    lower.includes("request timed out")
+    lower.includes("request timed out") ||
+    lower.includes("mainrequesttimedout")
   );
 }
 
@@ -163,7 +174,7 @@ export class ConnectionSupervisor {
       .catch(() => {
         if (this.destroyed) return;
         this.probeInFlight = false;
-        this.handleProbeResult({ ok: false, status: 0, error: "Probe failed" });
+        this.handleProbeResult({ ok: false, status: 0, error: msg("vmWizard.mainProbeFailed") });
       });
   }
 
@@ -191,12 +202,12 @@ export class ConnectionSupervisor {
     this.setPhase("connected");
   }
 
-  private onError(status: number, errorMessage: string | null): void {
+  private onError(status: number, errorMessage: string | I18nMessage | null): void {
     const cls = classifyError(status, errorMessage);
     this.errorClass = cls;
 
     if (cls === "blocking") {
-      this.lastError = errorMessage ?? `HTTP ${status}`;
+      this.lastError = errorMessage ?? msg("vmWizard.mainHttpError", { status });
       this.clearRetryTimer();
       this.clearStableCheck();
       this.setPhase("blocked");
@@ -213,7 +224,7 @@ export class ConnectionSupervisor {
     }
 
     this.failureCount++;
-    this.lastError = errorMessage ?? `HTTP ${status}`;
+    this.lastError = errorMessage ?? msg("vmWizard.mainHttpError", { status });
     this.connectedSince = null;
     this.clearStableCheck();
 
@@ -306,7 +317,7 @@ export function makeProbe(baseUrl: string, environmentId?: string): () => Promis
       }
 
       if (!res.ok) {
-        return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+        return { ok: false, status: res.status, error: msg("vmWizard.mainHttpError", { status: res.status }) };
       }
 
       const text = await res.text();
@@ -325,7 +336,7 @@ export function makeProbe(baseUrl: string, environmentId?: string): () => Promis
         return {
           ok: false,
           status: res.status,
-          error: envelope.error?.message ?? `HTTP ${res.status}`,
+          error: envelope.error?.message ?? msg("vmWizard.mainHttpError", { status: res.status }),
         };
       }
 
@@ -333,7 +344,7 @@ export function makeProbe(baseUrl: string, environmentId?: string): () => Promis
     } catch (err) {
       const message =
         err instanceof Error && err.name === "AbortError"
-          ? "Request timed out"
+          ? msg("vmWizard.mainRequestTimedOut")
           : err instanceof Error
             ? err.message
             : String(err);
@@ -386,7 +397,7 @@ export function resolveActiveUrl(endpoints: AccessEndpoint[], activeEndpointId: 
 }
 
 interface EndpointHealthEntry {
-  lastError: string | null;
+  lastError: string | I18nMessage | null;
   failureCount: number;
   phase: ConnectionPhase;
 }

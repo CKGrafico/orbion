@@ -1,6 +1,7 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, I18nMessage } from "../shared/ipc.js";
+import { msg } from "./i18n.js";
 
 interface LegacyInstance {
   id: string;
@@ -203,7 +204,7 @@ export function migrateFromLocalStorage(rawInstances: string, rawSelectedId: str
   }
 }
 
-export function updateEndpointHealth(environmentId: string, endpointId: string, lastError: string | null, failureCount: number): void {
+export function updateEndpointHealth(environmentId: string, endpointId: string, lastError: string | I18nMessage | null, failureCount: number): void {
   const envs = getEnvironments();
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
@@ -265,7 +266,12 @@ export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEnd
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
-  env.opencode = endpoint;
+  if (endpoint && endpoint.password) {
+    const encrypted = encryptValue(endpoint.password);
+    env.opencode = encrypted ? { ...endpoint, password: encrypted } : endpoint;
+  } else {
+    env.opencode = endpoint;
+  }
   store.set("environments", envs);
 }
 
@@ -345,7 +351,7 @@ export async function exchangePairingCode(
 
     const data = await res.json() as unknown;
     if (typeof data !== "object" || data === null || !("accessToken" in data)) {
-      return { ok: false, error: "Invalid pairing response from daemon" };
+      return { ok: false, error: msg("vmWizard.mainInvalidPairingResponse") };
     }
 
     const response = data as { accessToken: string; scope?: SessionScope; expiresAt?: number | null };

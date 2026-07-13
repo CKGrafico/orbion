@@ -13,10 +13,10 @@ import { PanelLeft, Search, ArrowLeft, RotateCw } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { AddVmWizard } from "./components/AddVmWizard";
-import { LoopsView } from "./components/LoopsView";
 import { LoopDetail } from "./components/LoopDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
 import { hostLabel, timeAgo } from "./format";
+import { translateMessage, standaloneIntl } from "./i18n";
 
 type View = { kind: "list" } | { kind: "loop"; loopId: string };
 
@@ -53,6 +53,7 @@ export function App(): React.ReactNode {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [mutedEnvs, setMutedEnvs] = useState<Set<string>>(() => {
+    if (window.api) return new Set<string>();
     try {
       const raw = localStorage.getItem("orbion.muted.v1");
       if (raw) return new Set(JSON.parse(raw) as string[]);
@@ -74,14 +75,16 @@ export function App(): React.ReactNode {
           setView({ kind: "list" });
         }
       });
-      try {
-        const raw = localStorage.getItem("orbion.muted.v1");
-        if (raw) {
-          for (const id of JSON.parse(raw) as string[]) {
-            bridge.setMuted(id, true);
+      if (!window.api) {
+        try {
+          const raw = localStorage.getItem("orbion.muted.v1");
+          if (raw) {
+            for (const id of JSON.parse(raw) as string[]) {
+              bridge.setMuted(id, true);
+            }
           }
-        }
-      } catch { /* empty */ }
+        } catch { /* empty */ }
+      }
       return bridge;
     },
     [select],
@@ -140,15 +143,21 @@ export function App(): React.ReactNode {
 
     const check = async (): Promise<void> => {
       for (const env of environments) {
-        const res = await fetchLoops(env);
-        if (cancelled) return;
-        const h: EnvironmentHealth = res.ok ? "ok" : "offline";
-        setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
-        if (res.ok && Array.isArray(res.data)) {
-          setPerEnvLoops((prev) => {
-            if (prev[env.id] === res.data) return prev;
-            return { ...prev, [env.id]: res.data as LoopMeta[] };
-          });
+        try {
+          const res = await fetchLoops(env);
+          if (cancelled) return;
+          const h: EnvironmentHealth = res.ok ? "ok" : "offline";
+          setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
+          if (res.ok && Array.isArray(res.data)) {
+            setPerEnvLoops((prev) => {
+              if (prev[env.id] === res.data) return prev;
+              return { ...prev, [env.id]: res.data };
+            });
+          }
+        } catch {
+          if (!cancelled) {
+            setHealth((prev) => (prev[env.id] === "offline" ? prev : { ...prev, [env.id]: "offline" }));
+          }
         }
       }
     };
@@ -250,7 +259,7 @@ export function App(): React.ReactNode {
             itemId: env.id,
             itemType: "loop",
             status: current,
-            message: `${env.name} is ${getPillLabel(current)}`,
+            message: standaloneIntl.formatMessage({ id: "app.notificationItemNeedsAttention" }, { envName: env.name, itemType: "loop" }),
           });
         }
       }
@@ -263,7 +272,9 @@ export function App(): React.ReactNode {
       const next = new Set(prev);
       if (next.has(environmentId)) next.delete(environmentId);
       else next.add(environmentId);
-      localStorage.setItem("orbion.muted.v1", JSON.stringify([...next]));
+      if (!window.api) {
+        localStorage.setItem("orbion.muted.v1", JSON.stringify([...next]));
+      }
       notificationBridge.setMuted(environmentId, next.has(environmentId));
       return next;
     });
@@ -288,7 +299,7 @@ export function App(): React.ReactNode {
       if (cancelled) return;
       if (res.ok && Array.isArray(res.data)) {
         setLoops(res.data);
-        setPerEnvLoops((prev) => ({ ...prev, [selected.id]: res.data as LoopMeta[] }));
+        setPerEnvLoops((prev) => ({ ...prev, [selected.id]: res.data }));
         setLastUpdated(Date.now());
       }
     };
@@ -418,7 +429,7 @@ export function App(): React.ReactNode {
                   const h = health[selected.id] ?? "unknown";
                   const cs = connectionStatus[selected.id];
                   if (cs && cs.phase === "blocked" && cs.lastError) {
-                    return intl.formatMessage({ id: "app.blockedLabel" }, { detail: cs.lastError });
+                    return intl.formatMessage({ id: "app.blockedLabel" }, { detail: translateMessage(intl, cs.lastError) });
                   }
                   if (h === "offline" || h === "backoff" || h === "blocked" || h === "connecting") {
                     return intl.formatMessage({ id: `app.${h}` });

@@ -3,6 +3,11 @@
 // daemon sends no CORS headers, so renderer fetch would be blocked — and
 // main-process fetch also works unchanged for environments on remote VMs.
 
+export interface I18nMessage {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
 export interface ApiRequestArgs {
   baseUrl: string;
   path: string;
@@ -15,7 +20,7 @@ export interface ApiResponse<T = unknown> {
   ok: boolean;
   status: number;
   data?: T;
-  error?: string;
+  error?: string | I18nMessage;
 }
 
 export interface StreamSubscribeArgs {
@@ -43,7 +48,7 @@ export interface SessionToken {
 export interface PairingCodeExchangeResponse {
   ok: boolean;
   token?: SessionToken;
-  error?: string;
+  error?: string | I18nMessage;
 }
 
 // ── Config store (electron-store) ───────────────────────────────────
@@ -54,7 +59,7 @@ export interface AccessEndpoint {
   id: string;
   kind: EndpointKind;
   url: string;
-  lastError: string | null;
+  lastError: string | I18nMessage | null;
   failureCount: number;
 }
 
@@ -94,6 +99,13 @@ export interface ConfigBridge {
 
 export type InfraAction = "machine-status" | "clone-repo";
 
+export interface MachineStatusEntry {
+  id: string;
+  name: string;
+  health: string;
+  endpoints: Array<{ url: string; kind: string }>;
+}
+
 export interface InfraActionArgs {
   action: InfraAction;
   params?: Record<string, unknown>;
@@ -102,7 +114,7 @@ export interface InfraActionArgs {
 export interface InfraActionResult {
   ok: boolean;
   data?: unknown;
-  error?: string;
+  error?: string | I18nMessage;
 }
 
 export interface InfraBridge {
@@ -121,7 +133,7 @@ export type ConnectionPhase =
 
 export interface ConnectionStatus {
   phase: ConnectionPhase;
-  lastError: string | null;
+  lastError: string | I18nMessage | null;
   errorClass: "transient" | "blocking" | null;
   failureCount: number;
   backoffMs: number;
@@ -131,7 +143,7 @@ export interface ConnectionStatus {
 export interface EndpointHealth {
   endpointId: string;
   phase: ConnectionPhase;
-  lastError: string | null;
+  lastError: string | I18nMessage | null;
   failureCount: number;
 }
 
@@ -160,7 +172,7 @@ export type OpenCodeErrorKind = "unreachable" | "rejected" | "unauthenticated" |
 export interface OpenCodeConnectionStatus {
   authState: OpenCodeAuthState;
   errorKind: OpenCodeErrorKind;
-  errorMessage: string | null;
+  errorMessage: string | I18nMessage | null;
   serverVersion: string | null;
   connectedProviders: string[];
   checkedAt: number | null;
@@ -183,11 +195,6 @@ export type VmWizardStep =
   | "consent"
   | "done"
   | "error";
-
-export interface I18nMessage {
-  key: string;
-  params?: Record<string, string | number>;
-}
 
 export interface SshHost {
   host: string;

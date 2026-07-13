@@ -189,7 +189,12 @@
     "pid": "PID",
     "workingDir": "Working dir",
     "command": "Command",
-    "emptyValue": "—"
+    "emptyValue": "—",
+    "statusRunning": "running",
+    "statusWaiting": "waiting",
+    "statusPaused": "paused",
+    "statusIdle": "idle",
+    "statusStopped": "stopped"
   },
   "logs": {
     "title": "Logs",

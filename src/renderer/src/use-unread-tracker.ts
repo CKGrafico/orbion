@@ -7,6 +7,7 @@ export interface UnreadState {
 const STORAGE_KEY = "orbion.unread.v1";
 
 function loadState(): UnreadState {
+  if (window.api) return { lastVisited: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as UnreadState;
@@ -15,6 +16,7 @@ function loadState(): UnreadState {
 }
 
 function saveState(state: UnreadState): void {
+  if (window.api) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch { /* empty */ }
@@ -23,7 +25,6 @@ function saveState(state: UnreadState): void {
 export function useUnreadTracker(): {
   isUnread: (itemId: string, completedAt: number | null) => boolean;
   markVisited: (itemId: string) => void;
-  getUnreadIds: (items: Array<{ id: string; completedAt: number | null }>) => string[];
 } {
   const [state, setState] = useState<UnreadState>(loadState);
   const stateRef = useRef(state);
@@ -50,12 +51,5 @@ export function useUnreadTracker(): {
     [],
   );
 
-  const getUnreadIds = useCallback(
-    (items: Array<{ id: string; completedAt: number | null }>): string[] => {
-      return items.filter((item) => isUnread(item.id, item.completedAt)).map((item) => item.id);
-    },
-    [isUnread],
-  );
-
-  return { isUnread, markVisited, getUnreadIds };
+  return { isUnread, markVisited };
 }

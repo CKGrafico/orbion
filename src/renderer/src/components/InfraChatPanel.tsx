@@ -1,12 +1,13 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import type { ChatTurn, AccessMode } from "../types";
-import type { InfraActionArgs } from "../../../shared/ipc";
+import type { InfraActionArgs, MachineStatusEntry } from "../../../shared/ipc";
 import { useTranscript } from "../chat/useTranscript";
 import { MarkdownContent } from "../chat/MarkdownContent";
 import { ChatComposer } from "../chat/ChatComposer";
 import { Server } from "lucide-react";
 import type { ApprovalDecision, ApprovalRequest, QuestionRequest } from "../chat/types";
+import { translateMessage } from "../i18n";
 
 interface InfraChatPanelProps {
   mainVmId: string;
@@ -16,7 +17,7 @@ interface InfraChatPanelProps {
 function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
   if (!Array.isArray(data)) return intl.formatMessage({ id: "infra.noData" });
   const lines: string[] = [`## ${intl.formatMessage({ id: "infra.fleetStatusHeader" })}\n`];
-  for (const machine of data as Array<{ id: string; name: string; health: string; endpoints: Array<{ url: string; kind: string }> }>) {
+  for (const machine of data as MachineStatusEntry[]) {
     const icon = machine.health === "connected" ? "🟢" : machine.health === "offline" ? "🔴" : "🟡";
     lines.push(`**${machine.name}** ${icon} \`${machine.health}\``);
     for (const ep of machine.endpoints) {
@@ -100,7 +101,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               responseText = JSON.stringify(result.data, null, 2);
             }
           } else {
-            responseText = intl.formatMessage({ id: "infra.errorMessage" }, { detail: result.error ?? intl.formatMessage({ id: "infra.unknownError" }) });
+            responseText = intl.formatMessage({ id: "infra.errorMessage" }, { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) });
           }
           appendAssistantContent(turnId, responseText);
           finishTurn(turnId);

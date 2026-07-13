@@ -1,6 +1,6 @@
-import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint } from "../../shared/ipc";
+import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint } from "../../shared/ipc";
 
-export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint };
+export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint };
 
 export type LoopStatus = "running" | "waiting" | "paused" | "idle" | "stopped";
 
@@ -53,16 +53,6 @@ export interface TaskDefinition {
   onSuccessTaskId: string | null;
   onFailureTaskId: string | null;
   createdAt: string;
-}
-
-export type Section = "loops" | "tasks" | "projects" | "chat";
-
-export interface AccessEndpoint {
-  id: string;
-  kind: EndpointKind;
-  url: string;
-  lastError: string | null;
-  failureCount: number;
 }
 
 export interface Environment {

@@ -46,7 +46,7 @@ export function LoopDetail(props: {
             className="chip"
             style={{ color: STATUS_COLORS[loop.status] ?? "var(--text-secondary)" }}
           >
-            ● {loop.status}
+            ● {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
           </span>
         ) : null}
       </div>
@@ -72,28 +72,28 @@ export function LoopDetail(props: {
               <div className="value">{timeAgo(loop.lastRunAt)}</div>
             </div>
             <div className="meta-item">
-              <div className="label">Last exit</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.lastExit" })}</div>
               <div className="value" style={failed ? { color: "var(--danger)" } : undefined}>
                 {loop.lastExitCode === null ? "—" : loop.lastExitCode}
               </div>
             </div>
             <div className="meta-item">
-              <div className="label">Runs</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.runs" })}</div>
               <div className="value">
                 {loop.runCount}
                 {loop.maxRuns ? ` / ${loop.maxRuns}` : ""}
               </div>
             </div>
             <div className="meta-item">
-              <div className="label">PID</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.pid" })}</div>
               <div className="value">{loop.pid ?? "—"}</div>
             </div>
             <div className="meta-item">
-              <div className="label">Working dir</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.workingDir" })}</div>
               <div className="value mono">{loop.cwd}</div>
             </div>
             <div className="meta-item">
-              <div className="label">Command</div>
+              <div className="label">{intl.formatMessage({ id: "loopDetail.command" })}</div>
               <div className="value mono">{commandLine(loop.command, loop.commandArgs)}</div>
             </div>
           </div>
