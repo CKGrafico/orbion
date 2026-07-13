@@ -31,9 +31,29 @@ export interface StreamEventPayload {
   text: string;
 }
 
+// ── Config store (electron-store) ───────────────────────────────────
+
+export interface Instance {
+  id: string;
+  name: string;
+  baseUrl: string;
+}
+
+export interface ConfigBridge {
+  getInstances: () => Promise<Instance[]>;
+  addInstance: (name: string, baseUrl: string) => Promise<Instance>;
+  removeInstance: (id: string) => Promise<void>;
+  getSelectedInstanceId: () => Promise<string | null>;
+  setSelectedInstanceId: (id: string | null) => Promise<void>;
+  migrateFromLocalStorage: (rawInstances: string, rawSelectedId: string | null) => Promise<boolean>;
+}
+
+// ── Full IPC bridge ─────────────────────────────────────────────────
+
 export interface LoopTaskBridge {
   request: <T = unknown>(args: ApiRequestArgs) => Promise<ApiResponse<T>>;
   subscribeStream: (args: StreamSubscribeArgs) => Promise<void>;
   unsubscribeStream: (subId: string) => Promise<void>;
   onStreamEvent: (cb: (payload: StreamEventPayload) => void) => () => void;
+  config: ConfigBridge;
 }

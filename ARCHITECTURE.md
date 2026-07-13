@@ -32,8 +32,9 @@ it (no pause/resume/trigger/edit/delete).
 orbion/
 ├── src/
 │   ├── main/
-│   │   └── index.ts            # Electron main: window lifecycle, IPC handlers,
-│   │                           #   HTTP proxy, SSE client, bounds persistence
+│   │   ├── index.ts            # Electron main: window lifecycle, IPC handlers,
+│   │   │                       #   HTTP proxy, SSE client, bounds persistence
+│   │   └── config-store.ts     # electron-store config + safeStorage wrapper
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
 │   ├── shared/
@@ -45,7 +46,7 @@ orbion/
 │           ├── App.tsx          # Top-level layout, routing, polling, health
 │           ├── api.ts           # REST + SSE client (real vs mock dispatch)
 │           ├── mock.ts          # Fake data adapter for browser-only dev
-│           ├── store.ts         # localStorage-backed instance registry (hook)
+│           ├── store.ts         # IPC-backed instance registry hook (fallback: localStorage in mock)
 │           ├── types.ts         # Domain types mirrored from loop-task
 │           ├── format.ts        # time/label/status formatting helpers
 │           ├── theme.css        # Design tokens + all component styles
@@ -81,7 +82,8 @@ flowchart LR
     R["Renderer (React 19)\nsandboxed"]
     P["Preload\ncontextBridge → window.api"]
     M["Main process\nHTTP proxy + SSE client"]
-    LS[("localStorage\ninstances + selection")]
+    ES[("electron-store\n(config.json in userData)\ninstances + selection")]
+    SS["safeStorage wrapper\n(encryption ready, unused)"]
     WB[("userData/window-bounds.json")]
   end
 
@@ -91,7 +93,9 @@ flowchart LR
   user --> R
   R <-->|window.api| P
   P <-->|ipcRenderer/ipcMain| M
-  R -.reads/writes.-> LS
+  R -.config IPC.-> ES
+  M -.reads/writes.-> ES
+  M -.encrypt/decrypt.-> SS
   M -.reads/writes.-> WB
   M -->|"GET /api/loops, /tasks, /projects"| D1
   M -->|"SSE /api/loops/:id/logs/stream"| D1
@@ -110,8 +114,8 @@ flowchart LR
 - **State model:** local component state + a `useInstances` hook. "Routing" is a
   simple `view` discriminated union (`list` | `loop`) plus a `section` enum in
   `App.tsx` — there is no URL router.
-- **Inputs:** data from `api.ts`; persisted instances from `store.ts`.
-- **Outputs:** IPC calls via `window.api`; `localStorage` writes.
+- **Inputs:** data from `api.ts`; persisted instances from `store.ts` via IPC.
+- **Outputs:** IPC calls via `window.api`.
 
 ### 3.2 Backend / Server / API (Main process)
 
@@ -126,6 +130,12 @@ There is no separate server; the **Electron main process is the backend**
   response body, splits on `\n\n`, and forwards `data:` / `event:` lines to the
   renderer as `stream:event` messages. Subscriptions are tracked in a
   `Map<subId, AbortController>` for clean teardown.
+- **Config store** (`config-store.ts`) — manages instance and selection state
+  via `electron-store` (typed JSON in `userData`). Exposes CRUD operations
+  (`getInstances`, `addInstance`, `removeInstance`, `getSelectedInstanceId`,
+  `setSelectedInstanceId`) and a one-time `migrateFromLocalStorage` function.
+  Also provides a `safeStorage` wrapper (`encryptValue`/`decryptValue`) for
+  future secrets, with no encryption call sites yet.
 - **Window management** — single-instance lock, custom hidden titlebar with a
   Windows overlay, `ready-to-show` gating, and external links routed to the
   system browser via `setWindowOpenHandler`.
@@ -133,13 +143,16 @@ There is no separate server; the **Electron main process is the backend**
   state to `window-bounds.json` in the Electron `userData` dir.
 
 IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
-`stream:unsubscribe`.
+`stream:unsubscribe`, `config:getInstances`, `config:addInstance`,
+`config:removeInstance`, `config:getSelectedInstanceId`,
+`config:setSelectedInstanceId`, `config:migrateFromLocalStorage`.
 
 ### 3.3 Shared Libraries / Common Code
 
 - **`src/shared/ipc.ts`** — the single source of truth for the IPC contract:
   `ApiRequestArgs`, `ApiResponse<T>`, `StreamSubscribeArgs`,
-  `StreamEventPayload`, and `LoopTaskBridge` (the shape of `window.api`).
+  `StreamEventPayload`, `Instance`, `ConfigBridge`, and `LoopTaskBridge`
+  (the shape of `window.api`, including the `config` sub-bridge).
   Imported by all three layers so the boundary stays type-safe.
 - **`src/renderer/src/types.ts`** — domain types (`LoopMeta`, `RunRecord`,
   `Project`, `TaskDefinition`, `Instance`, `LoopStatus`, `InstanceHealth`)
@@ -152,7 +165,9 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 - **`src/preload/index.ts`** — builds a `LoopTaskBridge` and exposes it as
   `window.api` via `contextBridge.exposeInMainWorld`. Wraps `ipcRenderer.invoke`
   for request/subscribe/unsubscribe and `ipcRenderer.on("stream:event", …)` for
-  push events, returning an unsubscribe cleanup for the listener.
+  push events, returning an unsubscribe cleanup for the listener. The `config`
+  sub-bridge wraps the config-store IPC channels for instance CRUD and
+  localStorage migration.
 
 ### 3.5 CLI / Scripts / Automation
 
@@ -201,17 +216,28 @@ sequenceDiagram
 ## 5. Data Stores
 
 The app has **no database or backend store of its own**; all authoritative data
-lives in the loop-task daemons. Local persistence only:
+lives in the loop-task daemons. Local persistence uses two mechanisms:
 
-- **`localStorage`** (renderer, `store.ts`): registered instances
-  (`lta.instances.v1`) and the selected instance id (`lta.selectedInstance.v1`).
-  An `Instance` is `{ id, name, baseUrl }`; ids are an 8-char slice of
-  `crypto.randomUUID()`.
-- **`window-bounds.json`** (main, in Electron `userData`): window
+- **electron-store** (main process, `config-store.ts`): a typed JSON store in
+  Electron's `userData` directory holding registered instances (`Instance[]`)
+  and the selected instance id (`string | null`). Accessed by the renderer only
+  through typed IPC channels (`config:getInstances`, `config:addInstance`,
+  `config:removeInstance`, `config:getSelectedInstanceId`,
+  `config:setSelectedInstanceId`, `config:migrateFromLocalStorage`). This
+  eliminates the renderer-side `localStorage` XSS surface from previous versions.
+- **window-bounds.json** (main, in Electron `userData`): window
   size/position/maximized state.
 
-No schemas or migrations beyond the versioned localStorage keys (the `.v1`
-suffix is the migration hook).
+A **safeStorage wrapper** (`config-store.ts`: `encryptValue`/`decryptValue`) is
+available for future secrets (e.g. daemon auth tokens), using OS-native
+encryption (DPAPI on Windows, Keychain on macOS, libsecret on Linux). No
+encryption call sites exist yet — the capability is ready for when secrets
+appear.
+
+**Migration:** on first launch after upgrade, `config:migrateFromLocalStorage`
+reads the old `lta.instances.v1` and `lta.selectedInstance.v1` localStorage
+keys, writes them into electron-store, and clears the keys. The renderer's
+`store.ts` handles this automatically.
 
 ## 6. External Integrations / APIs
 
@@ -228,8 +254,8 @@ suffix is the migration hook).
 - **Failure behavior:** 10s request timeout → structured error; failed polls
   flip the instance health dot to `offline`; SSE `error`/`end` closes the
   subscription. Errors are surfaced in the UI rather than thrown.
-- **Config location:** instance URLs are stored in `localStorage`, entered via
-  `AddInstanceModal`.
+- **Config location:** instance URLs are stored in `electron-store` (main process),
+  entered via `AddInstanceModal`, and accessed through the typed IPC contract.
 
 ## 7. Key Technologies
 
@@ -237,11 +263,13 @@ suffix is the migration hook).
 |---|---|---|
 | Electron 37 | Desktop shell | Provides the main/preload/renderer split and OS integration |
 | electron-vite 4 | Build tool | Bundles the three processes; HMR in dev |
+| electron-store 11 | Config persistence | Typed JSON store in userData; replaces renderer localStorage |
 | Vite 7 | Bundler/dev server | Renderer builds + browser-only preview |
 | React 19 | UI framework | Component-based renderer |
 | TypeScript 5.8 (strict) | Language | Type-safe IPC contract across process boundaries |
 | Plain CSS + custom properties | Styling | Design tokens in `theme.css`; no CSS framework |
 | Server-Sent Events (SSE) | Log streaming | Push-based live log following |
+| Electron safeStorage | Encryption-at-rest | OS-native encryption wrapper; ready for future secrets |
 | pnpm | Package manager | Dependency management (Node >= 20) |
 
 ## 8. Deployment & Infrastructure
@@ -264,6 +292,14 @@ suffix is the migration hook).
 - **Renderer sandboxing:** `contextIsolation: true`, `nodeIntegration: false`.
   The renderer has no Node/network access and reaches the outside world only
   through the narrow `window.api` bridge.
+- **No localStorage for config:** instance data is stored in the main process
+  via `electron-store`, eliminating the renderer-side XSS surface that
+  `localStorage` exposed. The renderer accesses config only through the typed
+  IPC contract.
+- **Encryption-at-rest readiness:** a `safeStorage` wrapper is available in
+  `config-store.ts` for encrypting secrets before they are persisted. No call
+  sites use encryption yet — the capability is ready for when daemon auth
+  tokens or other secrets need to be stored.
 - **URL validation:** the main process rejects any base URL that is not
   `http:`/`https:` before making a request.
 - **External links:** `setWindowOpenHandler` denies in-app navigation and opens
@@ -328,8 +364,9 @@ and screenshots without a daemon. This is a notable gap (see §15).
   a plain browser for fast UI iteration and screenshots.
 - **No router / no state library.** The UI is small enough that a `view` union +
   local state is simpler than adding dependencies.
-- **Local-only persistence.** Instances in `localStorage`, bounds in a JSON file;
-  the app intentionally owns no durable domain data.
+- **Local-only persistence.** Instances in `electron-store` (main process), bounds
+  in a JSON file; the app intentionally owns no durable domain data. localStorage
+  is used only as a fallback in mock mode (browser-only dev with no Electron).
 
 ## 15. Constraints, Risks, and Technical Debt
 
