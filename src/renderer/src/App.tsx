@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConnectionStatus, EndpointHealth } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Section } from "./types";
 import { useEnvironments } from "./store";
-import { fetchLoops, isMock, resolveBaseUrl } from "./api";
+import { fetchLoops, isMock } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { SegmentedTabs } from "./components/SegmentedTabs";
 import { AddEnvironmentModal } from "./components/AddInstanceModal";
@@ -195,9 +195,9 @@ export function App(): React.ReactNode {
     setFilter("");
   };
 
-  const handleAdd = (name: string, baseUrl: string): void => {
+  const handleAdd = (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale"): void => {
     void (async () => {
-      const env = await add(name, baseUrl);
+      const env = await add(name, baseUrl, kind);
       handleSelect(env.id);
       setModalOpen(false);
     })();

@@ -17,7 +17,7 @@ export function useEnvironments(): {
   environments: Environment[];
   selectedId: string | null;
   select: (id: string | null) => void;
-  add: (name: string, baseUrl: string) => Promise<Environment>;
+  add: (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale") => Promise<Environment>;
   remove: (id: string) => void;
   addEndpoint: (environmentId: string, url: string, kind: "direct" | "ssh" | "tailscale") => void;
   removeEndpoint: (environmentId: string, endpointId: string) => void;
@@ -94,11 +94,11 @@ export function useEnvironments(): {
     [],
   );
 
-  const add = useCallback(async (name: string, baseUrl: string): Promise<Environment> => {
+  const add = useCallback(async (name: string, baseUrl: string, kind?: "direct" | "ssh" | "tailscale"): Promise<Environment> => {
     const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
 
     if (window.api) {
-      const env = await window.api.config.addEnvironment(name, trimmedUrl);
+      const env = await window.api.config.addEnvironment(name, trimmedUrl, kind);
       setEnvironments(await window.api.config.getEnvironments());
       return env;
     }
@@ -109,7 +109,7 @@ export function useEnvironments(): {
         for (const ep of env.endpoints) {
           const epReachable = await probeUrl(ep.url);
           if (epReachable) {
-            addEndpointFn(env.id, trimmedUrl, "direct");
+            addEndpointFn(env.id, trimmedUrl, kind ?? "direct");
             return env;
           }
         }
@@ -122,7 +122,7 @@ export function useEnvironments(): {
       name: name.trim(),
       endpoints: [{
         id: endpointId,
-        kind: "direct",
+        kind: kind ?? "direct",
         url: trimmedUrl,
         lastError: null,
         failureCount: 0,

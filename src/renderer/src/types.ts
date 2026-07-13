@@ -1,6 +1,6 @@
-import type { EndpointKind } from "../../shared/ipc";
+import type { EndpointKind, TailscalePeer, TailscalePeersResponse } from "../../shared/ipc";
 
-export type { EndpointKind };
+export type { EndpointKind, TailscalePeer, TailscalePeersResponse };
 
 export type LoopStatus = "running" | "waiting" | "paused" | "idle" | "stopped";
 

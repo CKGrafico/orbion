@@ -29,6 +29,7 @@ import {
   resolveActiveUrl,
   fetchFingerprint,
 } from "./connection-supervisor.js";
+import { fetchPeers } from "./tailscale.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -436,6 +437,8 @@ app.whenReady().then(() => {
   ipcMain.handle("connection:fetchFingerprint", async (_event, baseUrl: string) => {
     return fetchFingerprint(baseUrl);
   });
+
+  ipcMain.handle("tailscale:peers", () => fetchPeers());
 
   seedSupervisors();
   createWindow();

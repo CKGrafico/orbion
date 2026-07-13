@@ -5,6 +5,7 @@ import type {
   EndpointHealth,
   StreamSubscribeArgs,
   StreamEventPayload,
+  TailscalePeersResponse,
   LoopTaskBridge,
 } from "../shared/ipc.js";
 
@@ -82,6 +83,9 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.send("connection:networkChanged", online);
     },
   },
+
+  tailscalePeers: () =>
+    ipcRenderer.invoke("tailscale:peers") as Promise<TailscalePeersResponse>,
 };
 
 contextBridge.exposeInMainWorld("api", bridge);

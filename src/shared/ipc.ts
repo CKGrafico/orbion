@@ -86,6 +86,22 @@ export interface EndpointHealth {
   failureCount: number;
 }
 
+// ── Tailscale peer discovery ────────────────────────────────────────
+
+export interface TailscalePeer {
+  hostName: string;
+  dnsName: string;
+  tailscaleIPs: string[];
+  online: boolean;
+  os: string;
+}
+
+export interface TailscalePeersResponse {
+  available: boolean;
+  peers: TailscalePeer[];
+  error?: string;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -104,4 +120,5 @@ export interface LoopTaskBridge {
   onStreamEvent: (cb: (payload: StreamEventPayload) => void) => () => void;
   config: ConfigBridge;
   connection: ConnectionBridge;
+  tailscalePeers: () => Promise<TailscalePeersResponse>;
 }
