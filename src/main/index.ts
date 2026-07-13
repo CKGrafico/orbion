@@ -4,21 +4,104 @@ import fs from "node:fs";
 import type {
   ApiRequestArgs,
   ApiResponse,
+  ConnectionStatus,
+  EndpointHealth,
   StreamSubscribeArgs,
 } from "../shared/ipc.js";
+import type { Environment } from "../shared/ipc.js";
 import {
-  getInstances,
-  addInstance,
-  removeInstance,
-  getSelectedInstanceId,
-  setSelectedInstanceId,
+  getEnvironments,
+  addEnvironment,
+  removeEnvironment,
+  addEndpoint,
+  removeEndpoint,
+  setActiveEndpoint,
+  getSelectedEnvironmentId,
+  setSelectedEnvironmentId,
   migrateFromLocalStorage,
+  updateEndpointHealth,
+  findEnvironmentByFingerprint,
+  setEnvironmentFingerprintId,
 } from "./config-store.js";
+import {
+  ConnectionSupervisor,
+  EndpointHealthTracker,
+  makeProbe,
+  resolveActiveUrl,
+  fetchFingerprint,
+} from "./connection-supervisor.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-/** Active SSE subscriptions, keyed by subId. */
 const streams = new Map<string, AbortController>();
+
+const supervisors = new Map<string, ConnectionSupervisor>();
+const endpointTrackers = new Map<string, EndpointHealthTracker>();
+
+function getOrCreateSupervisor(environmentId: string, baseUrl: string): ConnectionSupervisor {
+  let existing = supervisors.get(environmentId);
+  if (existing) return existing;
+
+  const supervisor = new ConnectionSupervisor(
+    makeProbe(baseUrl),
+    (status: ConnectionStatus) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("connection:status", { environmentId, status });
+      }
+    },
+  );
+  supervisors.set(environmentId, supervisor);
+  supervisor.start();
+  return supervisor;
+}
+
+function syncEndpointTracker(environmentId: string): void {
+  const envs = getEnvironments();
+  const env = envs.find((e: Environment) => e.id === environmentId);
+  if (!env) return;
+
+  let tracker = endpointTrackers.get(environmentId);
+  if (!tracker) {
+    tracker = new EndpointHealthTracker(environmentId, (health) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("connection:endpointHealth", { environmentId, health });
+      }
+    });
+    endpointTrackers.set(environmentId, tracker);
+  }
+  tracker.syncEndpoints(env.endpoints);
+}
+
+function removeSupervisor(environmentId: string): void {
+  const supervisor = supervisors.get(environmentId);
+  if (supervisor) {
+    supervisor.destroy();
+    supervisors.delete(environmentId);
+  }
+  const tracker = endpointTrackers.get(environmentId);
+  if (tracker) {
+    tracker.destroy();
+    endpointTrackers.delete(environmentId);
+  }
+}
+
+function wakeupAll(): void {
+  for (const supervisor of supervisors.values()) {
+    supervisor.wakeup();
+  }
+}
+
+let osOffline = false;
+
+function setOsOffline(value: boolean): void {
+  if (osOffline === value) return;
+  osOffline = value;
+  if (!osOffline) {
+    wakeupAll();
+  }
+}
 
 function isAllowedBaseUrl(baseUrl: string): boolean {
   try {
@@ -35,7 +118,7 @@ function joinUrl(baseUrl: string, apiPath: string): string {
 
 async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   if (!isAllowedBaseUrl(args.baseUrl)) {
-    return { ok: false, status: 0, error: `Invalid instance URL: ${args.baseUrl}` };
+    return { ok: false, status: 0, error: `Invalid environment URL: ${args.baseUrl}` };
   }
 
   const controller = new AbortController();
@@ -57,7 +140,6 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
       // keep raw text for non-JSON responses
     }
 
-    // loop-task envelopes responses as { ok, data } / { ok, error: { message } }.
     if (parsed && typeof parsed === "object" && "ok" in parsed) {
       const envelope = parsed as { ok: boolean; data?: unknown; error?: { message?: string } };
       if (envelope.ok) {
@@ -80,10 +162,6 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   }
 }
 
-/**
- * Minimal SSE client: reads the response body incrementally and forwards
- * `data:` lines / `event:` names to the renderer as stream events.
- */
 async function handleStreamSubscribe(
   sender: Electron.WebContents,
   args: StreamSubscribeArgs,
@@ -138,8 +216,6 @@ async function handleStreamSubscribe(
   }
 }
 
-// ── Window bounds persistence ────────────────────────────────────────
-
 interface WindowBounds {
   x?: number;
   y?: number;
@@ -169,6 +245,16 @@ function saveBounds(win: BrowserWindow): void {
     fs.writeFileSync(boundsFile(), JSON.stringify(bounds));
   } catch {
     // non-fatal
+  }
+}
+
+function seedSupervisors(): void {
+  for (const env of getEnvironments()) {
+    const url = resolveActiveUrl(env.endpoints, env.activeEndpointId);
+    if (url) {
+      getOrCreateSupervisor(env.id, url);
+    }
+    syncEndpointTracker(env.id);
   }
 }
 
@@ -212,7 +298,6 @@ function createWindow(): void {
   win.on("move", scheduleSave);
   win.on("close", () => saveBounds(win));
 
-  // External links open in the system browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
@@ -223,9 +308,12 @@ function createWindow(): void {
   } else {
     void win.loadFile(path.join(import.meta.dirname, "../renderer/index.html"));
   }
+
+  win.on("focus", () => {
+    wakeupAll();
+  });
 }
 
-// Single-instance: a second launch focuses the existing window instead.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -253,14 +341,58 @@ app.whenReady().then(() => {
     streams.delete(subId);
   });
 
-  ipcMain.handle("config:getInstances", () => getInstances());
-  ipcMain.handle("config:addInstance", (_event, name: string, baseUrl: string) =>
-    addInstance(name, baseUrl),
-  );
-  ipcMain.handle("config:removeInstance", (_event, id: string) => removeInstance(id));
-  ipcMain.handle("config:getSelectedInstanceId", () => getSelectedInstanceId());
-  ipcMain.handle("config:setSelectedInstanceId", (_event, id: string | null) =>
-    setSelectedInstanceId(id),
+  ipcMain.handle("config:getEnvironments", () => getEnvironments());
+  ipcMain.handle("config:addEnvironment", async (_event, name: string, url: string, kind?: string) => {
+    const endpointKind = (kind as "direct" | "ssh" | "tailscale") ?? "direct";
+    const fingerprint = await fetchFingerprint(url);
+    if (fingerprint) {
+      const existing = findEnvironmentByFingerprint(fingerprint.id);
+      if (existing) {
+        const ep = addEndpoint(existing.id, url, endpointKind);
+        syncEndpointTracker(existing.id);
+        const activeUrl = resolveActiveUrl(existing.endpoints, ep?.id ?? existing.activeEndpointId);
+        if (activeUrl) getOrCreateSupervisor(existing.id, activeUrl);
+        return existing;
+      }
+    }
+    const env = addEnvironment(name, url, endpointKind);
+    if (fingerprint) {
+      setEnvironmentFingerprintId(env.id, fingerprint.id);
+    }
+    const activeUrl = resolveActiveUrl(env.endpoints, env.activeEndpointId);
+    if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
+    syncEndpointTracker(env.id);
+    return env;
+  });
+  ipcMain.handle("config:removeEnvironment", (_event, id: string) => {
+    removeSupervisor(id);
+    removeEnvironment(id);
+  });
+  ipcMain.handle("config:addEndpoint", (_event, environmentId: string, url: string, kind: string) => {
+    const ep = addEndpoint(environmentId, url, kind as "direct" | "ssh" | "tailscale");
+    syncEndpointTracker(environmentId);
+    return ep;
+  });
+  ipcMain.handle("config:removeEndpoint", (_event, environmentId: string, endpointId: string) => {
+    removeEndpoint(environmentId, endpointId);
+    syncEndpointTracker(environmentId);
+  });
+  ipcMain.handle("config:setActiveEndpoint", (_event, environmentId: string, endpointId: string) => {
+    setActiveEndpoint(environmentId, endpointId);
+    const envs = getEnvironments();
+    const env = envs.find((e: Environment) => e.id === environmentId);
+    if (env) {
+      const url = resolveActiveUrl(env.endpoints, endpointId);
+      if (url) {
+        removeSupervisor(environmentId);
+        getOrCreateSupervisor(environmentId, url);
+      }
+    }
+    syncEndpointTracker(environmentId);
+  });
+  ipcMain.handle("config:getSelectedEnvironmentId", () => getSelectedEnvironmentId());
+  ipcMain.handle("config:setSelectedEnvironmentId", (_event, id: string | null) =>
+    setSelectedEnvironmentId(id),
   );
   ipcMain.handle(
     "config:migrateFromLocalStorage",
@@ -268,6 +400,39 @@ app.whenReady().then(() => {
       migrateFromLocalStorage(rawInstances, rawSelectedId),
   );
 
+  ipcMain.handle("connection:getStatus", (_event, environmentId: string) => {
+    const supervisor = supervisors.get(environmentId);
+    return supervisor ? supervisor.getStatus() : null;
+  });
+
+  ipcMain.handle("connection:getEndpointHealth", (_event, environmentId: string): EndpointHealth[] => {
+    const tracker = endpointTrackers.get(environmentId);
+    if (tracker) return tracker.getHealth();
+    const envs = getEnvironments();
+    const env = envs.find((e: Environment) => e.id === environmentId);
+    if (!env) return [];
+    return env.endpoints.map((ep) => ({
+      endpointId: ep.id,
+      phase: ep.failureCount > 0 && ep.lastError ? "backoff" as const : "connected" as const,
+      lastError: ep.lastError,
+      failureCount: ep.failureCount,
+    }));
+  });
+
+  ipcMain.handle("connection:retry", (_event, environmentId: string) => {
+    const supervisor = supervisors.get(environmentId);
+    if (supervisor) supervisor.wakeup();
+  });
+
+  ipcMain.on("connection:networkChanged", (_event, online: boolean) => {
+    setOsOffline(!online);
+  });
+
+  ipcMain.handle("connection:fetchFingerprint", async (_event, baseUrl: string) => {
+    return fetchFingerprint(baseUrl);
+  });
+
+  seedSupervisors();
   createWindow();
 
   app.on("activate", () => {
@@ -278,5 +443,9 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   for (const controller of streams.values()) controller.abort();
   streams.clear();
+  for (const supervisor of supervisors.values()) supervisor.destroy();
+  supervisors.clear();
+  for (const tracker of endpointTrackers.values()) tracker.destroy();
+  endpointTrackers.clear();
   if (process.platform !== "darwin") app.quit();
 });

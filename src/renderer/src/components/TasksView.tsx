@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import type { Instance, TaskDefinition } from "../types";
+import type { Environment, TaskDefinition } from "../types";
 import { fetchTasks } from "../api";
 import { commandLine } from "../format";
 import { Icon } from "./Icon";
 
-export function TasksView(props: { instance: Instance; filter: string }): React.ReactNode {
+export function TasksView(props: { instance: Environment; filter: string }): React.ReactNode {
   const { instance, filter } = props;
   const [tasks, setTasks] = useState<TaskDefinition[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -24,7 +24,7 @@ export function TasksView(props: { instance: Instance; filter: string }): React.
       cancelled = true;
       clearInterval(timer);
     };
-  }, [instance.id, instance.baseUrl]);
+  }, [instance.id, instance.activeEndpointId]);
 
   const nameOf = (id: string | null): string | null =>
     id ? (tasks.find((t) => t.id === id)?.name ?? id.slice(0, 8)) : null;
@@ -46,7 +46,7 @@ export function TasksView(props: { instance: Instance; filter: string }): React.
             <Icon name="list" size={30} strokeWidth={1.2} />
           </span>
           <h3>No tasks</h3>
-          <p>This instance has no reusable tasks yet.</p>
+          <p>This environment has no reusable tasks yet.</p>
         </div>
       </div>
     );
@@ -87,7 +87,7 @@ export function TasksView(props: { instance: Instance; filter: string }): React.
               );
             })}
             {q && visible.length === 0 ? (
-              <div className="row-empty">No tasks match “{filter}”.</div>
+              <div className="row-empty">No tasks match "{filter}".</div>
             ) : null}
           </div>
         </div>

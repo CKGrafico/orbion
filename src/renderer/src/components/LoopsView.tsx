@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Instance, InstanceHealth, LoopMeta, Project } from "../types";
-import { fetchProjects } from "../api";
+import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
+import { fetchProjects, resolveBaseUrl } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil } from "../format";
 import { Icon } from "./Icon";
 
@@ -9,16 +9,15 @@ function loopLabel(loop: LoopMeta): string {
 }
 
 export function LoopsView(props: {
-  instance: Instance;
+  instance: Environment;
   loops: LoopMeta[];
   filter: string;
-  health: InstanceHealth;
+  health: EnvironmentHealth;
   onOpenLoop: (id: string) => void;
 }): React.ReactNode {
   const { instance, loops, filter, health, onOpenLoop } = props;
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Project colors for the row dots — fetched once per instance.
   useEffect(() => {
     let cancelled = false;
     void fetchProjects(instance).then((res) => {
@@ -27,7 +26,7 @@ export function LoopsView(props: {
     return () => {
       cancelled = true;
     };
-  }, [instance.id, instance.baseUrl]);
+  }, [instance.id, instance.activeEndpointId]);
 
   const projectColor = (loop: LoopMeta): string | undefined =>
     projects.find((p) => p.id === loop.projectId)?.color;
@@ -47,17 +46,19 @@ export function LoopsView(props: {
   const running = loops.filter((l) => l.status === "running").length;
 
   if (loops.length === 0) {
+    const disconnected = health === "offline" || health === "backoff" || health === "blocked";
+    const baseUrl = resolveBaseUrl(instance);
     return (
       <div className="content-inner">
         <div className="empty">
           <span className="glyph">
             <Icon name="rotate" size={30} strokeWidth={1.2} />
           </span>
-          <h3>{health === "offline" ? "Instance unreachable" : "No loops"}</h3>
+          <h3>{disconnected ? "Environment unreachable" : "No loops"}</h3>
           <p>
-            {health === "offline"
-              ? `Could not reach ${instance.baseUrl}. Is the loop-task daemon running?`
-              : "This instance has no loops yet. Create one with the loop-task CLI or board."}
+            {disconnected
+              ? `Could not reach ${baseUrl}. Is the loop-task daemon running?`
+              : "This environment has no loops yet. Create one with the loop-task CLI or board."}
           </p>
         </div>
       </div>
@@ -118,7 +119,7 @@ export function LoopsView(props: {
               );
             })}
             {visible.length === 0 ? (
-              <div className="row-empty">No loops match “{filter}”.</div>
+              <div className="row-empty">No loops match "{filter}".</div>
             ) : null}
           </div>
         </div>

@@ -1,7 +1,8 @@
 import { useState } from "react";
+import type { Environment } from "../types";
 import { apiRequest } from "../api";
 
-export function AddInstanceModal(props: {
+export function AddEnvironmentModal(props: {
   onSubmit: (name: string, baseUrl: string) => void;
   onCancel: () => void;
 }): React.ReactNode {
@@ -16,7 +17,7 @@ export function AddInstanceModal(props: {
     const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
 
     if (!trimmedName) {
-      setError("Give this instance a name.");
+      setError("Give this environment a name.");
       return;
     }
     try {
@@ -29,14 +30,17 @@ export function AddInstanceModal(props: {
 
     setChecking(true);
     setError(null);
-    const probe = await apiRequest(
-      { id: "probe", name: trimmedName, baseUrl: trimmedUrl },
-      "/api/loops",
-    );
+    const probeEnv: Environment = {
+      id: "probe",
+      name: trimmedName,
+      endpoints: [{ id: "probe-ep", kind: "direct", url: trimmedUrl, lastError: null, failureCount: 0 }],
+      activeEndpointId: "probe-ep",
+    };
+    const probe = await apiRequest(probeEnv, "/api/loops");
     setChecking(false);
 
     if (!probe.ok) {
-      setError(`Could not reach the instance: ${probe.error ?? "unknown error"}`);
+      setError(`Could not reach the environment: ${probe.error ?? "unknown error"}`);
       return;
     }
     onSubmit(trimmedName, trimmedUrl);
@@ -45,7 +49,7 @@ export function AddInstanceModal(props: {
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Add loop-task instance</h2>
+        <h2>Add loop-task environment</h2>
 
         <div className="field">
           <label>Name</label>
@@ -78,7 +82,7 @@ export function AddInstanceModal(props: {
             Cancel
           </button>
           <button className="btn primary" onClick={() => void submit()} disabled={checking}>
-            {checking ? "Checking…" : "Add instance"}
+            {checking ? "Checking…" : "Add environment"}
           </button>
         </div>
       </div>

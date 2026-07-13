@@ -1,13 +1,19 @@
 import type { ApiResponse, StreamEventPayload } from "../../shared/ipc";
-import type { Instance, LoopMeta, Project, TaskDefinition } from "./types";
+import type { Environment, LoopMeta, Project, TaskDefinition } from "./types";
 import { mockRequest, mockSubscribeLogs } from "./mock";
 
 export const isMock = typeof window !== "undefined" && !window.api;
 
-// ── REST ──────────────────────────────────────────────────────────────
+export function resolveBaseUrl(env: Environment): string {
+  if (env.activeEndpointId) {
+    const ep = env.endpoints.find((e) => e.id === env.activeEndpointId);
+    if (ep) return ep.url;
+  }
+  return env.endpoints.length > 0 ? env.endpoints[0].url : "";
+}
 
 export async function apiRequest<T = unknown>(
-  instance: Instance,
+  env: Environment,
   path: string,
   method: "GET" | "POST" | "PATCH" | "DELETE" = "GET",
   body?: unknown,
@@ -15,35 +21,33 @@ export async function apiRequest<T = unknown>(
   if (!window.api) {
     return mockRequest<T>(path);
   }
-  return window.api.request<T>({ baseUrl: instance.baseUrl, path, method, body });
+  const baseUrl = resolveBaseUrl(env);
+  return window.api.request<T>({ baseUrl, path, method, body });
 }
 
-export function fetchLoops(instance: Instance): Promise<ApiResponse<LoopMeta[]>> {
-  return apiRequest<LoopMeta[]>(instance, "/api/loops");
+export function fetchLoops(env: Environment): Promise<ApiResponse<LoopMeta[]>> {
+  return apiRequest<LoopMeta[]>(env, "/api/loops");
 }
 
-export function fetchLoop(instance: Instance, id: string): Promise<ApiResponse<LoopMeta>> {
-  return apiRequest<LoopMeta>(instance, `/api/loops/${encodeURIComponent(id)}`);
+export function fetchLoop(env: Environment, id: string): Promise<ApiResponse<LoopMeta>> {
+  return apiRequest<LoopMeta>(env, `/api/loops/${encodeURIComponent(id)}`);
 }
 
-export function fetchProjects(instance: Instance): Promise<ApiResponse<Project[]>> {
-  return apiRequest<Project[]>(instance, "/api/projects");
+export function fetchProjects(env: Environment): Promise<ApiResponse<Project[]>> {
+  return apiRequest<Project[]>(env, "/api/projects");
 }
 
-export function fetchTasks(instance: Instance): Promise<ApiResponse<TaskDefinition[]>> {
-  return apiRequest<TaskDefinition[]>(instance, "/api/tasks");
+export function fetchTasks(env: Environment): Promise<ApiResponse<TaskDefinition[]>> {
+  return apiRequest<TaskDefinition[]>(env, "/api/tasks");
 }
 
 export function fetchLogs(
-  instance: Instance,
+  env: Environment,
   loopId: string,
   tail: number,
 ): Promise<ApiResponse<string>> {
-  return apiRequest<string>(instance, `/api/loops/${encodeURIComponent(loopId)}/logs?tail=${tail}`);
+  return apiRequest<string>(env, `/api/loops/${encodeURIComponent(loopId)}/logs?tail=${tail}`);
 }
-
-// ── SSE log streaming ────────────────────────────────────────────────
-// One global listener dispatches stream events to per-subscription callbacks.
 
 interface LogStreamHandlers {
   onLine: (line: string) => void;
@@ -67,12 +71,8 @@ function ensureGlobalListener(): void {
   });
 }
 
-/**
- * Follow a loop's log via SSE. Returns an unsubscribe function.
- * In mock mode, emits synthetic lines on an interval.
- */
 export function subscribeLogs(
-  instance: Instance,
+  env: Environment,
   loopId: string,
   onLine: (line: string) => void,
   onClose?: () => void,
@@ -85,9 +85,10 @@ export function subscribeLogs(
   const subId = crypto.randomUUID();
   handlers.set(subId, { onLine, onClose });
 
+  const baseUrl = resolveBaseUrl(env);
   void window.api.subscribeStream({
     subId,
-    baseUrl: instance.baseUrl,
+    baseUrl,
     path: `/api/loops/${encodeURIComponent(loopId)}/logs/stream?tail=0`,
   });
 
@@ -96,3 +97,5 @@ export function subscribeLogs(
     void window.api?.unsubscribeStream(subId);
   };
 }
+
+

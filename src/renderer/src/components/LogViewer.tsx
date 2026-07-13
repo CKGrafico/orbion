@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Instance } from "../types";
+import type { Environment } from "../types";
 import { fetchLogs, subscribeLogs } from "../api";
 
 const INITIAL_TAIL = 200;
@@ -12,7 +12,7 @@ function classifyLine(line: string): string | undefined {
   return undefined;
 }
 
-export function LogViewer(props: { instance: Instance; loopId: string }): React.ReactNode {
+export function LogViewer(props: { instance: Environment; loopId: string }): React.ReactNode {
   const { instance, loopId } = props;
   const [lines, setLines] = useState<string[]>([]);
   const [follow, setFollow] = useState(true);
@@ -28,7 +28,6 @@ export function LogViewer(props: { instance: Instance; loopId: string }): React.
     });
   }, []);
 
-  // Initial tail, then live SSE follow.
   useEffect(() => {
     let cancelled = false;
     setLines([]);
@@ -48,9 +47,8 @@ export function LogViewer(props: { instance: Instance; loopId: string }): React.
       cancelled = true;
       unsubscribe();
     };
-  }, [instance.id, instance.baseUrl, loopId, appendLines]);
+  }, [instance.id, instance.activeEndpointId, loopId, appendLines]);
 
-  // Autoscroll while following.
   useEffect(() => {
     if (followRef.current && paneRef.current) {
       paneRef.current.scrollTop = paneRef.current.scrollHeight;

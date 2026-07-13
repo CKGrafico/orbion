@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import type { Instance, LoopMeta, Project } from "../types";
+import type { Environment, LoopMeta, Project } from "../types";
 import { fetchProjects } from "../api";
 import { Icon } from "./Icon";
 
 export function ProjectsView(props: {
-  instance: Instance;
+  instance: Environment;
   loops: LoopMeta[];
   filter: string;
 }): React.ReactNode {
@@ -27,7 +27,7 @@ export function ProjectsView(props: {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [instance.id, instance.baseUrl]);
+  }, [instance.id, instance.activeEndpointId]);
 
   const loopCount = (projectId: string): number =>
     loops.filter((l) => (l.projectId ?? "default") === projectId).length;
@@ -43,7 +43,7 @@ export function ProjectsView(props: {
             <Icon name="folder" size={30} strokeWidth={1.2} />
           </span>
           <h3>No projects</h3>
-          <p>This instance has no projects yet.</p>
+          <p>This environment has no projects yet.</p>
         </div>
       </div>
     );
@@ -70,7 +70,7 @@ export function ProjectsView(props: {
               </div>
             ))}
             {q && visible.length === 0 ? (
-              <div className="row-empty">No projects match “{filter}”.</div>
+              <div className="row-empty">No projects match "{filter}".</div>
             ) : null}
           </div>
         </div>

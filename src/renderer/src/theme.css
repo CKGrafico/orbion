@@ -345,6 +345,16 @@ input {
   flex-shrink: 0;
 }
 
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.instance-item .dot[style*="connecting"],
+.instance-item .dot[style*="backoff"] {
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;

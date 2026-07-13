@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   ApiRequestArgs,
+  ConnectionStatus,
+  EndpointHealth,
   StreamSubscribeArgs,
   StreamEventPayload,
   LoopTaskBridge,
@@ -26,15 +28,59 @@ const bridge: LoopTaskBridge = {
   },
 
   config: {
-    getInstances: () => ipcRenderer.invoke("config:getInstances"),
-    addInstance: (name: string, baseUrl: string) =>
-      ipcRenderer.invoke("config:addInstance", name, baseUrl),
-    removeInstance: (id: string) => ipcRenderer.invoke("config:removeInstance", id),
-    getSelectedInstanceId: () => ipcRenderer.invoke("config:getSelectedInstanceId"),
-    setSelectedInstanceId: (id: string | null) =>
-      ipcRenderer.invoke("config:setSelectedInstanceId", id),
+    getEnvironments: () => ipcRenderer.invoke("config:getEnvironments"),
+    addEnvironment: (name: string, url: string, kind?: string) =>
+      ipcRenderer.invoke("config:addEnvironment", name, url, kind),
+    removeEnvironment: (id: string) => ipcRenderer.invoke("config:removeEnvironment", id),
+    addEndpoint: (environmentId: string, url: string, kind: string) =>
+      ipcRenderer.invoke("config:addEndpoint", environmentId, url, kind),
+    removeEndpoint: (environmentId: string, endpointId: string) =>
+      ipcRenderer.invoke("config:removeEndpoint", environmentId, endpointId),
+    setActiveEndpoint: (environmentId: string, endpointId: string) =>
+      ipcRenderer.invoke("config:setActiveEndpoint", environmentId, endpointId),
+    getSelectedEnvironmentId: () => ipcRenderer.invoke("config:getSelectedEnvironmentId"),
+    setSelectedEnvironmentId: (id: string | null) =>
+      ipcRenderer.invoke("config:setSelectedEnvironmentId", id),
     migrateFromLocalStorage: (rawInstances: string, rawSelectedId: string | null) =>
       ipcRenderer.invoke("config:migrateFromLocalStorage", rawInstances, rawSelectedId),
+  },
+
+  connection: {
+    getStatus: (environmentId: string) =>
+      ipcRenderer.invoke("connection:getStatus", environmentId) as Promise<ConnectionStatus | null>,
+    getEndpointHealth: (environmentId: string) =>
+      ipcRenderer.invoke("connection:getEndpointHealth", environmentId) as Promise<EndpointHealth[]>,
+    retry: (environmentId: string) =>
+      ipcRenderer.invoke("connection:retry", environmentId) as Promise<void>,
+    onStatusChange: (cb: (environmentId: string, status: ConnectionStatus) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        environmentId: string,
+        status: ConnectionStatus,
+      ): void => {
+        cb(environmentId, status);
+      };
+      ipcRenderer.on("connection:status", listener);
+      return () => {
+        ipcRenderer.removeListener("connection:status", listener);
+      };
+    },
+    onEndpointHealthChange: (cb: (environmentId: string, health: EndpointHealth[]) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        environmentId: string,
+        health: EndpointHealth[],
+      ): void => {
+        cb(environmentId, health);
+      };
+      ipcRenderer.on("connection:endpointHealth", listener);
+      return () => {
+        ipcRenderer.removeListener("connection:endpointHealth", listener);
+      };
+    },
+    notifyNetworkChanged: (online: boolean) => {
+      ipcRenderer.send("connection:networkChanged", online);
+    },
   },
 };
 

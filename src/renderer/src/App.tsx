@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Instance, InstanceHealth, LoopMeta, Section } from "./types";
-import { useInstances } from "./store";
-import { fetchLoops, isMock } from "./api";
+import type { ConnectionStatus, EndpointHealth } from "../../shared/ipc";
+import type { Environment, EnvironmentHealth, LoopMeta, Section } from "./types";
+import { useEnvironments } from "./store";
+import { fetchLoops, isMock, resolveBaseUrl } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { SegmentedTabs } from "./components/SegmentedTabs";
-import { AddInstanceModal } from "./components/AddInstanceModal";
+import { AddEnvironmentModal } from "./components/AddInstanceModal";
 import { LoopsView } from "./components/LoopsView";
 import { LoopDetail } from "./components/LoopDetail";
 import { TasksView } from "./components/TasksView";
@@ -20,33 +21,142 @@ const SECTION_LABELS: Record<Section, string> = {
   projects: "Projects",
 };
 
+function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
+  switch (phase) {
+    case "connected":
+      return "ok";
+    case "connecting":
+      return "connecting";
+    case "backoff":
+      return "backoff";
+    case "blocked":
+      return "blocked";
+    case "offline":
+      return "offline";
+    default:
+      return "unknown";
+  }
+}
+
 export function App(): React.ReactNode {
-  const { instances, selectedId, select, add, remove } = useInstances();
+  const { environments, selectedId, select, add, remove, setActiveEndpoint } = useEnvironments();
   const [section, setSection] = useState<Section>("loops");
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [health, setHealth] = useState<Record<string, InstanceHealth>>({});
+  const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
+  const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
+  const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const filterRef = useRef<HTMLInputElement | null>(null);
 
-  const selected: Instance | null = instances.find((i) => i.id === selectedId) ?? null;
+  const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
-  const markHealth = useCallback((id: string, value: InstanceHealth) => {
-    setHealth((prev) => (prev[id] === value ? prev : { ...prev, [id]: value }));
+  useEffect(() => {
+    if (!window.api) return;
+
+    const unsub = window.api.connection.onStatusChange(
+      (environmentId: string, status: ConnectionStatus) => {
+        const h = phaseToHealth(status.phase);
+        setHealth((prev) => (prev[environmentId] === h ? prev : { ...prev, [environmentId]: h }));
+        setConnectionStatus((prev) =>
+          prev[environmentId] === status ? prev : { ...prev, [environmentId]: status },
+        );
+      },
+    );
+    return unsub;
   }, []);
 
-  // Poll loops for the selected instance (the daemon's /api/events SSE is not
-  // fed server-side, so polling is the reliable option). refreshTick allows a
-  // manual refresh from the prompt bar's action button.
+  useEffect(() => {
+    if (!window.api) return;
+
+    const unsub = window.api.connection.onEndpointHealthChange(
+      (environmentId: string, health: EndpointHealth[]) => {
+        setEndpointHealth((prev) => {
+          const existing = prev[environmentId];
+          if (existing && existing.length === health.length && existing.every((h, i) => h.endpointId === health[i].endpointId && h.phase === health[i].phase)) {
+            return prev;
+          }
+          return { ...prev, [environmentId]: health };
+        });
+      },
+    );
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (window.api || environments.length === 0) return;
+    let cancelled = false;
+
+    const check = async (): Promise<void> => {
+      for (const env of environments) {
+        const res = await fetchLoops(env);
+        if (cancelled) return;
+        const h: EnvironmentHealth = res.ok ? "ok" : "offline";
+        setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
+      }
+    };
+
+    void check();
+    const timer = setInterval(() => void check(), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [environments]);
+
+  useEffect(() => {
+    if (!window.api || environments.length === 0) return;
+    let cancelled = false;
+
+    const fetchAll = async (): Promise<void> => {
+      for (const env of environments) {
+        const status = await window.api!.connection.getStatus(env.id);
+        if (cancelled || !status) return;
+        const h = phaseToHealth(status.phase);
+        setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
+        setConnectionStatus((prev) =>
+          prev[env.id] === status ? prev : { ...prev, [env.id]: status },
+        );
+      }
+    };
+
+    void fetchAll();
+    return () => { cancelled = true; };
+  }, [environments]);
+
+  useEffect(() => {
+    if (!window.api) return;
+
+    const report = (): void => {
+      window.api!.connection.notifyNetworkChanged(navigator.onLine);
+    };
+
+    window.addEventListener("online", report);
+    window.addEventListener("offline", report);
+    report();
+
+    return () => {
+      window.removeEventListener("online", report);
+      window.removeEventListener("offline", report);
+    };
+  }, []);
+
   useEffect(() => {
     if (!selected) {
       setLoops([]);
       return;
     }
+
+    const connStatus = connectionStatus[selected.id];
+    if (connStatus && connStatus.phase !== "connected") {
+      setLoops([]);
+      return;
+    }
+
     let cancelled = false;
 
     const load = async (): Promise<void> => {
@@ -55,9 +165,6 @@ export function App(): React.ReactNode {
       if (res.ok && Array.isArray(res.data)) {
         setLoops(res.data);
         setLastUpdated(Date.now());
-        markHealth(selected.id, "ok");
-      } else {
-        markHealth(selected.id, "offline");
       }
     };
 
@@ -67,29 +174,7 @@ export function App(): React.ReactNode {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selected?.id, selected?.baseUrl, markHealth, refreshTick]);
-
-  // Background health checks for non-selected instances.
-  useEffect(() => {
-    if (instances.length === 0) return;
-    let cancelled = false;
-
-    const check = async (): Promise<void> => {
-      for (const instance of instances) {
-        if (instance.id === selectedId) continue;
-        const res = await fetchLoops(instance);
-        if (cancelled) return;
-        markHealth(instance.id, res.ok ? "ok" : "offline");
-      }
-    };
-
-    void check();
-    const timer = setInterval(() => void check(), 20000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [instances, selectedId, markHealth]);
+  }, [selected?.id, selected?.activeEndpointId, refreshTick, connectionStatus[selected?.id ?? ""]?.phase]);
 
   const handleSelect = (id: string): void => {
     select(id);
@@ -97,6 +182,12 @@ export function App(): React.ReactNode {
     setView({ kind: "list" });
     setFilter("");
   };
+
+  const handleRetry = useCallback((id: string): void => {
+    if (window.api) {
+      void window.api.connection.retry(id);
+    }
+  }, []);
 
   const handleSection = (next: Section): void => {
     setSection(next);
@@ -106,8 +197,8 @@ export function App(): React.ReactNode {
 
   const handleAdd = (name: string, baseUrl: string): void => {
     void (async () => {
-      const instance = await add(name, baseUrl);
-      handleSelect(instance.id);
+      const env = await add(name, baseUrl);
+      handleSelect(env.id);
       setModalOpen(false);
     })();
   };
@@ -121,12 +212,22 @@ export function App(): React.ReactNode {
     });
   };
 
+  const handleSetEndpoint = (environmentId: string, endpointId: string): void => {
+    setActiveEndpoint(environmentId, endpointId);
+  };
+
   const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
   const goBack = (): void => setView({ kind: "list" });
 
   const inDetail = view.kind === "loop";
   const updatedLabel =
     lastUpdated === null ? "…" : timeAgo(new Date(lastUpdated).toISOString());
+
+  const activeEndpoint = selected
+    ? (selected.activeEndpointId
+        ? selected.endpoints.find((ep) => ep.id === selected.activeEndpointId)
+        : selected.endpoints[0])
+    : null;
 
   return (
     <div className="app">
@@ -163,12 +264,16 @@ export function App(): React.ReactNode {
           <aside className="panel sidebar-panel">
             <SegmentedTabs active={section} onChange={handleSection} disabled={!selected} />
             <Sidebar
-              instances={instances}
+              environments={environments}
               selectedId={selectedId}
               health={health}
+              connectionStatus={connectionStatus}
+              endpointHealth={endpointHealth}
               onSelect={handleSelect}
               onAdd={() => setModalOpen(true)}
               onRemove={handleRemove}
+              onRetry={handleRetry}
+              onSetEndpoint={handleSetEndpoint}
             />
           </aside>
         ) : null}
@@ -177,11 +282,21 @@ export function App(): React.ReactNode {
           {selected ? (
             <div className="main-header">
               <span className="main-title">{selected.name}</span>
-              <span className="chip mono">{hostLabel(selected.baseUrl)}</span>
+              {activeEndpoint ? (
+                <span className="chip mono">{hostLabel(activeEndpoint.url)}</span>
+              ) : null}
               <span className="main-header-meta">
-                {(health[selected.id] ?? "unknown") === "offline"
-                  ? "offline"
-                  : `updated ${updatedLabel}`}
+                {(() => {
+                  const h = health[selected.id] ?? "unknown";
+                  const cs = connectionStatus[selected.id];
+                  if (cs && cs.phase === "blocked" && cs.lastError) {
+                    return `blocked: ${cs.lastError}`;
+                  }
+                  if (h === "offline" || h === "backoff" || h === "blocked" || h === "connecting") {
+                    return h;
+                  }
+                  return `updated ${updatedLabel}`;
+                })()}
               </span>
             </div>
           ) : null}
@@ -192,13 +307,13 @@ export function App(): React.ReactNode {
                 <span className="glyph">
                   <Icon name="rotate" size={30} strokeWidth={1.2} />
                 </span>
-                <h3>No instance selected</h3>
+                <h3>No environment selected</h3>
                 <p>
-                  Add a loop-task instance by its API URL (for example{" "}
+                  Add a loop-task environment by its API URL (for example{" "}
                   <code>http://127.0.0.1:8845</code>) to see its loops, tasks, and projects.
                 </p>
                 <button className="btn primary" onClick={() => setModalOpen(true)}>
-                  Add instance
+                  Add environment
                 </button>
               </div>
             ) : inDetail ? (
@@ -234,7 +349,7 @@ export function App(): React.ReactNode {
                 />
                 <div className="prompt-row">
                   <span className="prompt-chip">{SECTION_LABELS[section]}</span>
-                  <span className="prompt-meta">{hostLabel(selected.baseUrl)}</span>
+                  <span className="prompt-meta">{activeEndpoint ? hostLabel(activeEndpoint.url) : ""}</span>
                   <span style={{ flex: 1 }} />
                   {section === "loops" ? (
                     <span className="prompt-meta mono">{loops.length} loops</span>
@@ -254,7 +369,7 @@ export function App(): React.ReactNode {
       </div>
 
       {modalOpen ? (
-        <AddInstanceModal onSubmit={handleAdd} onCancel={() => setModalOpen(false)} />
+        <AddEnvironmentModal onSubmit={handleAdd} onCancel={() => setModalOpen(false)} />
       ) : null}
     </div>
   );

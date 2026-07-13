@@ -1,5 +1,6 @@
-// Mirrors the loop-task daemon's domain types (subset the app consumes).
-// Source of truth: loop-task repo src/types.ts + GET /api/openapi.json.
+import type { EndpointKind } from "../../shared/ipc";
+
+export type { EndpointKind };
 
 export type LoopStatus = "running" | "waiting" | "paused" | "idle" | "stopped";
 
@@ -54,14 +55,21 @@ export interface TaskDefinition {
   createdAt: string;
 }
 
-/** Section switcher inside an instance. */
 export type Section = "loops" | "tasks" | "projects";
 
-/** A registered loop-task daemon the app talks to. */
-export interface Instance {
+export interface AccessEndpoint {
   id: string;
-  name: string;
-  baseUrl: string;
+  kind: EndpointKind;
+  url: string;
+  lastError: string | null;
+  failureCount: number;
 }
 
-export type InstanceHealth = "unknown" | "ok" | "offline";
+export interface Environment {
+  id: string;
+  name: string;
+  endpoints: AccessEndpoint[];
+  activeEndpointId: string | null;
+}
+
+export type EnvironmentHealth = "unknown" | "ok" | "offline" | "connecting" | "backoff" | "blocked";

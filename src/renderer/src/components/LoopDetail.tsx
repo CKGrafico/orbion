@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import type { Instance, LoopMeta } from "../types";
+import type { Environment, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil } from "../format";
 import { LogViewer } from "./LogViewer";
 import { Icon } from "./Icon";
 
 export function LoopDetail(props: {
-  instance: Instance;
+  instance: Environment;
   loopId: string;
   initial: LoopMeta | null;
   onBack: () => void;
@@ -14,7 +14,6 @@ export function LoopDetail(props: {
   const { instance, loopId, initial, onBack } = props;
   const [loop, setLoop] = useState<LoopMeta | null>(initial);
 
-  // Keep the header fresh while the detail is open.
   useEffect(() => {
     let cancelled = false;
     const load = async (): Promise<void> => {
@@ -27,7 +26,7 @@ export function LoopDetail(props: {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [instance.id, instance.baseUrl, loopId]);
+  }, [instance.id, instance.activeEndpointId, loopId]);
 
   const title =
     loop?.description?.trim() || (loop ? commandLine(loop.command, loop.commandArgs) : loopId);

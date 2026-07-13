@@ -1,7 +1,7 @@
 {
   "name": "orbion",
   "version": "0.1.0",
-  "description": "Orbion — the open-source control plane for Loop Engineering. Manages loop-task instances (loops, logs, projects) over the loop-task HTTP API.",
+  "description": "Orbion — the open-source control plane for Loop Engineering. Manages loop-task environments (loops, logs, projects) over the loop-task HTTP API.",
   "type": "module",
   "main": "./out/main/index.js",
   "author": "Quique Fdez Guerra",
