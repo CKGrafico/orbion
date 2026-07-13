@@ -50,6 +50,20 @@ const PATHS: Record<string, React.ReactNode> = {
     </>
   ),
   square: <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />,
+  bell: (
+    <>
+      <path d="M8 14.5c.83 0 1.5-.67 1.5-1.5h-3c0 .83.67 1.5 1.5 1.5Z" fill="currentColor" stroke="none" />
+      <path d="M12.5 10.5v-3a4.5 4.5 0 0 0-9 0v3l-1 1.5h11l-1-1.5Z" />
+    </>
+  ),
+  bellOff: (
+    <>
+      <path d="M2.5 2.5l11 11" />
+      <path d="M5.4 5.4A4.5 4.5 0 0 0 3.5 9v1.5l-1 1.5h7" />
+      <path d="M12.5 10.5v-3a4.48 4.48 0 0 0-1.5-3.35" />
+      <path d="M8 14.5c.83 0 1.5-.67 1.5-1.5h-3c0 .83.67 1.5 1.5 1.5Z" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

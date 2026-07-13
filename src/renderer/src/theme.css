@@ -1896,3 +1896,42 @@ input {
 .pick-main-vm-item .name {
   font-weight: 500;
 }
+
+/* ── Status pills ─────────────────────────────────────────────────── */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-pill-sm {
+  font-size: 9.5px;
+  padding: 1px 5px;
+}
+
+/* ── Unread dot ─────────────────────────────────────────────────── */
+
+.unread-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--bg-sidebar);
+  pointer-events: none;
+}
+
+.instance-item.selected .unread-dot {
+  border-color: var(--bg-active);
+}

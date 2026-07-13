@@ -1,14 +1,9 @@
 import type { ConnectionStatus, EndpointHealth } from "../../../shared/ipc";
-import type { Environment, EnvironmentHealth, AccessEndpoint, EnvironmentAuthState, OpenCodeConnectionStatus, OpenCodeAuthState } from "../types";
+import type { Environment, EnvironmentHealth, AccessEndpoint, OpenCodeConnectionStatus, OpenCodeAuthState } from "../types";
+import type { FleetItemStatus } from "../fleet-status";
 import { Icon } from "./Icon";
+import { StatusPill, UnreadDot } from "./StatusPill";
 import { hostLabel } from "../format";
-
-const AUTH_STATE_LABELS: Record<EnvironmentAuthState, string> = {
-  unauthenticated: "no auth",
-  paired: "",
-  blocked: "pair again",
-  unknown: "",
-};
 
 const HEALTH_COLORS: Record<EnvironmentHealth, string> = {
   ok: "#a9d95c",
@@ -72,6 +67,10 @@ export function Sidebar(props: {
   connectionStatus?: Record<string, ConnectionStatus>;
   endpointHealth?: Record<string, EndpointHealth[]>;
   openCodeStatus?: Record<string, OpenCodeConnectionStatus>;
+  fleetStatus?: Record<string, FleetItemStatus>;
+  unreadEnvs?: Set<string>;
+  mutedEnvs?: Set<string>;
+  onToggleMute?: (environmentId: string) => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onAddVm?: () => void;
@@ -81,7 +80,7 @@ export function Sidebar(props: {
   onRepair?: (id: string) => void;
   onSetOpenCodeEndpoint?: (environmentId: string, url: string, password: string | null) => void;
 }): React.ReactNode {
-  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, onSelect, onAdd, onAddVm, onRemove, onRetry, onSetEndpoint, onRepair, onSetOpenCodeEndpoint } = props;
+  const { environments, selectedId, health, connectionStatus, endpointHealth, openCodeStatus, fleetStatus, unreadEnvs, mutedEnvs, onToggleMute, onSelect, onAdd, onAddVm, onRemove, onRetry, onSetEndpoint, onRepair } = props;
 
   return (
     <div className="sidebar">
@@ -115,6 +114,10 @@ export function Sidebar(props: {
             const activeEp = env.activeEndpointId
               ? env.endpoints.find((e) => e.id === env.activeEndpointId)
               : env.endpoints[0];
+            const fleetItem = fleetStatus?.[env.id];
+            const isUnread = unreadEnvs?.has(env.id) ?? false;
+            const isMuted = mutedEnvs?.has(env.id) ?? false;
+            const showPill = fleetItem && fleetItem !== "idle";
             return (
             <div key={env.id}>
               <button
@@ -122,11 +125,15 @@ export function Sidebar(props: {
                 onClick={() => onSelect(env.id)}
                 title={healthTooltip(h, cs)}
               >
-                <span
-                  className="dot"
-                  style={{ background: HEALTH_COLORS[h] }}
-                />
+                <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                  <span
+                    className="dot"
+                    style={{ background: HEALTH_COLORS[h] }}
+                  />
+                  <UnreadDot visible={isUnread} />
+                </span>
                 <span className="name">{env.name}</span>
+                {showPill ? <StatusPill status={fleetItem!} size="sm" /> : null}
                 {env.authState === "unauthenticated" ? (
                   <span className="stat" style={{ fontSize: 9, color: "var(--text-muted)", marginRight: 2, opacity: 0.7 }}>
                     no auth
@@ -174,6 +181,19 @@ export function Sidebar(props: {
                     }}
                   >
                     <Icon name="rotate" size={12} />
+                  </span>
+                ) : null}
+                {onToggleMute ? (
+                  <span
+                    className="remove"
+                    role="button"
+                    title={isMuted ? "Unmute notifications" : "Mute notifications"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleMute(env.id);
+                    }}
+                  >
+                    <Icon name={isMuted ? "bellOff" : "bell"} size={12} />
                   </span>
                 ) : null}
                 <span

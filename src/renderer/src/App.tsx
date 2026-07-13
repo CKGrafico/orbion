@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Section } from "./types";
+import type { FleetItemStatus } from "./fleet-status";
+import { rollUpEnvironmentStatus, isNotifiableStatus, PILL_LABELS } from "./fleet-status";
+import { loopStatusToFleetItem } from "./fleet-mapping";
 import { useEnvironments } from "./store";
 import { fetchLoops, isMock } from "./api";
+import { useUnreadTracker } from "./use-unread-tracker";
+import { createNotificationBridge } from "./use-notifications";
 import { Sidebar } from "./components/Sidebar";
 import { SegmentedTabs } from "./components/SegmentedTabs";
 import { AddEnvironmentModal } from "./components/AddInstanceModal";
@@ -61,7 +66,42 @@ export function App(): React.ReactNode {
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [mutedEnvs, setMutedEnvs] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("orbion.muted.v1");
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch { /* empty */ }
+    return new Set<string>();
+  });
+  const [perEnvLoops, setPerEnvLoops] = useState<Record<string, LoopMeta[]>>({});
   const filterRef = useRef<HTMLInputElement | null>(null);
+
+  const { isUnread, markVisited } = useUnreadTracker();
+
+  const notificationBridge = useMemo(
+    () => {
+      const bridge = createNotificationBridge((envId, itemId, itemType) => {
+        select(envId);
+        if (itemType === "loop") {
+          setSection("loops");
+          setView({ kind: "loop", loopId: itemId });
+        } else {
+          setSection("chat");
+          setView({ kind: "list" });
+        }
+      });
+      try {
+        const raw = localStorage.getItem("orbion.muted.v1");
+        if (raw) {
+          for (const id of JSON.parse(raw) as string[]) {
+            bridge.setMuted(id, true);
+          }
+        }
+      } catch { /* empty */ }
+      return bridge;
+    },
+    [select],
+  );
 
   const mockChatTurns = useMemo(() => generateMockSession(50, 12), []);
   const mockStreamingTurn = useMemo(() => generateStreamingTurn(), []);
@@ -123,6 +163,12 @@ export function App(): React.ReactNode {
         if (cancelled) return;
         const h: EnvironmentHealth = res.ok ? "ok" : "offline";
         setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
+        if (res.ok && Array.isArray(res.data)) {
+          setPerEnvLoops((prev) => {
+            if (prev[env.id] === res.data) return prev;
+            return { ...prev, [env.id]: res.data as LoopMeta[] };
+          });
+        }
       }
     };
 
@@ -183,6 +229,65 @@ export function App(): React.ReactNode {
     };
   }, []);
 
+  const fleetStatus = useMemo<Record<string, FleetItemStatus>>(() => {
+    const result: Record<string, FleetItemStatus> = {};
+    for (const env of environments) {
+      const envLoops = perEnvLoops[env.id] ?? [];
+      const childStatuses: FleetItemStatus[] = envLoops.map((l) =>
+        loopStatusToFleetItem(l.status, l.lastExitCode),
+      );
+      result[env.id] = rollUpEnvironmentStatus(childStatuses);
+    }
+    return result;
+  }, [environments, perEnvLoops]);
+
+  const unreadEnvs = useMemo<Set<string>>(() => {
+    const ids = new Set<string>();
+    for (const env of environments) {
+      const envLoops = perEnvLoops[env.id] ?? [];
+      const hasUnread = envLoops.some((l) => {
+        if (l.status !== "running" && l.lastRunAt) {
+          return isUnread(l.id, new Date(l.lastRunAt).getTime());
+        }
+        return false;
+      });
+      if (hasUnread) ids.add(env.id);
+    }
+    return ids;
+  }, [environments, perEnvLoops, isUnread]);
+
+  const prevFleetStatus = useRef<Record<string, FleetItemStatus>>({});
+  useEffect(() => {
+    for (const env of environments) {
+      const current = fleetStatus[env.id];
+      const prev = prevFleetStatus.current[env.id];
+      if (current !== prev && isNotifiableStatus(current) && prev !== undefined) {
+        if (!mutedEnvs.has(env.id)) {
+          notificationBridge.sendNotification({
+            environmentId: env.id,
+            environmentName: env.name,
+            itemId: env.id,
+            itemType: "loop",
+            status: current,
+            message: `${env.name} is ${PILL_LABELS[current]}`,
+          });
+        }
+      }
+    }
+    prevFleetStatus.current = { ...fleetStatus };
+  }, [fleetStatus, environments, notificationBridge, mutedEnvs]);
+
+  const handleToggleMute = useCallback((environmentId: string) => {
+    setMutedEnvs((prev) => {
+      const next = new Set(prev);
+      if (next.has(environmentId)) next.delete(environmentId);
+      else next.add(environmentId);
+      localStorage.setItem("orbion.muted.v1", JSON.stringify([...next]));
+      notificationBridge.setMuted(environmentId, next.has(environmentId));
+      return next;
+    });
+  }, [notificationBridge]);
+
   useEffect(() => {
     if (!selected) {
       setLoops([]);
@@ -202,6 +307,7 @@ export function App(): React.ReactNode {
       if (cancelled) return;
       if (res.ok && Array.isArray(res.data)) {
         setLoops(res.data);
+        setPerEnvLoops((prev) => ({ ...prev, [selected.id]: res.data as LoopMeta[] }));
         setLastUpdated(Date.now());
       }
     };
@@ -216,6 +322,7 @@ export function App(): React.ReactNode {
 
   const handleSelect = (id: string): void => {
     select(id);
+    markVisited(id);
     setSection("loops");
     setView({ kind: "list" });
     setFilter("");
@@ -326,6 +433,10 @@ export function App(): React.ReactNode {
               connectionStatus={connectionStatus}
               endpointHealth={endpointHealth}
               openCodeStatus={openCodeStatus}
+              fleetStatus={fleetStatus}
+              unreadEnvs={unreadEnvs}
+              mutedEnvs={mutedEnvs}
+              onToggleMute={handleToggleMute}
               onSelect={handleSelect}
               onAdd={() => setModalOpen(true)}
               onAddVm={() => setVmWizardOpen(true)}
