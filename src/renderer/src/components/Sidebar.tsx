@@ -1,12 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useIntl, type IntlShape } from "react-intl";
-import type { ConnectionStatus, EndpointHealth } from "../../../shared/ipc";
-import type { Environment, EnvironmentHealth, OpenCodeConnectionStatus, LoopMeta, Project } from "../types";
-import type { FleetItemStatus } from "../fleet-status";
+import type { ConnectionStatus } from "../../../shared/ipc";
+import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
-import { RotateCw, X, Bell, BellOff, Plus, ChevronRight } from "lucide-react";
-import { UnreadDot } from "./StatusPill";
+import { X, Plus, ChevronRight, Search, ArrowUpDown, Link } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { translateMessage } from "../i18n";
 
@@ -15,14 +13,10 @@ type View =
   | { kind: "project"; projectId: string }
   | { kind: "loop"; loopId: string };
 
-const HEALTH_COLORS: Record<EnvironmentHealth, string> = {
-  ok: "var(--health-ok)",
-  offline: "var(--health-offline)",
-  unknown: "var(--health-unknown)",
-  connecting: "var(--health-connecting)",
-  backoff: "var(--health-backoff)",
-  blocked: "var(--health-blocked)",
-};
+/** Composite key for a Project(instance) pair — unique across environments */
+function projectInstanceKey(projectId: string, envId: string): string {
+  return `${envId}::${projectId}`;
+}
 
 function healthTooltip(intl: IntlShape, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
   if (status) {
@@ -70,307 +64,261 @@ function LoopStatusDot({ status, lastExitCode }: LoopStatusDotProps): React.Reac
   return <span className="tree-dot" style={{ background: color }} />;
 }
 
+/** A flattened project-instance node for the 2-level tree */
+interface ProjectInstanceNode {
+  key: string;          // composite key: `${envId}::${projectId}`
+  projectId: string;
+  projectName: string;
+  projectColor: string;
+  envId: string;
+  envName: string;
+  loops: LoopMeta[];
+}
+
 export function Sidebar(props: {
   environments: Environment[];
   selectedId: string | null;
   health: Record<string, EnvironmentHealth>;
   connectionStatus?: Record<string, ConnectionStatus>;
-  endpointHealth?: Record<string, EndpointHealth[]>;
-  openCodeStatus?: Record<string, OpenCodeConnectionStatus>;
-  fleetStatus?: Record<string, FleetItemStatus>;
-  unreadEnvs?: Set<string>;
-  mutedEnvs?: Set<string>;
   perEnvLoops: Record<string, LoopMeta[]>;
   perEnvProjects: Record<string, Project[]>;
   view: View;
-  onToggleMute?: (environmentId: string) => void;
   onSelect: (id: string) => void;
   onNavigate: (view: View) => void;
   onAddVm?: () => void;
-  onRemove: (id: string) => void;
-  onRetry?: (id: string) => void;
-  onSetEndpoint?: (environmentId: string, endpointId: string) => void;
 }): React.ReactNode {
   const {
-    environments, selectedId, health, connectionStatus, endpointHealth,
-    fleetStatus, unreadEnvs, mutedEnvs, onToggleMute,
-    onSelect, onAddVm, onRemove, onRetry, onSetEndpoint,
+    environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
+    onSelect, onAddVm,
   } = props;
   const intl = useIntl();
-  const [filterId, setFilterId] = useState<string>("");
 
-  // Track which instance and project nodes are expanded
-  const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
+  // Text search filter
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Track which project-instance nodes are expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
-  const visibleEnvs = filterId ? environments.filter((e) => e.id === filterId) : environments;
+  // Whether there's more than one environment (controls instance badge visibility)
+  const hasMultipleEnvs = environments.length > 1;
 
-  const toggleInstance = useCallback((id: string) => {
-    setExpandedInstances((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  // Build flattened Project(instance) node list
+  const projectNodes = useMemo<ProjectInstanceNode[]>(() => {
+    const nodes: ProjectInstanceNode[] = [];
+    for (const env of environments) {
+      const envProjects = perEnvProjects[env.id] ?? [];
+      const envLoops = perEnvLoops[env.id] ?? [];
+
+      // Group loops by projectId
+      const loopsByProject = new Map<string, LoopMeta[]>();
+      for (const loop of envLoops) {
+        const pid = loop.projectId ?? "default";
+        const existing = loopsByProject.get(pid) ?? [];
+        existing.push(loop);
+        loopsByProject.set(pid, existing);
+      }
+
+      for (const project of envProjects) {
+        const projectLoops = loopsByProject.get(project.id) ?? [];
+        nodes.push({
+          key: projectInstanceKey(project.id, env.id),
+          projectId: project.id,
+          projectName: project.name,
+          projectColor: project.color,
+          envId: env.id,
+          envName: env.name,
+          loops: projectLoops,
+        });
+      }
+
+      // Also include "default" (unassigned) loops as a virtual project under each env
+      const unassignedLoops = loopsByProject.get("default") ?? envLoops.filter(
+        (l) => !l.projectId || !envProjects.some((p) => p.id === l.projectId)
+      );
+      if (unassignedLoops.length > 0) {
+        // Check if a "default" project exists; if not, create a virtual one
+        const hasDefaultProject = envProjects.some((p) => p.id === "default");
+        if (!hasDefaultProject) {
+          nodes.push({
+            key: projectInstanceKey("default", env.id),
+            projectId: "default",
+            projectName: "Default",
+            projectColor: PILL_COLORS["idle"],
+            envId: env.id,
+            envName: env.name,
+            loops: unassignedLoops,
+          });
+        }
+      }
+    }
+    return nodes;
+  }, [environments, perEnvProjects, perEnvLoops]);
+
+  // Filter by search query
+  const filteredNodes = useMemo(() => {
+    if (!searchQuery.trim()) return projectNodes;
+    const q = searchQuery.toLowerCase();
+    return projectNodes.filter((node) => {
+      // Match project name, instance name, or any loop description
+      if (node.projectName.toLowerCase().includes(q)) return true;
+      if (node.envName.toLowerCase().includes(q)) return true;
+      if (node.loops.some((l) => (l.description || l.id).toLowerCase().includes(q))) return true;
+      return false;
     });
-  }, []);
+  }, [projectNodes, searchQuery]);
 
-  const toggleProject = useCallback((id: string) => {
+  const toggleProject = useCallback((key: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }, []);
 
-  // Auto-expand the selected instance
-  const isInstanceExpanded = (id: string): boolean => {
-    if (id === selectedId) return true;
-    return expandedInstances.has(id);
+  // Determine which environment is "selected" for a given project node
+  // When clicking a project or loop, we select the environment it belongs to
+  const isProjectSelected = (node: ProjectInstanceNode): boolean => {
+    if (node.envId !== selectedId) return false;
+    if (view.kind === "project" && view.projectId === node.projectId) return true;
+    // Also selected if any child loop is the active loop view
+    if (view.kind === "loop" && node.loops.some((l) => l.id === view.loopId)) return true;
+    return false;
   };
+
+  const isLoopSelected = (loopId: string): boolean => {
+    return view.kind === "loop" && view.loopId === loopId;
+  };
+
+  // Total visible project count
+  const totalProjects = filteredNodes.length;
 
   return (
     <div className="sidebar">
-      <div className="sidebar-top">
-        <select
-          className="sidebar-filter"
-          value={filterId}
-          onChange={(e) => setFilterId(e.target.value)}
+      {/* Search input */}
+      <div className="sidebar-search-wrap">
+        <Search size={13} className="sidebar-search-icon" />
+        <input
+          className="sidebar-search"
+          type="text"
+          placeholder={intl.formatMessage({ id: "sidebar.searchPlaceholder" })}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        {searchQuery ? (
+          <button
+            className="sidebar-search-clear"
+            onClick={() => setSearchQuery("")}
+          >
+            <X size={12} />
+          </button>
+        ) : null}
+      </div>
+
+      {/* Toolbar: section label + action buttons */}
+      <div className="sidebar-toolbar">
+        <span className="overline">{intl.formatMessage({ id: "sidebar.projects" })}</span>
+        <span className="overline sidebar-count">{totalProjects || ""}</span>
+        <span style={{ flex: 1 }} />
+        <button
+          className="sidebar-toolbar-btn"
+          title={intl.formatMessage({ id: "sidebar.sort" })}
         >
-          <option value="">{intl.formatMessage({ id: "sidebar.allEnvironments" })}</option>
-          {environments.map((env) => (
-            <option key={env.id} value={env.id}>{env.name}</option>
-          ))}
-        </select>
-        <button className="sidebar-add" title={intl.formatMessage({ id: "sidebar.addEnvironment" })} onClick={onAddVm}>
-          <Plus size={14} />
+          <ArrowUpDown size={13} />
+        </button>
+        <button
+          className="sidebar-toolbar-btn"
+          title={intl.formatMessage({ id: "sidebar.connectInstance" })}
+          onClick={onAddVm}
+        >
+          <Link size={13} />
+        </button>
+        <button
+          className="sidebar-toolbar-btn"
+          title={intl.formatMessage({ id: "sidebar.newProject" })}
+        >
+          <Plus size={13} />
         </button>
       </div>
 
-      <div className="sidebar-section">
-        <span className="overline">{intl.formatMessage({ id: "sidebar.environments" })}</span>
-        <span className="overline">{visibleEnvs.length || ""}</span>
-      </div>
-
+      {/* 2-level tree: Project(instance) > Loop */}
       <div className="sidebar-list">
-        {visibleEnvs.length === 0 ? (
-          <div style={{ padding: "6px 10px", fontSize: 12.5, color: "var(--text-muted)" }}>
-            {intl.formatMessage({ id: "sidebar.noEnvironments" })}
+        {filteredNodes.length === 0 ? (
+          <div className="sidebar-empty">
+            {searchQuery
+              ? intl.formatMessage({ id: "sidebar.noSearchResults" })
+              : intl.formatMessage({ id: "sidebar.noProjects" })}
           </div>
         ) : (
-          visibleEnvs.map((env) => {
-            const h = health[env.id] ?? "unknown";
-            const cs = connectionStatus?.[env.id];
-            const fleetItem = fleetStatus?.[env.id] ?? "idle";
-            const isUnread = unreadEnvs?.has(env.id) ?? false;
-            const isMuted = mutedEnvs?.has(env.id) ?? false;
-            const instanceExpanded = isInstanceExpanded(env.id);
-            const isSelected = env.id === selectedId;
+          filteredNodes.map((node) => {
+            const projectExpanded = expandedProjects.has(node.key);
+            const projectSelected = isProjectSelected(node);
+            const hasChildren = node.loops.length > 0;
 
-            const envLoops = perEnvLoops[env.id] ?? [];
-            const envProjects = perEnvProjects[env.id] ?? [];
-
-            // Group loops by projectId
-            const loopsByProject = new Map<string, LoopMeta[]>();
-            const unassignedLoops: LoopMeta[] = [];
-            for (const loop of envLoops) {
-              const pid = loop.projectId ?? "default";
-              if (pid === "default" || !envProjects.some((p) => p.id === pid)) {
-                unassignedLoops.push(loop);
-              } else {
-                const existing = loopsByProject.get(pid) ?? [];
-                existing.push(loop);
-                loopsByProject.set(pid, existing);
-              }
-            }
-
-            const hasChildren = envLoops.length > 0 || envProjects.length > 0;
-            const instanceViewMatch = isSelected && view.kind === "instance";
+            const h = health[node.envId] ?? "unknown";
+            const cs = connectionStatus?.[node.envId];
 
             return (
-              <div key={env.id}>
-                {/* Instance node (level 0) */}
+              <div key={node.key}>
+                {/* Project node (level 0) */}
                 <div
-                  className={`tree-node tree-node-depth-0${isSelected ? " selected" : ""}${instanceViewMatch ? " selected" : ""}`}
+                  className={`tree-node tree-node-depth-0${projectSelected ? " selected" : ""}`}
                   onClick={() => {
-                    onSelect(env.id);
-                    onNavigate({ kind: "instance" });
+                    onSelect(node.envId);
+                    onNavigate({ kind: "project", projectId: node.projectId });
                   }}
                   title={healthTooltip(intl, h, cs)}
                 >
                   <TreeNodeChevron
-                    expanded={instanceExpanded}
+                    expanded={projectExpanded}
                     hasChildren={hasChildren}
-                    onClick={(e) => { e.stopPropagation(); toggleInstance(env.id); }}
+                    onClick={(e) => { e.stopPropagation(); toggleProject(node.key); }}
                   />
-                  <span className="env-dot-wrap">
-                    <span className="tree-dot" style={{ background: HEALTH_COLORS[h] }} />
-                    <UnreadDot visible={isUnread} />
+                  <span className="tree-dot" style={{ background: node.projectColor }} />
+                  <span className="tree-label">{node.projectName}</span>
+                  {hasMultipleEnvs ? (
+                    <span className="tree-instance-badge">{node.envName}</span>
+                  ) : null}
+                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }}>
+                    {node.loops.length}
                   </span>
-                  <span className="tree-label">{env.name}</span>
-
-                  {/* Fleet status pill */}
-                  {fleetItem !== "idle" ? (
-                    <span
-                      className="tree-pill"
-                      style={{
-                        background: `${PILL_COLORS[fleetItem]}22`,
-                        color: PILL_COLORS[fleetItem],
-                      }}
-                    >
-                      {getPillLabel(fleetItem)}
-                    </span>
-                  ) : null}
-
-                  {env.role === "main-vm" ? (
-                    <span className="tree-pill" style={{ background: "color-mix(in srgb, var(--accent-infra) 15%, transparent)", color: "var(--accent-infra)" }}>
-                      {intl.formatMessage({ id: "sidebar.main" })}
-                    </span>
-                  ) : null}
-
-                  {/* Action buttons on hover */}
-                  <div className="env-actions">
-                    {(h === "backoff" || h === "blocked") && onRetry ? (
-                      <span className="remove" role="button" title={intl.formatMessage({ id: "sidebar.retryConnection" })}
-                        onClick={(e) => { e.stopPropagation(); onRetry(env.id); }}>
-                        <RotateCw size={11} />
-                      </span>
-                    ) : null}
-                    {onToggleMute ? (
-                      <span className="remove" role="button"
-                        title={isMuted ? intl.formatMessage({ id: "sidebar.unmuteNotifications" }) : intl.formatMessage({ id: "sidebar.muteNotifications" })}
-                        onClick={(e) => { e.stopPropagation(); onToggleMute(env.id); }}>
-                        {isMuted ? <BellOff size={11} /> : <Bell size={11} />}
-                      </span>
-                    ) : null}
-                    <span className="remove" role="button" title={intl.formatMessage({ id: "sidebar.removeEnvironment" })}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(intl.formatMessage({ id: "sidebar.removeConfirm" }, { name: env.name }))) {
-                          onRemove(env.id);
-                        }
-                      }}>
-                      <X size={11} />
-                    </span>
-                  </div>
                 </div>
 
-                {/* Expanded instance: project and loop children */}
-                {instanceExpanded ? (
+                {/* Loop children (level 1) */}
+                {projectExpanded ? (
                   <div className="tree-children">
-                    {/* Project nodes (level 1) */}
-                    {envProjects.map((project) => {
-                      const projectLoops = loopsByProject.get(project.id) ?? [];
-                      const projectExpanded = expandedProjects.has(project.id);
-                      const projectViewMatch = isSelected && view.kind === "project" && view.projectId === project.id;
+                    {node.loops.map((loop) => {
+                      const loopSelected = isLoopSelected(loop.id);
+                      const loopTitle = loop.description?.trim() || loop.id;
+                      const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
+                      const loopColor = PILL_COLORS[fleetItem];
 
                       return (
-                        <div key={project.id}>
-                          <div
-                            className={`tree-node tree-node-depth-1${projectViewMatch ? " selected" : ""}`}
-                            onClick={() => {
-                              onSelect(env.id);
-                              onNavigate({ kind: "project", projectId: project.id });
-                            }}
+                        <div
+                          key={loop.id}
+                          className={`tree-node tree-node-depth-1${loopSelected ? " selected" : ""}`}
+                          onClick={() => {
+                            onSelect(node.envId);
+                            onNavigate({ kind: "loop", loopId: loop.id });
+                          }}
+                        >
+                          <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
+                          <LoopStatusDot status={loop.status} lastExitCode={loop.lastExitCode} />
+                          <span className="tree-label">{loopTitle}</span>
+                          <span
+                            className="tree-loop-status"
+                            style={{ color: loopColor }}
+                            title={getPillLabel(fleetItem)}
                           >
-                            <TreeNodeChevron
-                              expanded={projectExpanded}
-                              hasChildren={projectLoops.length > 0}
-                              onClick={(e) => { e.stopPropagation(); toggleProject(project.id); }}
-                            />
-                            <span className="tree-dot" style={{ background: project.color }} />
-                            <span className="tree-label">{project.name}</span>
-                            <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }}>
-                              {projectLoops.length}
-                            </span>
-                          </div>
-
-                          {/* Loop children (level 2) */}
-                          {projectExpanded ? (
-                            <div className="tree-project-children">
-                              {projectLoops.map((loop) => {
-                                const loopViewMatch = isSelected && view.kind === "loop" && view.loopId === loop.id;
-                                const loopTitle = loop.description?.trim() || loop.id;
-                                return (
-                                  <div
-                                    key={loop.id}
-                                    className={`tree-node tree-node-depth-2${loopViewMatch ? " selected" : ""}`}
-                                    onClick={() => {
-                                      onSelect(env.id);
-                                      onNavigate({ kind: "loop", loopId: loop.id });
-                                    }}
-                                  >
-                                    <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
-                                    <LoopStatusDot status={loop.status} lastExitCode={loop.lastExitCode} />
-                                    <span className="tree-label">{loopTitle}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : null}
+                            {getPillLabel(fleetItem)}
+                          </span>
+                          <span className="tree-loop-runcount">
+                            {loop.runCount > 0 ? `${loop.runCount}r` : ""}
+                          </span>
                         </div>
                       );
                     })}
-
-                    {/* Unassigned loops (no project) */}
-                    {unassignedLoops.length > 0 ? (
-                      <div className="tree-project-children">
-                        {unassignedLoops.map((loop) => {
-                          const loopViewMatch = isSelected && view.kind === "loop" && view.loopId === loop.id;
-                          const loopTitle = loop.description?.trim() || loop.id;
-                          return (
-                            <div
-                              key={loop.id}
-                              className={`tree-node tree-node-depth-2${loopViewMatch ? " selected" : ""}`}
-                              onClick={() => {
-                                onSelect(env.id);
-                                onNavigate({ kind: "loop", loopId: loop.id });
-                              }}
-                            >
-                              <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
-                              <LoopStatusDot status={loop.status} lastExitCode={loop.lastExitCode} />
-                              <span className="tree-label">{loopTitle}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-
-                    {/* Endpoints (multi-endpoint environments) */}
-                    {env.endpoints.length > 1 && isSelected ? (
-                      <div style={{ paddingLeft: 14 }}>
-                        {env.endpoints.map((ep) => {
-                          const epH = endpointHealth?.[env.id]?.find((eh) => eh.endpointId === ep.id);
-                          const epLabel = ep.kind === "ssh"
-                            ? intl.formatMessage({ id: "sidebar.kindSsh" })
-                            : ep.kind === "tailscale"
-                              ? intl.formatMessage({ id: "sidebar.kindTailscale" })
-                              : intl.formatMessage({ id: "sidebar.kindDirect" });
-                          return (
-                            <button
-                              key={ep.id}
-                              className={`instance-item${ep.id === env.activeEndpointId ? " selected" : ""}`}
-                              style={{ fontSize: 11, opacity: ep.id === env.activeEndpointId ? 1 : 0.6, padding: "3px 10px" }}
-                              onClick={(e) => { e.stopPropagation(); onSetEndpoint?.(env.id, ep.id); }}
-                              title={epH?.lastError ? `${epLabel}, ${translateMessage(intl, epH.lastError)}` : epLabel}
-                            >
-                              <span className="dot" style={{
-                                background: ep.id === env.activeEndpointId ? "var(--accent-blue)"
-                                  : (epH ? (({ connected: "var(--endpoint-connected)", backoff: "var(--endpoint-backoff)", offline: "var(--endpoint-offline)" } as Record<string, string>)[epH.phase] ?? "var(--text-muted)") : "var(--text-muted)"),
-                                width: 6, height: 6,
-                              }} />
-                              <span className="name">{epLabel}</span>
-                              {epH && epH.failureCount > 0 ? (
-                                <span className="stat" style={{ fontSize: 9, color: "var(--danger)", marginLeft: 4 }}>
-                                  {intl.formatMessage({ id: "sidebar.errorsCount" }, { count: epH.failureCount })}
-                                </span>
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
               </div>

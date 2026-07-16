@@ -72,7 +72,14 @@
     "badgeApiOff": "HTTP API disabled",
     "badgeMcp": "MCP API enabled",
     "badgeMcpOff": "MCP API disabled",
-    "idleStatus": "idle"
+    "idleStatus": "idle",
+    "searchPlaceholder": "Search projects, loops…",
+    "projects": "Projects",
+    "noProjects": "No projects yet",
+    "noSearchResults": "No results",
+    "sort": "Sort",
+    "connectInstance": "Connect instance",
+    "newProject": "New project"
   },
   "vmWizard": {
     "stepPickTarget": "Pick target",

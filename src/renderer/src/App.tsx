@@ -589,21 +589,12 @@ export function App(): React.ReactNode {
               selectedId={selectedId}
               health={health}
               connectionStatus={connectionStatus}
-              endpointHealth={endpointHealth}
-              openCodeStatus={openCodeStatus}
-              fleetStatus={fleetStatus}
-              unreadEnvs={unreadEnvs}
-              mutedEnvs={mutedEnvs}
               perEnvLoops={perEnvLoops}
               perEnvProjects={perEnvProjects}
               view={view}
-              onToggleMute={handleToggleMute}
               onSelect={handleSelect}
               onNavigate={handleNavigate}
               onAddVm={() => setVmWizardOpen(true)}
-              onRemove={handleRemove}
-              onRetry={handleRetry}
-              onSetEndpoint={handleSetEndpoint}
             />
           </aside>
         ) : null}
