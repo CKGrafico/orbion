@@ -416,9 +416,6 @@ export function App(): React.ReactNode {
               onRetry={handleRetry}
               onSetEndpoint={handleSetEndpoint}
             />
-            {mainVm ? (
-              <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
-            ) : null}
           </aside>
         ) : null}
 
@@ -471,7 +468,9 @@ export function App(): React.ReactNode {
             )}
           </div>
 
-          {selected && !inDetail ? (
+          {selected && !inDetail && mainVm ? (
+            <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
+          ) : selected && !inDetail && !mainVm ? (
             <div className="prompt-bar">
               <div className="prompt-box">
                 <input
