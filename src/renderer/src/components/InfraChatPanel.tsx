@@ -1,10 +1,13 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import type { ChatTurn, AccessMode } from "../types";
 import type { InfraActionArgs, MachineStatusEntry } from "../../../shared/ipc";
 import { useTranscript } from "../chat/useTranscript";
-import { MarkdownContent } from "../chat/MarkdownContent";
 import { ChatComposer } from "../chat/ChatComposer";
+
+const MarkdownContent = lazy(() =>
+  import("../chat/MarkdownContent").then((m) => ({ default: m.MarkdownContent })),
+);
 import { Server } from "lucide-react";
 import type { ApprovalDecision, ApprovalRequest, QuestionRequest } from "../chat/types";
 import { translateMessage } from "../i18n";
@@ -189,7 +192,9 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                   <div key={row.id} className="transcript-user-msg">
                     <div className="transcript-avatar infra-user-avatar">{intl.formatMessage({ id: "infra.userInitials" })}</div>
                     <div className="transcript-msg-body">
-                      <MarkdownContent content={row.content} />
+                      <Suspense fallback={null}>
+                        <MarkdownContent content={row.content} />
+                      </Suspense>
                     </div>
                   </div>
                 );
@@ -198,7 +203,9 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                   <div key={row.id} className="transcript-assistant-msg">
                     <div className="transcript-avatar infra-assistant-avatar">{intl.formatMessage({ id: "infra.botInitials" })}</div>
                     <div className="transcript-msg-body">
-                      <MarkdownContent content={row.content} streaming={row.streaming} />
+                      <Suspense fallback={null}>
+                        <MarkdownContent content={row.content} streaming={row.streaming} />
+                      </Suspense>
                     </div>
                   </div>
                 );
