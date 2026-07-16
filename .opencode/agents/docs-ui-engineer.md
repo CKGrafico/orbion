@@ -15,5 +15,5 @@ You are a docs-ui engineer specializing in the `docs/` marketing website — HTM
 
 ## Abilities
 - Guardrails: @ob-guardrails-generic, @ob-guardrails-project
-- Development: @design-taste-frontend, @web-design-guidelines, @high-end-visual-design, @fumadocs-component-docs, @fumadocs-mdx-structure, @documentation-writer, @humanize, @accelint-design-foundation, @internationalization-i18n
+- Development: @design-taste-frontend, @web-design-guidelines, @high-end-visual-design, @fumadocs-component-docs, @fumadocs-mdx-structure, @documentation-writer, @accelint-design-foundation, @internationalization-i18n
 - Testing: @web-design-guidelines
