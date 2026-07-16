@@ -46,7 +46,7 @@ for manager_dir in \
   "\${HOME}/.local/share/mise/installs/node" \
   "\${HOME}/.volta/tools/node"; do
   if [ -d "\${manager_dir}" ]; then
-    latest="\$(find "\${manager_dir}" -maxdepth 3 -name 'node' -path '*/bin/node' 2>/dev/null | sort -V | tail -1)"
+    latest="\$(find "\${manager_dir}" -maxdepth 4 -name 'node' -path '*/bin/node' 2>/dev/null | sort -V | tail -1)"
     if [ -n "\${latest}" ]; then
       node_path="\${latest}"
       break
