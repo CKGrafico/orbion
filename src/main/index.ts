@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import type {
@@ -576,12 +576,22 @@ app.whenReady().then(() => {
 
   ipcMain.handle("config:setOpenCodeEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setOpenCodeEndpoint", rawArgs);
-    await setOpenCodeEndpoint(environmentId, endpoint);
+    const result = await setOpenCodeEndpoint(environmentId, endpoint);
+    if (!result.ok && result.reason === "encryption-unavailable") {
+      void dialog.showMessageBox({
+        type: "warning",
+        title: "Password Not Saved",
+        message: "Password storage requires a keychain.",
+        detail: "Install libsecret on Linux or ensure a keychain is available on your system. Your password was not saved.",
+      });
+      return result;
+    }
     if (endpoint) {
       await refreshOpenCodeStatus(environmentId, endpoint);
     } else {
       clearOpenCodeStatus(environmentId);
     }
+    return result;
   });
 
   ipcMain.handle("config:setMainVm", async (_event, ...rawArgs) => {

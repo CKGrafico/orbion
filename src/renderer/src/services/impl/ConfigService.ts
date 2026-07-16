@@ -6,6 +6,7 @@ import type {
   SessionScope,
   PairingCodeExchangeResponse,
   OpenCodeEndpoint,
+  SetOpenCodeEndpointResult,
 } from "../../../../shared/ipc";
 import type { IConfigService } from "../interfaces";
 
@@ -48,7 +49,7 @@ export class ConfigService implements IConfigService {
   async removeSessionToken(environmentId: string): Promise<void> {
     return this.api.removeSessionToken(environmentId);
   }
-  async setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<void> {
+  async setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult> {
     return this.api.setOpenCodeEndpoint(environmentId, endpoint);
   }
   async setMainVm(environmentId: string): Promise<void> {

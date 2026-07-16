@@ -41,9 +41,22 @@ function makeClient(endpoint: OpenCodeEndpoint): OpencodeClient {
   const headers: Record<string, string> = {};
 
   if (endpoint.password) {
-    const decrypted = decryptValue(endpoint.password) ?? endpoint.password;
-    const encoded = Buffer.from(`admin:${decrypted}`).toString("base64");
-    headers["Authorization"] = `Basic ${encoded}`;
+    let decrypted: string | null = null;
+
+    if (endpoint.wasEncrypted) {
+      // Password was encrypted — decryption MUST succeed; no silent fallback
+      decrypted = decryptValue(endpoint.password);
+      // If decryption fails on an encrypted password, the ciphertext IS NOT a valid password
+      // — falling back to it would silently send garbage credentials.
+    } else {
+      // Legacy entry: wasEncrypted is false/undefined, password was never encrypted
+      decrypted = endpoint.password;
+    }
+
+    if (decrypted) {
+      const encoded = Buffer.from(`admin:${decrypted}`).toString("base64");
+      headers["Authorization"] = `Basic ${encoded}`;
+    }
   }
 
   return createOpencodeClient({ baseUrl, headers });

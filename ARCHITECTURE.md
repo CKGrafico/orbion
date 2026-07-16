@@ -83,7 +83,7 @@ flowchart LR
     P["Preload\ncontextBridge → window.api"]
     M["Main process\nHTTP proxy + SSE client"]
     ES[("electron-store\n(config.json in userData)\ninstances + selection")]
-    SS["safeStorage wrapper\n(encryption ready, unused)"]
+    SS["safeStorage wrapper\n(encrypts secrets at rest)"]
     WB[("userData/window-bounds.json")]
   end
 
@@ -236,7 +236,12 @@ lives in the loop-task daemons. Local persistence uses two mechanisms:
 A **safeStorage wrapper** (`config-store.ts`: `encryptValue`/`decryptValue`) is
 used to encrypt session tokens and OpenCode endpoint passwords before persisting
 them, using OS-native encryption (DPAPI on Windows, Keychain on macOS,
-libsecret on Linux).
+libsecret on Linux). If `safeStorage.isEncryptionAvailable()` returns `false`,
+password storage is rejected — the `setOpenCodeEndpoint` IPC returns
+`{ ok: false, reason: "encryption-unavailable" }` and a dialog is shown to the
+user. The `wasEncrypted` flag on `OpenCodeEndpoint` tracks whether a password
+was encrypted, enabling correct decryption behavior and backward compatibility
+with legacy unencrypted entries.
 
 **Migration:** on first launch after upgrade, `config:migrateFromLocalStorage`
 reads the old `lta.instances.v1` and `lta.selectedInstance.v1` localStorage
@@ -273,7 +278,7 @@ keys, writes them into electron-store, and clears the keys. The renderer's
 | TypeScript 5.8 (strict) | Language | Type-safe IPC contract across process boundaries |
 | Plain CSS + custom properties | Styling | Design tokens in `theme.css`; no CSS framework |
 | Server-Sent Events (SSE) | Log streaming | Push-based live log following |
-| Electron safeStorage | Encryption-at-rest | OS-native encryption wrapper; ready for future secrets |
+| Electron safeStorage | Encryption-at-rest | OS-native encryption wrapper; encrypts session tokens and OpenCode passwords; rejects storage when unavailable |
 | pnpm | Package manager | Dependency management (Node >= 20) |
 
 ## 8. Deployment & Infrastructure
@@ -301,17 +306,21 @@ keys, writes them into electron-store, and clears the keys. The renderer's
   `localStorage` exposed. The renderer accesses config only through the typed
   IPC contract.
 - **Encryption-at-rest readiness:** a `safeStorage` wrapper is available in
-  `config-store.ts` for encrypting secrets before they are persisted. No call
-  sites use encryption yet — the capability is ready for when daemon auth
-  tokens or other secrets need to be stored.
+  `config-store.ts` for encrypting secrets before they are persisted. Session
+  tokens and OpenCode endpoint passwords are encrypted via this wrapper. If
+  `safeStorage.isEncryptionAvailable()` returns `false` (e.g. Linux without
+  libsecret), password storage is **rejected** with a user-facing error —
+  passwords are never stored in plaintext. The `OpenCodeEndpoint.wasEncrypted`
+  flag distinguishes encrypted entries from legacy unencrypted ones.
 - **URL validation:** the main process rejects any base URL that is not
   `http:`/`https:` before making a request.
 - **External links:** `setWindowOpenHandler` denies in-app navigation and opens
   links in the system browser.
 - **Trust boundary:** renderer ⇄ preload ⇄ main. Only the main process performs
   network and filesystem I/O.
-- **Auth/secrets:** none — the daemon API is unauthenticated and assumed local
-  or tunneled. No secrets are stored.
+- **Auth/secrets:** OpenCode endpoint passwords are encrypted at rest via
+  `safeStorage`. Session tokens are similarly encrypted. Plaintext storage is
+  rejected when the OS keychain is unavailable.
 
 ## 10. Monitoring & Observability
 

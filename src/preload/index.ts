@@ -11,6 +11,7 @@ import type {
   SessionScope,
   OpenCodeConnectionStatus,
   OpenCodeEndpoint,
+  SetOpenCodeEndpointResult,
   VmWizardProgress,
   VmWizardResult,
   VmWizardServiceSelection,
@@ -59,7 +60,7 @@ const bridge: LoopTaskBridge = {
     removeSessionToken: (environmentId: string) =>
       ipcRenderer.invoke("config:removeSessionToken", environmentId),
     setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) =>
-      ipcRenderer.invoke("config:setOpenCodeEndpoint", environmentId, endpoint) as Promise<void>,
+      ipcRenderer.invoke("config:setOpenCodeEndpoint", environmentId, endpoint) as Promise<SetOpenCodeEndpointResult>,
     setMainVm: (environmentId: string) =>
       ipcRenderer.invoke("config:setMainVm", environmentId) as Promise<void>,
     getMainVmId: () =>

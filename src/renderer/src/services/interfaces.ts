@@ -5,6 +5,7 @@ import type {
   SessionScope,
   PairingCodeExchangeResponse,
   OpenCodeEndpoint,
+  SetOpenCodeEndpointResult,
   ConnectionStatus,
   EndpointHealth,
   OpenCodeConnectionStatus,
@@ -33,7 +34,7 @@ export interface IConfigService {
   migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | null): Promise<boolean>;
   exchangePairingCode(baseUrl: string, code: string, scope?: SessionScope): Promise<PairingCodeExchangeResponse>;
   removeSessionToken(environmentId: string): Promise<void>;
-  setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<void>;
+  setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult>;
   setMainVm(environmentId: string): Promise<void>;
   getMainVmId(): Promise<string | null>;
 }

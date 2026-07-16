@@ -296,6 +296,8 @@ const validators: Record<string, Validator> = {
         if (!isNonEmptyString(ep.url)) issues.push("endpoint.url must be a non-empty string");
         if (ep.password !== null && !isString(ep.password))
           issues.push("endpoint.password must be a string or null");
+        if (ep.wasEncrypted !== undefined && typeof ep.wasEncrypted !== "boolean")
+          issues.push("endpoint.wasEncrypted must be a boolean or undefined");
       }
     }
     return issues;

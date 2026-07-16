@@ -16,6 +16,7 @@ import type {
   PairingCodeExchangeResponse,
   OpenCodeEndpoint,
   SessionScope,
+  SetOpenCodeEndpointResult,
 } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
@@ -155,7 +156,7 @@ export class MockConfigService implements IConfigService {
   async migrateFromLocalStorage(): Promise<boolean> { return false; }
   async exchangePairingCode(): Promise<PairingCodeExchangeResponse> { return { ok: false, error: "mock" }; }
   async removeSessionToken(): Promise<void> {}
-  async setOpenCodeEndpoint(_environmentId: string, _endpoint: OpenCodeEndpoint | null): Promise<void> {}
+  async setOpenCodeEndpoint(_environmentId: string, _endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult> { return { ok: true }; }
   async setMainVm(environmentId: string): Promise<void> {
     mockEnvironments.forEach((e) => { e.role = e.id === environmentId ? "main-vm" : undefined; });
     saveMockEnvironments();

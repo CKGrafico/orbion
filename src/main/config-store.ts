@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, I18nMessage } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage } from "../shared/ipc.js";
 import { msg } from "./i18n.js";
 
 interface LegacyInstance {
@@ -299,24 +299,44 @@ function _removeSessionToken(environmentId: string): void {
   store.set("sessionTokens", tokens);
 }
 
-function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
+function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): SetOpenCodeEndpointResult {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
+  if (!env) return { ok: true };
   if (endpoint && endpoint.password) {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { ok: false, reason: "encryption-unavailable" };
+    }
     const encrypted = encryptValue(endpoint.password);
-    env.opencode = encrypted ? { ...endpoint, password: encrypted } : endpoint;
+    if (!encrypted) {
+      return { ok: false, reason: "encryption-unavailable" };
+    }
+    env.opencode = { ...endpoint, password: encrypted, wasEncrypted: true };
   } else {
     env.opencode = endpoint;
   }
   store.set("environments", envs);
+  return { ok: true };
 }
 
 function _setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
-  env.infraOpenCode = endpoint;
+  if (endpoint && endpoint.password) {
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = encryptValue(endpoint.password);
+      if (encrypted) {
+        env.infraOpenCode = { ...endpoint, password: encrypted, wasEncrypted: true };
+      } else {
+        env.infraOpenCode = { ...endpoint, wasEncrypted: false };
+      }
+    } else {
+      env.infraOpenCode = { ...endpoint, wasEncrypted: false };
+    }
+  } else {
+    env.infraOpenCode = endpoint;
+  }
   store.set("environments", envs);
 }
 
@@ -396,7 +416,7 @@ export function removeSessionToken(environmentId: string): Promise<void> {
   return serialize(() => _removeSessionToken(environmentId));
 }
 
-export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<void> {
+export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult> {
   return serialize(() => _setOpenCodeEndpoint(environmentId, endpoint));
 }
 

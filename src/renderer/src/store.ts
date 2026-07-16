@@ -112,8 +112,11 @@ export function useEnvironments(): {
   const setOpenCodeEndpointFn = useCallback(
     (environmentId: string, url: string, password: string | null) => {
       const endpoint: OpenCodeEndpoint = { url: url.trim().replace(/\/+$/, ""), password };
-      void configService.setOpenCodeEndpoint(environmentId, endpoint).then(async () => {
-        setEnvironments(await configService.getEnvironments());
+      void configService.setOpenCodeEndpoint(environmentId, endpoint).then(async (result) => {
+        if (result.ok) {
+          setEnvironments(await configService.getEnvironments());
+        }
+        // If !result.ok, the main process already showed a dialog — nothing to do here
       }).catch(() => {});
     },
     [configService],

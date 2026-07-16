@@ -91,7 +91,7 @@ export interface ConfigBridge {
   migrateFromLocalStorage: (rawInstances: string, rawSelectedId: string | null) => Promise<boolean>;
   exchangePairingCode: (baseUrl: string, code: string, scope?: SessionScope) => Promise<PairingCodeExchangeResponse>;
   removeSessionToken: (environmentId: string) => Promise<void>;
-  setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) => Promise<void>;
+  setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) => Promise<SetOpenCodeEndpointResult>;
   setMainVm: (environmentId: string) => Promise<void>;
   getMainVmId: () => Promise<string | null>;
 }
@@ -182,7 +182,13 @@ export interface OpenCodeConnectionStatus {
 export interface OpenCodeEndpoint {
   url: string;
   password: string | null;
+  /** True if the password was encrypted via safeStorage. Undefined/false for legacy plaintext entries. */
+  wasEncrypted?: boolean;
 }
+
+export type SetOpenCodeEndpointResult =
+  | { ok: true }
+  | { ok: false; reason: "encryption-unavailable" };
 
 // ── Add-VM wizard ───────────────────────────────────────────────────
 
