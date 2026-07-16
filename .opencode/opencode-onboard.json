@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "generatedAt": "2026-07-16T11:36:35.275Z",
-  "onboardVersion": "1.3.8",
+  "generatedAt": "2026-07-16T21:32:55.220Z",
+  "onboardVersion": "1.3.12",
   "opencodeVersion": "1.17.14",
   "platform": {
     "backlog": "github",
@@ -13,7 +13,7 @@
     "fast": "opencode/big-pickle"
   },
   "agents": {
-    "maxConcurrent": 4
+    "maxConcurrent": 3
   },
   "source": {
     "mode": "current",

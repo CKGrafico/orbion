@@ -8,6 +8,12 @@
       "disable": true
     }
   },
+  "permission": {
+    "skill": {
+      "ob-*": "allow",
+      "openspec-*": "allow"
+    }
+  },
   "model": "opencode-go/glm-5.1",
   "plugin": [
     "@slkiser/opencode-quota@latest"
