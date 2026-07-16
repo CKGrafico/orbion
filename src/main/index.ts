@@ -336,7 +336,7 @@ function createWindow(): void {
       preload: path.join(import.meta.dirname, "../preload/index.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
