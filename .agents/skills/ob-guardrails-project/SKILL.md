@@ -20,7 +20,9 @@ license: MIT
 
 ## File Organization
 
-- **One responsibility per file.** Do not create god-files or dumping-ground files like `constants.ts`, `types.ts`, `config.ts`, or `utils.ts` that collect unrelated items from different domains. Split by domain or feature instead (e.g. `loop-types.ts`, `env-config.ts`, `ssh-utils.ts`). Evidence: ARCHITECTURE.md §1 shows clear per-concern file names (`config-store.ts`, `connection-supervisor.ts`, `vm-wizard.ts`, `ssh-probe.ts`).
+- **One responsibility per file — no god-files, no dumping grounds.** Never create files named `constants.ts`, `types.ts`, `config.ts`, `utils.ts`, `helpers.ts`, or similar catch-alls that collect unrelated items from different domains. If a file imports from 5+ unrelated modules it is a sign it must be split. Split by domain or feature instead (e.g. `loop-types.ts`, `env-config.ts`, `ssh-utils.ts`, `wizard-constants.ts`). Evidence: ARCHITECTURE.md §1 shows clear per-concern file names (`config-store.ts`, `connection-supervisor.ts`, `vm-wizard.ts`, `ssh-probe.ts`).
+- **Renderer follows Feature-Sliced Design (FSD).** The `src/renderer/src/` tree is organised into FSD layers: `app/` → `pages/` → `widgets/` → `features/` → `entities/` → `shared/`. Upper layers may import from lower layers only — never the reverse. `shared/` holds truly cross-cutting UI primitives (design tokens, i18n helpers, generic hooks). Domain logic lives in `entities/` or `features/`, never in `shared/`. Evidence: `frontend-engineer.md` description; `@feature-sliced-design` skill installed.
+- **Keep components small and single-purpose.** A component file that exceeds ~200 lines is a signal it is doing too much. Extract sub-components, custom hooks, or utility functions into separate files within the same FSD slice. Evidence: FSD conventions; `@react-render-optimization` skill; project history shows large components being split.
 - **Domain types live in `src/renderer/src/types.ts` or `src/shared/ipc.ts`.** Types mirrored from the loop-task daemon (`LoopMeta`, `RunRecord`, `Project`, `TaskDefinition`, `LoopStatus`) go in `types.ts`. Types shared across process boundaries go in `ipc.ts`. Do not duplicate type definitions across layers — re-export from the canonical location. Evidence: `types.ts` re-exports from `ipc.ts` rather than redefining.
 - **Formatting helpers are pure functions in `src/renderer/src/format.ts`.** Time/label/status formatting (`timeAgo`, `timeUntil`, `commandLine`, `hostLabel`, `STATUS_COLORS`) must remain pure and side-effect-free. Evidence: ARCHITECTURE.md §3.3.
 
@@ -101,4 +103,31 @@ license: MIT
 - **Respect Electron process boundaries in proposals.** Network I/O belongs in main; the renderer only calls `window.api`. Call out any new IPC channel explicitly. Evidence: openspec/config.yaml rules.proposal.
 - **Include a verification step in every task.** At minimum `pnpm typecheck` must pass. Evidence: openspec/config.yaml rules.tasks.
 
-<!-- Last updated: 2026-07-16T13:15:00Z -->
+## Skills & Patterns
+
+The following skills are installed in `.agents/skills/` and must be respected when working in their domain. When in doubt, load the relevant skill before implementing.
+
+### Architecture & Structure
+- **`@feature-sliced-design`** — FSD layer rules for `src/renderer/src/`. Upper layers import from lower; `shared/` holds only cross-cutting primitives. Use this skill for any renderer structural decision.
+- **`@inversify-hooks`** — DI container wiring with `useInject` hook. Use for injecting services into React components and registering singletons/transients in the container.
+
+### React & Performance
+- **`@react-2026`** — React 19 patterns: Server Components, Actions, `use()`, `useOptimistic`, `useTransition`. Load before adding new React features.
+- **`@react-render-optimization`** — memoization, virtualization, avoiding re-renders. Load before touching hot-path components or adding lists. The renderer uses `@tanstack/react-virtual` for long lists.
+- **`@vercel-react-best-practices`** — data fetching, Suspense, concurrent patterns. Load for any data-loading or async UI work.
+- **`@hooks-pattern`** (PatternsDev) — custom hook composition. Prefer extracting stateful logic into hooks over putting it in components.
+- **`@provider-pattern`** (PatternsDev) — React context/provider patterns. Prefer this over prop drilling across more than 2 levels.
+- **`@compound-pattern`** (PatternsDev) — compound component API design for complex UI.
+- **`@virtual-lists`** (PatternsDev) — virtualizing large lists. Required when rendering >50 rows.
+
+### Build & Bundling
+- **`@vite`** — Vite 7 / electron-vite 4 configuration. Load for any build config change.
+- **`@vite-bundle-optimization`** (PatternsDev) — code splitting, tree shaking, dynamic imports. Load before changing import structure.
+- **`@js-performance-patterns`** (PatternsDev) — JS runtime performance. Load for hot-path or CPU-sensitive work.
+
+### Styling & Design
+- **`@accelint-design-foundation`** — CSS custom-property design tokens, spacing scale, variant system. Load for any styling work.
+
+### DI wiring rule: `inversify-hooks` container must be configured in `app/` layer (FSD). Features inject via `useInject`; they do not construct services directly.
+
+<!-- Last updated: 2026-07-16T14:30:00Z -->
