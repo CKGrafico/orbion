@@ -312,8 +312,8 @@ export function makeProbe(baseUrl: string, environmentId?: string): () => Promis
       clearTimeout(timeout);
 
       if (res.status === 401 && environmentId) {
-        removeSessionToken(environmentId);
-        setEnvironmentAuthState(environmentId, "blocked");
+        await removeSessionToken(environmentId);
+        await setEnvironmentAuthState(environmentId, "blocked");
       }
 
       if (!res.ok) {

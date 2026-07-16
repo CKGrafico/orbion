@@ -178,8 +178,8 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
     });
 
     if (res.status === 401 && envId) {
-      removeSessionToken(envId);
-      setEnvironmentAuthState(envId, "blocked");
+      await removeSessionToken(envId);
+      await setEnvironmentAuthState(envId, "blocked");
     }
 
     const text = await res.text();
@@ -418,18 +418,18 @@ app.whenReady().then(() => {
     if (fingerprint) {
       const existing = findEnvironmentByFingerprint(fingerprint.id);
       if (existing) {
-        const ep = addEndpoint(existing.id, url, endpointKind);
+        const ep = await addEndpoint(existing.id, url, endpointKind);
         syncEndpointTracker(existing.id);
         const activeUrl = resolveActiveUrl(existing.endpoints, ep?.id ?? existing.activeEndpointId);
         if (activeUrl) getOrCreateSupervisor(existing.id, activeUrl);
         return existing;
       }
     }
-    const env = addEnvironment(name, url, endpointKind);
+    const env = await addEnvironment(name, url, endpointKind);
     if (fingerprint) {
-      setEnvironmentFingerprintId(env.id, fingerprint.id);
+      await setEnvironmentFingerprintId(env.id, fingerprint.id);
     }
-    autoPromoteFirstEnvIfNeeded();
+    await autoPromoteFirstEnvIfNeeded();
     const activeUrl = resolveActiveUrl(env.endpoints, env.activeEndpointId);
     if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
     syncEndpointTracker(env.id);
@@ -442,34 +442,34 @@ app.whenReady().then(() => {
     if (result.ok && result.token) {
       const envId = findEnvironmentIdByUrl(baseUrl);
       if (envId) {
-        storeSessionToken(envId, result.token);
+        await storeSessionToken(envId, result.token);
       }
     }
     return result;
   });
-  ipcMain.handle("config:removeSessionToken", (_event, ...rawArgs) => {
+  ipcMain.handle("config:removeSessionToken", async (_event, ...rawArgs) => {
     const [environmentId] = validateIpc<[string]>("config:removeSessionToken", rawArgs);
-    removeSessionToken(environmentId);
+    await removeSessionToken(environmentId);
   });
-  ipcMain.handle("config:removeEnvironment", (_event, ...rawArgs) => {
+  ipcMain.handle("config:removeEnvironment", async (_event, ...rawArgs) => {
     const [id] = validateIpc<[string]>("config:removeEnvironment", rawArgs);
     removeSupervisor(id);
-    removeEnvironment(id);
+    await removeEnvironment(id);
   });
-  ipcMain.handle("config:addEndpoint", (_event, ...rawArgs) => {
+  ipcMain.handle("config:addEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, url, kind] = validateIpc<[string, string, string]>("config:addEndpoint", rawArgs);
-    const ep = addEndpoint(environmentId, url, kind as "direct" | "ssh" | "tailscale");
+    const ep = await addEndpoint(environmentId, url, kind as "direct" | "ssh" | "tailscale");
     syncEndpointTracker(environmentId);
     return ep;
   });
-  ipcMain.handle("config:removeEndpoint", (_event, ...rawArgs) => {
+  ipcMain.handle("config:removeEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, endpointId] = validateIpc<[string, string]>("config:removeEndpoint", rawArgs);
-    removeEndpoint(environmentId, endpointId);
+    await removeEndpoint(environmentId, endpointId);
     syncEndpointTracker(environmentId);
   });
-  ipcMain.handle("config:setActiveEndpoint", (_event, ...rawArgs) => {
+  ipcMain.handle("config:setActiveEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, endpointId] = validateIpc<[string, string]>("config:setActiveEndpoint", rawArgs);
-    setActiveEndpoint(environmentId, endpointId);
+    await setActiveEndpoint(environmentId, endpointId);
     const envs = getEnvironments();
     const env = envs.find((e: Environment) => e.id === environmentId);
     if (env) {
@@ -485,13 +485,13 @@ app.whenReady().then(() => {
     validateIpc("config:getSelectedEnvironmentId", []);
     return getSelectedEnvironmentId();
   });
-  ipcMain.handle("config:setSelectedEnvironmentId", (_event, ...rawArgs) => {
+  ipcMain.handle("config:setSelectedEnvironmentId", async (_event, ...rawArgs) => {
     const [id] = validateIpc<[string | null]>("config:setSelectedEnvironmentId", rawArgs);
     return setSelectedEnvironmentId(id);
   });
   ipcMain.handle(
     "config:migrateFromLocalStorage",
-    (_event, ...rawArgs) => {
+    async (_event, ...rawArgs) => {
       const [rawInstances, rawSelectedId] = validateIpc<[string, string | null]>("config:migrateFromLocalStorage", rawArgs);
       return migrateFromLocalStorage(rawInstances, rawSelectedId);
     },
@@ -576,7 +576,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle("config:setOpenCodeEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setOpenCodeEndpoint", rawArgs);
-    setOpenCodeEndpoint(environmentId, endpoint);
+    await setOpenCodeEndpoint(environmentId, endpoint);
     if (endpoint) {
       await refreshOpenCodeStatus(environmentId, endpoint);
     } else {
@@ -584,9 +584,9 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("config:setMainVm", (_event, ...rawArgs) => {
+  ipcMain.handle("config:setMainVm", async (_event, ...rawArgs) => {
     const [environmentId] = validateIpc<[string]>("config:setMainVm", rawArgs);
-    setMainVm(environmentId);
+    await setMainVm(environmentId);
   });
 
   ipcMain.handle("config:getMainVmId", () => {
@@ -661,7 +661,7 @@ app.whenReady().then(() => {
     return { mainVmId, connected };
   });
 
-  autoPromoteFirstEnvIfNeeded();
+  void autoPromoteFirstEnvIfNeeded();
   createWindow();
 
   app.on("activate", () => {
