@@ -219,20 +219,24 @@ The app has **no database or backend store of its own**; all authoritative data
 lives in the loop-task daemons. Local persistence uses two mechanisms:
 
 - **electron-store** (main process, `config-store.ts`): a typed JSON store in
-  Electron's `userData` directory holding registered instances (`Instance[]`)
-  and the selected instance id (`string | null`). Accessed by the renderer only
-  through typed IPC channels (`config:getInstances`, `config:addInstance`,
-  `config:removeInstance`, `config:getSelectedInstanceId`,
-  `config:setSelectedInstanceId`, `config:migrateFromLocalStorage`). This
-  eliminates the renderer-side `localStorage` XSS surface from previous versions.
+  Electron's `userData` directory holding registered environments
+  (`Environment[]`), session tokens, the selected environment id, and related
+  state. Accessed by the renderer only through typed IPC channels. This
+  eliminates the renderer-side `localStorage` XSS surface from previous
+  versions.
+  All mutating operations are serialized through a `serialize()` wrapper that
+  chains writes via a single Promise queue (`writeChain`), preventing
+  read-modify-write race conditions when concurrent IPC handlers overlap.
+  Internal (private) `_impl` functions bypass the queue; only the public
+  exported wrappers enter it — so cross-calls within a mutation (e.g.
+  `storeSessionToken` → `setEnvironmentAuthState`) cannot deadlock.
 - **window-bounds.json** (main, in Electron `userData`): window
   size/position/maximized state.
 
 A **safeStorage wrapper** (`config-store.ts`: `encryptValue`/`decryptValue`) is
-available for future secrets (e.g. daemon auth tokens), using OS-native
-encryption (DPAPI on Windows, Keychain on macOS, libsecret on Linux). No
-encryption call sites exist yet — the capability is ready for when secrets
-appear.
+used to encrypt session tokens and OpenCode endpoint passwords before persisting
+them, using OS-native encryption (DPAPI on Windows, Keychain on macOS,
+libsecret on Linux).
 
 **Migration:** on first launch after upgrade, `config:migrateFromLocalStorage`
 reads the old `lta.instances.v1` and `lta.selectedInstance.v1` localStorage
