@@ -206,7 +206,7 @@ node_path="\$(\${MISE_BIN} exec node -- which node 2>/dev/null || echo '')"
 if [ -z "\${node_path}" ]; then
   node_path="\$(command -v node 2>/dev/null || echo '')"
 fi
-node_version="\$(\\\${node_path}" --version 2>/dev/null || echo 'unknown')"
+node_version="\$("\${node_path}" --version 2>/dev/null || echo 'unknown')"
 
 if [ -z "\${node_path}" ]; then
   echo "MISE_INSTALL_FAILED|node not found after mise install"
