@@ -44,6 +44,21 @@ const store = new Store<ConfigSchema>({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Write serialization — prevents read-modify-write races under concurrent IPC
+// ---------------------------------------------------------------------------
+let writeChain: Promise<void> = Promise.resolve();
+
+function serialize<T>(fn: () => T): Promise<T> {
+  const next = writeChain.then(() => fn());
+  writeChain = next.catch(() => {});
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Migration (synchronous — only runs once at startup before IPC is active)
+// ---------------------------------------------------------------------------
+
 function ensureMigrated(): void {
   if (store.get("instancesMigrated", false)) return;
 
@@ -75,6 +90,10 @@ function ensureMigrated(): void {
   store.set("instancesMigrated", true);
 }
 
+// ---------------------------------------------------------------------------
+// Read functions (synchronous — reads are consistent per-call and never lose data)
+// ---------------------------------------------------------------------------
+
 export function getEnvironments(): EnvironmentWithFingerprint[] {
   ensureMigrated();
   return store.get("environments", []);
@@ -86,7 +105,48 @@ export function findEnvironmentByFingerprint(fingerprintId: string): Environment
   return envs.find((e) => e.fingerprintId === fingerprintId);
 }
 
-export function setEnvironmentFingerprintId(environmentId: string, fingerprintId: string): void {
+export function getSelectedEnvironmentId(): string | null {
+  ensureMigrated();
+  return store.get("selectedEnvironmentId", null);
+}
+
+export function getMainVmId(): string | null {
+  ensureMigrated();
+  const envs = store.get("environments", []);
+  const mainVm = envs.find((e) => e.role === "main-vm");
+  return mainVm?.id ?? null;
+}
+
+export function getMainVm(): EnvironmentWithFingerprint | null {
+  ensureMigrated();
+  const envs = store.get("environments", []);
+  return envs.find((e) => e.role === "main-vm") ?? null;
+}
+
+export function getSessionToken(environmentId: string): SessionToken | null {
+  const tokens = store.get("sessionTokens", {});
+  const entry = tokens[environmentId];
+  if (!entry) return null;
+  const accessToken = decryptValue(entry.encryptedAccessToken);
+  if (!accessToken) return null;
+  const token: SessionToken = {
+    accessToken,
+    scope: entry.scope,
+    expiresAt: entry.expiresAt,
+  };
+  if (token.expiresAt !== null && Date.now() > token.expiresAt) {
+    void removeSessionToken(environmentId);
+    void _setEnvironmentAuthState(environmentId, "blocked");
+    return null;
+  }
+  return token;
+}
+
+// ---------------------------------------------------------------------------
+// Mutation internals (unserialized — called from within serialize() only)
+// ---------------------------------------------------------------------------
+
+function _setEnvironmentFingerprintId(environmentId: string, fingerprintId: string): void {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
@@ -94,7 +154,7 @@ export function setEnvironmentFingerprintId(environmentId: string, fingerprintId
   store.set("environments", envs);
 }
 
-export function addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Environment {
+function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Environment {
   ensureMigrated();
   const endpointId = crypto.randomUUID().slice(0, 8);
   const endpoint: AccessEndpoint = {
@@ -111,13 +171,13 @@ export function addEnvironment(name: string, url: string, kind: EndpointKind = "
     endpoints: [endpoint],
     activeEndpointId: endpointId,
   };
-  const envs = getEnvironments();
+  const envs = store.get("environments", []);
   store.set("environments", [...envs, env]);
   return env;
 }
 
-export function removeEnvironment(id: string): void {
-  const envs = getEnvironments().filter((e) => e.id !== id);
+function _removeEnvironment(id: string): void {
+  const envs = store.get("environments", []).filter((e) => e.id !== id);
   store.set("environments", envs);
   const selectedId = store.get("selectedEnvironmentId");
   if (selectedId === id) {
@@ -125,8 +185,8 @@ export function removeEnvironment(id: string): void {
   }
 }
 
-export function addEndpoint(environmentId: string, url: string, kind: EndpointKind): AccessEndpoint | null {
-  const envs = getEnvironments();
+function _addEndpoint(environmentId: string, url: string, kind: EndpointKind): AccessEndpoint | null {
+  const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return null;
 
@@ -142,8 +202,8 @@ export function addEndpoint(environmentId: string, url: string, kind: EndpointKi
   return endpoint;
 }
 
-export function removeEndpoint(environmentId: string, endpointId: string): void {
-  const envs = getEnvironments();
+function _removeEndpoint(environmentId: string, endpointId: string): void {
+  const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
 
@@ -154,8 +214,8 @@ export function removeEndpoint(environmentId: string, endpointId: string): void 
   store.set("environments", envs);
 }
 
-export function setActiveEndpoint(environmentId: string, endpointId: string): void {
-  const envs = getEnvironments();
+function _setActiveEndpoint(environmentId: string, endpointId: string): void {
+  const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
   if (!env.endpoints.some((ep) => ep.id === endpointId)) return;
@@ -163,21 +223,16 @@ export function setActiveEndpoint(environmentId: string, endpointId: string): vo
   store.set("environments", envs);
 }
 
-export function getSelectedEnvironmentId(): string | null {
-  ensureMigrated();
-  return store.get("selectedEnvironmentId", null);
-}
-
-export function setSelectedEnvironmentId(id: string | null): void {
+function _setSelectedEnvironmentId(id: string | null): void {
   store.set("selectedEnvironmentId", id);
 }
 
-export function migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | null): boolean {
+function _migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | null): boolean {
   try {
     const parsed = JSON.parse(rawInstances) as LegacyInstance[];
     if (!Array.isArray(parsed)) return false;
 
-    const current = getEnvironments();
+    const current = store.get("environments", []);
     if (current.length === 0) {
       const environments: Environment[] = parsed.map((inst) => {
         const endpoint: AccessEndpoint = {
@@ -205,8 +260,8 @@ export function migrateFromLocalStorage(rawInstances: string, rawSelectedId: str
   }
 }
 
-export function updateEndpointHealth(environmentId: string, endpointId: string, lastError: string | I18nMessage | null, failureCount: number): void {
-  const envs = getEnvironments();
+function _updateEndpointHealth(environmentId: string, endpointId: string, lastError: string | I18nMessage | null, failureCount: number): void {
+  const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
   const ep = env.endpoints.find((e) => e.id === endpointId);
@@ -216,7 +271,7 @@ export function updateEndpointHealth(environmentId: string, endpointId: string, 
   store.set("environments", envs);
 }
 
-export function setEnvironmentAuthState(environmentId: string, authState: EnvironmentAuthState): void {
+function _setEnvironmentAuthState(environmentId: string, authState: EnvironmentAuthState): void {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
@@ -224,7 +279,7 @@ export function setEnvironmentAuthState(environmentId: string, authState: Enviro
   store.set("environments", envs);
 }
 
-export function storeSessionToken(environmentId: string, token: SessionToken): boolean {
+function _storeSessionToken(environmentId: string, token: SessionToken): boolean {
   const encrypted = encryptValue(token.accessToken);
   if (!encrypted) return false;
   const tokens = store.get("sessionTokens", {});
@@ -234,36 +289,17 @@ export function storeSessionToken(environmentId: string, token: SessionToken): b
     expiresAt: token.expiresAt,
   };
   store.set("sessionTokens", tokens);
-  setEnvironmentAuthState(environmentId, "paired");
+  _setEnvironmentAuthState(environmentId, "paired");
   return true;
 }
 
-export function getSessionToken(environmentId: string): SessionToken | null {
-  const tokens = store.get("sessionTokens", {});
-  const entry = tokens[environmentId];
-  if (!entry) return null;
-  const accessToken = decryptValue(entry.encryptedAccessToken);
-  if (!accessToken) return null;
-  const token: SessionToken = {
-    accessToken,
-    scope: entry.scope,
-    expiresAt: entry.expiresAt,
-  };
-  if (token.expiresAt !== null && Date.now() > token.expiresAt) {
-    removeSessionToken(environmentId);
-    setEnvironmentAuthState(environmentId, "blocked");
-    return null;
-  }
-  return token;
-}
-
-export function removeSessionToken(environmentId: string): void {
+function _removeSessionToken(environmentId: string): void {
   const tokens = store.get("sessionTokens", {});
   delete tokens[environmentId];
   store.set("sessionTokens", tokens);
 }
 
-export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
+function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
@@ -276,7 +312,7 @@ export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEnd
   store.set("environments", envs);
 }
 
-export function setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
+function _setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return;
@@ -284,20 +320,7 @@ export function setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCo
   store.set("environments", envs);
 }
 
-export function getMainVmId(): string | null {
-  ensureMigrated();
-  const envs = store.get("environments", []);
-  const mainVm = envs.find((e) => e.role === "main-vm");
-  return mainVm?.id ?? null;
-}
-
-export function getMainVm(): EnvironmentWithFingerprint | null {
-  ensureMigrated();
-  const envs = store.get("environments", []);
-  return envs.find((e) => e.role === "main-vm") ?? null;
-}
-
-export function setMainVm(environmentId: string): void {
+function _setMainVm(environmentId: string): void {
   const envs = store.get("environments", []);
   for (const env of envs) {
     if (env.role === "main-vm") {
@@ -311,7 +334,7 @@ export function setMainVm(environmentId: string): void {
   store.set("environments", envs);
 }
 
-export function autoPromoteFirstEnvIfNeeded(): void {
+function _autoPromoteFirstEnvIfNeeded(): void {
   const envs = store.get("environments", []);
   if (envs.length === 0) return;
   const hasMainVm = envs.some((e) => e.role === "main-vm");
@@ -320,6 +343,78 @@ export function autoPromoteFirstEnvIfNeeded(): void {
     store.set("environments", envs);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Public mutating functions (serialized through write queue)
+// ---------------------------------------------------------------------------
+
+export function setEnvironmentFingerprintId(environmentId: string, fingerprintId: string): Promise<void> {
+  return serialize(() => _setEnvironmentFingerprintId(environmentId, fingerprintId));
+}
+
+export function addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Promise<Environment> {
+  return serialize(() => _addEnvironment(name, url, kind, sshTarget));
+}
+
+export function removeEnvironment(id: string): Promise<void> {
+  return serialize(() => _removeEnvironment(id));
+}
+
+export function addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null> {
+  return serialize(() => _addEndpoint(environmentId, url, kind));
+}
+
+export function removeEndpoint(environmentId: string, endpointId: string): Promise<void> {
+  return serialize(() => _removeEndpoint(environmentId, endpointId));
+}
+
+export function setActiveEndpoint(environmentId: string, endpointId: string): Promise<void> {
+  return serialize(() => _setActiveEndpoint(environmentId, endpointId));
+}
+
+export function setSelectedEnvironmentId(id: string | null): Promise<void> {
+  return serialize(() => _setSelectedEnvironmentId(id));
+}
+
+export function migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | null): Promise<boolean> {
+  return serialize(() => _migrateFromLocalStorage(rawInstances, rawSelectedId));
+}
+
+export function updateEndpointHealth(environmentId: string, endpointId: string, lastError: string | I18nMessage | null, failureCount: number): Promise<void> {
+  return serialize(() => _updateEndpointHealth(environmentId, endpointId, lastError, failureCount));
+}
+
+export function setEnvironmentAuthState(environmentId: string, authState: EnvironmentAuthState): Promise<void> {
+  return serialize(() => _setEnvironmentAuthState(environmentId, authState));
+}
+
+export function storeSessionToken(environmentId: string, token: SessionToken): Promise<boolean> {
+  return serialize(() => _storeSessionToken(environmentId, token));
+}
+
+export function removeSessionToken(environmentId: string): Promise<void> {
+  return serialize(() => _removeSessionToken(environmentId));
+}
+
+export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<void> {
+  return serialize(() => _setOpenCodeEndpoint(environmentId, endpoint));
+}
+
+export function setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<void> {
+  return serialize(() => _setInfraOpenCodeEndpoint(environmentId, endpoint));
+}
+
+export function setMainVm(environmentId: string): Promise<void> {
+  return serialize(() => _setMainVm(environmentId));
+}
+
+export function autoPromoteFirstEnvIfNeeded(): Promise<void> {
+  return serialize(() => _autoPromoteFirstEnvIfNeeded());
+}
+
+// ---------------------------------------------------------------------------
+// Network / crypto utilities (no store mutations)
+// ---------------------------------------------------------------------------
 
 export async function exchangePairingCode(
   baseUrl: string,

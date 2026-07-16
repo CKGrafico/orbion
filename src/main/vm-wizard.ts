@@ -354,14 +354,14 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   // If no remoteCode, skip pairing progress entirely.
 
   // Step 4: Save environment (direct URL, daemon is reachable on the VM's IP)
-  const env = addEnvironment(envName, daemonUrl, "direct", host.label);
-  autoPromoteFirstEnvIfNeeded();
+  const env = await addEnvironment(envName, daemonUrl, "direct", host.label);
+  await autoPromoteFirstEnvIfNeeded();
 
   if (pair.paired) {
     const envIdByUrl = env.id;
     const exchangeAgain = await exchangePairingCode(daemonUrl, remoteCode ?? "", "operate");
     if (exchangeAgain.ok && exchangeAgain.token) {
-      storeSessionToken(envIdByUrl, exchangeAgain.token);
+      await storeSessionToken(envIdByUrl, exchangeAgain.token);
     }
   }
 
