@@ -44,6 +44,7 @@ license: MIT
 - **REST API responses unwrapped from loop-task envelope.** The daemon returns `{ ok, data }` / `{ ok, error: { message } }`. The main process `handleApiRequest` unwraps this into `ApiResponse<T>` shape. Always unwrap at the main-process boundary, not in the renderer. Evidence: ARCHITECTURE.md §3.2; `src/main/index.ts` lines 189–200.
 - **Keep comment ratio under 10%.** Code must be self-explanatory through names, structure, and types. Comments are for WHY, not WHAT, only when the reason cannot be inferred from context. If more than 10% of lines in a file are comments, refactor for clarity instead of commenting. Delete stale, obvious, or code-restating comments.
 - **Never use em-dashes (`—`).** Use commas, colons, or parentheses instead. This applies to all source files, comments, i18n strings, and documentation. The em-dash character (`U+2014`) is forbidden in this codebase.
+- **Never access `window.api` directly from components or hooks.** All IPC access goes through injected services via `useInject<IXxxService>(cid.IXxxService)`. The container is built in `src/renderer/src/services/container.ts` and picks real vs mock implementations based on `window.api` presence. Components resolve services with `useInject`; hooks that can't use hooks (e.g. inside effects) use `container.resolve`. The `bridge.d.ts` ambient declaration has been deleted; `mock.ts` is replaced by mock service implementations in `src/renderer/src/services/mock/`.
 
 ## Testing
 
