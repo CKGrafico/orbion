@@ -47,6 +47,7 @@ import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
+import { validateIpc } from "./ipc-validation.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -153,6 +154,9 @@ function findEnvironmentIdByUrl(baseUrl: string): string | null {
 async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   if (!isAllowedBaseUrl(args.baseUrl)) {
     return { ok: false, status: 0, error: msg("vmWizard.mainInvalidEnvUrl", { url: args.baseUrl }) };
+  }
+  if (!args.path.startsWith("/") || args.path.includes("..")) {
+    return { ok: false, status: 0, error: "Invalid API path" };
   }
 
   const controller = new AbortController();
@@ -387,19 +391,28 @@ app.on("second-instance", () => {
 app.setName("Orbion");
 
 app.whenReady().then(() => {
-  ipcMain.handle("api:request", (_event, args: ApiRequestArgs) => handleApiRequest(args));
+  ipcMain.handle("api:request", (_event, ...rawArgs) => {
+    const [args] = validateIpc<[ApiRequestArgs]>("api:request", rawArgs);
+    return handleApiRequest(args);
+  });
 
-  ipcMain.handle("stream:subscribe", (event, args: StreamSubscribeArgs) => {
+  ipcMain.handle("stream:subscribe", (event, ...rawArgs) => {
+    const [args] = validateIpc<[StreamSubscribeArgs]>("stream:subscribe", rawArgs);
     void handleStreamSubscribe(event.sender, args);
   });
 
-  ipcMain.handle("stream:unsubscribe", (_event, subId: string) => {
+  ipcMain.handle("stream:unsubscribe", (_event, ...rawArgs) => {
+    const [subId] = validateIpc<[string]>("stream:unsubscribe", rawArgs);
     streams.get(subId)?.abort();
     streams.delete(subId);
   });
 
-  ipcMain.handle("config:getEnvironments", () => getEnvironments());
-  ipcMain.handle("config:addEnvironment", async (_event, name: string, url: string, kind?: string) => {
+  ipcMain.handle("config:getEnvironments", () => {
+    validateIpc("config:getEnvironments", []);
+    return getEnvironments();
+  });
+  ipcMain.handle("config:addEnvironment", async (_event, ...rawArgs) => {
+    const [name, url, kind] = validateIpc<[string, string, string | undefined]>("config:addEnvironment", rawArgs);
     const endpointKind = (kind as "direct" | "ssh" | "tailscale") ?? "direct";
     const fingerprint = await fetchFingerprint(url);
     if (fingerprint) {
@@ -422,7 +435,8 @@ app.whenReady().then(() => {
     syncEndpointTracker(env.id);
     return env;
   });
-  ipcMain.handle("config:exchangePairingCode", async (_event, baseUrl: string, code: string, scope?: string) => {
+  ipcMain.handle("config:exchangePairingCode", async (_event, ...rawArgs) => {
+    const [baseUrl, code, scope] = validateIpc<[string, string, string | undefined]>("config:exchangePairingCode", rawArgs);
     const sessionScope = (scope as SessionScope) ?? "read-only";
     const result = await exchangePairingCode(baseUrl, code, sessionScope);
     if (result.ok && result.token) {
@@ -433,23 +447,28 @@ app.whenReady().then(() => {
     }
     return result;
   });
-  ipcMain.handle("config:removeSessionToken", (_event, environmentId: string) => {
+  ipcMain.handle("config:removeSessionToken", (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>("config:removeSessionToken", rawArgs);
     removeSessionToken(environmentId);
   });
-  ipcMain.handle("config:removeEnvironment", (_event, id: string) => {
+  ipcMain.handle("config:removeEnvironment", (_event, ...rawArgs) => {
+    const [id] = validateIpc<[string]>("config:removeEnvironment", rawArgs);
     removeSupervisor(id);
     removeEnvironment(id);
   });
-  ipcMain.handle("config:addEndpoint", (_event, environmentId: string, url: string, kind: string) => {
+  ipcMain.handle("config:addEndpoint", (_event, ...rawArgs) => {
+    const [environmentId, url, kind] = validateIpc<[string, string, string]>("config:addEndpoint", rawArgs);
     const ep = addEndpoint(environmentId, url, kind as "direct" | "ssh" | "tailscale");
     syncEndpointTracker(environmentId);
     return ep;
   });
-  ipcMain.handle("config:removeEndpoint", (_event, environmentId: string, endpointId: string) => {
+  ipcMain.handle("config:removeEndpoint", (_event, ...rawArgs) => {
+    const [environmentId, endpointId] = validateIpc<[string, string]>("config:removeEndpoint", rawArgs);
     removeEndpoint(environmentId, endpointId);
     syncEndpointTracker(environmentId);
   });
-  ipcMain.handle("config:setActiveEndpoint", (_event, environmentId: string, endpointId: string) => {
+  ipcMain.handle("config:setActiveEndpoint", (_event, ...rawArgs) => {
+    const [environmentId, endpointId] = validateIpc<[string, string]>("config:setActiveEndpoint", rawArgs);
     setActiveEndpoint(environmentId, endpointId);
     const envs = getEnvironments();
     const env = envs.find((e: Environment) => e.id === environmentId);
@@ -462,22 +481,30 @@ app.whenReady().then(() => {
     }
     syncEndpointTracker(environmentId);
   });
-  ipcMain.handle("config:getSelectedEnvironmentId", () => getSelectedEnvironmentId());
-  ipcMain.handle("config:setSelectedEnvironmentId", (_event, id: string | null) =>
-    setSelectedEnvironmentId(id),
-  );
+  ipcMain.handle("config:getSelectedEnvironmentId", () => {
+    validateIpc("config:getSelectedEnvironmentId", []);
+    return getSelectedEnvironmentId();
+  });
+  ipcMain.handle("config:setSelectedEnvironmentId", (_event, ...rawArgs) => {
+    const [id] = validateIpc<[string | null]>("config:setSelectedEnvironmentId", rawArgs);
+    return setSelectedEnvironmentId(id);
+  });
   ipcMain.handle(
     "config:migrateFromLocalStorage",
-    (_event, rawInstances: string, rawSelectedId: string | null) =>
-      migrateFromLocalStorage(rawInstances, rawSelectedId),
+    (_event, ...rawArgs) => {
+      const [rawInstances, rawSelectedId] = validateIpc<[string, string | null]>("config:migrateFromLocalStorage", rawArgs);
+      return migrateFromLocalStorage(rawInstances, rawSelectedId);
+    },
   );
 
-  ipcMain.handle("connection:getStatus", (_event, environmentId: string) => {
+  ipcMain.handle("connection:getStatus", (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>("connection:getStatus", rawArgs);
     const supervisor = supervisors.get(environmentId);
     return supervisor ? supervisor.getStatus() : null;
   });
 
-  ipcMain.handle("connection:getEndpointHealth", (_event, environmentId: string): EndpointHealth[] => {
+  ipcMain.handle("connection:getEndpointHealth", (_event, ...rawArgs): EndpointHealth[] => {
+    const [environmentId] = validateIpc<[string]>("connection:getEndpointHealth", rawArgs);
     const tracker = endpointTrackers.get(environmentId);
     if (tracker) return tracker.getHealth();
     const envs = getEnvironments();
@@ -491,52 +518,54 @@ app.whenReady().then(() => {
     }));
   });
 
-  ipcMain.handle("connection:retry", (_event, environmentId: string) => {
+  ipcMain.handle("connection:retry", (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>("connection:retry", rawArgs);
     const supervisor = supervisors.get(environmentId);
     if (supervisor) supervisor.wakeup();
   });
 
-  ipcMain.on("connection:networkChanged", (_event, online: boolean) => {
+  ipcMain.on("connection:networkChanged", (_event, ...rawArgs) => {
+    const [online] = validateIpc<[boolean]>("connection:networkChanged", rawArgs);
     setOsOffline(!online);
   });
 
-  ipcMain.handle("tailscale:peers", () => fetchPeers());
+  ipcMain.handle("tailscale:peers", () => {
+    validateIpc("tailscale:peers", []);
+    return fetchPeers();
+  });
 
-  ipcMain.handle("vmWizard:listSshHosts", () => vmListSshHosts());
+  ipcMain.handle("vmWizard:listSshHosts", () => {
+    validateIpc("vmWizard:listSshHosts", []);
+    return vmListSshHosts();
+  });
 
-  ipcMain.handle("vmWizard:start", async (_event, target: string, name?: string) => {
-    // Early validation at the IPC boundary: reject obviously malicious
-    // target strings before they reach any SSH command construction.
-    // parseTarget already validates individual fields, but this guard
-    // prevents obviously invalid input from even starting the wizard.
-    if (typeof target !== "string" || target.length === 0 || target.length > 512) {
-      throw new Error("vmWizard.mainInvalidTarget");
-    }
-    // Reject if target contains characters that should never appear in
-    // SSH host identifiers (shell metacharacters, control characters, etc.)
-    if (/[\x00-\x1f`$\\;"'&|<>(){}!\n\r]/.test(target)) {
-      throw new Error("vmWizard.mainInvalidTarget");
-    }
+  ipcMain.handle("vmWizard:start", async (_event, ...rawArgs) => {
+    const [target, name] = validateIpc<[string, string | undefined]>("vmWizard:start", rawArgs);
     return runWizard(target, name);
   });
 
   ipcMain.handle("vmWizard:cancel", () => {
+    validateIpc("vmWizard:cancel", []);
     cancelWizard();
   });
 
-  ipcMain.handle("vmWizard:respondConsent", (_event, decision: "install" | "skip") => {
+  ipcMain.handle("vmWizard:respondConsent", (_event, ...rawArgs) => {
+    const [decision] = validateIpc<["install" | "skip"]>("vmWizard:respondConsent", rawArgs);
     respondConsent(decision);
   });
 
-  ipcMain.handle("vmWizard:respondServiceSelection", (_event, selection) => {
+  ipcMain.handle("vmWizard:respondServiceSelection", (_event, ...rawArgs) => {
+    const [selection] = validateIpc<[import("../shared/ipc.js").VmWizardServiceSelection]>("vmWizard:respondServiceSelection", rawArgs);
     respondServiceSelection(selection);
   });
 
-  ipcMain.handle("opencode:getStatus", (_event, environmentId: string): OpenCodeConnectionStatus => {
+  ipcMain.handle("opencode:getStatus", (_event, ...rawArgs): OpenCodeConnectionStatus => {
+    const [environmentId] = validateIpc<[string]>("opencode:getStatus", rawArgs);
     return getOpenCodeStatus(environmentId);
   });
 
-  ipcMain.handle("opencode:refreshStatus", async (_event, environmentId: string): Promise<OpenCodeConnectionStatus> => {
+  ipcMain.handle("opencode:refreshStatus", async (_event, ...rawArgs): Promise<OpenCodeConnectionStatus> => {
+    const [environmentId] = validateIpc<[string]>("opencode:refreshStatus", rawArgs);
     const envs = getEnvironments();
     const env = envs.find((e: Environment) => e.id === environmentId);
     if (!env?.opencode) {
@@ -545,7 +574,8 @@ app.whenReady().then(() => {
     return refreshOpenCodeStatus(environmentId, env.opencode);
   });
 
-  ipcMain.handle("config:setOpenCodeEndpoint", async (_event, environmentId: string, endpoint: OpenCodeEndpoint | null) => {
+  ipcMain.handle("config:setOpenCodeEndpoint", async (_event, ...rawArgs) => {
+    const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setOpenCodeEndpoint", rawArgs);
     setOpenCodeEndpoint(environmentId, endpoint);
     if (endpoint) {
       await refreshOpenCodeStatus(environmentId, endpoint);
@@ -554,13 +584,18 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("config:setMainVm", (_event, environmentId: string) => {
+  ipcMain.handle("config:setMainVm", (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>("config:setMainVm", rawArgs);
     setMainVm(environmentId);
   });
 
-  ipcMain.handle("config:getMainVmId", () => getMainVmId());
+  ipcMain.handle("config:getMainVmId", () => {
+    validateIpc("config:getMainVmId", []);
+    return getMainVmId();
+  });
 
-  ipcMain.handle("infra:executeAction", async (_event, args: InfraActionArgs): Promise<InfraActionResult> => {
+  ipcMain.handle("infra:executeAction", async (_event, ...rawArgs): Promise<InfraActionResult> => {
+    const [args] = validateIpc<[InfraActionArgs]>("infra:executeAction", rawArgs);
     const mainVmEnv = getMainVm();
     if (!mainVmEnv) {
       return { ok: false, error: msg("vmWizard.mainNoMainVm") };
@@ -619,6 +654,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("infra:getStatus", () => {
+    validateIpc("infra:getStatus", []);
     const mainVmId = getMainVmId();
     const connected = mainVmId !== null && supervisors.has(mainVmId)
       && supervisors.get(mainVmId)!.getStatus().phase === "connected";
