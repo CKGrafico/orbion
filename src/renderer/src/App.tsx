@@ -569,7 +569,7 @@ export function App(): React.ReactNode {
                 onBack={goBack}
               />
             ) : (
-              <ProjectsView instance={selected} loops={loops} filter={filter} />
+              <ProjectsView instance={selected} loops={loops} filter={filter} connectionPhase={connectionStatus[selected.id]?.phase} />
             )}
           </div>
 

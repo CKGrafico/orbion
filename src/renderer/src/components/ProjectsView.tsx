@@ -8,13 +8,17 @@ export function ProjectsView(props: {
   instance: Environment;
   loops: LoopMeta[];
   filter: string;
+  connectionPhase?: string;
 }): React.ReactNode {
-  const { instance, loops, filter } = props;
+  const { instance, loops, filter, connectionPhase } = props;
   const intl = useIntl();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // Don't fetch until the daemon is reachable
+    if (connectionPhase && connectionPhase !== "connected") return;
+
     let cancelled = false;
     const load = async (): Promise<void> => {
       const res = await fetchProjects(instance);
@@ -29,7 +33,7 @@ export function ProjectsView(props: {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [instance.id, instance.activeEndpointId]);
+  }, [instance.id, instance.activeEndpointId, connectionPhase]);
 
   const loopCount = (projectId: string): number =>
     loops.filter((l) => (l.projectId ?? "default") === projectId).length;
