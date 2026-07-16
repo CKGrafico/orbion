@@ -319,7 +319,7 @@ export function App(): React.ReactNode {
   useEffect(() => {
     if (!selected) { setDaemonSettings(null); return; }
     const connStatus = connectionStatus[selected.id];
-    if (!connStatus || connStatus.phase !== "connected") { setDaemonSettings(null); return; }
+    if (!connStatus || connStatus.phase !== "connected") return;
     let cancelled = false;
     void fetchSettings(selected).then((res) => {
       if (!cancelled && res.ok && res.data) setDaemonSettings(res.data);
@@ -436,8 +436,10 @@ export function App(): React.ReactNode {
           {selected ? (
             <div className="main-header">
               <span className="main-title">{selected.name}</span>
-              {activeEndpoint ? (
-                <span className="chip mono" title={activeEndpoint.url}>{hostLabel(activeEndpoint.url)}</span>
+              {activeEndpoint && activeEndpoint.kind !== "ssh" ? (
+                <span className="chip mono" title={activeEndpoint.url}>
+                  {activeEndpoint.sshTarget ?? hostLabel(activeEndpoint.url)}
+                </span>
               ) : null}
               {daemonSettings ? (
                 <>

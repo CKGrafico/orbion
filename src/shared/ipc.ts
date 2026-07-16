@@ -59,6 +59,7 @@ export interface AccessEndpoint {
   id: string;
   kind: EndpointKind;
   url: string;
+  sshTarget?: string | null;
   lastError: string | I18nMessage | null;
   failureCount: number;
 }

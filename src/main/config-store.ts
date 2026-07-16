@@ -94,13 +94,14 @@ export function setEnvironmentFingerprintId(environmentId: string, fingerprintId
   store.set("environments", envs);
 }
 
-export function addEnvironment(name: string, url: string, kind: EndpointKind = "direct"): Environment {
+export function addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Environment {
   ensureMigrated();
   const endpointId = crypto.randomUUID().slice(0, 8);
   const endpoint: AccessEndpoint = {
     id: endpointId,
     kind,
     url: url.trim().replace(/\/+$/, ""),
+    sshTarget: sshTarget ?? null,
     lastError: null,
     failureCount: 0,
   };

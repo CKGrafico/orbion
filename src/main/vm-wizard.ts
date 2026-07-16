@@ -352,7 +352,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   // If no remoteCode, skip pairing progress entirely.
 
   // Step 5: Save environment
-  const env = addEnvironment(envName, daemonUrl, "ssh");
+  const env = addEnvironment(envName, daemonUrl, "ssh", host.label);
   autoPromoteFirstEnvIfNeeded();
 
   if (pair.paired) {
