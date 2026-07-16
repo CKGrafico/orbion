@@ -102,6 +102,31 @@ if [ -d "\${HOME}/.orbion/ssh-launch" ]; then
 fi
 `;
 
+// Detects which optional tools are already installed on the VM.
+const TOOLS_PROBE_SCRIPT = `
+# Each line: TOOL_INSTALLED|<name> or TOOL_MISSING|<name>
+check_tool() {
+  local name="\$1"
+  shift
+  if command -v "\$1" >/dev/null 2>&1; then
+    echo "TOOL_INSTALLED|\${name}"
+  else
+    echo "TOOL_MISSING|\${name}"
+  fi
+}
+
+check_tool gh gh
+check_tool azDo az
+check_tool jira acli
+check_tool gitlab glab
+check_tool docker docker
+check_tool terraform terraform
+check_tool tailscale tailscale
+check_tool claude claude
+check_tool jq jq
+check_tool ripgrep rg
+`;
+
 export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
   const result: VmWizardProbeResult = {
     reachable: false,
@@ -112,6 +137,16 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
     daemonPort: null,
     opencodeRunning: false,
     opencodePort: null,
+    ghInstalled: false,
+    azDoInstalled: false,
+    jiraInstalled: false,
+    gitlabInstalled: false,
+    dockerInstalled: false,
+    terraformInstalled: false,
+    tailscaleInstalled: false,
+    claudeInstalled: false,
+    jqInstalled: false,
+    ripgrepInstalled: false,
     errorDetail: null,
   };
 
@@ -162,6 +197,26 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
     } else if (trimmed === "OPENCODE_RUNNING_UNKNOWN_PORT") {
       result.opencodeRunning = true;
       result.opencodePort = null;
+    }
+  }
+
+  // Detect which optional tools are already installed
+  const toolsResult = await sshExec(host, TOOLS_PROBE_SCRIPT);
+  for (const line of toolsResult.stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("TOOL_INSTALLED|")) continue;
+    const tool = trimmed.split("|")[1];
+    switch (tool) {
+      case "gh": result.ghInstalled = true; break;
+      case "azDo": result.azDoInstalled = true; break;
+      case "jira": result.jiraInstalled = true; break;
+      case "gitlab": result.gitlabInstalled = true; break;
+      case "docker": result.dockerInstalled = true; break;
+      case "terraform": result.terraformInstalled = true; break;
+      case "tailscale": result.tailscaleInstalled = true; break;
+      case "claude": result.claudeInstalled = true; break;
+      case "jq": result.jqInstalled = true; break;
+      case "ripgrep": result.ripgrepInstalled = true; break;
     }
   }
 

@@ -201,8 +201,23 @@ export type VmWizardStep =
 export type VmWizardServiceStatus = "pending" | "skipped" | "already-running" | "installing" | "installed" | "started" | "failed";
 
 export interface VmWizardServiceSelection {
-  installLoopTask: boolean;
+  // Mandatory (always installed, no checkbox): Node.js (via mise), loop-task
   installOpenCode: boolean;
+  // Platform CLIs
+  installGh: boolean;
+  installAzDo: boolean;
+  installJira: boolean;
+  installGitlab: boolean;
+  // DevOps / Infra
+  installDocker: boolean;
+  installTerraform: boolean;
+  // Networking
+  installTailscale: boolean;
+  // AI
+  installClaudeCli: boolean;
+  // Utilities
+  installJq: boolean;
+  installRipgrep: boolean;
 }
 
 export interface SshHost {
@@ -223,6 +238,17 @@ export interface VmWizardProbeResult {
   daemonPort: number | null;
   opencodeRunning: boolean;
   opencodePort: number | null;
+  // Per-tool detection (true if already installed on the VM)
+  ghInstalled: boolean;
+  azDoInstalled: boolean;
+  jiraInstalled: boolean;
+  gitlabInstalled: boolean;
+  dockerInstalled: boolean;
+  terraformInstalled: boolean;
+  tailscaleInstalled: boolean;
+  claudeInstalled: boolean;
+  jqInstalled: boolean;
+  ripgrepInstalled: boolean;
   errorDetail: I18nMessage | null;
 }
 
@@ -234,6 +260,16 @@ export interface VmWizardLaunchResult {
   logTail: string | null;
   loopTaskStatus: VmWizardServiceStatus;
   openCodeStatus: VmWizardServiceStatus;
+  ghStatus: VmWizardServiceStatus;
+  azDoStatus: VmWizardServiceStatus;
+  jiraStatus: VmWizardServiceStatus;
+  gitlabStatus: VmWizardServiceStatus;
+  dockerStatus: VmWizardServiceStatus;
+  terraformStatus: VmWizardServiceStatus;
+  tailscaleStatus: VmWizardServiceStatus;
+  claudeStatus: VmWizardServiceStatus;
+  jqStatus: VmWizardServiceStatus;
+  ripgrepStatus: VmWizardServiceStatus;
 }
 
 export interface VmWizardTunnelResult {

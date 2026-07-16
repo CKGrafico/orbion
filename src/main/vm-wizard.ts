@@ -48,9 +48,19 @@ function emitProgress(progress: VmWizardProgress): void {
 }
 
 async function askServiceSelection(probe: VmWizardProbeResult): Promise<VmWizardServiceSelection> {
+  // loop-task is mandatory (always installed). Defaults: install if not already detected.
   const defaultSelection: VmWizardServiceSelection = {
-    installLoopTask: !probe.daemonRunning,
     installOpenCode: !probe.opencodeRunning,
+    installGh: !probe.ghInstalled,
+    installAzDo: !probe.azDoInstalled,
+    installJira: !probe.jiraInstalled,
+    installGitlab: !probe.gitlabInstalled,
+    installDocker: !probe.dockerInstalled,
+    installTerraform: !probe.terraformInstalled,
+    installTailscale: !probe.tailscaleInstalled,
+    installClaudeCli: !probe.claudeInstalled,
+    installJq: !probe.jqInstalled,
+    installRipgrep: !probe.ripgrepInstalled,
   };
   emitProgress({
     step: "pick-services",
