@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import type { SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../shared/ipc";
-import { ShieldCheck, X, Check, Loader, SkipForward } from "lucide-react";
+import { ShieldCheck, X, Check, Loader, SkipForward, Lock } from "lucide-react";
 import { translateMessage } from "../i18n";
 
 const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
@@ -28,7 +28,6 @@ const STEP_ORDER: VmWizardStep[] = [
   "pick-services",
   "consent",
   "installing",
-  "forwarding",
   "pairing",
   "done",
 ];
@@ -53,8 +52,17 @@ export function AddVmWizard(props: {
   const [running, setRunning] = useState(false);
   const [doneResult, setDoneResult] = useState<{ environmentId: string; environmentName: string; daemonUrl: string } | null>(null);
   const [serviceSelection, setServiceSelection] = useState<VmWizardServiceSelection>({
-    installLoopTask: true,
     installOpenCode: true,
+    installGh: true,
+    installAzDo: true,
+    installJira: true,
+    installGitlab: true,
+    installDocker: true,
+    installTerraform: true,
+    installTailscale: true,
+    installClaudeCli: true,
+    installJq: true,
+    installRipgrep: true,
   });
 
   useEffect(() => {
@@ -140,6 +148,64 @@ export function AddVmWizard(props: {
       case "failed": return intl.formatMessage({ id: "vmWizard.serviceStatusFailed" });
       default: return "";
     }
+  }
+
+  // Service definitions for the pick-services and installing panels
+  type ServiceCategory = "core" | "ai" | "platform" | "devops" | "networking" | "utilities";
+
+  interface ServiceDef {
+    key: keyof VmWizardServiceSelection;
+    nameKey: string;
+    descKey: string;
+    category: ServiceCategory;
+    mandatory?: boolean;
+    probeField?: string;
+    launchField?: string;
+  }
+
+  const SERVICES: ServiceDef[] = [
+    // Core (mandatory)
+    { key: "installOpenCode", nameKey: "vmWizard.serviceOpenCode", descKey: "vmWizard.serviceOpenCodeDesc", category: "core", probeField: "opencodeRunning", launchField: "openCodeStatus" },
+    // AI
+    { key: "installClaudeCli", nameKey: "vmWizard.serviceClaudeCli", descKey: "vmWizard.serviceClaudeCliDesc", category: "ai", probeField: "claudeInstalled", launchField: "claudeStatus" },
+    // Platform CLIs
+    { key: "installGh", nameKey: "vmWizard.serviceGh", descKey: "vmWizard.serviceGhDesc", category: "platform", probeField: "ghInstalled", launchField: "ghStatus" },
+    { key: "installAzDo", nameKey: "vmWizard.serviceAzDo", descKey: "vmWizard.serviceAzDoDesc", category: "platform", probeField: "azDoInstalled", launchField: "azDoStatus" },
+    { key: "installJira", nameKey: "vmWizard.serviceJira", descKey: "vmWizard.serviceJiraDesc", category: "platform", probeField: "jiraInstalled", launchField: "jiraStatus" },
+    { key: "installGitlab", nameKey: "vmWizard.serviceGitlab", descKey: "vmWizard.serviceGitlabDesc", category: "platform", probeField: "gitlabInstalled", launchField: "gitlabStatus" },
+    // DevOps
+    { key: "installDocker", nameKey: "vmWizard.serviceDocker", descKey: "vmWizard.serviceDockerDesc", category: "devops", probeField: "dockerInstalled", launchField: "dockerStatus" },
+    { key: "installTerraform", nameKey: "vmWizard.serviceTerraform", descKey: "vmWizard.serviceTerraformDesc", category: "devops", probeField: "terraformInstalled", launchField: "terraformStatus" },
+    // Networking
+    { key: "installTailscale", nameKey: "vmWizard.serviceTailscale", descKey: "vmWizard.serviceTailscaleDesc", category: "networking", probeField: "tailscaleInstalled", launchField: "tailscaleStatus" },
+    // Utilities
+    { key: "installJq", nameKey: "vmWizard.serviceJq", descKey: "vmWizard.serviceJqDesc", category: "utilities", probeField: "jqInstalled", launchField: "jqStatus" },
+    { key: "installRipgrep", nameKey: "vmWizard.serviceRipgrep", descKey: "vmWizard.serviceRipgrepDesc", category: "utilities", probeField: "ripgrepInstalled", launchField: "ripgrepStatus" },
+  ];
+
+  const CATEGORY_KEYS: Record<ServiceCategory, string> = {
+    core: "vmWizard.categoryCore",
+    ai: "vmWizard.categoryAI",
+    platform: "vmWizard.categoryPlatform",
+    devops: "vmWizard.categoryDevOps",
+    networking: "vmWizard.categoryNetworking",
+    utilities: "vmWizard.categoryUtilities",
+  };
+
+  // Group services by category, preserving order
+  const groupedServices = SERVICES.reduce<Record<ServiceCategory, ServiceDef[]>>((acc, svc) => {
+    (acc[svc.category] ??= []).push(svc);
+    return acc;
+  }, {} as Record<ServiceCategory, ServiceDef[]>);
+
+  function isServiceInstalled(svc: ServiceDef): boolean {
+    if (!progress?.probe) return false;
+    return Boolean((progress.probe as Record<string, unknown>)[svc.probeField ?? ""]);
+  }
+
+  function getLaunchStatus(svc: ServiceDef): VmWizardServiceStatus | null {
+    if (!progress?.launch) return null;
+    return (progress.launch as Record<string, unknown>)[svc.launchField ?? ""] as VmWizardServiceStatus | null;
   }
 
   return (
@@ -263,42 +329,75 @@ export function AddVmWizard(props: {
             <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 12 }}>
               {intl.formatMessage({ id: "vmWizard.pickServicesDescription" })}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
-                  {intl.formatMessage({ id: "vmWizard.categoryCore" })}
-                </div>
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={serviceSelection.installLoopTask}
-                    onChange={(e) => setServiceSelection((s) => ({ ...s, installLoopTask: e.target.checked }))}
-                    style={{ marginTop: 2 }}
-                  />
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{intl.formatMessage({ id: "vmWizard.serviceLoopTask" })}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{intl.formatMessage({ id: "vmWizard.serviceLoopTaskDesc" })}</div>
-                  </div>
-                </label>
+
+            {/* Mandatory: Node.js + loop-task */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
+                {intl.formatMessage({ id: "vmWizard.categoryCore" })} — {intl.formatMessage({ id: "vmWizard.mandatoryLabel" })}
               </div>
-              <div>
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
-                  {intl.formatMessage({ id: "vmWizard.categoryAI" })}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, opacity: 0.7 }}>
+                  <Lock size={12} style={{ color: "var(--text-muted)" }} />
+                  <span style={{ fontWeight: 500 }}>{intl.formatMessage({ id: "vmWizard.serviceNodeJs" })}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    {progress?.probe?.nodeFound
+                      ? `${intl.formatMessage({ id: "vmWizard.nodeFound" }, { version: progress.probe.nodeVersion ?? "?" })}`
+                      : intl.formatMessage({ id: "vmWizard.nodeNotFound" })}
+                  </span>
                 </div>
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={serviceSelection.installOpenCode}
-                    onChange={(e) => setServiceSelection((s) => ({ ...s, installOpenCode: e.target.checked }))}
-                    style={{ marginTop: 2 }}
-                  />
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{intl.formatMessage({ id: "vmWizard.serviceOpenCode" })}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{intl.formatMessage({ id: "vmWizard.serviceOpenCodeDesc" })}</div>
-                  </div>
-                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, opacity: 0.7 }}>
+                  <Lock size={12} style={{ color: "var(--text-muted)" }} />
+                  <span style={{ fontWeight: 500 }}>{intl.formatMessage({ id: "vmWizard.serviceLoopTask" })}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{intl.formatMessage({ id: "vmWizard.serviceLoopTaskDesc" })}</span>
+                </div>
               </div>
             </div>
+
+            {/* Optional services grouped by category */}
+            {Object.entries(groupedServices).filter(([cat]) => cat !== "core").map(([category, services]) => (
+              <div key={category} style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
+                  {intl.formatMessage({ id: CATEGORY_KEYS[category as ServiceCategory] })}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {services.map((svc) => {
+                    const installed = isServiceInstalled(svc);
+                    return (
+                      <label
+                        key={svc.key}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          cursor: installed ? "default" : "pointer",
+                          opacity: installed ? 0.6 : 1,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={serviceSelection[svc.key]}
+                          disabled={installed}
+                          onChange={(e) => setServiceSelection((s) => ({ ...s, [svc.key]: e.target.checked }))}
+                          style={{ marginTop: 2 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                            {intl.formatMessage({ id: svc.nameKey })}
+                            {installed ? (
+                              <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--accent-bg, rgba(0,200,100,0.12))", padding: "1px 6px", borderRadius: 4 }}>
+                                {intl.formatMessage({ id: "vmWizard.alreadyInstalled" })}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{intl.formatMessage({ id: svc.descKey })}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
             <div style={{ marginTop: 14 }}>
               <button
                 className="btn primary"
@@ -312,35 +411,50 @@ export function AddVmWizard(props: {
 
         {isInstalling && progress?.launch ? (
           <div style={{ marginTop: 12, padding: 12, background: "var(--bg-log)", borderRadius: 8, border: "1px solid var(--bg-active)" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
-                  {intl.formatMessage({ id: "vmWizard.categoryCore" })}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                  {serviceStatusIcon(progress.launch.loopTaskStatus)}
-                  <span>{intl.formatMessage({ id: "vmWizard.serviceLoopTask" })}</span>
-                  {progress.launch.loopTaskStatus !== "pending" ? (
-                    <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
-                      — {serviceStatusLabel(progress.launch.loopTaskStatus)}
-                    </span>
-                  ) : null}
-                </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {/* Mandatory: loop-task */}
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 2 }}>
+                {intl.formatMessage({ id: "vmWizard.categoryCore" })}
               </div>
-              <div>
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
-                  {intl.formatMessage({ id: "vmWizard.categoryAI" })}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                  {serviceStatusIcon(progress.launch.openCodeStatus)}
-                  <span>{intl.formatMessage({ id: "vmWizard.serviceOpenCode" })}</span>
-                  {progress.launch.openCodeStatus !== "pending" ? (
-                    <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
-                      — {serviceStatusLabel(progress.launch.openCodeStatus)}
-                    </span>
-                  ) : null}
-                </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                {serviceStatusIcon(progress.launch.loopTaskStatus)}
+                <span>{intl.formatMessage({ id: "vmWizard.serviceLoopTask" })}</span>
+                {progress.launch.loopTaskStatus !== "pending" ? (
+                  <span style={{ color: "var(--text-muted)", fontSize: 11 }}>— {serviceStatusLabel(progress.launch.loopTaskStatus)}</span>
+                ) : null}
               </div>
+
+              {/* All other services grouped by category */}
+              {(["ai", "platform", "devops", "networking", "utilities"] as ServiceCategory[]).map((category) => {
+                const services = groupedServices[category];
+                if (!services?.length) return null;
+                const visibleServices = services.filter((svc) => {
+                  // Show if status is not pending (i.e., something is happening)
+                  const status = getLaunchStatus(svc);
+                  return status && status !== "pending";
+                });
+                if (!visibleServices.length) return null;
+                return (
+                  <div key={category}>
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 2, marginTop: 4 }}>
+                      {intl.formatMessage({ id: CATEGORY_KEYS[category] })}
+                    </div>
+                    {visibleServices.map((svc) => {
+                      const status = getLaunchStatus(svc);
+                      if (!status) return null;
+                      return (
+                        <div key={svc.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                          {serviceStatusIcon(status)}
+                          <span>{intl.formatMessage({ id: svc.nameKey })}</span>
+                          {status !== "pending" ? (
+                            <span style={{ color: "var(--text-muted)", fontSize: 11 }}>— {serviceStatusLabel(status)}</span>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : null}

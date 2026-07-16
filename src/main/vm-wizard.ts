@@ -3,7 +3,6 @@ import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmW
 import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
-import { openTunnel, findExistingTunnel } from "./ssh-tunnel.js";
 import { addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded } from "./config-store.js";
 import { msg } from "./i18n.js";
 
@@ -288,38 +287,10 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   const daemonPort = launch.daemonPort ?? 8845;
   const opencodePort = launch.opencodePort;
 
-  // Step 3: Forward tunnel
-  if (wizardCancelled) {
-    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
-    throw new Error("vmWizard.mainCancelled");
-  }
-
-  emitProgress({ step: "forwarding", message: msg("vmWizard.mainOpeningTunnel", { port: daemonPort }), probe, launch });
-
-  const localPort = 18845;
-  const existing = findExistingTunnel(host, daemonPort);
-
-  let tunnel;
-  if (existing) {
-    tunnel = { forwarded: true, localPort: existing.localPort, errorDetail: null };
-  } else {
-    tunnel = await openTunnel(host, localPort, daemonPort);
-  }
-
-  emitProgress({ step: "forwarding", message: msg("vmWizard.mainTunnelOpen"), probe, launch, tunnel });
-
-  if (!tunnel.forwarded || !tunnel.localPort) {
-    emitProgress({
-      step: "error",
-      message: tunnel.errorDetail ?? msg("vmWizard.mainFailedTunnel"),
-      probe,
-      launch,
-      tunnel,
-    });
-    throw new Error("vmWizard.mainFailedTunnel");
-  }
-
-  const daemonUrl = `http://127.0.0.1:${tunnel.localPort}`;
+  // Direct URL — user is responsible for network reachability (Tailscale, VPN, LAN).
+  // No SSH tunnel: the daemon is bound on the VM and the user's network must reach it.
+  const daemonUrl = `http://${host.hostName}:${daemonPort}`;
+  const tunnel = { forwarded: true, localPort: daemonPort, errorDetail: null };
 
   // Step 4: Pair
   if (wizardCancelled) {
@@ -351,8 +322,8 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   }
   // If no remoteCode, skip pairing progress entirely.
 
-  // Step 5: Save environment
-  const env = addEnvironment(envName, daemonUrl, "ssh", host.label);
+  // Step 4: Save environment
+  const env = addEnvironment(envName, daemonUrl, "direct", host.label);
   autoPromoteFirstEnvIfNeeded();
 
   if (pair.paired) {
@@ -365,23 +336,10 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   }
 
   if (opencodePort) {
-    const ocLocalPort = 23284;
-    const ocExisting = findExistingTunnel(host, opencodePort);
-
-    if (ocExisting) {
-      await setOpenCodeEndpoint(env.id, {
-        url: `http://127.0.0.1:${ocExisting.localPort}`,
-        password: null,
-      });
-    } else {
-      const ocTunnel = await openTunnel(host, ocLocalPort, opencodePort);
-      if (ocTunnel.forwarded && ocTunnel.localPort) {
-        await setOpenCodeEndpoint(env.id, {
-          url: `http://127.0.0.1:${ocTunnel.localPort}`,
-          password: null,
-        });
-      }
-    }
+    await setOpenCodeEndpoint(env.id, {
+      url: `http://${host.hostName}:${opencodePort}`,
+      password: null,
+    });
   }
 
   emitProgress({
