@@ -23,7 +23,14 @@
     "notificationItemNeedsAttention": "{envName} {itemType} needs attention",
     "daemonHttpApi": "HTTP API",
     "daemonMcpApi": "MCP API",
-    "daemonBindAddress": "daemon bind address"
+    "daemonBindAddress": "daemon bind address",
+    "daemonChip": "Daemon",
+    "removeEnvironment": "Remove",
+    "removeConfirm": "Remove \"{name}\" from Orbion? The VM and its data are not affected.",
+    "removeCancel": "Cancel",
+    "removeConfirmBtn": "Remove",
+    "markAsMainTooltip": "Mark as main VM — this environment will be used for the AI chat assistant",
+    "isMainTooltip": "This is your main VM (used for AI chat)"
   },
   "sidebar": {
     "addEnvironment": "Add Environment",

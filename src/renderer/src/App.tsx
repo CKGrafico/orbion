@@ -11,7 +11,7 @@ import { fetchLoops, fetchSettings, isMock } from "./api";
 import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
-import { PanelLeft, Search, ArrowLeft, RotateCw } from "lucide-react";
+import { PanelLeft, Search, ArrowLeft, RotateCw, X, Star } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { AddVmWizard } from "./components/AddVmWizard";
@@ -40,6 +40,19 @@ function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
   }
 }
 
+function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
+  if (status) {
+    switch (status.phase) {
+      case "connected": return intl.formatMessage({ id: "sidebar.connected" });
+      case "connecting": return intl.formatMessage({ id: "sidebar.connecting" });
+      case "backoff": return intl.formatMessage({ id: "sidebar.retrying" }, { seconds: Math.round(status.backoffMs / 1000), failures: status.failureCount });
+      case "blocked": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.blockedTooltip" });
+      case "offline": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.offlineTooltip" });
+    }
+  }
+  return health;
+}
+
 export function App(): React.ReactNode {
   const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
   const intl = useIntl();
@@ -48,6 +61,7 @@ export function App(): React.ReactNode {
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pickMainVmOpen, setPickMainVmOpen] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
   const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
@@ -344,6 +358,7 @@ export function App(): React.ReactNode {
     const env = environments.find((e) => e.id === id);
     const wasMainVm = env?.role === "main-vm";
     remove(id);
+    setConfirmRemoveId(null);
     setHealth((prev) => {
       const next = { ...prev };
       delete next[id];
@@ -435,20 +450,44 @@ export function App(): React.ReactNode {
         <div className="panel main-panel">
           {selected ? (
             <div className="main-header">
+              {/* Left group: name · IP · status dots */}
               <span className="main-title">{selected.name}</span>
-              {activeEndpoint && activeEndpoint.kind !== "ssh" ? (
+
+              {activeEndpoint ? (
                 <span className="chip mono" title={activeEndpoint.url}>
                   {activeEndpoint.sshTarget ?? hostLabel(activeEndpoint.url)}
                 </span>
               ) : null}
+
+              {/* Daemon connection dot */}
+              {(() => {
+                const h = health[selected.id] ?? "unknown";
+                const dotColor =
+                  h === "ok" ? "var(--health-ok)"
+                  : h === "connecting" ? "var(--health-connecting)"
+                  : h === "backoff" ? "var(--health-backoff)"
+                  : h === "blocked" ? "var(--health-blocked)"
+                  : "var(--health-offline)";
+                return (
+                  <span className="chip" title={healthTooltip(intl, h, connectionStatus[selected.id])} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                    {intl.formatMessage({ id: "app.daemonChip" })}
+                  </span>
+                );
+              })()}
+
               {daemonSettings ? (
                 <>
                   <span className={`chip ${daemonSettings.httpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonHttpApi" })}>HTTP</span>
                   <span className={`chip ${daemonSettings.mcpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonMcpApi" })}>MCP</span>
-                  <span className="chip chip-muted mono" title={intl.formatMessage({ id: "app.daemonBindAddress" })}>{daemonSettings.httpApiHost}</span>
                 </>
               ) : null}
-              <span className="main-header-meta">
+
+              {/* Spacer */}
+              <span style={{ flex: 1 }} />
+
+              {/* Right group: meta · remove · mark-as-main */}
+              <span className="main-header-meta" style={{ marginLeft: 0 }}>
                 {(() => {
                   const h = health[selected.id] ?? "unknown";
                   const cs = connectionStatus[selected.id];
@@ -461,6 +500,33 @@ export function App(): React.ReactNode {
                   return intl.formatMessage({ id: "app.updatedLabel" }, { time: updatedLabel });
                 })()}
               </span>
+
+              <button
+                className="icon-btn"
+                title={intl.formatMessage({ id: "app.removeEnvironment" })}
+                onClick={() => setConfirmRemoveId(selected.id)}
+                style={{ color: "var(--danger)", opacity: 0.7 }}
+              >
+                <X size={14} />
+              </button>
+
+              {selected.role !== "main-vm" ? (
+                <button
+                  className="icon-btn"
+                  title={intl.formatMessage({ id: "app.markAsMainTooltip" })}
+                  onClick={() => { setMainVm(selected.id); }}
+                  style={{ opacity: 0.6 }}
+                >
+                  <Star size={14} />
+                </button>
+              ) : (
+                <span
+                  title={intl.formatMessage({ id: "app.isMainTooltip" })}
+                  style={{ display: "flex", alignItems: "center", padding: "0 4px", color: "var(--chip-warm)", opacity: 0.9 }}
+                >
+                  <Star size={14} fill="currentColor" />
+                </span>
+              )}
             </div>
           ) : null}
 
@@ -537,6 +603,34 @@ export function App(): React.ReactNode {
           onSkip={() => setPickMainVmOpen(false)}
         />
       ) : null}
+
+      {confirmRemoveId ? (() => {
+        const env = environments.find((e) => e.id === confirmRemoveId);
+        return (
+          <div className="modal-backdrop" onClick={() => setConfirmRemoveId(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 380 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+                {intl.formatMessage({ id: "app.removeEnvironment" })}
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 20px", lineHeight: 1.5 }}>
+                {intl.formatMessage({ id: "app.removeConfirm" }, { name: env?.name ?? confirmRemoveId })}
+              </p>
+              <div className="modal-actions">
+                <button className="btn" onClick={() => setConfirmRemoveId(null)}>
+                  {intl.formatMessage({ id: "app.removeCancel" })}
+                </button>
+                <button
+                  className="btn"
+                  style={{ background: "color-mix(in srgb, var(--danger) 18%, transparent)", color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 30%, transparent)" }}
+                  onClick={() => handleRemove(confirmRemoveId)}
+                >
+                  {intl.formatMessage({ id: "app.removeConfirmBtn" })}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })() : null}
     </div>
   );
 }
