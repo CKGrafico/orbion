@@ -1,209 +1,101 @@
 {
   "version": 1,
   "skills": {
-    "adversarial-review": {
-      "source": "basicmachines-co/basic-memory",
+    "accelint-design-foundation": {
+      "source": "gohypergiant/agent-skills",
       "sourceType": "github",
-      "skillPath": ".agents/skills/adversarial-review/SKILL.md",
-      "computedHash": "0a3285306f3198b7d98fa08b424d5746fc6bca1261eeb5f579e5dd145ff793e9"
+      "skillPath": "skills/accelint-design-foundation/SKILL.md",
+      "computedHash": "8e292e7e5dc8bbfbc047accfeaf9b722c5eaeae91547c5179a3ca797d88fc19c"
     },
-    "bm-remember": {
-      "source": "basicmachines-co/basic-memory",
+    "agentmemory": {
+      "source": "rohitg00/agentmemory",
       "sourceType": "github",
-      "skillPath": "plugins/claude-code/skills/bm-remember/SKILL.md",
-      "computedHash": "4cba8046e21527966779c430c54948865f64dbcce774cf8736c95d9ef9e8db6d"
-    },
-    "bm-setup": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "plugins/claude-code/skills/bm-setup/SKILL.md",
-      "computedHash": "74fb469fb9a8872bf82719a6b452cf6d97e0822807572f9cea1462c47ac5a984"
-    },
-    "bm-share": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "plugins/claude-code/skills/bm-share/SKILL.md",
-      "computedHash": "f26ce47f3a9c40e4172313ce026fade00584de6a7858e4fdd1b149824aff1964"
-    },
-    "bm-status": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "plugins/claude-code/skills/bm-status/SKILL.md",
-      "computedHash": "9fd393e5d40cfdaf56f251e4b77674d16fa2780750d084645f08ef3ac721a1b2"
-    },
-    "caveman": {
-      "source": "juliusbrussee/caveman",
-      "sourceType": "github",
-      "skillPath": "skills/caveman/SKILL.md",
-      "computedHash": "723fb2a8bec1156c0f0b5bf020cc739ed09702b7726ec6377480038871339f6e"
-    },
-    "code-review": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/code-review/SKILL.md",
-      "computedHash": "c4c32606791960835bca1d542882778ca75c8d91ba6d4f07b90e34ad44799484"
+      "skillPath": "skills/remember/SKILL.md",
+      "computedHash": "agentmemory-skills-placeholder"
     },
     "design-taste-frontend": {
-      "source": "Leonxlnx/taste-skill",
+      "source": "leonxlnx/taste-skill",
       "sourceType": "github",
       "skillPath": "skills/taste-skill/SKILL.md",
       "computedHash": "899b84384f74f540ea5284d9b2e9234e050998b42eacc805410b518d4226c0b3"
     },
-    "feature-sliced-design": {
-      "source": "feature-sliced/skills",
+    "documentation-writer": {
+      "source": "github/awesome-copilot",
       "sourceType": "github",
-      "skillPath": "feature-sliced-design/SKILL.md",
-      "computedHash": "d4eaefe92df4439ffa8c6c06762047f0fc3aeb5ffc620d5239dce8d95592fe60"
+      "skillPath": "skills/documentation-writer/SKILL.md",
+      "computedHash": "ee53d65b163cd7eb953a930c95841cfe398cc2c0bd24c06508bbaa07c432be35"
     },
-    "fix-pr-issues": {
-      "source": "basicmachines-co/basic-memory",
+    "electron-development": {
+      "source": "mindrally/skills",
       "sourceType": "github",
-      "skillPath": ".agents/skills/fix-pr-issues/SKILL.md",
-      "computedHash": "d175caf3bbc864f6db6190fe95beb7b745894486ec0bff8196c1c0df00ba3286"
+      "skillPath": "electron-development/SKILL.md",
+      "computedHash": "70fd62ad484e35884485ae043d22f3ea7ff3e1365c536569c1994a4c211ba931"
     },
-    "humanizer": {
-      "source": "blader/humanizer",
+    "find-skills": {
+      "source": "vercel-labs/skills",
       "sourceType": "github",
-      "skillPath": "SKILL.md",
-      "computedHash": "3479992308a89a652bd1e12d0f612dd00d02d845e166ab51f0caaafc9300a5e7"
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "781bd6d3f9b19f8c9af6b53d8d0e4876d0183841b565db34ca7092ffa412d111"
     },
-    "humanizer-zh": {
-      "source": "op7418/humanizer-zh",
+    "fumadocs-component-docs": {
+      "source": "theorcdev/8bitcn-ui",
       "sourceType": "github",
-      "skillPath": "SKILL.md",
-      "computedHash": "dede9681d9fea5caed2fb9d88656af3024c9ec0136fc833415ffc6e16d762429"
+      "skillPath": ".claude/skills/fumadocs-component-docs/SKILL.md",
+      "computedHash": "a138321af90f7f6806996dea4ca59e4e613f8de588dbdda5aa259db2513d0ff2"
     },
-    "infographics": {
-      "source": "basicmachines-co/basic-memory",
+    "fumadocs-mdx-structure": {
+      "source": "theorcdev/8bitcn-ui",
       "sourceType": "github",
-      "skillPath": ".agents/skills/infographics/SKILL.md",
-      "computedHash": "bab6b1fa457282d87d30a8dccff5c5bd2070422d7bcdd66022570ac1c1f85282"
+      "skillPath": ".claude/skills/fumadocs-mdx-structure/SKILL.md",
+      "computedHash": "f1b810c9074c3d9b7fae58fa1dde5eb21a5a60d37cff5089156fc750f8a91d77"
     },
-    "inversify-hooks": {
-      "source": "ckgrafico/inversify-hooks",
+    "high-end-visual-design": {
+      "source": "leonxlnx/taste-skill",
       "sourceType": "github",
-      "skillPath": "skills/inversify-hooks/SKILL.md",
-      "computedHash": "e67131906d824b0169153c999dd68fb490ecd59dc8991fba6420a92b3357114e"
+      "skillPath": "skills/soft-skill/SKILL.md",
+      "computedHash": "f730e4132775f13eea19e3dc39afc6bb453cfc0498872b127ad8f0d47cfd802d"
     },
-    "memory-capture": {
-      "source": "basicmachines-co/basic-memory",
+    "humanize": {
+      "source": "humanizerai/agent-skills",
       "sourceType": "github",
-      "skillPath": "skills/memory-capture/SKILL.md",
-      "computedHash": "2b385caa960ddead42c7546d2c51179ef9497285ea90af261d9d76726388c97a"
+      "skillPath": "skills/humanize/SKILL.md",
+      "computedHash": "0c272016e5734530bf8604533aee2f293444c5d3b3e83eb234b1d65534159160"
     },
-    "memory-ci-capture": {
-      "source": "basicmachines-co/basic-memory",
+    "internationalization-i18n": {
+      "source": "mindrally/skills",
       "sourceType": "github",
-      "skillPath": "skills/memory-ci-capture/SKILL.md",
-      "computedHash": "04364adb092120ea3003147a2dacb19fab7cd1397bc7ed781f3428c0b8ecfe43"
+      "skillPath": "internationalization-i18n/SKILL.md",
+      "computedHash": "5dd3043eecc450d2a82a522611517f124650ff60fe2f7eff74d0075d040cd31e"
     },
-    "memory-continue": {
-      "source": "basicmachines-co/basic-memory",
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
       "sourceType": "github",
-      "skillPath": "skills/memory-continue/SKILL.md",
-      "computedHash": "7a48ba25a1061f3b9f4eb10235056f7af5bb17220e47c20d1d9683483d056ffa"
+      "skillPath": "plugins/javascript-typescript/skills/typescript-advanced-types/SKILL.md",
+      "computedHash": "bc33bc9653d649a461e49abe45634b6b11a7aeeae552b05ec4d54d4589d16739"
     },
-    "memory-curate": {
-      "source": "basicmachines-co/basic-memory",
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
       "sourceType": "github",
-      "skillPath": "skills/memory-curate/SKILL.md",
-      "computedHash": "678b0cacd09d15c2a342148f8ff26bec1d0b957c1de21db6551e515853627492"
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
     },
-    "memory-defrag": {
-      "source": "basicmachines-co/basic-memory",
+    "vite": {
+      "source": "antfu/skills",
       "sourceType": "github",
-      "skillPath": "skills/memory-defrag/SKILL.md",
-      "computedHash": "aa10bfddd970b31939d5bc9182789d977c95694ce22932073ce64979f83fd3b2"
+      "skillPath": "skills/vite/SKILL.md",
+      "computedHash": "1cdc4bbecaa89544e6ef92566b015db989994bf90c4472683ac64f7a114dc3af"
     },
-    "memory-ingest": {
-      "source": "basicmachines-co/basic-memory",
+    "vitest": {
+      "source": "antfu/skills",
       "sourceType": "github",
-      "skillPath": "skills/memory-ingest/SKILL.md",
-      "computedHash": "62786161c05a96687d081eb256826c4600ed1b98e775760e73c8fee0505cfa56"
+      "skillPath": "skills/vitest/SKILL.md",
+      "computedHash": "3594bf6d97ca50836c611d8b1907322888c03d2c41b2f26761e644b8e67fe106"
     },
-    "memory-lifecycle": {
-      "source": "basicmachines-co/basic-memory",
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
       "sourceType": "github",
-      "skillPath": "skills/memory-lifecycle/SKILL.md",
-      "computedHash": "59b52b65fa586e500a437a09c6d338b591308eac78cdc8a0d2a8ae2dd6d37590"
-    },
-    "memory-literary-analysis": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-literary-analysis/SKILL.md",
-      "computedHash": "7d13f8d6b9c8ec52cb3927988acb9615f0917b2b51e81f2837c480131778c9f4"
-    },
-    "memory-metadata-search": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-metadata-search/SKILL.md",
-      "computedHash": "f7ca153b31684fd16c6a507b367c624050ca334c9fb1b73600d0ed0cbb07d40c"
-    },
-    "memory-notes": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-notes/SKILL.md",
-      "computedHash": "cd8186b7fe44111a0947f2157dc2399f446aa970897256e563c8e3b3fb83ea69"
-    },
-    "memory-reflect": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-reflect/SKILL.md",
-      "computedHash": "1aa0a1b31ce2b2b88a1acca1a476f26317ddd624bb53f9a9de8da41f05abf1cf"
-    },
-    "memory-research": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-research/SKILL.md",
-      "computedHash": "13a8931191a6898af1d8f9f09dee437e8ef43556ccff0da63e15781c028414b8"
-    },
-    "memory-schema": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-schema/SKILL.md",
-      "computedHash": "7608cc3b58541e8f4951d78375b8f2e10a2793802b6436107cc5f024aacaa696"
-    },
-    "memory-tasks": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": "skills/memory-tasks/SKILL.md",
-      "computedHash": "dec08f950e264d75031992df124d7c76270cfce2ef881de1ed5ecb5e2ca040b5"
-    },
-    "pr-create": {
-      "source": "basicmachines-co/basic-memory",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/pr-create/SKILL.md",
-      "computedHash": "11c454b9653f76cc3e53be2228e50b29483c14fce398f5b6ee201f22d337bb10"
-    },
-    "react-nextjs-patterns": {
-      "source": "duyet/claude-plugins",
-      "sourceType": "github",
-      "skillPath": "team-agents/skills/react-nextjs-patterns/SKILL.md",
-      "computedHash": "facf696c55d45d3b6dc974400c6c4a469abedfe1f76476112d3bf538b53064ea"
-    },
-    "suggest-lucide-icons": {
-      "source": "nweii/agent-stuff",
-      "sourceType": "github",
-      "skillPath": "skills/suggest-lucide-icons/SKILL.md",
-      "computedHash": "b901f87f7b6616c6610f071e59139bca4c6cffd8559d538bcb5541d74e3fc911"
-    },
-    "tailwind-v4-shadcn": {
-      "source": "secondsky/claude-skills",
-      "sourceType": "github",
-      "skillPath": "plugins/tailwind-v4-shadcn/skills/tailwind-v4-shadcn/SKILL.md",
-      "computedHash": "4eb905e229fce4220feecbc03b93c957a0b027a7200777c73f3925137d6c1c59"
-    },
-    "typescript-eslint": {
-      "source": "claude-dev-suite/claude-dev-suite",
-      "sourceType": "github",
-      "skillPath": "skills/quality/typescript-eslint/SKILL.md",
-      "computedHash": "343170faaf7490cc16e466629cfcdfcae84ba3679ca2f1c99141aa632d6deee9"
-    },
-    "web-i18n-next-intl": {
-      "source": "agents-inc/skills",
-      "sourceType": "github",
-      "skillPath": "src/skills/web-i18n-next-intl/SKILL.md",
-      "computedHash": "1b8a1602a6f21b75eae14efea59cc14b728cde1012abf1a212852c6b6005ac11"
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
     }
   }
 }

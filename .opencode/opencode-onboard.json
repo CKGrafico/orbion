@@ -1,51 +1,36 @@
 {
-  "schema": 1,
-  "generatedAt": "2026-07-08T19:27:28.990Z",
-  "onboardVersion": "1.2.3",
+  "version": 2,
+  "generatedAt": "2026-07-15T21:27:45.786Z",
+  "onboardVersion": "1.3.7",
   "opencodeVersion": "1.17.14",
-  "wizard": {
-    "platform": "github",
-    "backlogPlatform": "github",
-    "repoPlatform": "github",
-    "sourceMode": "current",
-    "sourceRoots": [
-      "C:\\Projects\\Personal\\loop-task-app"
-    ],
-    "maxConcurrentAgents": 4,
-    "preserved": {
-      "design": true,
-      "architecture": true,
-      "openspec": true
-    },
-    "openspec": {
-      "available": true,
-      "initialized": true
-    },
-    "additionalSkillsProvider": "npx-skills",
-    "models": {
-      "plan": "opencode-go/glm-5.2",
-      "build": "opencode-go/glm-5.1",
-      "fast": "opencode/big-pickle"
-    },
-    "optionalTools": {
-      "rtk": {
-        "optedIn": true,
-        "checked": true,
-        "available": true
-      },
-      "quota": {
-        "optedIn": true,
-        "installed": true
-      },
-      "caveman": {
-        "optedIn": true,
-        "installed": true
-      }
-    },
-    "cavemanGuidance": {
-      "enabled": true,
-      "patchedFiles": 0
-    }
+  "platform": {
+    "backlog": "github",
+    "repo": "github"
   },
-  "note": "Snapshot of onboarding choices. Runtime config — wizard.models and wizard.maxConcurrentAgents — is read by /ob-apply and the agent generator and is preserved across `opencode-onboard metadata` refreshes. Other fields are informational."
+  "models": {
+    "plan": "opencode-go/glm-5.2",
+    "build": "opencode-go/glm-5.1",
+    "fast": "opencode/big-pickle"
+  },
+  "agents": {
+    "maxConcurrent": 4
+  },
+  "source": {
+    "mode": "current",
+    "roots": [
+      "C:\\Projects\\Personal\\loop-task-app"
+    ]
+  },
+  "tools": {
+    "rtk": true,
+    "quota": true,
+    "caveman": true,
+    "codegraph": false,
+    "memory": false
+  },
+  "preexisting": {
+    "design": true,
+    "architecture": true,
+    "openspec": true
+  }
 }
