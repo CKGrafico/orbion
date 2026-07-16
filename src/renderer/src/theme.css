@@ -940,18 +940,307 @@ input {
   overflow-y: auto;
   height: calc(100vh - 440px);
   min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.log-viewer .run-header {
-  color: var(--warning);
+/* ── Run selector panel ──────────────────────────────────────────── */
+
+.run-selector {
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.log-viewer .exit-ok {
+.run-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.run-selector-header:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.run-selector-label {
+  flex: 1;
+}
+
+.run-selector-chevron {
+  color: var(--text-muted);
+}
+
+.run-selector-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.run-selector-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+}
+
+.run-selector-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-selector-entry:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.run-selector-dot {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.run-selector-run-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.run-selector-exit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.run-selector-exit.exit-ok {
   color: var(--success);
 }
 
-.log-viewer .exit-bad {
+.run-selector-exit.exit-bad {
   color: var(--danger);
+}
+
+.run-selector-duration {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.run-selector-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Run cards (collapsible log segments) ────────────────────────── */
+
+.run-card {
+  margin-bottom: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.run-card-expanded {
+  background: var(--bg-panel);
+}
+
+.run-card-collapsed {
+  background: var(--bg-elevated);
+}
+
+.run-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+}
+
+.run-card-header:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.run-card-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.run-card-label {
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.run-card-timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.run-card-content {
+  padding: 4px 12px 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── Log row components ──────────────────────────────────────────── */
+
+.log-plain-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 1px 0;
+}
+
+.log-exit-row {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 0;
+}
+
+.log-exit-ok {
+  color: var(--success);
+}
+
+.log-exit-bad {
+  color: var(--danger);
+}
+
+.log-tool-call-row {
+  padding: 2px 0;
+}
+
+.log-tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  text-align: left;
+  color: var(--text-secondary);
+}
+
+.log-tool-call-header:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.log-tool-call-icon {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.log-tool-call-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.log-tool-call-duration {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.log-tool-call-status {
+  font-size: 11.5px;
+  flex-shrink: 0;
+}
+
+.log-tool-call-status-completed {
+  color: var(--success);
+}
+
+.log-tool-call-status-running {
+  color: var(--warning);
+}
+
+.log-tool-call-status-error {
+  color: var(--danger);
+}
+
+.log-tool-call-chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.log-tool-call-output {
+  margin: 2px 0 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-input);
+}
+
+.log-tool-call-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 10px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.log-tool-call-output-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.log-tool-call-output pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-x: auto;
+  color: var(--text-secondary);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.log-markdown-row {
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 /* ── Prompt-box bottom bar (used as the section filter) ─────────── */
