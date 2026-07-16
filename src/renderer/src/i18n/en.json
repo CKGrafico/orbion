@@ -246,6 +246,19 @@
     "lastExit": "last exit {code}",
     "noMatch": "No loops match \"{filter}\"."
   },
+  "instanceDetail": {
+    "noProjects": "No projects",
+    "noProjectsDescription": "This environment has no projects yet.",
+    "viewProject": "View {name}",
+    "noLoopsInProject": "No loops in this project",
+    "unassigned": "Unassigned"
+  },
+  "projectDetail": {
+    "noLoops": "No loops",
+    "noLoopsDescription": "This project has no loops yet.",
+    "loopsCount": "{count} loops",
+    "notFound": "Project not found"
+  },
   "loopDetail": {
     "backToLoops": "Back to loops",
     "overview": "Overview",

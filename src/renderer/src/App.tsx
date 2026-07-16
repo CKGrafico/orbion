@@ -1,28 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus } from "../../shared/ipc";
-import type { Environment, EnvironmentHealth, LoopMeta } from "./types";
+import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
-import { rollUpEnvironmentStatus, isNotifiableStatus, getPillLabel } from "./fleet-status";
+import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
 import { loopStatusToFleetItem } from "./fleet-mapping";
 import { useEnvironments } from "./store";
 import { OrbionMark } from "./components/OrbionMark";
-import { fetchLoops, fetchSettings, isMock } from "./api";
+import { fetchLoops, fetchProjects, fetchSettings, isMock } from "./api";
 import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
-import { PanelLeft, Search, ArrowLeft, RotateCw, X, Star } from "lucide-react";
+import { PanelLeft, RotateCw, X, Star } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
 import { LoopDetail } from "./components/LoopDetail";
+import { InstanceDetail } from "./components/InstanceDetail";
+import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
-import { ProjectsView } from "./components/ProjectsView";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IConfigService } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService } from "./services/interfaces";
+import { InfraChatPanel } from "./components/InfraChatPanel";
 
-type View = { kind: "list" } | { kind: "loop"; loopId: string };
+type View =
+  | { kind: "instance" }
+  | { kind: "project"; projectId: string }
+  | { kind: "loop"; loopId: string };
 
 function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
   switch (phase) {
@@ -55,13 +60,11 @@ function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHeal
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
+  const { environments, selectedId, mainVm, select, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
-  const [configService] = useInject<IConfigService>(cid.IConfigService);
-  const [view, setView] = useState<View>({ kind: "list" });
-  const [filter, setFilter] = useState("");
+  const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pickMainVmOpen, setPickMainVmOpen] = useState(false);
@@ -72,11 +75,10 @@ export function App(): React.ReactNode {
   const [openCodeStatus, setOpenCodeStatus] = useState<Record<string, OpenCodeConnectionStatus>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
   const [mutedEnvs, setMutedEnvs] = useState<Set<string>>(new Set<string>());
   const [perEnvLoops, setPerEnvLoops] = useState<Record<string, LoopMeta[]>>({});
+  const [perEnvProjects, setPerEnvProjects] = useState<Record<string, Project[]>>({});
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
-  const filterRef = useRef<HTMLInputElement | null>(null);
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -87,7 +89,7 @@ export function App(): React.ReactNode {
         if (itemType === "loop") {
           setView({ kind: "loop", loopId: itemId });
         } else {
-          setView({ kind: "list" });
+          setView({ kind: "instance" });
         }
       });
       return bridge;
@@ -241,6 +243,7 @@ export function App(): React.ReactNode {
     });
   }, [notificationBridge]);
 
+  // Fetch loops for the selected environment (polling every 5s)
   useEffect(() => {
     if (!selected) {
       setLoops([]);
@@ -260,7 +263,7 @@ export function App(): React.ReactNode {
       if (cancelled) return;
       if (res.ok && Array.isArray(res.data)) {
         setLoops(res.data);
-        setPerEnvLoops((prev) => ({ ...prev, [selected.id]: res.data }));
+        setPerEnvLoops((prev) => ({ ...prev, [selected.id]: res.data as LoopMeta[] }));
         setLastUpdated(Date.now());
       }
     };
@@ -271,7 +274,32 @@ export function App(): React.ReactNode {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selected?.id, selected?.activeEndpointId, refreshTick, connectionStatus[selected?.id ?? ""]?.phase]);
+  }, [selected?.id, selected?.activeEndpointId, connectionStatus[selected?.id ?? ""]?.phase]);
+
+  // Fetch projects for the selected environment (polling every 10s)
+  useEffect(() => {
+    if (!selected) return;
+
+    const connStatus = connectionStatus[selected.id];
+    if (connStatus && connStatus.phase !== "connected") return;
+
+    let cancelled = false;
+
+    const load = async (): Promise<void> => {
+      const res = await fetchProjects(selected);
+      if (cancelled) return;
+      if (res.ok && Array.isArray(res.data)) {
+        setPerEnvProjects((prev) => ({ ...prev, [selected.id]: res.data as Project[] }));
+      }
+    };
+
+    void load();
+    const timer = setInterval(() => void load(), 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [selected?.id, selected?.activeEndpointId, connectionStatus[selected?.id ?? ""]?.phase]);
 
   useEffect(() => {
     if (!selected) { setDaemonSettings(null); return; }
@@ -287,9 +315,12 @@ export function App(): React.ReactNode {
   const handleSelect = (id: string): void => {
     select(id);
     markVisited(id);
-    setView({ kind: "list" });
-    setFilter("");
+    setView({ kind: "instance" });
   };
+
+  const handleNavigate = useCallback((newView: View): void => {
+    setView(newView);
+  }, []);
 
   const handleRetry = useCallback((id: string): void => {
     void connectionService.retry(id);
@@ -320,17 +351,218 @@ export function App(): React.ReactNode {
   };
 
   const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
-  const goBack = (): void => setView({ kind: "list" });
+  const openProject = (projectId: string): void => setView({ kind: "project", projectId });
 
-  const inDetail = view.kind === "loop";
   const updatedLabel =
-    lastUpdated === null ? "…" : timeAgo(new Date(lastUpdated).toISOString());
+    lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
   const activeEndpoint = selected
     ? (selected.activeEndpointId
         ? selected.endpoints.find((ep) => ep.id === selected.activeEndpointId)
         : selected.endpoints[0])
     : null;
+
+  // Determine what to render in the content area
+  const renderContent = (): React.ReactNode => {
+    if (!selected) {
+      return (
+        <div className="empty">
+          <span className="glyph">
+            <RotateCw size={30} strokeWidth={1.2} />
+          </span>
+          <h3>{intl.formatMessage({ id: "app.noEnvironmentSelected" })}</h3>
+          <p>
+            {intl.formatMessage({ id: "app.noEnvironmentDescription" })}
+          </p>
+          <button className="btn primary" onClick={() => setVmWizardOpen(true)}>
+            {intl.formatMessage({ id: "app.addEnvironment" })}
+          </button>
+        </div>
+      );
+    }
+
+    switch (view.kind) {
+      case "instance":
+        return (
+          <InstanceDetail
+            instance={selected}
+            loops={loops}
+            connectionPhase={connectionStatus[selected.id]?.phase}
+            onOpenLoop={openLoop}
+            onOpenProject={openProject}
+          />
+        );
+      case "project": {
+        const projectList = perEnvProjects[selected.id] ?? [];
+        const project = projectList.find((p) => p.id === view.projectId);
+        const projectLoops = loops.filter((l) => (l.projectId ?? "default") === view.projectId);
+        if (!project) {
+          return (
+            <div className="content-inner">
+              <div className="empty">
+                <h3>{intl.formatMessage({ id: "projectDetail.notFound" })}</h3>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <ProjectDetail
+            project={project}
+            loops={projectLoops}
+            onOpenLoop={openLoop}
+          />
+        );
+      }
+      case "loop":
+        return (
+          <LoopDetail
+            instance={selected}
+            loopId={view.loopId}
+            initial={loops.find((l) => l.id === view.loopId) ?? null}
+            onBack={() => setView({ kind: "instance" })}
+          />
+        );
+    }
+  };
+
+  // Resolve detail header for project and loop views
+  const renderDetailHeader = (): React.ReactNode => {
+    if (!selected) return null;
+
+    if (view.kind === "project") {
+      const projectList = perEnvProjects[selected.id] ?? [];
+      const project = projectList.find((p) => p.id === view.projectId);
+      const projectLoops = loops.filter((l) => (l.projectId ?? "default") === view.projectId);
+      return (
+        <div className="main-header">
+          <span className="dot" style={{ background: project?.color ?? "var(--text-muted)" }} />
+          <span className="main-title">{project?.name ?? view.projectId}</span>
+          <span className="chip">{intl.formatMessage({ id: "projectDetail.loopsCount" }, { count: projectLoops.length })}</span>
+          <span style={{ flex: 1 }} />
+        </div>
+      );
+    }
+
+    if (view.kind === "loop") {
+      const loop = loops.find((l) => l.id === view.loopId);
+      const title = loop?.description?.trim() || loop?.id || view.loopId;
+      return (
+        <div className="main-header">
+          <span className="main-title">{title}</span>
+          {loop ? (
+            <span
+              className="chip"
+              style={{ color: `var(--status-${loop.status})` }}
+            >
+              {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
+            </span>
+          ) : null}
+          <span style={{ flex: 1 }} />
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // Main header for instance detail (existing header)
+  const renderInstanceHeader = (): React.ReactNode => {
+    if (!selected || view.kind !== "instance") return null;
+
+    return (
+      <div className="main-header">
+        {/* Left group: name * IP * status dots */}
+        <span className="main-title">{selected.name}</span>
+
+        {activeEndpoint ? (() => {
+          let label: string | null = null;
+          if (activeEndpoint.sshTarget) {
+            const m = /^[^@]+@([^:]+)(?::\d+)?$/.exec(activeEndpoint.sshTarget);
+            label = m ? m[1] : activeEndpoint.sshTarget;
+          } else {
+            const h = hostLabel(activeEndpoint.url);
+            if (!h.startsWith("127.0.0.1") && !h.startsWith("localhost")) {
+              label = h;
+            }
+          }
+          return label ? (
+            <span className="chip mono" title={activeEndpoint.sshTarget ?? activeEndpoint.url}>
+              {label}
+            </span>
+          ) : null;
+        })() : null}
+
+        {/* Daemon connection dot */}
+        {(() => {
+          const h = health[selected.id] ?? "unknown";
+          const dotColor =
+            h === "ok" ? "var(--health-ok)"
+            : h === "connecting" ? "var(--health-connecting)"
+            : h === "backoff" ? "var(--health-backoff)"
+            : h === "blocked" ? "var(--health-blocked)"
+            : "var(--health-offline)";
+          return (
+            <span className="chip" title={healthTooltip(intl, h, connectionStatus[selected.id])} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+              {intl.formatMessage({ id: "app.daemonChip" })}
+            </span>
+          );
+        })()}
+
+        {daemonSettings ? (
+          <>
+            <span className={`chip ${daemonSettings.httpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonHttpApi" })}>HTTP</span>
+            <span className={`chip ${daemonSettings.mcpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonMcpApi" })}>MCP</span>
+          </>
+        ) : null}
+
+        {/* Spacer */}
+        <span style={{ flex: 1 }} />
+
+        {/* Right group: meta * remove * mark-as-main */}
+        <span className="main-header-meta" style={{ marginLeft: 0 }}>
+          {(() => {
+            const h = health[selected.id] ?? "unknown";
+            const cs = connectionStatus[selected.id];
+            if (cs && cs.phase === "blocked" && cs.lastError) {
+              return intl.formatMessage({ id: "app.blockedLabel" }, { detail: translateMessage(intl, cs.lastError) });
+            }
+            if (h === "offline" || h === "backoff" || h === "blocked" || h === "connecting") {
+              return intl.formatMessage({ id: `app.${h}` });
+            }
+            return intl.formatMessage({ id: "app.updatedLabel" }, { time: updatedLabel });
+          })()}
+        </span>
+
+        <button
+          className="icon-btn"
+          title={intl.formatMessage({ id: "app.removeEnvironment" })}
+          onClick={() => setConfirmRemoveId(selected.id)}
+          style={{ color: "var(--danger)", opacity: 0.7 }}
+        >
+          <X size={14} />
+        </button>
+
+        {selected.role !== "main-vm" ? (
+          <button
+            className="icon-btn"
+            title={intl.formatMessage({ id: "app.markAsMainTooltip" })}
+            onClick={() => { setMainVm(selected.id); }}
+            style={{ opacity: 0.6 }}
+          >
+            <Star size={14} />
+          </button>
+        ) : (
+          <span
+            title={intl.formatMessage({ id: "app.isMainTooltip" })}
+            style={{ display: "flex", alignItems: "center", padding: "0 4px", color: "var(--chip-warm)", opacity: 0.9 }}
+          >
+            <Star size={14} fill="currentColor" />
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="app">
@@ -341,22 +573,6 @@ export function App(): React.ReactNode {
           onClick={() => setSidebarOpen((v) => !v)}
         >
           <PanelLeft size={15} />
-        </button>
-        <button
-          className="icon-btn"
-          title={intl.formatMessage({ id: "app.search" })}
-          onClick={() => filterRef.current?.focus()}
-        >
-          <Search size={15} />
-        </button>
-        <button
-          className="icon-btn"
-          title={intl.formatMessage({ id: "app.back" })}
-          disabled={!inDetail}
-          style={!inDetail ? { opacity: 0.35, cursor: "default" } : undefined}
-          onClick={goBack}
-        >
-          <ArrowLeft size={15} />
         </button>
         <span className="titlebar-brand">
           <OrbionMark size={16} />
@@ -378,8 +594,12 @@ export function App(): React.ReactNode {
               fleetStatus={fleetStatus}
               unreadEnvs={unreadEnvs}
               mutedEnvs={mutedEnvs}
+              perEnvLoops={perEnvLoops}
+              perEnvProjects={perEnvProjects}
+              view={view}
               onToggleMute={handleToggleMute}
               onSelect={handleSelect}
+              onNavigate={handleNavigate}
               onAddVm={() => setVmWizardOpen(true)}
               onRemove={handleRemove}
               onRetry={handleRetry}
@@ -389,155 +609,16 @@ export function App(): React.ReactNode {
         ) : null}
 
         <div className="panel main-panel">
-          {selected ? (
-            <div className="main-header">
-              {/* Left group: name · IP · status dots */}
-              <span className="main-title">{selected.name}</span>
-
-              {activeEndpoint ? (() => {
-                // For SSH endpoints: show the real host from sshTarget (strip user@ prefix).
-                // For direct/tailscale: show the URL host, that IS the real IP.
-                // Never show 127.0.0.1 (tunnel localhost, not meaningful to the user).
-                let label: string | null = null;
-                if (activeEndpoint.sshTarget) {
-                  // "user@host:port" or "user@host" → extract just the host part
-                  const m = /^[^@]+@([^:]+)(?::\d+)?$/.exec(activeEndpoint.sshTarget);
-                  label = m ? m[1] : activeEndpoint.sshTarget;
-                } else {
-                  const h = hostLabel(activeEndpoint.url);
-                  // suppress tunnel localhost, meaningless to display
-                  if (!h.startsWith("127.0.0.1") && !h.startsWith("localhost")) {
-                    label = h;
-                  }
-                }
-                return label ? (
-                  <span className="chip mono" title={activeEndpoint.sshTarget ?? activeEndpoint.url}>
-                    {label}
-                  </span>
-                ) : null;
-              })() : null}
-
-              {/* Daemon connection dot */}
-              {(() => {
-                const h = health[selected.id] ?? "unknown";
-                const dotColor =
-                  h === "ok" ? "var(--health-ok)"
-                  : h === "connecting" ? "var(--health-connecting)"
-                  : h === "backoff" ? "var(--health-backoff)"
-                  : h === "blocked" ? "var(--health-blocked)"
-                  : "var(--health-offline)";
-                return (
-                  <span className="chip" title={healthTooltip(intl, h, connectionStatus[selected.id])} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                    {intl.formatMessage({ id: "app.daemonChip" })}
-                  </span>
-                );
-              })()}
-
-              {daemonSettings ? (
-                <>
-                  <span className={`chip ${daemonSettings.httpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonHttpApi" })}>HTTP</span>
-                  <span className={`chip ${daemonSettings.mcpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonMcpApi" })}>MCP</span>
-                </>
-              ) : null}
-
-              {/* Spacer */}
-              <span style={{ flex: 1 }} />
-
-              {/* Right group: meta · remove · mark-as-main */}
-              <span className="main-header-meta" style={{ marginLeft: 0 }}>
-                {(() => {
-                  const h = health[selected.id] ?? "unknown";
-                  const cs = connectionStatus[selected.id];
-                  if (cs && cs.phase === "blocked" && cs.lastError) {
-                    return intl.formatMessage({ id: "app.blockedLabel" }, { detail: translateMessage(intl, cs.lastError) });
-                  }
-                  if (h === "offline" || h === "backoff" || h === "blocked" || h === "connecting") {
-                    return intl.formatMessage({ id: `app.${h}` });
-                  }
-                  return intl.formatMessage({ id: "app.updatedLabel" }, { time: updatedLabel });
-                })()}
-              </span>
-
-              <button
-                className="icon-btn"
-                title={intl.formatMessage({ id: "app.removeEnvironment" })}
-                onClick={() => setConfirmRemoveId(selected.id)}
-                style={{ color: "var(--danger)", opacity: 0.7 }}
-              >
-                <X size={14} />
-              </button>
-
-              {selected.role !== "main-vm" ? (
-                <button
-                  className="icon-btn"
-                  title={intl.formatMessage({ id: "app.markAsMainTooltip" })}
-                  onClick={() => { setMainVm(selected.id); }}
-                  style={{ opacity: 0.6 }}
-                >
-                  <Star size={14} />
-                </button>
-              ) : (
-                <span
-                  title={intl.formatMessage({ id: "app.isMainTooltip" })}
-                  style={{ display: "flex", alignItems: "center", padding: "0 4px", color: "var(--chip-warm)", opacity: 0.9 }}
-                >
-                  <Star size={14} fill="currentColor" />
-                </span>
-              )}
-            </div>
-          ) : null}
+          {renderInstanceHeader()}
+          {renderDetailHeader()}
 
           <div className="content">
-            {!selected ? (
-              <div className="empty">
-                <span className="glyph">
-                  <RotateCw size={30} strokeWidth={1.2} />
-                </span>
-                <h3>{intl.formatMessage({ id: "app.noEnvironmentSelected" })}</h3>
-                <p>
-                  {intl.formatMessage({ id: "app.noEnvironmentDescription" })}
-                </p>
-                <button className="btn primary" onClick={() => setVmWizardOpen(true)}>
-                  {intl.formatMessage({ id: "app.addEnvironment" })}
-                </button>
-              </div>
-            ) : inDetail ? (
-              <LoopDetail
-                instance={selected}
-                loopId={(view as { kind: "loop"; loopId: string }).loopId}
-                initial={loops.find((l) => l.id === (view as { loopId: string }).loopId) ?? null}
-                onBack={goBack}
-              />
-            ) : (
-              <ProjectsView instance={selected} loops={loops} filter={filter} connectionPhase={connectionStatus[selected.id]?.phase} />
-            )}
+            {renderContent()}
           </div>
 
-          {selected && !inDetail ? (
-            <div className="prompt-bar">
-              <div className="prompt-box">
-                <input
-                  ref={filterRef}
-                  placeholder={intl.formatMessage({ id: "app.filterLoops" })}
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                />
-                <div className="prompt-row">
-                  <span className="prompt-chip">{intl.formatMessage({ id: "app.loops" })}</span>
-                  <span className="prompt-meta">{activeEndpoint ? hostLabel(activeEndpoint.url) : ""}</span>
-                  <span style={{ flex: 1 }} />
-                  <span className="prompt-meta mono">{intl.formatMessage({ id: "app.loopsCount" }, { count: loops.length })}</span>
-                  <button
-                    className="prompt-action"
-                    title={intl.formatMessage({ id: "app.refreshNow" })}
-                    onClick={() => setRefreshTick((n) => n + 1)}
-                  >
-                    <RotateCw size={14} strokeWidth={1.8} />
-                  </button>
-                </div>
-              </div>
-            </div>
+          {/* InfraChatPanel now shows on ALL views */}
+          {selected && mainVm ? (
+            <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
           ) : null}
         </div>
       </div>
