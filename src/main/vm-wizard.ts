@@ -4,7 +4,7 @@ import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
 import { openTunnel, findExistingTunnel } from "./ssh-tunnel.js";
-import { addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint } from "./config-store.js";
+import { addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded } from "./config-store.js";
 import { msg } from "./i18n.js";
 
 let wizardCancelled = false;
@@ -353,6 +353,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   // Step 5: Save environment
   const env = addEnvironment(envName, daemonUrl, "ssh");
+  autoPromoteFirstEnvIfNeeded();
 
   if (pair.paired) {
     // Try to find the env by URL to store the session token

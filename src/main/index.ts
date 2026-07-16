@@ -613,6 +613,7 @@ app.whenReady().then(() => {
     return { mainVmId, connected };
   });
 
+  autoPromoteFirstEnvIfNeeded();
   createWindow();
 
   app.on("activate", () => {
