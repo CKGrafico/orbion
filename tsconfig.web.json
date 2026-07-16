@@ -15,7 +15,8 @@
     "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": false,
+    "experimentalDecorators": true
   },
   "include": ["src/renderer/src/**/*", "src/shared/**/*"]
 }
