@@ -7,7 +7,8 @@ import { rollUpEnvironmentStatus, isNotifiableStatus, getPillLabel } from "./fle
 import { loopStatusToFleetItem } from "./fleet-mapping";
 import { useEnvironments } from "./store";
 import { OrbionMark } from "./components/OrbionMark";
-import { fetchLoops, isMock } from "./api";
+import { fetchLoops, fetchSettings, isMock } from "./api";
+import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
 import { PanelLeft, Search, ArrowLeft, RotateCw } from "lucide-react";
@@ -63,6 +64,7 @@ export function App(): React.ReactNode {
     return new Set<string>();
   });
   const [perEnvLoops, setPerEnvLoops] = useState<Record<string, LoopMeta[]>>({});
+  const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const filterRef = useRef<HTMLInputElement | null>(null);
 
   const { isUnread, markVisited } = useUnreadTracker();
@@ -314,6 +316,17 @@ export function App(): React.ReactNode {
     };
   }, [selected?.id, selected?.activeEndpointId, refreshTick, connectionStatus[selected?.id ?? ""]?.phase]);
 
+  useEffect(() => {
+    if (!selected) { setDaemonSettings(null); return; }
+    const connStatus = connectionStatus[selected.id];
+    if (!connStatus || connStatus.phase !== "connected") { setDaemonSettings(null); return; }
+    let cancelled = false;
+    void fetchSettings(selected).then((res) => {
+      if (!cancelled && res.ok && res.data) setDaemonSettings(res.data);
+    });
+    return () => { cancelled = true; };
+  }, [selected?.id, selected?.activeEndpointId, connectionStatus[selected?.id ?? ""]?.phase]);
+
   const handleSelect = (id: string): void => {
     select(id);
     markVisited(id);
@@ -424,7 +437,14 @@ export function App(): React.ReactNode {
             <div className="main-header">
               <span className="main-title">{selected.name}</span>
               {activeEndpoint ? (
-                <span className="chip mono">{hostLabel(activeEndpoint.url)}</span>
+                <span className="chip mono" title={activeEndpoint.url}>{hostLabel(activeEndpoint.url)}</span>
+              ) : null}
+              {daemonSettings ? (
+                <>
+                  <span className={`chip ${daemonSettings.httpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonHttpApi" })}>HTTP</span>
+                  <span className={`chip ${daemonSettings.mcpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonMcpApi" })}>MCP</span>
+                  <span className="chip chip-muted mono" title={intl.formatMessage({ id: "app.daemonBindAddress" })}>{daemonSettings.httpApiHost}</span>
+                </>
               ) : null}
               <span className="main-header-meta">
                 {(() => {

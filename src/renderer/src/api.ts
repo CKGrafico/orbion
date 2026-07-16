@@ -29,6 +29,16 @@ export function fetchLoops(env: Environment): Promise<ApiResponse<LoopMeta[]>> {
   return apiRequest<LoopMeta[]>(env, "/api/loops");
 }
 
+export interface DaemonSettings {
+  httpApiEnabled: boolean;
+  mcpApiEnabled: boolean;
+  httpApiHost: string;
+}
+
+export function fetchSettings(env: Environment): Promise<ApiResponse<DaemonSettings>> {
+  return apiRequest<DaemonSettings>(env, "/api/settings");
+}
+
 export function fetchLoop(env: Environment, id: string): Promise<ApiResponse<LoopMeta>> {
   return apiRequest<LoopMeta>(env, `/api/loops/${encodeURIComponent(id)}`);
 }

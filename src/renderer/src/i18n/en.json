@@ -20,7 +20,10 @@
     "backoff": "backoff",
     "blocked": "blocked",
     "connecting": "connecting",
-    "notificationItemNeedsAttention": "{envName} {itemType} needs attention"
+    "notificationItemNeedsAttention": "{envName} {itemType} needs attention",
+    "daemonHttpApi": "HTTP API",
+    "daemonMcpApi": "MCP API",
+    "daemonBindAddress": "daemon bind address"
   },
   "sidebar": {
     "addEnvironment": "Add Environment",

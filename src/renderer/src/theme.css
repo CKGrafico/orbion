@@ -405,6 +405,21 @@ input {
   line-height: 1.7;
 }
 
+.chip-ok {
+  background: color-mix(in srgb, var(--health-ok) 15%, transparent);
+  color: var(--health-ok);
+}
+
+.chip-off {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.chip-muted {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
 .mono {
   font-family: var(--font-mono);
 }
