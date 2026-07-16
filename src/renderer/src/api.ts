@@ -68,6 +68,7 @@ let globalUnlisten: (() => void) | null = null;
 
 interface LogStreamHandlers {
   onLine: (line: string) => void;
+  onEvent?: (parsed: unknown) => void;
   onClose?: () => void;
 }
 
@@ -79,6 +80,21 @@ function ensureGlobalListener(): void {
     if (!handler) return;
     if (payload.kind === "data") {
       handler.onLine(payload.text);
+    } else if (payload.kind === "event") {
+      if (handler.onEvent) {
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(payload.text);
+        } catch {
+          // Not valid JSON, fall back to plain text
+          handler.onLine(payload.text);
+          return;
+        }
+        handler.onEvent(parsed);
+      } else {
+        // No event handler, fall back to plain text
+        handler.onLine(payload.text);
+      }
     } else if (payload.kind === "end" || payload.kind === "error") {
       handler.onClose?.();
       streamHandlers.delete(payload.subId);
@@ -91,11 +107,12 @@ export function subscribeLogs(
   loopId: string,
   onLine: (line: string) => void,
   onClose?: () => void,
+  onEvent?: (parsed: unknown) => void,
 ): () => void {
   ensureGlobalListener();
   const streamService = getStreamService();
   const subId = crypto.randomUUID();
-  streamHandlers.set(subId, { onLine, onClose });
+  streamHandlers.set(subId, { onLine, onClose, onEvent });
 
   const baseUrl = resolveBaseUrl(env);
   void streamService.subscribeStream({

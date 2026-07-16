@@ -100,7 +100,7 @@ export function LoopDetail(props: {
         </div>
       ) : null}
 
-      <LogViewer instance={instance} loopId={loopId} />
+      <LogViewer instance={instance} loopId={loopId} runHistory={loop?.runHistory} />
     </div>
   );
 }

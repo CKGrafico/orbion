@@ -44,9 +44,18 @@ function mockLoop(partial: Partial<LoopMeta> & Pick<LoopMeta, "id" | "status" | 
 }
 
 const MOCK_LOOPS: LoopMeta[] = [
-  mockLoop({ id: "loop-1", status: "running", command: "npm run build", intervalHuman: "5m", runCount: 142, lastExitCode: 0, lastRunAt: iso(-300000), nextRunAt: iso(300000), pid: 12345 }),
-  mockLoop({ id: "loop-2", status: "waiting", command: "pnpm test", intervalHuman: "10m", runCount: 88, lastExitCode: 0, lastRunAt: iso(-600000), nextRunAt: iso(400000) }),
-  mockLoop({ id: "loop-3", status: "stopped", command: "docker compose up", intervalHuman: "1h", runCount: 12, lastExitCode: 1, lastRunAt: iso(-7200000) }),
+  mockLoop({ id: "loop-1", status: "running", command: "npm run build", intervalHuman: "5m", runCount: 142, lastExitCode: 0, lastRunAt: iso(-300000), nextRunAt: iso(300000), pid: 12345, runHistory: [
+    { runNumber: 142, startedAt: iso(-300000), exitCode: 0, duration: 4500, logSize: 1024, status: "completed", logOffset: 0 },
+    { runNumber: 141, startedAt: iso(-600000), exitCode: 0, duration: 4200, logSize: 980, status: "completed", logOffset: 0 },
+    { runNumber: 140, startedAt: iso(-900000), exitCode: 1, duration: 1200, logSize: 512, status: "completed", logOffset: 0 },
+  ] }),
+  mockLoop({ id: "loop-2", status: "waiting", command: "pnpm test", intervalHuman: "10m", runCount: 88, lastExitCode: 0, lastRunAt: iso(-600000), nextRunAt: iso(400000), runHistory: [
+    { runNumber: 88, startedAt: iso(-600000), exitCode: 0, duration: 3200, logSize: 768, status: "completed", logOffset: 0 },
+    { runNumber: 87, startedAt: iso(-1200000), exitCode: 0, duration: 2800, logSize: 720, status: "completed", logOffset: 0 },
+  ] }),
+  mockLoop({ id: "loop-3", status: "stopped", command: "docker compose up", intervalHuman: "1h", runCount: 12, lastExitCode: 1, lastRunAt: iso(-7200000), runHistory: [
+    { runNumber: 12, startedAt: iso(-7200000), exitCode: 1, duration: 5400, logSize: 2048, status: "completed", logOffset: 0 },
+  ] }),
 ];
 
 const MOCK_TASKS: TaskDefinition[] = [
@@ -59,7 +68,7 @@ function mockRequest<T>(path: string): Promise<ApiResponse<T>> {
   if (path.includes("/api/loops")) data = MOCK_LOOPS;
   else if (path.includes("/api/projects")) data = MOCK_PROJECTS;
   else if (path.includes("/api/tasks")) data = MOCK_TASKS;
-  else if (path.includes("/api/loops/") && path.includes("/logs")) data = "[mock] No logs available";
+  else if (path.includes("/api/loops/") && path.includes("/logs")) data = "=== Run #142\nBuilding project...\nnpm run build\nexit 0\n=== Run #141\nBuilding project...\nnpm run build\nexit 0\n=== Run #140\nBuilding project...\nnpm run build\nexit 1";
   else if (path.includes("/api/settings")) data = { httpApiEnabled: true, mcpApiEnabled: false, httpApiHost: "0.0.0.0" };
   return Promise.resolve({ ok: true, status: 200, data: data as T });
 }

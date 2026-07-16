@@ -285,6 +285,20 @@
     "copy": "Copy",
     "noOutput": "No log output yet."
   },
+  "runSelector": {
+    "title": "Runs",
+    "runN": "Run #{number}",
+    "collapsed": "Show runs"
+  },
+  "logRows": {
+    "runHeader": "Run #{number}",
+    "exitCode": "exit {code}",
+    "duration": "{ms}ms",
+    "completed": "completed",
+    "failed": "failed",
+    "running": "running",
+    "output": "Output"
+  },
   "infra": {
     "title": "Infrastructure",
     "description": "Ask about your fleet: machine status, clone repos, manage services.",
