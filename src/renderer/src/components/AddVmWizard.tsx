@@ -210,7 +210,7 @@ export function AddVmWizard(props: {
 
   return (
     <div className="modal-backdrop" onClick={handleCancel}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 760 }}>
         <h2>{intl.formatMessage({ id: "vmWizard.title" })}</h2>
         <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: "4px 0 14px" }}>
           {intl.formatMessage({ id: "vmWizard.description" })}
@@ -359,7 +359,7 @@ export function AddVmWizard(props: {
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
                   {intl.formatMessage({ id: CATEGORY_KEYS[category as ServiceCategory] })}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
                   {services.map((svc) => {
                     const installed = isServiceInstalled(svc);
                     return (
@@ -368,7 +368,7 @@ export function AddVmWizard(props: {
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
-                          gap: 10,
+                          gap: 8,
                           cursor: installed ? "default" : "pointer",
                           opacity: installed ? 0.6 : 1,
                         }}
@@ -378,10 +378,10 @@ export function AddVmWizard(props: {
                           checked={serviceSelection[svc.key]}
                           disabled={installed}
                           onChange={(e) => setServiceSelection((s) => ({ ...s, [svc.key]: e.target.checked }))}
-                          style={{ marginTop: 2 }}
+                          style={{ marginTop: 3, flexShrink: 0 }}
                         />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                             {intl.formatMessage({ id: svc.nameKey })}
                             {installed ? (
                               <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--accent-bg, rgba(0,200,100,0.12))", padding: "1px 6px", borderRadius: 4 }}>
@@ -389,7 +389,7 @@ export function AddVmWizard(props: {
                               </span>
                             ) : null}
                           </div>
-                          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{intl.formatMessage({ id: svc.descKey })}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.3 }}>{intl.formatMessage({ id: svc.descKey })}</div>
                         </div>
                       </label>
                     );

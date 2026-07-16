@@ -140,6 +140,7 @@
     "running": "Running…",
     "startWizard": "Start wizard",
     "mainInvalidTarget": "Invalid target \"{target}\". Use user@host format or a known SSH alias.",
+    "mainAlreadyExists": "Environment \"{name}\" is already connected to this target. Remove it first or select it from the sidebar.",
     "mainWizardCancelled": "Wizard cancelled.",
     "mainProbing": "Probing {label}…",
     "mainProbeComplete": "Probe complete.",

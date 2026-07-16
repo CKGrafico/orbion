@@ -4,7 +4,7 @@ import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
 import { openTunnel, findExistingTunnel } from "./ssh-tunnel.js";
-import { addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded } from "./config-store.js";
+import { getEnvironments, addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded } from "./config-store.js";
 import { msg } from "./i18n.js";
 
 let wizardCancelled = false;
@@ -119,6 +119,20 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   }
 
   const envName = name ?? host.hostName ?? host.host;
+
+  // Duplicate guard: reject if an environment with the same SSH target already exists
+  const existingEnvs = getEnvironments();
+  const duplicateBySshTarget = existingEnvs.find((e) =>
+    e.endpoints.some((ep) => ep.sshTarget === host!.label)
+  );
+  if (duplicateBySshTarget) {
+    emitProgress({
+      step: "error",
+      message: msg("vmWizard.mainAlreadyExists", { name: duplicateBySshTarget.name }),
+      probe: null,
+    });
+    throw new Error("vmWizard.mainAlreadyExists");
+  }
 
   // Step 1: Probe
   emitProgress({ step: "probing", message: msg("vmWizard.mainProbing", { label: host.label }) });
