@@ -135,6 +135,8 @@
     "confirmServices": "Continue",
     "setAsMain": "Set as main VM",
     "setAsMainDesc": "Use this environment for the AI chat assistant. Changing the main VM may lose the previous chat context.",
+    "setAsMainFirstDesc": "This is your first environment, so it will be set as the main VM automatically.",
+    "firstEnvMainBadge": "Required",
     "securityNote": "Make sure you can SSH into the target. We recommend using Tailscale or a private network. Never expose your environments to the public internet.",
     "sshConfigHosts": "SSH config hosts",
     "nodeNotFound": "Node: not found",

@@ -133,6 +133,13 @@ export function AddVmWizard(props: {
   const isPickServices = currentStep === "pick-services";
   const isInstalling = currentStep === "installing";
   const [setAsMain, setSetAsMain] = useState(true);
+  const [envCount, setEnvCount] = useState(0);
+
+  useEffect(() => {
+    if (!window.api) return;
+    void window.api.config.getEnvironments().then((envs) => setEnvCount(envs.length));
+  }, []);
+  const isFirstEnv = envCount === 0;
 
   function serviceStatusIcon(status: VmWizardServiceStatus): React.ReactNode {
     switch (status) {
@@ -491,19 +498,27 @@ export function AddVmWizard(props: {
 
         {isDone && doneResult ? (
           <div style={{ marginTop: 12, padding: 12, background: "var(--bg-log)", borderRadius: 8, border: "1px solid var(--bg-active)" }}>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: isFirstEnv ? "default" : "pointer", opacity: isFirstEnv ? 0.7 : 1 }}>
               <input
                 type="checkbox"
                 checked={setAsMain}
+                disabled={isFirstEnv}
                 onChange={(e) => setSetAsMain(e.target.checked)}
                 style={{ marginTop: 2 }}
               />
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
                   {intl.formatMessage({ id: "vmWizard.setAsMain" })}
+                  {isFirstEnv ? (
+                    <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--accent-bg, rgba(0,200,100,0.12))", padding: "1px 6px", borderRadius: 4 }}>
+                      {intl.formatMessage({ id: "vmWizard.firstEnvMainBadge" })}
+                    </span>
+                  ) : null}
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.4 }}>
-                  {intl.formatMessage({ id: "vmWizard.setAsMainDesc" })}
+                  {isFirstEnv
+                    ? intl.formatMessage({ id: "vmWizard.setAsMainFirstDesc" })
+                    : intl.formatMessage({ id: "vmWizard.setAsMainDesc" })}
                 </div>
               </div>
             </label>
