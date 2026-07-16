@@ -1,12 +1,26 @@
 import crypto from "node:crypto";
 import type { SshHost, VmWizardLaunchResult } from "../shared/ipc.js";
 import { sshExec } from "./ssh-probe.js";
+import { validateSshHost } from "./ssh-config.js";
 import { msg } from "./i18n.js";
 
 const DEFAULT_DAEMON_PORT = 8845;
 const DEFAULT_OPENCODE_PORT = 13284;
 
+// ─── Shell-safe helpers ──────────────────────────────────────────────
+
+/**
+ * Assert that a port number is a valid TCP port (1–65535).
+ * Throws if the value is out of range or not a safe integer.
+ */
+function assertSafePort(port: number, name: string): void {
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid ${name}: ${port}`);
+  }
+}
+
 function hashForHost(host: SshHost): string {
+  validateSshHost(host);
   return crypto.createHash("sha256").update(`${host.user}@${host.hostName}:${host.port}`).digest("hex").slice(0, 12);
 }
 
@@ -303,9 +317,21 @@ export async function launchOnVm(
     ripgrepStatus: "pending",
   };
 
+  // Validate host fields before using them in any command construction
+  try {
+    validateSshHost(host);
+  } catch {
+    result.errorDetail = msg("vmWizard.mainInvalidTarget", { target: host.label });
+    return result;
+  }
+
   const hash = hashForHost(host);
   const daemonPort = probeResult.daemonPort ?? DEFAULT_DAEMON_PORT;
   const opencodePort = probeResult.opencodePort ?? DEFAULT_OPENCODE_PORT;
+
+  // Validate port numbers before substituting into scripts
+  assertSafePort(daemonPort, "daemonPort");
+  assertSafePort(opencodePort, "opencodePort");
 
   if (probeResult.daemonRunning && probeResult.daemonPort) {
     result.started = true;
@@ -411,7 +437,18 @@ export async function launchOnVm(
 }
 
 export async function createPairingCodeOnRemote(host: SshHost, daemonPort: number): Promise<string | null> {
-  const script = `curl -s http://127.0.0.1:${daemonPort}/api/pair/create 2>/dev/null || echo "PAIR_CREATE_FAILED"`;
+  // Validate inputs before constructing any shell command
+  try {
+    validateSshHost(host);
+  } catch {
+    return null;
+  }
+  assertSafePort(daemonPort, "daemonPort");
+
+  // Use shell-escaped port interpolation to prevent injection.
+  // daemonPort is validated as a safe integer 1–65535 above, so
+  // String(daemonPort) can only contain digits.
+  const script = `curl -s http://127.0.0.1:${String(daemonPort)}/api/pair/create 2>/dev/null || echo "PAIR_CREATE_FAILED"`;
   const result = await sshExec(host, script);
 
   if (result.code !== 0) return null;
@@ -426,6 +463,11 @@ export async function createPairingCodeOnRemote(host: SshHost, daemonPort: numbe
 }
 
 export async function readRemoteLog(host: SshHost, hash: string): Promise<string | null> {
+  try {
+    validateSshHost(host);
+  } catch {
+    return null;
+  }
   const script = TAIL_LOG_SCRIPT.replace(/__HASH__/g, hash);
   const result = await sshExec(host, script);
   return result.stdout.trim() || null;

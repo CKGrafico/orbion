@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { SshHost, VmWizardTunnelResult } from "../shared/ipc.js";
+import { validateSshHost } from "./ssh-config.js";
 import { msg } from "./i18n.js";
 
 const TUNNEL_CONNECT_TIMEOUT_MS = 15_000;
@@ -18,6 +19,17 @@ export function openTunnel(
   localPort: number,
   remotePort: number,
 ): Promise<VmWizardTunnelResult> {
+  // Validate host fields before constructing SSH arguments
+  try {
+    validateSshHost(host);
+  } catch {
+    return Promise.resolve({
+      forwarded: false,
+      localPort: null,
+      errorDetail: msg("vmWizard.mainTunnelStartFailed", { detail: "Invalid SSH host parameters" }),
+    });
+  }
+
   const tunnelId = `${host.user}@${host.hostName}:${remotePort}`;
 
   const existing = activeTunnels.get(tunnelId);

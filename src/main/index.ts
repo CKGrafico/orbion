@@ -505,6 +505,18 @@ app.whenReady().then(() => {
   ipcMain.handle("vmWizard:listSshHosts", () => vmListSshHosts());
 
   ipcMain.handle("vmWizard:start", async (_event, target: string, name?: string) => {
+    // Early validation at the IPC boundary: reject obviously malicious
+    // target strings before they reach any SSH command construction.
+    // parseTarget already validates individual fields, but this guard
+    // prevents obviously invalid input from even starting the wizard.
+    if (typeof target !== "string" || target.length === 0 || target.length > 512) {
+      throw new Error("vmWizard.mainInvalidTarget");
+    }
+    // Reject if target contains characters that should never appear in
+    // SSH host identifiers (shell metacharacters, control characters, etc.)
+    if (/[\x00-\x1f`$\\;"'&|<>(){}!\n\r]/.test(target)) {
+      throw new Error("vmWizard.mainInvalidTarget");
+    }
     return runWizard(target, name);
   });
 
