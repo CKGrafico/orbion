@@ -1,5 +1,5 @@
 import { BrowserWindow } from "electron";
-import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, I18nMessage } from "../shared/ipc.js";
+import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage } from "../shared/ipc.js";
 import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
@@ -9,6 +9,7 @@ import { msg } from "./i18n.js";
 
 let wizardCancelled = false;
 let consentResolver: ((decision: "install" | "skip") => void) | null = null;
+let serviceSelectionResolver: ((selection: VmWizardServiceSelection) => void) | null = null;
 
 export function cancelWizard(): void {
   wizardCancelled = true;
@@ -21,12 +22,20 @@ export function isWizardCancelled(): boolean {
 export function resetWizardState(): void {
   wizardCancelled = false;
   consentResolver = null;
+  serviceSelectionResolver = null;
 }
 
 export function respondConsent(decision: "install" | "skip"): void {
   if (consentResolver) {
     consentResolver(decision);
     consentResolver = null;
+  }
+}
+
+export function respondServiceSelection(selection: VmWizardServiceSelection): void {
+  if (serviceSelectionResolver) {
+    serviceSelectionResolver(selection);
+    serviceSelectionResolver = null;
   }
 }
 
@@ -37,6 +46,26 @@ function emitProgress(progress: VmWizardProgress): void {
   if (win && !win.isDestroyed()) {
     win.webContents.send("vmWizard:progress", progress);
   }
+}
+
+async function askServiceSelection(probe: VmWizardProbeResult): Promise<VmWizardServiceSelection> {
+  const defaultSelection: VmWizardServiceSelection = {
+    installLoopTask: !probe.daemonRunning,
+    installOpenCode: !probe.opencodeRunning,
+  };
+  emitProgress({
+    step: "pick-services",
+    message: msg("vmWizard.stepPickServices"),
+    probe,
+    serviceSelection: defaultSelection,
+  });
+
+  const selection = await new Promise<VmWizardServiceSelection>((resolve) => {
+    serviceSelectionResolver = resolve;
+  });
+
+  if (wizardCancelled) throw new Error("vmWizard.mainCancelled");
+  return selection;
 }
 
 async function askConsent(
@@ -219,7 +248,15 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe: reprobe });
   }
 
-  // Step 2: Install / Start
+  // Step 2: Pick services
+  if (wizardCancelled) {
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    throw new Error("vmWizard.mainCancelled");
+  }
+
+  const serviceSelection = await askServiceSelection(probe);
+
+  // Step 3: Install / Start
   if (wizardCancelled) {
     emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
     throw new Error("vmWizard.mainCancelled");
@@ -232,6 +269,8 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     daemonPort: probe.daemonPort,
     opencodeRunning: probe.opencodeRunning,
     opencodePort: probe.opencodePort,
+    installLoopTask: serviceSelection.installLoopTask,
+    installOpenCode: serviceSelection.installOpenCode,
   });
 
   emitProgress({ step: "installing", message: msg("vmWizard.mainServicesReady"), probe, launch });
