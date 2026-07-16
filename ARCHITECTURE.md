@@ -34,11 +34,16 @@ orbion/
 │   ├── main/
 │   │   ├── index.ts            # Electron main: window lifecycle, IPC handlers,
 │   │   │                       #   HTTP proxy, SSE client, bounds persistence
-│   │   └── config-store.ts     # electron-store config + safeStorage wrapper
+│   │   ├── http-utils.ts       # Shared fetch + envelope unwrapping (fetchAndUnwrap)
+│   │   ├── config-store.ts     # electron-store config + safeStorage wrapper
+│   │   ├── connection-supervisor.ts  # Periodic health probes + SSE reconnect
+│   │   ├── opencode-client.ts  # OpenCode server status + version checks
+│   │   └── ssh-probe.ts        # SSH-based VM probing + Node/mise installation
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
 │   ├── shared/
-│   │   └── ipc.ts              # IPC contract shared by main/preload/renderer
+│   │   ├── ipc.ts              # IPC contract shared by main/preload/renderer
+│   │   └── utils.ts            # Pure utilities: compareSemver, trimTrailingSlash
 │   └── renderer/
 │       ├── index.html          # Renderer HTML entry
 │       └── src/

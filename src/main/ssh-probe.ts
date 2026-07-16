@@ -1,20 +1,10 @@
 import { execFile } from "node:child_process";
 import type { SshHost, VmWizardProbeResult, I18nMessage } from "../shared/ipc.js";
+import { compareSemver } from "../shared/utils.js";
 import { buildSshArgs } from "./ssh-config.js";
 import { msg } from "./i18n.js";
 
 const NODE_VERSION_FLOOR = "18.0.0";
-
-function compareSemver(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(".").map(Number);
-  const pb = b.replace(/^v/, "").split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    const na = pa[i] ?? 0;
-    const nb = pb[i] ?? 0;
-    if (na !== nb) return na - nb;
-  }
-  return 0;
-}
 
 function sshExec(host: SshHost, command: string, timeout = 30_000): Promise<{ stdout: string; stderr: string; code: number }> {
   const args = buildSshArgs(host, command);

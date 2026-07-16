@@ -1,7 +1,8 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
 import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage } from "../shared/ipc.js";
-import { msg } from "./i18n.js";
+import { trimTrailingSlash } from "../shared/utils.js";
+import { fetchAndUnwrap } from "./http-utils.js";
 
 interface LegacyInstance {
   id: string;
@@ -160,7 +161,7 @@ function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct
   const endpoint: AccessEndpoint = {
     id: endpointId,
     kind,
-    url: url.trim().replace(/\/+$/, ""),
+    url: trimTrailingSlash(url.trim()),
     sshTarget: sshTarget ?? null,
     lastError: null,
     failureCount: 0,
@@ -193,7 +194,7 @@ function _addEndpoint(environmentId: string, url: string, kind: EndpointKind): A
   const endpoint: AccessEndpoint = {
     id: crypto.randomUUID().slice(0, 8),
     kind,
-    url: url.trim().replace(/\/+$/, ""),
+    url: trimTrailingSlash(url.trim()),
     lastError: null,
     failureCount: 0,
   };
@@ -441,46 +442,32 @@ export async function exchangePairingCode(
   code: string,
   scope: SessionScope = "read-only",
 ): Promise<PairingCodeExchangeResponse> {
-  try {
-    const url = `${baseUrl.replace(/\/+$/, "")}/api/pair/exchange`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    const res = await fetch(url, {
+  const result = await fetchAndUnwrap<{ accessToken: string; scope?: SessionScope; expiresAt?: number | null }>(
+    `${trimTrailingSlash(baseUrl)}/api/pair/exchange`,
+    {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, scope }),
-      signal: controller.signal,
-    });
+      body: { code, scope },
+      timeoutMs: 10_000,
+      validateJson: (data) => {
+        if (typeof data === "object" && data !== null && "accessToken" in data) {
+          return data;
+        }
+        return null;
+      },
+      errorKey: "vmWizard.mainInvalidPairingResponse",
+    },
+  );
 
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      let errorMsg = `HTTP ${res.status}`;
-      try {
-        const parsed = JSON.parse(body) as { error?: { message?: string } };
-        if (parsed.error?.message) errorMsg = parsed.error.message;
-      } catch { /* use default */ }
-      return { ok: false, error: errorMsg };
-    }
-
-    const data = await res.json() as unknown;
-    if (typeof data !== "object" || data === null || !("accessToken" in data)) {
-      return { ok: false, error: msg("vmWizard.mainInvalidPairingResponse") };
-    }
-
-    const response = data as { accessToken: string; scope?: SessionScope; expiresAt?: number | null };
+  if (result.ok) {
     const token: SessionToken = {
-      accessToken: response.accessToken,
-      scope: response.scope ?? scope,
-      expiresAt: response.expiresAt ?? null,
+      accessToken: result.data.accessToken,
+      scope: result.data.scope ?? scope,
+      expiresAt: result.data.expiresAt ?? null,
     };
     return { ok: true, token };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: message };
   }
+
+  return { ok: false, error: result.error };
 }
 
 export function encryptValue(plaintext: string): string | null {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { Environment, OpenCodeEndpoint, AccessEndpoint } from "./types";
 import type { EndpointKind } from "../../shared/ipc";
+import { trimTrailingSlash } from "../../shared/utils";
 import type { IConfigService } from "./services/interfaces";
 
 export function useEnvironments(): {
@@ -57,7 +58,7 @@ export function useEnvironments(): {
   );
 
   const add = useCallback(async (name: string, baseUrl: string, kind?: EndpointKind): Promise<Environment> => {
-    const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
+    const trimmedUrl = trimTrailingSlash(baseUrl.trim());
     const env = await configService.addEnvironment(name, trimmedUrl, kind);
     setEnvironments(await configService.getEnvironments());
     return env;
@@ -111,7 +112,7 @@ export function useEnvironments(): {
 
   const setOpenCodeEndpointFn = useCallback(
     (environmentId: string, url: string, password: string | null) => {
-      const endpoint: OpenCodeEndpoint = { url: url.trim().replace(/\/+$/, ""), password };
+      const endpoint: OpenCodeEndpoint = { url: trimTrailingSlash(url.trim()), password };
       void configService.setOpenCodeEndpoint(environmentId, endpoint).then(async (result) => {
         if (result.ok) {
           setEnvironments(await configService.getEnvironments());

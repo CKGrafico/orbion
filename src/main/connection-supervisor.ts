@@ -1,5 +1,7 @@
 import type { AccessEndpoint, EndpointHealth, I18nMessage } from "../shared/ipc.js";
+import { trimTrailingSlash } from "../shared/utils.js";
 import { getSessionToken, setEnvironmentAuthState, removeSessionToken } from "./config-store.js";
+import { fetchAndUnwrap } from "./http-utils.js";
 import { msg } from "./i18n.js";
 
 export type ConnectionPhase =
@@ -293,63 +295,28 @@ export class ConnectionSupervisor {
 
 export function makeProbe(baseUrl: string, environmentId?: string): () => Promise<ProbeResult> {
   return async (): Promise<ProbeResult> => {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-
-      const headers: Record<string, string> = {};
-      if (environmentId) {
-        const token = getSessionToken(environmentId);
-        if (token) headers["Authorization"] = `Bearer ${token.accessToken}`;
-      }
-
-      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/api/loops`, {
-        method: "GET",
-        signal: controller.signal,
-        headers,
-      });
-
-      clearTimeout(timeout);
-
-      if (res.status === 401 && environmentId) {
-        await removeSessionToken(environmentId);
-        await setEnvironmentAuthState(environmentId, "blocked");
-      }
-
-      if (!res.ok) {
-        return { ok: false, status: res.status, error: msg("vmWizard.mainHttpError", { status: res.status }) };
-      }
-
-      const text = await res.text();
-      let parsed: unknown = text;
-      try {
-        parsed = text ? JSON.parse(text) : null;
-      } catch {
-        // keep raw text
-      }
-
-      if (parsed && typeof parsed === "object" && "ok" in parsed) {
-        const envelope = parsed as { ok: boolean; error?: { message?: string } };
-        if (envelope.ok) {
-          return { ok: true, status: res.status, error: null };
-        }
-        return {
-          ok: false,
-          status: res.status,
-          error: envelope.error?.message ?? msg("vmWizard.mainHttpError", { status: res.status }),
-        };
-      }
-
-      return { ok: true, status: res.status, error: null };
-    } catch (err) {
-      const message =
-        err instanceof Error && err.name === "AbortError"
-          ? msg("vmWizard.mainRequestTimedOut")
-          : err instanceof Error
-            ? err.message
-            : String(err);
-      return { ok: false, status: 0, error: message };
+    const headers: Record<string, string> = {};
+    if (environmentId) {
+      const token = getSessionToken(environmentId);
+      if (token) headers["Authorization"] = `Bearer ${token.accessToken}`;
     }
+
+    const result = await fetchAndUnwrap(`${trimTrailingSlash(baseUrl)}/api/loops`, {
+      method: "GET",
+      headers,
+      timeoutMs: PROBE_TIMEOUT_MS,
+      onUnauthorized: environmentId
+        ? async () => {
+            await removeSessionToken(environmentId);
+            await setEnvironmentAuthState(environmentId, "blocked");
+          }
+        : undefined,
+    });
+
+    if (result.ok) {
+      return { ok: true, status: result.status, error: null };
+    }
+    return { ok: false, status: result.status, error: result.error };
   };
 }
 
@@ -363,28 +330,23 @@ export interface EnvironmentFingerprint {
 }
 
 export async function fetchFingerprint(baseUrl: string): Promise<EnvironmentFingerprint | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FINGERPRINT_TIMEOUT_MS);
-
-    const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/.well-known/orbion/environment`, {
+  const result = await fetchAndUnwrap<EnvironmentFingerprint>(
+    `${trimTrailingSlash(baseUrl)}/.well-known/orbion/environment`,
+    {
       method: "GET",
-      signal: controller.signal,
       headers: { Accept: "application/json" },
-    });
+      timeoutMs: FINGERPRINT_TIMEOUT_MS,
+      validateJson: (data) => {
+        if (typeof data === "object" && data !== null && "id" in data && "label" in data) {
+          return data;
+        }
+        return null;
+      },
+    },
+  );
 
-    clearTimeout(timeout);
-
-    if (!res.ok) return null;
-
-    const data = await res.json() as unknown;
-    if (typeof data === "object" && data !== null && "id" in data && "label" in data) {
-      return data as EnvironmentFingerprint;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  if (result.ok) return result.data;
+  return null;
 }
 
 export function resolveActiveUrl(endpoints: AccessEndpoint[], activeEndpointId: string | null): string | null {

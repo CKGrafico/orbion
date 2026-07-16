@@ -13,6 +13,8 @@ import type {
   InfraActionResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
+import { trimTrailingSlash } from "../shared/utils.js";
+import { fetchAndUnwrap } from "./http-utils.js";
 import {
   getEnvironments,
   addEnvironment,
@@ -48,8 +50,6 @@ import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from ".
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
 import { validateIpc } from "./ipc-validation.js";
-
-const DEFAULT_TIMEOUT_MS = 10_000;
 
 const streams = new Map<string, AbortController>();
 
@@ -137,15 +137,15 @@ function isAllowedBaseUrl(baseUrl: string): boolean {
 }
 
 function joinUrl(baseUrl: string, apiPath: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}${apiPath.startsWith("/") ? "" : "/"}${apiPath}`;
+  return `${trimTrailingSlash(baseUrl)}${apiPath.startsWith("/") ? "" : "/"}${apiPath}`;
 }
 
 function findEnvironmentIdByUrl(baseUrl: string): string | null {
-  const normalized = baseUrl.trim().replace(/\/+$/, "");
+  const normalized = trimTrailingSlash(baseUrl.trim());
   const envs = getEnvironments();
   for (const env of envs) {
     for (const ep of env.endpoints) {
-      if (ep.url.trim().replace(/\/+$/, "") === normalized) return env.id;
+      if (trimTrailingSlash(ep.url.trim()) === normalized) return env.id;
     }
   }
   return null;
@@ -159,57 +159,24 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
     return { ok: false, status: 0, error: "Invalid API path" };
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), args.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-
   const envId = findEnvironmentIdByUrl(args.baseUrl);
   const token = envId ? getSessionToken(envId) : null;
 
-  try {
-    const headers: Record<string, string> = {};
-    if (args.body !== undefined) headers["Content-Type"] = "application/json";
-    if (token) headers["Authorization"] = `Bearer ${token.accessToken}`;
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token.accessToken}`;
 
-    const res = await fetch(joinUrl(args.baseUrl, args.path), {
-      method: args.method ?? "GET",
-      headers,
-      body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
-      signal: controller.signal,
-    });
-
-    if (res.status === 401 && envId) {
-      await removeSessionToken(envId);
-      await setEnvironmentAuthState(envId, "blocked");
-    }
-
-    const text = await res.text();
-    let parsed: unknown = text;
-    try {
-      parsed = text ? JSON.parse(text) : null;
-    } catch {
-      // keep raw text for non-JSON responses
-    }
-
-    if (parsed && typeof parsed === "object" && "ok" in parsed) {
-      const envelope = parsed as { ok: boolean; data?: unknown; error?: { message?: string } };
-      if (envelope.ok) {
-        return { ok: true, status: res.status, data: envelope.data };
-      }
-      return { ok: false, status: res.status, error: envelope.error?.message ?? msg("vmWizard.mainHttpError", { status: res.status }) };
-    }
-
-    if (!res.ok) {
-      return { ok: false, status: res.status, error: msg("vmWizard.mainHttpError", { status: res.status }) };
-    }
-    return { ok: true, status: res.status, data: parsed };
-  } catch (err) {
-    const message = err instanceof Error && err.name === "AbortError"
-      ? msg("vmWizard.mainRequestTimedOut")
-      : err instanceof Error ? err.message : String(err);
-    return { ok: false, status: 0, error: message };
-  } finally {
-    clearTimeout(timeout);
-  }
+  return fetchAndUnwrap(joinUrl(args.baseUrl, args.path), {
+    method: args.method,
+    headers,
+    body: args.body,
+    timeoutMs: args.timeoutMs,
+    onUnauthorized: envId
+      ? async () => {
+          await removeSessionToken(envId);
+          await setEnvironmentAuthState(envId, "blocked");
+        }
+      : undefined,
+  });
 }
 
 async function handleStreamSubscribe(

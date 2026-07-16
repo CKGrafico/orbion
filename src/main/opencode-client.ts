@@ -3,6 +3,7 @@ import type {
   OpenCodeConnectionStatus,
   OpenCodeEndpoint,
 } from "../shared/ipc.js";
+import { compareSemver, trimTrailingSlash } from "../shared/utils.js";
 import { BrowserWindow } from "electron";
 import { msg } from "./i18n.js";
 import { decryptValue } from "./config-store.js";
@@ -25,19 +26,8 @@ function emptyStatus(): OpenCodeConnectionStatus {
   };
 }
 
-function compareSemver(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(".").map(Number);
-  const pb = b.replace(/^v/, "").split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    const na = pa[i] ?? 0;
-    const nb = pb[i] ?? 0;
-    if (na !== nb) return na - nb;
-  }
-  return 0;
-}
-
 function makeClient(endpoint: OpenCodeEndpoint): OpencodeClient {
-  const baseUrl = endpoint.url.trim().replace(/\/+$/, "");
+  const baseUrl = trimTrailingSlash(endpoint.url.trim());
   const headers: Record<string, string> = {};
 
   if (endpoint.password) {
