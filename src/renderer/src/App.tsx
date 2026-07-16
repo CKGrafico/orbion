@@ -13,13 +13,15 @@ import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
 import { PanelLeft, Search, ArrowLeft, RotateCw, X, Star } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
-import { InfraChatPanel } from "./components/InfraChatPanel";
 import { AddVmWizard } from "./components/AddVmWizard";
 import { LoopDetail } from "./components/LoopDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
 import { ProjectsView } from "./components/ProjectsView";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
+import { cid, useInject } from "inversify-hooks";
+import type { IConnectionService, IOpenCodeService, IConfigService } from "./services/interfaces";
+import { fetchLoops, fetchSettings, isMock } from "./api";
 
 type View = { kind: "list" } | { kind: "loop"; loopId: string };
 
@@ -56,6 +58,9 @@ function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHeal
 export function App(): React.ReactNode {
   const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
   const intl = useIntl();
+  const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
+  const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
@@ -69,14 +74,7 @@ export function App(): React.ReactNode {
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
-  const [mutedEnvs, setMutedEnvs] = useState<Set<string>>(() => {
-    if (window.api) return new Set<string>();
-    try {
-      const raw = localStorage.getItem("orbion.muted.v1");
-      if (raw) return new Set(JSON.parse(raw) as string[]);
-    } catch { /* empty */ }
-    return new Set<string>();
-  });
+  const [mutedEnvs, setMutedEnvs] = useState<Set<string>>(new Set<string>());
   const [perEnvLoops, setPerEnvLoops] = useState<Record<string, LoopMeta[]>>({});
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const filterRef = useRef<HTMLInputElement | null>(null);
@@ -93,16 +91,6 @@ export function App(): React.ReactNode {
           setView({ kind: "list" });
         }
       });
-      if (!window.api) {
-        try {
-          const raw = localStorage.getItem("orbion.muted.v1");
-          if (raw) {
-            for (const id of JSON.parse(raw) as string[]) {
-              bridge.setMuted(id, true);
-            }
-          }
-        } catch { /* empty */ }
-      }
       return bridge;
     },
     [select],
@@ -111,9 +99,7 @@ export function App(): React.ReactNode {
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (!window.api) return;
-
-    const unsub = window.api.connection.onStatusChange(
+    const unsub = connectionService.onStatusChange(
       (environmentId: string, status: ConnectionStatus) => {
         const h = phaseToHealth(status.phase);
         setHealth((prev) => (prev[environmentId] === h ? prev : { ...prev, [environmentId]: h }));
@@ -123,12 +109,10 @@ export function App(): React.ReactNode {
       },
     );
     return unsub;
-  }, []);
+  }, [connectionService]);
 
   useEffect(() => {
-    if (!window.api) return;
-
-    const unsub = window.api.connection.onEndpointHealthChange(
+    const unsub = connectionService.onEndpointHealthChange(
       (environmentId: string, health: EndpointHealth[]) => {
         setEndpointHealth((prev) => {
           const existing = prev[environmentId];
@@ -140,12 +124,10 @@ export function App(): React.ReactNode {
       },
     );
     return unsub;
-  }, []);
+  }, [connectionService]);
 
   useEffect(() => {
-    if (!window.api) return;
-
-    const unsub = window.api.opencode.onStatusChange(
+    const unsub = openCodeService.onStatusChange(
       (environmentId: string, status: OpenCodeConnectionStatus) => {
         setOpenCodeStatus((prev) =>
           prev[environmentId] === status ? prev : { ...prev, [environmentId]: status },
@@ -153,48 +135,15 @@ export function App(): React.ReactNode {
       },
     );
     return unsub;
-  }, []);
+  }, [openCodeService]);
 
   useEffect(() => {
-    if (window.api || environments.length === 0) return;
-    let cancelled = false;
-
-    const check = async (): Promise<void> => {
-      for (const env of environments) {
-        try {
-          const res = await fetchLoops(env);
-          if (cancelled) return;
-          const h: EnvironmentHealth = res.ok ? "ok" : "offline";
-          setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
-          if (res.ok && Array.isArray(res.data)) {
-            setPerEnvLoops((prev) => {
-              if (prev[env.id] === res.data) return prev;
-              return { ...prev, [env.id]: res.data };
-            });
-          }
-        } catch {
-          if (!cancelled) {
-            setHealth((prev) => (prev[env.id] === "offline" ? prev : { ...prev, [env.id]: "offline" }));
-          }
-        }
-      }
-    };
-
-    void check();
-    const timer = setInterval(() => void check(), 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [environments]);
-
-  useEffect(() => {
-    if (!window.api || environments.length === 0) return;
+    if (isMock || environments.length === 0) return;
     let cancelled = false;
 
     const fetchAll = async (): Promise<void> => {
       for (const env of environments) {
-        const status = await window.api!.connection.getStatus(env.id);
+        const status = await connectionService.getStatus(env.id);
         if (cancelled || !status) return;
         const h = phaseToHealth(status.phase);
         setHealth((prev) => (prev[env.id] === h ? prev : { ...prev, [env.id]: h }));
@@ -207,7 +156,7 @@ export function App(): React.ReactNode {
     const fetchOpenCode = async (): Promise<void> => {
       for (const env of environments) {
         if (!env.opencode) continue;
-        const status = await window.api!.opencode.getStatus(env.id);
+        const status = await openCodeService.getStatus(env.id);
         if (cancelled) return;
         setOpenCodeStatus((prev) =>
           prev[env.id] === status ? prev : { ...prev, [env.id]: status },
@@ -218,13 +167,11 @@ export function App(): React.ReactNode {
     void fetchAll();
     void fetchOpenCode();
     return () => { cancelled = true; };
-  }, [environments]);
+  }, [environments, connectionService, openCodeService]);
 
   useEffect(() => {
-    if (!window.api) return;
-
     const report = (): void => {
-      window.api!.connection.notifyNetworkChanged(navigator.onLine);
+      connectionService.notifyNetworkChanged(navigator.onLine);
     };
 
     window.addEventListener("online", report);
@@ -235,7 +182,7 @@ export function App(): React.ReactNode {
       window.removeEventListener("online", report);
       window.removeEventListener("offline", report);
     };
-  }, []);
+  }, [connectionService]);
 
   const fleetStatus = useMemo<Record<string, FleetItemStatus>>(() => {
     const result: Record<string, FleetItemStatus> = {};
@@ -290,9 +237,6 @@ export function App(): React.ReactNode {
       const next = new Set(prev);
       if (next.has(environmentId)) next.delete(environmentId);
       else next.add(environmentId);
-      if (!window.api) {
-        localStorage.setItem("orbion.muted.v1", JSON.stringify([...next]));
-      }
       notificationBridge.setMuted(environmentId, next.has(environmentId));
       return next;
     });
@@ -349,10 +293,8 @@ export function App(): React.ReactNode {
   };
 
   const handleRetry = useCallback((id: string): void => {
-    if (window.api) {
-      void window.api.connection.retry(id);
-    }
-  }, []);
+    void connectionService.retry(id);
+  }, [connectionService]);
 
   const handleRemove = (id: string): void => {
     const env = environments.find((e) => e.id === id);
@@ -573,9 +515,7 @@ export function App(): React.ReactNode {
             )}
           </div>
 
-          {selected && !inDetail && mainVm ? (
-            <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
-          ) : selected && !inDetail && !mainVm ? (
+          {selected && !inDetail ? (
             <div className="prompt-bar">
               <div className="prompt-box">
                 <input

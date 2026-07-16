@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
+import { cid, useInject } from "inversify-hooks";
 import type { SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../shared/ipc";
 import { ShieldCheck, X, Check, Loader, SkipForward, Lock } from "lucide-react";
 import { translateMessage } from "../i18n";
+import type { IVmWizardService, IConfigService } from "../services/interfaces";
 
 const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   idle: "",
@@ -43,6 +45,8 @@ export function AddVmWizard(props: {
 }): React.ReactNode {
   const { onDone, onCancel } = props;
   const intl = useIntl();
+  const [vmWizardService] = useInject<IVmWizardService>(cid.IVmWizardService);
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
 
   const [target, setTarget] = useState("");
   const [envName, setEnvName] = useState("");
@@ -66,9 +70,8 @@ export function AddVmWizard(props: {
   });
 
   useEffect(() => {
-    if (!window.api) return;
     let cancelled = false;
-    void window.api.vmWizard.listSshHosts().then((h: SshHost[]) => {
+    void vmWizardService.listSshHosts().then((h: SshHost[]) => {
       if (cancelled) return;
       setHosts(h);
       setHostsLoaded(true);
@@ -77,11 +80,10 @@ export function AddVmWizard(props: {
       setHostsLoaded(true);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [vmWizardService]);
 
   useEffect(() => {
-    if (!window.api) return;
-    const unsub = window.api.vmWizard.onProgress((p: VmWizardProgress) => {
+    const unsub = vmWizardService.onProgress((p: VmWizardProgress) => {
       setProgress(p);
       if (p.serviceSelection) setServiceSelection(p.serviceSelection);
       if (p.step === "done" || p.step === "error") {
@@ -89,7 +91,7 @@ export function AddVmWizard(props: {
       }
     });
     return unsub;
-  }, []);
+  }, [vmWizardService]);
 
   const startWizard = async (): Promise<void> => {
     const trimmed = target.trim();
@@ -99,7 +101,7 @@ export function AddVmWizard(props: {
     setProgress(null);
 
     try {
-      const result = await window.api!.vmWizard.startWizard(trimmed, envName.trim() || undefined);
+      const result = await vmWizardService.startWizard(trimmed, envName.trim() || undefined);
       setDoneResult(result);
     } catch {
       // progress already set via onProgress
@@ -112,16 +114,16 @@ export function AddVmWizard(props: {
   };
 
   const handleCancel = (): void => {
-    if (running && window.api) {
-      void window.api.vmWizard.cancelWizard();
+    if (running) {
+      vmWizardService.cancelWizard();
     }
     onCancel();
   };
 
   const handleDoneFinal = (): void => {
     if (!doneResult) return;
-    if (setAsMain && window.api) {
-      void window.api.config.setMainVm(doneResult.environmentId);
+    if (setAsMain) {
+      void configService.setMainVm(doneResult.environmentId);
     }
     onDone(doneResult.environmentId, doneResult.environmentName, doneResult.daemonUrl);
   };
@@ -136,9 +138,8 @@ export function AddVmWizard(props: {
   const [envCount, setEnvCount] = useState(0);
 
   useEffect(() => {
-    if (!window.api) return;
-    void window.api.config.getEnvironments().then((envs) => setEnvCount(envs.length));
-  }, []);
+    void configService.getEnvironments().then((envs) => setEnvCount(envs.length));
+  }, [configService]);
   const isFirstEnv = envCount === 0;
 
   function serviceStatusIcon(status: VmWizardServiceStatus): React.ReactNode {
@@ -482,13 +483,13 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 className="btn primary"
-                onClick={() => window.api?.vmWizard.respondConsent("install")}
+                onClick={() => vmWizardService.respondConsent("install")}
               >
                 {intl.formatMessage({ id: "vmWizard.installViaMise" })}
               </button>
               <button
                 className="btn"
-                onClick={() => window.api?.vmWizard.respondConsent("skip")}
+                onClick={() => vmWizardService.respondConsent("skip")}
               >
                 {intl.formatMessage({ id: "vmWizard.skip" })}
               </button>
@@ -532,7 +533,7 @@ export function AddVmWizard(props: {
           {isPickServices ? (
             <button
               className="btn primary"
-              onClick={() => window.api?.vmWizard.respondServiceSelection(serviceSelection)}
+              onClick={() => vmWizardService.respondServiceSelection(serviceSelection)}
             >
               {intl.formatMessage({ id: "vmWizard.confirmServices" })}
             </button>
