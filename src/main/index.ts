@@ -343,6 +343,7 @@ function createWindow(): void {
   win.once("ready-to-show", () => {
     if (saved.maximized) win.maximize();
     win.show();
+    seedSupervisors();
   });
 
   let saveTimer: NodeJS.Timeout | null = null;
@@ -608,7 +609,6 @@ app.whenReady().then(() => {
     return { mainVmId, connected };
   });
 
-  seedSupervisors();
   createWindow();
 
   app.on("activate", () => {
