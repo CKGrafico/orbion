@@ -26,6 +26,7 @@ export function useEnvironments(): {
   removeSessionToken: (environmentId: string) => void;
   setOpenCodeEndpoint: (environmentId: string, url: string, password: string | null) => void;
   setMainVm: (environmentId: string) => void;
+  reload: () => Promise<void>;
 } {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -290,6 +291,16 @@ export function useEnvironments(): {
     [],
   );
 
+  const reloadFn = useCallback(async () => {
+    if (!window.api) return;
+    const [envs, sid] = await Promise.all([
+      window.api.config.getEnvironments(),
+      window.api.config.getSelectedEnvironmentId(),
+    ]);
+    setEnvironments(envs);
+    setSelectedId(sid);
+  }, []);
+
   if (!loaded) {
     return {
       environments: [],
@@ -304,6 +315,7 @@ export function useEnvironments(): {
       removeSessionToken: removeSessionTokenFn,
       setOpenCodeEndpoint: setOpenCodeEndpointFn,
       setMainVm: setMainVmFn,
+      reload: reloadFn,
     };
   }
 
@@ -320,5 +332,6 @@ export function useEnvironments(): {
     removeSessionToken: removeSessionTokenFn,
     setOpenCodeEndpoint: setOpenCodeEndpointFn,
     setMainVm: setMainVmFn,
+    reload: reloadFn,
   };
 }

@@ -40,7 +40,7 @@ function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setMainVm } = useEnvironments();
+  const { environments, selectedId, mainVm, select, add, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
   const intl = useIntl();
   const [view, setView] = useState<View>({ kind: "list" });
   const [filter, setFilter] = useState("");
@@ -347,7 +347,7 @@ export function App(): React.ReactNode {
 
   const handleVmWizardDone = (_environmentId: string, _environmentName: string, _daemonUrl: string): void => {
     setVmWizardOpen(false);
-    handleSelect(_environmentId);
+    void reload().then(() => handleSelect(_environmentId));
   };
 
   const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
