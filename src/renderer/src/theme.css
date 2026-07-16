@@ -200,7 +200,6 @@ input {
   flex: 1;
   min-width: 0;
   background: var(--bg-panel);
-  position: relative;
 }
 
 /* ── Segmented pill switcher ────────────────────────────────────── */
@@ -455,7 +454,7 @@ input {
 .content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 26px 130px;
+  padding: 20px 26px;
 }
 
 .content.content-chat {

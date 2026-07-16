@@ -126,12 +126,6 @@ export function ChatComposer({
               {intl.formatMessage({ id: "chat.fullAccess" })}
             </button>
           </div>
-          <span className="spacer" />
-          <span className={`composer-mode-indicator ${accessMode}`}>
-            {accessMode === "supervised"
-              ? intl.formatMessage({ id: "chat.supervised" })
-              : intl.formatMessage({ id: "chat.fullAccess" })}
-          </span>
         </div>
 
         <div className="composer-text-row">
