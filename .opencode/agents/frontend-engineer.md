@@ -15,5 +15,5 @@ You are a frontend engineer specializing in Electron desktop applications with R
 
 ## Abilities
 - Guardrails: @ob-guardrails-generic, @ob-guardrails-project
-- Development: @vercel-react-best-practices, @typescript-advanced-types, @electron-development, @vite, @accelint-design-foundation, @internationalization-i18n
+- Development: @vercel-react-best-practices, @typescript-advanced-types, @electron-development, @vite, @accelint-design-foundation, @internationalization-i18n, @inversify-hooks
 - Testing: @vitest

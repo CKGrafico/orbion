@@ -15,6 +15,6 @@ You are the default engineer, mostly used by the user for architecture and plann
 
 ## Abilities
 - Guardrails: @ob-guardrails-generic, @ob-guardrails-project, @ob-default
-- Development: @ob-default, @vercel-react-best-practices, @typescript-advanced-types, @electron-development, @vite, @accelint-design-foundation, @internationalization-i18n, @design-taste-frontend, @web-design-guidelines, @high-end-visual-design, @fumadocs-component-docs, @fumadocs-mdx-structure, @documentation-writer
-- Testing: @ob-default, @vitest, @web-design-guidelines
+- Development: @ob-default
+- Testing: @ob-default
 - Infrastructure: @ob-default

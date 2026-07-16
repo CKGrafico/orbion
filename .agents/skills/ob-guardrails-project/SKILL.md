@@ -40,6 +40,7 @@ license: MIT
 - **All user-facing copy must go through i18n keys — no magic strings.** The main process uses `msg(key, params)` to create `I18nMessage` objects; the renderer uses `react-intl` `formatMessage` / `translateMessage()`. Never hardcode user-facing text in components. Evidence: openspec/config.yaml rules; `src/main/i18n.ts`; `src/renderer/src/i18n/index.ts`.
 - **Function components + hooks only.** No class components. React 19 function components with hooks. Evidence: ARCHITECTURE.md §3.1; openspec/config.yaml conventions.
 - **REST API responses unwrapped from loop-task envelope.** The daemon returns `{ ok, data }` / `{ ok, error: { message } }`. The main process `handleApiRequest` unwraps this into `ApiResponse<T>` shape. Always unwrap at the main-process boundary, not in the renderer. Evidence: ARCHITECTURE.md §3.2; `src/main/index.ts` lines 189–200.
+- **Keep comment ratio under 10%.** Code must be self-explanatory through names, structure, and types. Comments are for WHY, not WHAT — only when the reason cannot be inferred from context. If more than 10% of lines in a file are comments, refactor for clarity instead of commenting. Delete stale, obvious, or code-restating comments.
 
 ## Testing
 
@@ -100,4 +101,4 @@ license: MIT
 - **Respect Electron process boundaries in proposals.** Network I/O belongs in main; the renderer only calls `window.api`. Call out any new IPC channel explicitly. Evidence: openspec/config.yaml rules.proposal.
 - **Include a verification step in every task.** At minimum `pnpm typecheck` must pass. Evidence: openspec/config.yaml rules.tasks.
 
-<!-- Last updated: 2026-07-16T08:50:00Z -->
+<!-- Last updated: 2026-07-16T13:15:00Z -->

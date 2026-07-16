@@ -339,6 +339,108 @@ input {
   background: var(--bg-hover);
 }
 
+/* 2-line env item */
+.env-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 7px 10px;
+}
+
+.env-item-row1 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.env-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.env-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.env-item-row2 {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-left: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.env-badges {
+  display: none;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.env-item:hover .env-badges {
+  display: flex;
+}
+
+.env-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.env-badge-ok {
+  background: color-mix(in srgb, var(--health-ok) 15%, transparent);
+  color: var(--health-ok);
+}
+
+.env-badge-off {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.env-badge-main {
+  background: color-mix(in srgb, var(--accent-infra) 15%, transparent);
+  color: var(--accent-infra);
+}
+
+.env-actions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.env-item:hover .env-actions {
+  display: flex;
+}
+
+.env-item .remove {
+  opacity: 1;
+  color: var(--text-muted);
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 5px;
+}
+
+.env-item .remove:hover {
+  color: var(--danger);
+  background: var(--bg-hover);
+}
+
 .sidebar-footer {
   border-top: 1px solid var(--border-subtle);
   margin-top: 6px;
