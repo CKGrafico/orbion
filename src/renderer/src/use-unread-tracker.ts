@@ -7,7 +7,6 @@ export interface UnreadState {
 const STORAGE_KEY = "orbion.unread.v1";
 
 function loadState(): UnreadState {
-  if (window.api) return { lastVisited: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as UnreadState;
@@ -16,7 +15,6 @@ function loadState(): UnreadState {
 }
 
 function saveState(state: UnreadState): void {
-  if (window.api) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch { /* empty */ }
