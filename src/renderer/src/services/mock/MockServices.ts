@@ -304,6 +304,22 @@ export class MockInfraService implements IInfraService {
         },
       };
     }
+    if (args.action === "edit-issue") {
+      const params = args.params as { issueNumber?: number; title?: string; body?: string; addLabels?: string[]; removeLabels?: string[] } | undefined;
+      const changes: Record<string, unknown> = {};
+      if (params?.title) changes.title = true;
+      if (params?.body) changes.body = true;
+      if (params?.addLabels?.length) changes.labelsAdded = params.addLabels;
+      if (params?.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
+      return {
+        ok: true,
+        data: {
+          platform: "github",
+          issueNumber: params?.issueNumber ?? 42,
+          changes,
+        },
+      };
+    }
     return { ok: false, error: "mock" };
   }
   async getStatus(): Promise<{ mainVmId: string | null; connected: boolean }> { return { mainVmId: null, connected: false }; }

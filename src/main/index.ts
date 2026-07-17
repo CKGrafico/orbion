@@ -25,6 +25,8 @@ import type {
   InboxQueryResult,
   AddLabelParams,
   AddLabelResult,
+  EditIssueParams,
+  EditIssueResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -961,6 +963,142 @@ app.whenReady().then(() => {
               labels: params.labels,
             };
             resolve({ ok: true, data: result });
+          });
+        });
+      }
+      case "edit-issue": {
+        const params = args.params as EditIssueParams | undefined;
+        if (!params?.issueNumber) {
+          return { ok: false, error: msg("editIssue.issueNumberRequired") };
+        }
+        if (!params.title && !params.body && !params.addLabels?.length && !params.removeLabels?.length) {
+          return { ok: false, error: msg("editIssue.noChanges") };
+        }
+
+        const cachedPlatform = args.params?.projectId
+          ? platformCache.get(platformCacheKey(mainVmEnv.id, args.params.projectId as string))
+          : undefined;
+
+        let preferredCli: "gh" | "az" | null = null;
+        if (cachedPlatform === "github") {
+          preferredCli = "gh";
+        } else if (cachedPlatform === "ado") {
+          preferredCli = "az";
+        }
+
+        const cliCheck = await checkPlatformCli();
+        if (!cliCheck && !preferredCli) {
+          return { ok: false, error: msg("editIssue.noPlatformCli") };
+        }
+
+        let useCli: "gh" | "az";
+        if (preferredCli) {
+          if (preferredCli === "gh" && cliCheck?.cli === "gh" && cliCheck.authenticated) {
+            useCli = "gh";
+          } else if (preferredCli === "az" && cliCheck?.cli === "az" && cliCheck.authenticated) {
+            useCli = "az";
+          } else if (cliCheck && cliCheck.authenticated) {
+            useCli = cliCheck.cli;
+          } else {
+            if (!cliCheck) {
+              return { ok: false, error: msg("editIssue.noPlatformCli") };
+            }
+            if (cliCheck.cli === "gh") {
+              return { ok: false, error: msg("editIssue.ghNotAuth") };
+            }
+            return { ok: false, error: msg("editIssue.azNotAuth") };
+          }
+        } else {
+          if (!cliCheck) {
+            return { ok: false, error: msg("editIssue.noPlatformCli") };
+          }
+          if (!cliCheck.authenticated) {
+            if (cliCheck.cli === "gh") {
+              return { ok: false, error: msg("editIssue.ghNotAuth") };
+            }
+            return { ok: false, error: msg("editIssue.azNotAuth") };
+          }
+          useCli = cliCheck.cli;
+        }
+
+        // Azure DevOps: label operations are not supported via az boards CLI
+        if (useCli === "az" && (params.addLabels?.length || params.removeLabels?.length)) {
+          return { ok: false, error: msg("editIssue.adoLabelsNotSupported") };
+        }
+
+        if (useCli === "gh") {
+          const ghArgs: string[] = ["issue", "edit", String(params.issueNumber)];
+          if (params.title) {
+            ghArgs.push("--title", params.title);
+          }
+          if (params.body) {
+            ghArgs.push("--body", params.body);
+          }
+          if (params.addLabels?.length) {
+            ghArgs.push("--add-label", params.addLabels.join(","));
+          }
+          if (params.removeLabels?.length) {
+            ghArgs.push("--remove-label", params.removeLabels.join(","));
+          }
+          if (params.repo) {
+            ghArgs.push("--repo", params.repo);
+          }
+
+          const changes: EditIssueResult["changes"] = {};
+          if (params.title) changes.title = true;
+          if (params.body) changes.body = true;
+          if (params.addLabels?.length) changes.labelsAdded = params.addLabels;
+          if (params.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
+
+          return new Promise<InfraActionResult>((resolve) => {
+            execFile("gh", ghArgs, (err, _stdout, stderr) => {
+              if (err) {
+                resolve({ ok: false, error: msg("editIssue.editFailed", { detail: stderr || err.message }) });
+                return;
+              }
+              const result: EditIssueResult = {
+                platform: "github",
+                issueNumber: params.issueNumber,
+                changes,
+              };
+              resolve({ ok: true, data: result });
+            });
+          });
+        }
+
+        // az boards work-item update
+        const azArgs: string[] = [
+          "boards", "work-item", "update",
+          "--id", String(params.issueNumber),
+        ];
+        if (params.title) {
+          azArgs.push("--title", params.title);
+        }
+        if (params.body) {
+          azArgs.push("--description", params.body);
+        }
+
+        const changes: EditIssueResult["changes"] = {};
+        if (params.title) changes.title = true;
+        if (params.body) changes.body = true;
+
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("az", azArgs, (err, stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: msg("editIssue.editFailed", { detail: stderr || err.message }) });
+              return;
+            }
+            try {
+              const parsed = JSON.parse(stdout) as { id?: number };
+              const result: EditIssueResult = {
+                platform: "ado",
+                issueNumber: parsed.id ?? params.issueNumber,
+                changes,
+              };
+              resolve({ ok: true, data: result });
+            } catch {
+              resolve({ ok: false, error: msg("editIssue.editFailed", { detail: "Unexpected output from az CLI" }) });
+            }
           });
         });
       }

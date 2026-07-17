@@ -122,7 +122,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue";
 
 export interface CreateIssueParams {
   title: string;
@@ -185,6 +185,33 @@ export interface AddLabelParams {
 export interface AddLabelResult {
   issueNumber: number;
   labels: string[];
+}
+
+export interface EditIssueParams {
+  /** Issue number on the platform. */
+  issueNumber: number;
+  /** New title. Omit to keep the current title. */
+  title?: string;
+  /** New body/description. Omit to keep the current body. */
+  body?: string;
+  /** Labels to ADD (appended to existing). */
+  addLabels?: string[];
+  /** Labels to REMOVE from the issue. */
+  removeLabels?: string[];
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+}
+
+export interface EditIssueResult {
+  platform: "github" | "ado";
+  issueNumber: number;
+  /** Fields that were actually changed. */
+  changes: {
+    title?: boolean;
+    body?: boolean;
+    labelsAdded?: string[];
+    labelsRemoved?: string[];
+  };
 }
 
 export interface InfraActionArgs {

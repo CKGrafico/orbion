@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode } from "../types";
-import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult } from "../../../shared/ipc";
+import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult, EditIssueResult } from "../../../shared/ipc";
 import type { IInfraService, IConfigService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
@@ -91,6 +91,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   /** Pending issue drafts keyed by turnId, awaiting user confirmation */
   const [pendingIssues, setPendingIssues] = useState<Record<string, { title: string; body: string }>>({});
+  /** Pending issue edits keyed by turnId, awaiting user confirmation */
+  const [pendingEdits, setPendingEdits] = useState<Record<string, { issueNumber: number; title?: string; body?: string; addLabels?: string[]; removeLabels?: string[]; repo?: string }>>({});
   /** Pending label offers keyed by turnId, awaiting user acceptance */
   const [pendingLabelOffers, setPendingLabelOffers] = useState<Record<string, { issueNumber: number; labels: string[]; repo?: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -272,6 +274,163 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         return;
       }
 
+      // Detect "edit issue" / "update issue" intent
+      const isEditIssue =
+        lower.includes("edit issue") ||
+        lower.includes("update issue") ||
+        lower.includes("rename issue") ||
+        lower.includes("change issue") ||
+        (lower.includes("issue") && (lower.includes("add label") || lower.includes("remove label")));
+
+      if (isEditIssue) {
+        // Extract issue number from text (e.g. "#42", "issue 42", "issue #42")
+        const numberMatch = text.match(/#(\d+)/) || text.match(/issue\s+(\d+)/i);
+        if (!numberMatch) {
+          // Ambiguous reference: no issue number found
+          const turn: ChatTurn = {
+            id: turnId,
+            userMessage: {
+              id: `infra-msg-${now}-u`,
+              role: "user",
+              content: text,
+              startedAt: now,
+            },
+            assistantMessage: {
+              id: `infra-msg-${now}-a`,
+              role: "assistant",
+              content: intl.formatMessage({ id: "editIssue.ambiguousReference" }),
+              toolCalls: [],
+              startedAt: now + 100,
+              finishedAt: now + 100,
+            },
+            finished: true,
+            collapsed: false,
+            accessMode,
+          };
+          addTurn(turn);
+          setActiveTurnId(null);
+          return;
+        }
+
+        const issueNumber = parseInt(numberMatch[1], 10);
+
+        // Extract title change: "rename issue #42 to New Title" or "edit issue #42 title: New Title"
+        let newTitle: string | undefined;
+        const renameMatch = text.match(/(?:rename|change)\s+issue\s+(?:#\d+|\d+)\s+(?:to\s+)?[:\-]?\s*(.+)/i);
+        const titleMatch2 = text.match(/title\s*[:\-]\s*(.+)/i);
+        if (renameMatch) {
+          newTitle = renameMatch[1].trim();
+        } else if (titleMatch2) {
+          newTitle = titleMatch2[1].trim();
+        }
+
+        // Extract body change: "body: description text"
+        let newBody: string | undefined;
+        const bodyMatch = text.match(/body\s*[:\-]\s*(.+)/i);
+        if (bodyMatch) {
+          newBody = bodyMatch[1].trim();
+        }
+
+        // Extract label add: "add label bug,feature" or "add labels bug, feature"
+        let addLabels: string[] | undefined;
+        const addLabelMatch = text.match(/add\s+labels?\s+[:\-]?\s*([a-zA-Z0-9\-_,\s]+)/i);
+        if (addLabelMatch) {
+          addLabels = addLabelMatch[1].split(",").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+        }
+
+        // Extract label remove: "remove label bug" or "remove labels bug, feature"
+        let removeLabels: string[] | undefined;
+        const removeLabelMatch = text.match(/remove\s+labels?\s+[:\-]?\s*([a-zA-Z0-9\-_,\s]+)/i);
+        if (removeLabelMatch) {
+          removeLabels = removeLabelMatch[1].split(",").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+        }
+
+        // Check if any changes were specified
+        if (!newTitle && !newBody && !addLabels?.length && !removeLabels?.length) {
+          const turn: ChatTurn = {
+            id: turnId,
+            userMessage: {
+              id: `infra-msg-${now}-u`,
+              role: "user",
+              content: text,
+              startedAt: now,
+            },
+            assistantMessage: {
+              id: `infra-msg-${now}-a`,
+              role: "assistant",
+              content: intl.formatMessage({ id: "editIssue.noChanges" }),
+              toolCalls: [],
+              startedAt: now + 100,
+              finishedAt: now + 100,
+            },
+            finished: true,
+            collapsed: false,
+            accessMode,
+          };
+          addTurn(turn);
+          setActiveTurnId(null);
+          return;
+        }
+
+        // Build preview of proposed changes
+        const changeLines: string[] = [];
+        if (newTitle) {
+          changeLines.push(intl.formatMessage({ id: "editIssue.changeTitle" }, { old: "...", new: newTitle }));
+        }
+        if (newBody) {
+          changeLines.push(intl.formatMessage({ id: "editIssue.changeBody" }));
+        }
+        if (addLabels?.length) {
+          changeLines.push(intl.formatMessage({ id: "editIssue.changeAddLabels" }, { labels: addLabels.map((l: string) => `\`${l}\``).join(" ") }));
+        }
+        if (removeLabels?.length) {
+          changeLines.push(intl.formatMessage({ id: "editIssue.changeRemoveLabels" }, { labels: removeLabels.map((l: string) => `\`${l}\``).join(" ") }));
+        }
+
+        const previewText = intl.formatMessage(
+          { id: "editIssue.previewChanges" },
+          { number: issueNumber, changes: changeLines.join("\n") },
+        );
+
+        const questionId = `edit-q-${now}`;
+        const turn: ChatTurn = {
+          id: turnId,
+          userMessage: {
+            id: `infra-msg-${now}-u`,
+            role: "user",
+            content: text,
+            startedAt: now,
+          },
+          assistantMessage: {
+            id: `infra-msg-${now}-a`,
+            role: "assistant",
+            content: previewText,
+            toolCalls: [],
+            startedAt: now + 100,
+            finishedAt: undefined,
+          },
+          finished: false,
+          collapsed: false,
+          accessMode,
+          question: {
+            id: questionId,
+            turnId,
+            text: intl.formatMessage({ id: "editIssue.applyQuestion" }),
+            options: [
+              { key: "apply-edit", label: intl.formatMessage({ id: "editIssue.optionApply" }) },
+              { key: "cancel-edit", label: intl.formatMessage({ id: "editIssue.optionCancel" }) },
+            ],
+            singleChoice: true,
+            allowFreeText: false,
+            resolved: false,
+          },
+        };
+        addTurn(turn);
+        setActiveTurnId(turnId);
+        setPendingEdits((prev) => ({ ...prev, [turnId]: { issueNumber, title: newTitle, body: newBody, addLabels, removeLabels } }));
+        return;
+      }
+
       const turn: ChatTurn = {
         id: turnId,
         userMessage: {
@@ -442,6 +601,64 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         return;
       }
 
+      // Check for pending edit-issue confirmation
+      const pendingEdit = pendingEdits[activeTurnId];
+      if (pendingEdit) {
+        if (answer === "apply-edit") {
+          void infraService
+            .executeAction({
+              action: "edit-issue",
+              params: {
+                issueNumber: pendingEdit.issueNumber,
+                title: pendingEdit.title,
+                body: pendingEdit.body,
+                addLabels: pendingEdit.addLabels,
+                removeLabels: pendingEdit.removeLabels,
+                repo: pendingEdit.repo,
+              },
+            })
+            .then((result) => {
+              let responseText: string;
+              if (result.ok) {
+                const editResult = result.data as EditIssueResult;
+                const summaryParts: string[] = [];
+                if (editResult.changes.title) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryTitle" }));
+                if (editResult.changes.body) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryBody" }));
+                if (editResult.changes.labelsAdded?.length) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryLabelsAdded" }, { labels: editResult.changes.labelsAdded.join("`, `") }));
+                if (editResult.changes.labelsRemoved?.length) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryLabelsRemoved" }, { labels: editResult.changes.labelsRemoved.join("`, `") }));
+                responseText = intl.formatMessage(
+                  { id: "editIssue.applied" },
+                  { number: editResult.issueNumber, summary: summaryParts.join(", ") },
+                );
+              } else {
+                responseText = intl.formatMessage(
+                  { id: "editIssue.editFailed" },
+                  { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+                );
+              }
+              appendAssistantContent(activeTurnId!, responseText);
+              finishTurn(activeTurnId!);
+              setActiveTurnId(null);
+              setPendingEdits((prev) => {
+                const next = { ...prev };
+                delete next[activeTurnId!];
+                return next;
+              });
+            });
+        } else {
+          // Cancel edit
+          appendAssistantContent(activeTurnId, intl.formatMessage({ id: "editIssue.optionCancel" }));
+          finishTurn(activeTurnId);
+          setActiveTurnId(null);
+          setPendingEdits((prev) => {
+            const next = { ...prev };
+            delete next[activeTurnId!];
+            return next;
+          });
+        }
+        return;
+      }
+
       const pending = pendingIssues[activeTurnId];
       if (!pending) return;
 
@@ -570,7 +787,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         });
       }
     },
-    [activeTurnId, answerQuestion, pendingIssues, pendingLabelOffers, infraService, configService, intl, appendAssistantContent, finishTurn, addTurn, accessMode],
+    [activeTurnId, answerQuestion, pendingIssues, pendingEdits, pendingLabelOffers, infraService, configService, intl, appendAssistantContent, finishTurn, addTurn, accessMode],
   );
 
   const handleAccessModeChange = useCallback(
