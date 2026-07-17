@@ -57,6 +57,9 @@ orbion/
 │           ├── format.ts        # time/label/status formatting helpers
 │           ├── theme.css        # Design tokens + all component styles
 │           ├── bridge.d.ts      # Ambient window.api typing for the renderer
+│           ├── features/
+│           │   └── inbox/
+│           │       └── InboxPanel.tsx  # Conversational inbox with fleet-scoped queries
 │           └── components/
 │               ├── Sidebar.tsx           # Instance list + health dots
 │               ├── SegmentedTabs.tsx     # Loops/Tasks/Projects pill switcher
@@ -152,7 +155,11 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `stream:unsubscribe`, `config:getInstances`, `config:addInstance`,
 `config:removeInstance`, `config:getSelectedInstanceId`,
 `config:setSelectedInstanceId`, `config:migrateFromLocalStorage`,
-`infra:executeAction`, `infra:getStatus`, `infra:getPlatform`.
+`infra:executeAction`, `infra:getStatus`, `infra:getPlatform`,
+`budget:getWatches`, `budget:addWatch`, `budget:removeWatch`,
+`budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
+`budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
+`inbox:queryFleet`.
 
 ### 3.3 Shared Libraries / Common Code
 
