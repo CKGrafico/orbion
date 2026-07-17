@@ -12,6 +12,8 @@ import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { useNativeNotifications } from "./use-notifications";
 import { useBudgetWatch } from "./use-budget-watch";
+import { useLoopTransitions } from "./use-loop-transitions";
+import type { LoopTransition } from "./use-loop-transitions";
 import { PanelLeft, RotateCw, X, Star, BellOff, Bell } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
@@ -153,6 +155,30 @@ export function App(): React.ReactNode {
   }, [sendInboxNotification]);
 
   const budgetWatch = useBudgetWatch(perEnvLoops, environments, handleBudgetBreach);
+
+  // Loop state transition detection for inbox notifications
+  const handleLoopTransition = useCallback((transition: LoopTransition) => {
+    const env = environments.find((e) => e.id === transition.environmentId);
+    if (!env) return;
+    if (mutedEnvs.has(transition.environmentId)) return;
+
+    const isFailed = transition.lastExitCode !== null && transition.lastExitCode !== 0;
+    const type = isFailed ? "failure" : "finished";
+
+    void sendInboxNotification({
+      environmentId: transition.environmentId,
+      environmentName: env.name,
+      itemId: transition.loopId,
+      itemType: "loop",
+      status: type === "failure" ? "failed" : "completed",
+      message: standaloneIntl.formatMessage(
+        { id: type === "failure" ? "inbox.transitionFailed" : "inbox.transitionFinished" },
+        { loopName: transition.loopDescription, exitCode: transition.lastExitCode, maxRuns: transition.maxRuns, runCount: transition.runCount },
+      ),
+    });
+  }, [environments, mutedEnvs, sendInboxNotification]);
+
+  useLoopTransitions(perEnvLoops, handleLoopTransition);
 
   // Outage escalation tracking
   const [escalatedOutages, setEscalatedOutages] = useState<Map<string, OutageEscalation>>(new Map());

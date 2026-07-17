@@ -509,6 +509,10 @@
     "finishedLoop": "finished loop",
     "instanceOffline": "instance offline",
     "prolongedOffline": "prolonged outage",
+    "typeFailure": "failure",
+    "typeFinished": "finished",
+    "typeWatch": "watch",
+    "typeDigest": "digest",
     "tabActive": "Active",
     "tabDone": "Done",
     "doneEmptyMessage": "No resolved items in the last 30 days.",
@@ -516,6 +520,7 @@
     "resolution.breach-cleared": "runs dropped below threshold",
     "resolution.instance-online": "instance came back online",
     "resolution.outage-resolved": "instance reconnected after prolonged outage",
+    "resolution.watch-cleared": "watch condition cleared",
     "action.run-now": "Run now",
     "action.pause": "Pause",
     "action.resume": "Resume",
@@ -525,6 +530,8 @@
     "viewTitle": "Inbox",
     "viewDescription": "Fleet-wide notifications — things that happened while you weren't looking.",
     "itemTimestamp": "{time}",
-    "itemSourceProject": "{project} on {instance}"
+    "itemSourceProject": "{project} on {instance}",
+    "transitionFailed": "{loopName} failed (exit {exitCode})",
+    "transitionFinished": "{loopName} finished ({runCount}/{maxRuns} runs)"
   }
 }

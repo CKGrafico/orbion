@@ -402,7 +402,29 @@ export type InboxItemKind =
   | "pending-approval"
   | "awaiting-input"
   | "instance-offline"
-  | "prolonged-offline";
+  | "prolonged-offline"
+  | "digest";
+
+/** Broad notification category that groups item kinds for visual treatment. */
+export type NotificationType = "failure" | "finished" | "watch" | "digest";
+
+/** Map each InboxItemKind to its broad NotificationType. */
+export function kindToNotificationType(kind: InboxItemKind): NotificationType {
+  switch (kind) {
+    case "failed-loop":
+    case "instance-offline":
+    case "prolonged-offline":
+      return "failure";
+    case "finished-loop":
+      return "finished";
+    case "breach":
+    case "pending-approval":
+    case "awaiting-input":
+      return "watch";
+    case "digest":
+      return "digest";
+  }
+}
 
 /** Inline actions that can be performed on an inbox item without leaving the inbox. */
 export type InboxAction =
@@ -416,6 +438,8 @@ export type InboxAction =
 export interface InboxItem {
   id: string;
   kind: InboxItemKind;
+  /** Broad notification category for icon/color treatment. */
+  notificationType: NotificationType;
   environmentId: string;
   environmentName: string;
   /** Loop ID when the item refers to a specific loop. */
@@ -440,7 +464,8 @@ export type InboxItemResolutionReason =
   | "loop-recovered"
   | "breach-cleared"
   | "instance-online"
-  | "outage-resolved";
+  | "outage-resolved"
+  | "watch-cleared";
 
 export interface ResolvedInboxItem {
   /** The original inbox item data at the time of resolution. */

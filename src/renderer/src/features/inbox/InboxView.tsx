@@ -6,8 +6,9 @@ import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, Resolv
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment, Project } from "../../types";
 import {
-  Inbox, AlertTriangle, CheckCircle2, XCircle, WifiOff, Clock,
+  Inbox, AlertTriangle, CheckCircle2, XCircle, WifiOff,
   Play, Pause, RotateCw, MessageSquare, X, Search, ArrowUp, ChevronRight,
+  Layers,
 } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
@@ -32,7 +33,7 @@ interface QueryTurn {
 }
 
 /** Map inbox item kind to icon component */
-function KindIcon({ kind }: { kind: InboxItem["kind"] }): React.ReactNode {
+function KindIcon({ kind, notificationType }: { kind: InboxItem["kind"]; notificationType: InboxItem["notificationType"] }): React.ReactNode {
   switch (kind) {
     case "failed-loop":
       return <XCircle size={16} strokeWidth={1.8} />;
@@ -43,13 +44,25 @@ function KindIcon({ kind }: { kind: InboxItem["kind"] }): React.ReactNode {
     case "instance-offline":
     case "prolonged-offline":
       return <WifiOff size={16} strokeWidth={1.8} />;
+    case "digest":
+      return <Layers size={16} strokeWidth={1.8} />;
     default:
-      return <Clock size={16} strokeWidth={1.8} />;
+      // Fallback based on notificationType
+      switch (notificationType) {
+        case "failure":
+          return <XCircle size={16} strokeWidth={1.8} />;
+        case "finished":
+          return <CheckCircle2 size={16} strokeWidth={1.8} />;
+        case "watch":
+          return <AlertTriangle size={16} strokeWidth={1.8} />;
+        case "digest":
+          return <Layers size={16} strokeWidth={1.8} />;
+      }
   }
 }
 
 /** Color class for item kind */
-function kindColor(kind: InboxItem["kind"]): string {
+function kindColor(kind: InboxItem["kind"], notificationType: InboxItem["notificationType"]): string {
   switch (kind) {
     case "failed-loop":
       return "var(--danger)";
@@ -60,8 +73,20 @@ function kindColor(kind: InboxItem["kind"]): string {
     case "instance-offline":
     case "prolonged-offline":
       return "var(--accent-blue)";
+    case "digest":
+      return "var(--accent-infra)";
     default:
-      return "var(--text-muted)";
+      // Fallback based on notificationType
+      switch (notificationType) {
+        case "failure":
+          return "var(--danger)";
+        case "finished":
+          return "var(--success)";
+        case "watch":
+          return "var(--warning)";
+        case "digest":
+          return "var(--accent-infra)";
+      }
   }
 }
 
@@ -346,7 +371,7 @@ function InboxViewItemRow({
   const intl = useIntl();
   const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
 
-  const color = kindColor(item.kind);
+  const color = kindColor(item.kind, item.notificationType);
 
   const handleAction = useCallback(async (action: InboxAction, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -402,7 +427,7 @@ function InboxViewItemRow({
       tabIndex={0}
     >
       <span className="inbox-view-item-icon" style={{ color }}>
-        <KindIcon kind={item.kind} />
+        <KindIcon kind={item.kind} notificationType={item.notificationType} />
       </span>
       <div className="inbox-view-item-body">
         <span className="inbox-view-item-title">{item.title}</span>

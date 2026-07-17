@@ -1,6 +1,7 @@
 import { injectable } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams, IApiService, IConfigService } from "../interfaces";
 import type { InboxItem, InboxAction, InboxQueryResult, ResolvedInboxItem, InboxItemResolutionReason, ApiResponse } from "../../../../shared/ipc";
+import { kindToNotificationType } from "../../../../shared/ipc";
 import { cid, container } from "inversify-hooks";
 import { loopStatusToFleetItem } from "../../fleet-mapping";
 import type { LoopStatus } from "../../types";
@@ -12,11 +13,15 @@ function getResolutionReasonForItem(item: InboxItem): InboxItemResolutionReason 
     case "finished-loop":
       return "loop-recovered";
     case "breach":
-      return "breach-cleared";
+    case "pending-approval":
+    case "awaiting-input":
+      return "watch-cleared";
     case "instance-offline":
       return "instance-online";
     case "prolonged-offline":
       return "outage-resolved";
+    case "digest":
+      return "watch-cleared";
     default:
       return "loop-recovered";
   }
@@ -87,6 +92,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
     items.push({
       id: `breach:${breach.id}`,
       kind: "breach",
+      notificationType: kindToNotificationType("breach"),
       environmentId: breach.environmentId,
       environmentName: breach.environmentName,
       loopId: breach.loopId,
@@ -109,6 +115,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
         items.push({
           id: `prolonged-offline:${env.id}`,
           kind: "prolonged-offline",
+          notificationType: kindToNotificationType("prolonged-offline"),
           environmentId: env.id,
           environmentName: env.name,
           title: env.name,
@@ -130,6 +137,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
         items.push({
           id: `offline:${env.id}`,
           kind: "instance-offline",
+          notificationType: kindToNotificationType("instance-offline"),
           environmentId: env.id,
           environmentName: env.name,
           title: env.name,
@@ -156,6 +164,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
         items.push({
           id: itemId,
           kind: "failed-loop",
+          notificationType: kindToNotificationType("failed-loop"),
           environmentId: env.id,
           environmentName: env.name,
           loopId: loop.id,
@@ -173,6 +182,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
         items.push({
           id: itemId,
           kind: "finished-loop",
+          notificationType: kindToNotificationType("finished-loop"),
           environmentId: env.id,
           environmentName: env.name,
           loopId: loop.id,
@@ -244,6 +254,10 @@ function answerFleetQuery(
         ? "instance offline"
         : item.kind === "prolonged-offline"
         ? "prolonged outage"
+        : item.kind === "pending-approval"
+        ? "approval needed"
+        : item.kind === "awaiting-input"
+        ? "input needed"
         : item.kind;
 
       if (item.loopId) {
@@ -267,7 +281,7 @@ function answerFleetQuery(
     q.includes("broken");
 
   if (isFailedQuery) {
-    const failed = items.filter((i) => i.kind === "failed-loop" || i.kind === "breach");
+    const failed = items.filter((i) => i.notificationType === "failure");
     if (failed.length === 0) {
       return { answer: "No failures or errors across the fleet right now.", references: [] };
     }
@@ -288,7 +302,7 @@ function answerFleetQuery(
     q.includes("down");
 
   if (isOfflineQuery) {
-    const offline = items.filter((i) => i.kind === "instance-offline" || i.kind === "prolonged-offline");
+    const offline = items.filter((i) => i.notificationType === "failure" && (i.kind === "instance-offline" || i.kind === "prolonged-offline"));
     if (offline.length === 0) {
       return { answer: "All instances are reachable.", references: [] };
     }
@@ -297,6 +311,26 @@ function answerFleetQuery(
       references.push(item);
       const link = `[${item.title}](inbox://${item.id})`;
       lines.push(`- ${link}${item.detail ? ` (${item.detail})` : ""}`);
+    }
+    return { answer: lines.join("\n"), references };
+  }
+
+  // "finished" / "completed" / "done" (loops that hit max-runs)
+  const isFinishedQuery =
+    q.includes("finished") ||
+    q.includes("completed") ||
+    q.includes("done loop");
+
+  if (isFinishedQuery) {
+    const finishedItems = items.filter((i) => i.notificationType === "finished");
+    if (finishedItems.length === 0) {
+      return { answer: "No finished loops right now.", references: [] };
+    }
+    const lines: string[] = [`**${finishedItems.length} finished loop${finishedItems.length !== 1 ? "s" : ""}:**\n`];
+    for (const item of finishedItems.slice(0, 10)) {
+      references.push(item);
+      const link = `[${item.title}](inbox://${item.id})`;
+      lines.push(`- ${link} on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
     }
     return { answer: lines.join("\n"), references };
   }
@@ -315,6 +349,26 @@ function answerFleetQuery(
     }
     const lines: string[] = [`**${breachItems.length} budget breach${breachItems.length !== 1 ? "es" : ""}:**\n`];
     for (const item of breachItems) {
+      references.push(item);
+      const link = `[${item.title}](inbox://${item.id})`;
+      lines.push(`- ${link} on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
+    }
+    return { answer: lines.join("\n"), references };
+  }
+
+  // "watches" / "watch" / "notifications" / "alerts"
+  const isWatchQuery =
+    q.includes("watch") ||
+    q.includes("alert") ||
+    q.includes("notification");
+
+  if (isWatchQuery) {
+    const watchItems = items.filter((i) => i.notificationType === "watch");
+    if (watchItems.length === 0) {
+      return { answer: "No active watches or alerts right now.", references: [] };
+    }
+    const lines: string[] = [`**${watchItems.length} watch alert${watchItems.length !== 1 ? "s" : ""}:**\n`];
+    for (const item of watchItems.slice(0, 10)) {
       references.push(item);
       const link = `[${item.title}](inbox://${item.id})`;
       lines.push(`- ${link} on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);

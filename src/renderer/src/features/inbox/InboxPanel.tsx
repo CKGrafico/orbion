@@ -286,14 +286,14 @@ function InboxItemRow({
   const intl = useIntl();
   const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
 
-  const kindIcon = item.kind === "breach" ? "!" : item.kind === "failed-loop" ? "x" : item.kind === "finished-loop" ? "✓" : item.kind === "instance-offline" ? "-" : item.kind === "prolonged-offline" ? "⏻" : "?";
-  const kindClass = item.kind === "breach" || item.kind === "failed-loop"
+  const typeIcon = item.notificationType === "failure" ? "!" : item.notificationType === "finished" ? "✓" : item.notificationType === "watch" ? "!" : item.notificationType === "digest" ? "≡" : "?";
+  const typeClass = item.notificationType === "failure"
     ? "inbox-item-dot-danger"
-    : item.kind === "finished-loop"
+    : item.notificationType === "finished"
     ? "inbox-item-dot-success"
-    : item.kind === "prolonged-offline"
+    : item.notificationType === "watch"
     ? "inbox-item-dot-warning"
-    : item.kind === "instance-offline"
+    : item.notificationType === "digest"
     ? "inbox-item-dot-info"
     : "inbox-item-dot-info";
 
@@ -339,7 +339,7 @@ function InboxItemRow({
       role="button"
       tabIndex={0}
     >
-      <span className={`inbox-item-dot ${kindClass}`}>{kindIcon}</span>
+      <span className={`inbox-item-dot ${typeClass}`}>{typeIcon}</span>
       <div className="inbox-item-info">
         <span className="inbox-item-title">{item.title}</span>
         <span className="inbox-item-meta">

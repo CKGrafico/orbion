@@ -30,6 +30,7 @@ import type {
   NotificationSendArgs,
   OutageEscalation,
 } from "../../../../shared/ipc";
+import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
   IConfigService,
@@ -452,6 +453,7 @@ export class MockInboxService implements IInboxService {
       items.push({
         id: `breach:${breach.id}`,
         kind: "breach",
+        notificationType: kindToNotificationType("breach"),
         environmentId: breach.environmentId,
         environmentName: breach.environmentName,
         loopId: breach.loopId,
@@ -473,6 +475,7 @@ export class MockInboxService implements IInboxService {
           items.push({
             id: `prolonged-offline:${env.id}`,
             kind: "prolonged-offline",
+            notificationType: kindToNotificationType("prolonged-offline"),
             environmentId: env.id,
             environmentName: env.name,
             title: env.name,
@@ -491,6 +494,7 @@ export class MockInboxService implements IInboxService {
           items.push({
             id: `offline:${env.id}`,
             kind: "instance-offline",
+            notificationType: kindToNotificationType("instance-offline"),
             environmentId: env.id,
             environmentName: env.name,
             title: env.name,
@@ -513,6 +517,7 @@ export class MockInboxService implements IInboxService {
           items.push({
             id: itemId,
             kind: "failed-loop",
+            notificationType: kindToNotificationType("failed-loop"),
             environmentId: env.id,
             environmentName: env.name,
             loopId: loop.id,
@@ -529,6 +534,7 @@ export class MockInboxService implements IInboxService {
           items.push({
             id: itemId,
             kind: "finished-loop",
+            notificationType: kindToNotificationType("finished-loop"),
             environmentId: env.id,
             environmentName: env.name,
             loopId: loop.id,
@@ -602,7 +608,10 @@ export class MockInboxService implements IInboxService {
           reason = "loop-recovered";
           break;
         case "breach":
-          reason = "breach-cleared";
+        case "pending-approval":
+        case "awaiting-input":
+        case "digest":
+          reason = "watch-cleared";
           break;
         case "instance-offline":
           reason = "instance-online";

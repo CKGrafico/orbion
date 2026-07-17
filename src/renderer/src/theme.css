@@ -50,6 +50,10 @@
   --pill-done: #a4b1cd;
   --pill-failed: #ff8484;
   --pill-idle: #64718c;
+  --nt-failure: var(--danger);
+  --nt-finished: var(--success);
+  --nt-watch: var(--warning);
+  --nt-digest: var(--accent-infra);
   --titlebar-height: 42px;
   --sidebar-width: 320px;
   --gutter: 8px;
