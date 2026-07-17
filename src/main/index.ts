@@ -170,7 +170,11 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   }
 
   const envId = findEnvironmentIdByUrl(args.baseUrl);
-  const token = envId ? getSessionToken(envId) : null;
+  if (!envId) {
+    return { ok: false, status: 0, error: msg("vmWizard.mainBaseUrlNotRegistered", { url: args.baseUrl }) };
+  }
+
+  const token = getSessionToken(envId);
 
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token.accessToken}`;
@@ -180,12 +184,10 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
     headers,
     body: args.body,
     timeoutMs: args.timeoutMs,
-    onUnauthorized: envId
-      ? async () => {
-          await removeSessionToken(envId);
-          await setEnvironmentAuthState(envId, "blocked");
-        }
-      : undefined,
+    onUnauthorized: async () => {
+      await removeSessionToken(envId);
+      await setEnvironmentAuthState(envId, "blocked");
+    },
   });
 }
 
@@ -196,6 +198,17 @@ async function handleStreamSubscribe(
   if (!isAllowedBaseUrl(args.baseUrl)) return;
   if (streams.has(args.subId)) return;
 
+  const envId = findEnvironmentIdByUrl(args.baseUrl);
+  if (!envId) {
+    const send = (kind: "data" | "event" | "end" | "error", text: string): void => {
+      if (!sender.isDestroyed()) {
+        sender.send("stream:event", { subId: args.subId, kind, text });
+      }
+    };
+    send("error", "Base URL not registered as an environment");
+    return;
+  }
+
   const controller = new AbortController();
   streams.set(args.subId, controller);
 
@@ -205,8 +218,7 @@ async function handleStreamSubscribe(
     }
   };
 
-  const envId = findEnvironmentIdByUrl(args.baseUrl);
-  const token = envId ? getSessionToken(envId) : null;
+  const token = getSessionToken(envId);
 
   const streamHeaders: Record<string, string> = { Accept: "text/event-stream" };
   if (token) streamHeaders["Authorization"] = `Bearer ${token.accessToken}`;
