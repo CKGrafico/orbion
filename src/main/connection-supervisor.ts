@@ -26,6 +26,8 @@ interface ProbeResult {
   ok: boolean;
   status: number;
   error: string | I18nMessage | null;
+  /** Original error from the probe, preserved for diagnostics. */
+  cause?: unknown;
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
@@ -173,10 +175,16 @@ export class ConnectionSupervisor {
         this.probeInFlight = false;
         this.handleProbeResult(result);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (this.destroyed) return;
         this.probeInFlight = false;
-        this.handleProbeResult({ ok: false, status: 0, error: msg("vmWizard.mainProbeFailed") });
+        console.error("[connection-supervisor] probe threw unexpectedly:", err);
+        this.handleProbeResult({
+          ok: false,
+          status: 0,
+          error: msg("vmWizard.mainProbeFailed"),
+          cause: err,
+        });
       });
   }
 

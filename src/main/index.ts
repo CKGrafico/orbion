@@ -278,8 +278,12 @@ function loadBounds(): WindowBounds {
     const raw = fs.readFileSync(boundsFile(), "utf8");
     const parsed = JSON.parse(raw) as WindowBounds;
     if (typeof parsed.width === "number" && typeof parsed.height === "number") return parsed;
-  } catch {
+    console.warn("[bounds] Invalid bounds file content, using defaults");
+  } catch (err) {
     // first launch or corrupt file, use defaults
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn("[bounds] Failed to load bounds file, using defaults:", err);
+    }
   }
   return { width: 1440, height: 900 };
 }
@@ -288,8 +292,8 @@ function saveBounds(win: BrowserWindow): void {
   try {
     const bounds: WindowBounds = { ...win.getNormalBounds(), maximized: win.isMaximized() };
     fs.writeFileSync(boundsFile(), JSON.stringify(bounds));
-  } catch {
-    // non-fatal
+  } catch (err) {
+    console.warn("[bounds] Failed to save window bounds:", err);
   }
 }
 

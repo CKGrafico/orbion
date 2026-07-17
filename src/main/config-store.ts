@@ -59,7 +59,9 @@ let writeChain: Promise<void> = Promise.resolve();
 
 function serialize<T>(fn: () => T): Promise<T> {
   const next = writeChain.then(() => fn());
-  writeChain = next.catch(() => {});
+  writeChain = next.catch((err) => {
+    console.error("[config-store] serialized write failed:", err);
+  });
   return next;
 }
 
