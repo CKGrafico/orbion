@@ -19,6 +19,18 @@ function assertSafePort(port: number, name: string): void {
   }
 }
 
+/**
+ * Validate that a hash value contains only hex characters (1–12 chars).
+ * The output of hashForHost() is always a 12-char hex substring;
+ * any value that does not match this pattern is rejected to prevent
+ * shell injection via template substitution.
+ */
+function validateHash(hash: string): void {
+  if (!/^[a-f0-9]{1,12}$/.test(hash)) {
+    throw new Error(`Invalid hash: "${hash}" contains disallowed characters`);
+  }
+}
+
 function hashForHost(host: SshHost): string {
   validateSshHost(host);
   return crypto.createHash("sha256").update(`${host.user}@${host.hostName}:${host.port}`).digest("hex").slice(0, 12);
@@ -329,7 +341,9 @@ export async function launchOnVm(
   const daemonPort = probeResult.daemonPort ?? DEFAULT_DAEMON_PORT;
   const opencodePort = probeResult.opencodePort ?? DEFAULT_OPENCODE_PORT;
 
-  // Validate port numbers before substituting into scripts
+  // Validate hash and port numbers before substituting into shell scripts.
+  // hashForHost() always returns hex, but we validate defensively.
+  validateHash(hash);
   assertSafePort(daemonPort, "daemonPort");
   assertSafePort(opencodePort, "opencodePort");
 
@@ -468,9 +482,17 @@ export async function readRemoteLog(host: SshHost, hash: string): Promise<string
   } catch {
     return null;
   }
+  // Validate hash before substituting into shell template to prevent
+  // command injection. hashForHost() always produces hex, but this
+  // function accepts arbitrary strings from callers.
+  try {
+    validateHash(hash);
+  } catch {
+    return null;
+  }
   const script = TAIL_LOG_SCRIPT.replace(/__HASH__/g, hash);
   const result = await sshExec(host, script);
   return result.stdout.trim() || null;
 }
 
-export { hashForHost };
+export { hashForHost, validateHash };
