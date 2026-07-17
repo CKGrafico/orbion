@@ -1,5 +1,6 @@
 import { BrowserWindow } from "electron";
 import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage } from "../shared/ipc.js";
+import { TOOL_DEFINITIONS } from "../shared/tool-definitions.js";
 import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
@@ -49,18 +50,13 @@ function emitProgress(progress: VmWizardProgress): void {
 
 async function askServiceSelection(probe: VmWizardProbeResult): Promise<VmWizardServiceSelection> {
   // loop-task is mandatory (always installed). Defaults: install if not already detected.
+  const installTools: Record<string, boolean> = {};
+  for (const tool of TOOL_DEFINITIONS) {
+    installTools[tool.id] = !probe.installedTools[tool.id];
+  }
+
   const defaultSelection: VmWizardServiceSelection = {
-    installOpenCode: !probe.opencodeRunning,
-    installGh: !probe.ghInstalled,
-    installAzDo: !probe.azDoInstalled,
-    installJira: !probe.jiraInstalled,
-    installGitlab: !probe.gitlabInstalled,
-    installDocker: !probe.dockerInstalled,
-    installTerraform: !probe.terraformInstalled,
-    installTailscale: !probe.tailscaleInstalled,
-    installClaudeCli: !probe.claudeInstalled,
-    installJq: !probe.jqInstalled,
-    installRipgrep: !probe.ripgrepInstalled,
+    installTools,
   };
   emitProgress({
     step: "pick-services",
@@ -292,17 +288,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     daemonPort: probe.daemonPort,
     opencodeRunning: probe.opencodeRunning,
     opencodePort: probe.opencodePort,
-    installOpenCode: serviceSelection.installOpenCode,
-    installGh: serviceSelection.installGh,
-    installAzDo: serviceSelection.installAzDo,
-    installJira: serviceSelection.installJira,
-    installGitlab: serviceSelection.installGitlab,
-    installDocker: serviceSelection.installDocker,
-    installTerraform: serviceSelection.installTerraform,
-    installTailscale: serviceSelection.installTailscale,
-    installClaudeCli: serviceSelection.installClaudeCli,
-    installJq: serviceSelection.installJq,
-    installRipgrep: serviceSelection.installRipgrep,
+    installTools: serviceSelection.installTools,
   });
 
   emitProgress({ step: "installing", message: msg("vmWizard.mainServicesReady"), probe, launch });

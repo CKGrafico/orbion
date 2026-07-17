@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import type { SshHost, VmWizardLaunchResult } from "../shared/ipc.js";
+import type { SshHost, VmWizardLaunchResult, VmWizardServiceStatus } from "../shared/ipc.js";
+import { TOOL_DEFINITIONS, type ToolDefinition } from "../shared/tool-definitions.js";
 import { sshExec } from "./ssh-probe.js";
 import { validateSshHost } from "./ssh-config.js";
 import { msg } from "./i18n.js";
@@ -41,7 +42,163 @@ function hashForHost(host: SshHost): string {
   return crypto.createHash("sha256").update(`${host.user}@${host.hostName}:${host.port}`).digest("hex").slice(0, 12);
 }
 
-const LAUNCH_SCRIPT_TEMPLATE = `
+// ─── Dynamic shell script generation ────────────────────────────────
+
+/**
+ * Generate the install block for a single tool based on its definition and strategy.
+ *
+ * Each block follows the pattern:
+ *   1. Check __INSTALL_<ID>__ placeholder
+ *   2. Check if tool is already installed via `command -v`
+ *   3. Echo "<ID>_INSTALLING"
+ *   4. Install via the appropriate package manager
+ *   5. Echo "<ID>_INSTALLED" or "INSTALL_FAILED_<ID>"
+ */
+function generateInstallBlock(tool: ToolDefinition): string {
+  const id = tool.id;
+  const marker = id.toUpperCase(); // e.g. "GH", "AZDO", "DOCKER"
+  const binary = tool.binary;
+  const logFile = `$LAUNCH_DIR/install-${tool.logSuffix}.log`;
+
+  const header = `# ── Optional: ${id} ──────────────────────────────────────────
+INSTALL_${marker}="__INSTALL_${marker}__"
+if [ -n "$INSTALL_${marker}" ]; then
+  if ! command -v ${binary} >/dev/null 2>&1; then
+    echo "${marker}_INSTALLING"`;
+
+  const failureHandler = `echo "INSTALL_FAILED_${marker}"; exit 1;`;
+  const installFailedNoPkg = `echo "INSTALL_FAILED_${marker}|no supported package manager found"; exit 1`;
+  const success = `    echo "${marker}_INSTALLED"
+  fi
+fi`;
+
+  let installLogic: string;
+
+  switch (tool.strategy) {
+    case "npm": {
+      if (!tool.npmKey) throw new Error(`Tool ${id} uses npm strategy but has no npmKey`);
+      installLogic = `    "$NODE_BIN" -e "const { execSync } = require('child_process'); execSync('__NPM_${marker}__', { stdio: 'inherit' });" 2>"${logFile}" || { ${failureHandler} }`;
+      break;
+    }
+    case "apt": {
+      installLogic = `    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      break;
+    }
+    case "apt-brew": {
+      if (id === "terraform") {
+        installLogic = `    if command -v apt-get >/dev/null 2>&1; then
+      wget -qO- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg 2>/dev/null
+      echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
+      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+    elif command -v brew >/dev/null 2>&1; then
+      brew install ${binary} 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      } else {
+        // Generic apt-brew fallback
+        installLogic = `    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+    elif command -v brew >/dev/null 2>&1; then
+      brew install ${binary} 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      }
+      break;
+    }
+    case "apt-snap": {
+      installLogic = `    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+    elif command -v snap >/dev/null 2>&1; then
+      snap install ${binary} 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      break;
+    }
+    case "pip-apt": {
+      if (id === "azDo") {
+        installLogic = `    if command -v pip3 >/dev/null 2>&1; then
+      pip3 install azure-cli 2>"${logFile}" || { ${failureHandler} }
+    elif command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y -qq azure-cli 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi
+    az extension add --name azure-devops 2>/dev/null || true`;
+      } else {
+        installLogic = `    if command -v pip3 >/dev/null 2>&1; then
+      pip3 install ${binary} 2>"${logFile}" || { ${failureHandler} }
+    elif command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      }
+      break;
+    }
+    case "apt-keys": {
+      if (id === "gh") {
+        installLogic = `    if command -v apt-get >/dev/null 2>&1; then
+      type -p wget >/dev/null || (apt-get update -qq && apt-get install -y -qq wget)
+      wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+      chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      apt-get update -qq && apt-get install -y -qq gh 2>"${logFile}" || { ${failureHandler} }
+    elif command -v brew >/dev/null 2>&1; then
+      brew install gh 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      } else {
+        // Generic apt-keys (shouldn't happen but for safety)
+        installLogic = `    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+    else
+      ${installFailedNoPkg}
+    fi`;
+      }
+      break;
+    }
+    case "verified": {
+      if (id === "tailscale") {
+        installLogic = `    verified_install "__TAILSCALE_URL__" "__TAILSCALE_SHA__" "${logFile}" || { ${failureHandler} }`;
+      } else {
+        installLogic = `    verified_install "__${marker}_URL__" "__${marker}_SHA__" "${logFile}" || { ${failureHandler} }`;
+      }
+      break;
+    }
+    default: {
+      const _exhaustive: never = tool.strategy;
+      throw new Error(`Unknown install strategy: ${_exhaustive}`);
+    }
+  }
+
+  return `${header}
+${installLogic}
+${success}`;
+}
+
+/**
+ * Build the full launch script template dynamically from TOOL_DEFINITIONS.
+ * Only the mandatory loop-task install and daemon/opencode startup remain
+ * inline — all optional tool installs are generated from data.
+ */
+function buildLaunchScriptTemplate(): string {
+  const optionalBlocks = TOOL_DEFINITIONS
+    .map((t) => generateInstallBlock(t))
+    .join("\n\n");
+
+  // OpenCode has special post-install startup logic (separate port check)
+  // so we still need INSTALL_OPENCODE / OPENCODE_PORT placeholders. They are
+  // generated by the tool definition but referenced again in the startup.
+
+  return `
 set -e
 
 # ── Integrity-verified install function ──────────────────────────────
@@ -112,157 +269,8 @@ if [ -z "$DAEMON_SKIP" ]; then
   fi
 fi
 
-INSTALL_OPENCODE="__INSTALL_OPENCODE__"
-if [ -n "$INSTALL_OPENCODE" ]; then
-  if ! command -v opencode >/dev/null 2>&1; then
-    echo "OPENCODE_INSTALLING"
-    "$NODE_BIN" -e "const { execSync } = require('child_process'); execSync('__NPM_OPENCODE__', { stdio: 'inherit' });" 2>"$LAUNCH_DIR/install-oc.log" || {
-      echo "INSTALL_FAILED_OPENCODE"
-      cat "$LAUNCH_DIR/install-oc.log" 2>/dev/null
-      exit 1
-    }
-    echo "OPENCODE_INSTALLED"
-  fi
-fi
-
-# ── Optional: gh CLI (GitHub) ────────────────────────────────────
-INSTALL_GH="__INSTALL_GH__"
-if [ -n "$INSTALL_GH" ]; then
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "GH_INSTALLING"
-    if command -v apt-get >/dev/null 2>&1; then
-      type -p wget >/dev/null || (apt-get update -qq && apt-get install -y -qq wget)
-      wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
-      chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-      apt-get update -qq && apt-get install -y -qq gh 2>"$LAUNCH_DIR/install-gh.log" || { echo "INSTALL_FAILED_GH"; exit 1; }
-    elif command -v brew >/dev/null 2>&1; then
-      brew install gh 2>"$LAUNCH_DIR/install-gh.log" || { echo "INSTALL_FAILED_GH"; exit 1; }
-    else
-      echo "INSTALL_FAILED_GH|no apt-get or brew found"; exit 1
-    fi
-    echo "GH_INSTALLED"
-  fi
-fi
-
-# ── Optional: Azure DevOps CLI ───────────────────────────────────
-INSTALL_AZDO="__INSTALL_AZDO__"
-if [ -n "$INSTALL_AZDO" ]; then
-  if ! command -v az >/dev/null 2>&1; then
-    echo "AZDO_INSTALLING"
-    if command -v pip3 >/dev/null 2>&1; then
-      pip3 install azure-cli 2>"$LAUNCH_DIR/install-az.log" || { echo "INSTALL_FAILED_AZDO"; exit 1; }
-    elif command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq azure-cli 2>"$LAUNCH_DIR/install-az.log" || { echo "INSTALL_FAILED_AZDO"; exit 1; }
-    else
-      echo "INSTALL_FAILED_AZDO|no pip3 or apt-get found"; exit 1
-    fi
-    az extension add --name azure-devops 2>/dev/null || true
-    echo "AZDO_INSTALLED"
-  fi
-fi
-
-# ── Optional: Jira CLI (acli) ────────────────────────────────────
-INSTALL_JIRA="__INSTALL_JIRA__"
-if [ -n "$INSTALL_JIRA" ]; then
-  if ! command -v acli >/dev/null 2>&1; then
-    echo "JIRA_INSTALLING"
-    "$NODE_BIN" -e "const { execSync } = require('child_process'); execSync('__NPM_JIRA__', { stdio: 'inherit' });" 2>"$LAUNCH_DIR/install-jira.log" || { echo "INSTALL_FAILED_JIRA"; exit 1; }
-    echo "JIRA_INSTALLED"
-  fi
-fi
-
-# ── Optional: GitLab CLI (glab) ──────────────────────────────────
-INSTALL_GITLAB="__INSTALL_GITLAB__"
-if [ -n "$INSTALL_GITLAB" ]; then
-  if ! command -v glab >/dev/null 2>&1; then
-    echo "GITLAB_INSTALLING"
-    "$NODE_BIN" -e "const { execSync } = require('child_process'); execSync('__NPM_GITLAB__', { stdio: 'inherit' });" 2>"$LAUNCH_DIR/install-glab.log" || { echo "INSTALL_FAILED_GITLAB"; exit 1; }
-    echo "GITLAB_INSTALLED"
-  fi
-fi
-
-# ── Optional: Docker ─────────────────────────────────────────────
-INSTALL_DOCKER="__INSTALL_DOCKER__"
-if [ -n "$INSTALL_DOCKER" ]; then
-  if ! command -v docker >/dev/null 2>&1; then
-    echo "DOCKER_INSTALLING"
-    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq docker.io 2>"$LAUNCH_DIR/install-docker.log" || { echo "INSTALL_FAILED_DOCKER"; exit 1; }
-    elif command -v snap >/dev/null 2>&1; then
-      snap install docker 2>"$LAUNCH_DIR/install-docker.log" || { echo "INSTALL_FAILED_DOCKER"; exit 1; }
-    else
-      echo "INSTALL_FAILED_DOCKER|no apt-get or snap found"; exit 1
-    fi
-    echo "DOCKER_INSTALLED"
-  fi
-fi
-
-# ── Optional: Terraform ──────────────────────────────────────────
-INSTALL_TERRAFORM="__INSTALL_TERRAFORM__"
-if [ -n "$INSTALL_TERRAFORM" ]; then
-  if ! command -v terraform >/dev/null 2>&1; then
-    echo "TERRAFORM_INSTALLING"
-    if command -v apt-get >/dev/null 2>&1; then
-      wget -qO- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg 2>/dev/null
-      echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
-      apt-get update -qq && apt-get install -y -qq terraform 2>"$LAUNCH_DIR/install-tf.log" || { echo "INSTALL_FAILED_TERRAFORM"; exit 1; }
-    elif command -v brew >/dev/null 2>&1; then
-      brew install terraform 2>"$LAUNCH_DIR/install-tf.log" || { echo "INSTALL_FAILED_TERRAFORM"; exit 1; }
-    else
-      echo "INSTALL_FAILED_TERRAFORM|no apt-get or brew found"; exit 1
-    fi
-    echo "TERRAFORM_INSTALLED"
-  fi
-fi
-
-# ── Optional: Tailscale ──────────────────────────────────────────
-INSTALL_TAILSCALE="__INSTALL_TAILSCALE__"
-if [ -n "$INSTALL_TAILSCALE" ]; then
-  if ! command -v tailscale >/dev/null 2>&1; then
-    echo "TAILSCALE_INSTALLING"
-    verified_install "__TAILSCALE_URL__" "__TAILSCALE_SHA__" "$LAUNCH_DIR/install-tailscale.log" || { echo "INSTALL_FAILED_TAILSCALE"; exit 1; }
-    echo "TAILSCALE_INSTALLED"
-  fi
-fi
-
-# ── Optional: Claude CLI ─────────────────────────────────────────
-INSTALL_CLAUDE="__INSTALL_CLAUDE__"
-if [ -n "$INSTALL_CLAUDE" ]; then
-  if ! command -v claude >/dev/null 2>&1; then
-    echo "CLAUDE_INSTALLING"
-    "$NODE_BIN" -e "const { execSync } = require('child_process'); execSync('__NPM_CLAUDE__', { stdio: 'inherit' });" 2>"$LAUNCH_DIR/install-claude.log" || { echo "INSTALL_FAILED_CLAUDE"; exit 1; }
-    echo "CLAUDE_INSTALLED"
-  fi
-fi
-
-# ── Optional: jq ─────────────────────────────────────────────────
-INSTALL_JQ="__INSTALL_JQ__"
-if [ -n "$INSTALL_JQ" ]; then
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "JQ_INSTALLING"
-    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq jq 2>"$LAUNCH_DIR/install-jq.log" || { echo "INSTALL_FAILED_JQ"; exit 1; }
-    else
-      echo "INSTALL_FAILED_JQ|no apt-get found"; exit 1
-    fi
-    echo "JQ_INSTALLED"
-  fi
-fi
-
-# ── Optional: ripgrep ────────────────────────────────────────────
-INSTALL_RIPGREP="__INSTALL_RIPGREP__"
-if [ -n "$INSTALL_RIPGREP" ]; then
-  if ! command -v rg >/dev/null 2>&1; then
-    echo "RIPGREP_INSTALLING"
-    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq ripgrep 2>"$LAUNCH_DIR/install-rg.log" || { echo "INSTALL_FAILED_RIPGREP"; exit 1; }
-    else
-      echo "INSTALL_FAILED_RIPGREP|no apt-get found"; exit 1
-    fi
-    echo "RIPGREP_INSTALLED"
-  fi
-fi
+# ── Optional tool installs (generated from TOOL_DEFINITIONS) ───────
+${optionalBlocks}
 
 # ── Start loop-task daemon (bound to loopback) ───────────────────
 if [ -z "$DAEMON_SKIP" ]; then
@@ -291,6 +299,9 @@ fi
 
 echo "LAUNCH_DONE"
 `;
+}
+
+const LAUNCH_SCRIPT_TEMPLATE = buildLaunchScriptTemplate();
 
 const TAIL_LOG_SCRIPT = `
 LAUNCH_DIR="$HOME/.orbion/ssh-launch/__HASH__"
@@ -299,6 +310,26 @@ if [ -f "$LAUNCH_DIR/daemon.log" ]; then
 fi
 `;
 
+// ─── Marker parsing ─────────────────────────────────────────────
+
+/** Pre-computed marker maps for fast stdout line parsing */
+const INSTALLED_MARKER_TO_ID = new Map<string, string>();
+const FAILED_MARKER_PREFIX_TO_ID = new Map<string, string>();
+
+for (const tool of TOOL_DEFINITIONS) {
+  const marker = tool.id.toUpperCase();
+  INSTALLED_MARKER_TO_ID.set(`${marker}_INSTALLED`, tool.id);
+  FAILED_MARKER_PREFIX_TO_ID.set(`INSTALL_FAILED_${marker}`, tool.id);
+}
+
+/** Map of npmKey -> tool id for placeholder replacement */
+const NPM_KEY_TO_MARKER = new Map<string, string>();
+for (const tool of TOOL_DEFINITIONS) {
+  if (tool.npmKey) {
+    NPM_KEY_TO_MARKER.set(tool.npmKey, tool.id.toUpperCase());
+  }
+}
+
 export async function launchOnVm(
   host: SshHost,
   probeResult: {
@@ -306,37 +337,23 @@ export async function launchOnVm(
     daemonPort: number | null;
     opencodeRunning: boolean;
     opencodePort: number | null;
-    installOpenCode: boolean;
-    installGh: boolean;
-    installAzDo: boolean;
-    installJira: boolean;
-    installGitlab: boolean;
-    installDocker: boolean;
-    installTerraform: boolean;
-    installTailscale: boolean;
-    installClaudeCli: boolean;
-    installJq: boolean;
-    installRipgrep: boolean;
+    installTools: Record<string, boolean>;
   },
 ): Promise<VmWizardLaunchResult> {
+  // Initialize all tool statuses to "pending"
+  const toolStatuses: Record<string, VmWizardServiceStatus> = {};
+  for (const tool of TOOL_DEFINITIONS) {
+    toolStatuses[tool.id] = "pending";
+  }
+
   const result: VmWizardLaunchResult = {
     started: false,
     daemonPort: null,
     opencodePort: null,
     errorDetail: null,
     logTail: null,
-    loopTaskStatus: "pending",    // mandatory, always runs
-    openCodeStatus: "pending",
-    ghStatus: "pending",
-    azDoStatus: "pending",
-    jiraStatus: "pending",
-    gitlabStatus: "pending",
-    dockerStatus: "pending",
-    terraformStatus: "pending",
-    tailscaleStatus: "pending",
-    claudeStatus: "pending",
-    jqStatus: "pending",
-    ripgrepStatus: "pending",
+    loopTaskStatus: "pending",
+    toolStatuses,
   };
 
   // Validate host fields before using them in any command construction
@@ -352,7 +369,6 @@ export async function launchOnVm(
   const opencodePort = probeResult.opencodePort ?? DEFAULT_OPENCODE_PORT;
 
   // Validate hash and port numbers before substituting into shell scripts.
-  // hashForHost() always returns hex, but we validate defensively.
   validateHash(hash);
   assertSafePort(daemonPort, "daemonPort");
   assertSafePort(opencodePort, "opencodePort");
@@ -362,44 +378,45 @@ export async function launchOnVm(
     result.daemonPort = probeResult.daemonPort;
     result.loopTaskStatus = "already-running";
     result.opencodePort = probeResult.opencodeRunning ? (probeResult.opencodePort ?? DEFAULT_OPENCODE_PORT) : opencodePort;
-    result.openCodeStatus = probeResult.opencodeRunning ? "already-running" : "pending";
+    result.toolStatuses.openCode = probeResult.opencodeRunning ? "already-running" : "pending";
   }
 
-  if (!probeResult.installOpenCode) result.openCodeStatus = "skipped";
-  if (!probeResult.installGh) result.ghStatus = "skipped";
-  if (!probeResult.installAzDo) result.azDoStatus = "skipped";
-  if (!probeResult.installJira) result.jiraStatus = "skipped";
-  if (!probeResult.installGitlab) result.gitlabStatus = "skipped";
-  if (!probeResult.installDocker) result.dockerStatus = "skipped";
-  if (!probeResult.installTerraform) result.terraformStatus = "skipped";
-  if (!probeResult.installTailscale) result.tailscaleStatus = "skipped";
-  if (!probeResult.installClaudeCli) result.claudeStatus = "skipped";
-  if (!probeResult.installJq) result.jqStatus = "skipped";
-  if (!probeResult.installRipgrep) result.ripgrepStatus = "skipped";
+  // Mark tools as "skipped" when not selected for install
+  for (const tool of TOOL_DEFINITIONS) {
+    if (!probeResult.installTools[tool.id]) {
+      result.toolStatuses[tool.id] = "skipped";
+    }
+  }
 
-  const script = LAUNCH_SCRIPT_TEMPLATE
+  // Build placeholder replacements dynamically
+  let script = LAUNCH_SCRIPT_TEMPLATE
     .replace(/__HASH__/g, hash)
     .replace(/__VERIFIED_INSTALL_FN__/g, VERIFIED_INSTALL_FN)
     .replace(/__TAILSCALE_URL__/g, TAILSCALE_INSTALL.url)
     .replace(/__TAILSCALE_SHA__/g, TAILSCALE_INSTALL.sha256)
-    .replace(/__NPM_LOOP_TASK__/g, pinnedNpmInstall("loopTask"))
-    .replace(/__NPM_OPENCODE__/g, pinnedNpmInstall("openCode"))
-    .replace(/__NPM_JIRA__/g, pinnedNpmInstall("jira"))
-    .replace(/__NPM_GITLAB__/g, pinnedNpmInstall("gitlab"))
-    .replace(/__NPM_CLAUDE__/g, pinnedNpmInstall("claude"))
+    .replace(/__NPM_LOOP_TASK__/g, pinnedNpmInstall("loopTask"));
+
+  // Replace npm install placeholders for npm-strategy tools
+  for (const [npmKey, marker] of NPM_KEY_TO_MARKER) {
+    script = script.replace(
+      new RegExp(`__NPM_${marker}__`, "g"),
+      pinnedNpmInstall(npmKey as keyof typeof import("./verified-install.js").NPM_PACKAGES),
+    );
+  }
+
+  // Replace port placeholders
+  script = script
     .replace(/__DAEMON_PORT__/g, String(daemonPort))
-    .replace(/__OPENCODE_PORT__/g, String(opencodePort))
-    .replace(/__INSTALL_OPENCODE__/g, probeResult.installOpenCode ? "1" : "")
-    .replace(/__INSTALL_GH__/g, probeResult.installGh ? "1" : "")
-    .replace(/__INSTALL_AZDO__/g, probeResult.installAzDo ? "1" : "")
-    .replace(/__INSTALL_JIRA__/g, probeResult.installJira ? "1" : "")
-    .replace(/__INSTALL_GITLAB__/g, probeResult.installGitlab ? "1" : "")
-    .replace(/__INSTALL_DOCKER__/g, probeResult.installDocker ? "1" : "")
-    .replace(/__INSTALL_TERRAFORM__/g, probeResult.installTerraform ? "1" : "")
-    .replace(/__INSTALL_TAILSCALE__/g, probeResult.installTailscale ? "1" : "")
-    .replace(/__INSTALL_CLAUDE__/g, probeResult.installClaudeCli ? "1" : "")
-    .replace(/__INSTALL_JQ__/g, probeResult.installJq ? "1" : "")
-    .replace(/__INSTALL_RIPGREP__/g, probeResult.installRipgrep ? "1" : "");
+    .replace(/__OPENCODE_PORT__/g, String(opencodePort));
+
+  // Replace install flag placeholders for all tools
+  for (const tool of TOOL_DEFINITIONS) {
+    const marker = tool.id.toUpperCase();
+    script = script.replace(
+      new RegExp(`__INSTALL_${marker}__`, "g"),
+      probeResult.installTools[tool.id] ? "1" : "",
+    );
+  }
 
   const launchResult = await sshExec(host, script);
 
@@ -416,23 +433,19 @@ export async function launchOnVm(
       } else if (trimmed === "INSTALL_FAILED_LOOP_TASK") {
         result.errorDetail = msg("vmWizard.mainInstallLoopTaskFailed");
         result.loopTaskStatus = "failed";
-      } else if (trimmed === "INSTALL_FAILED_OPENCODE") {
-        result.errorDetail = msg("vmWizard.mainInstallOpenCodeFailed");
-        result.openCodeStatus = "failed";
       } else if (trimmed.startsWith("DAEMON_PORT_BUSY|")) {
         result.errorDetail = msg("vmWizard.mainDaemonPortBusy", { port: daemonPort });
       } else if (trimmed.startsWith("OPENCODE_PORT_BUSY|")) {
         result.errorDetail = msg("vmWizard.mainOpenCodePortBusy", { port: opencodePort });
-      } else if (trimmed.startsWith("INSTALL_FAILED_GH")) { result.ghStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_AZDO")) { result.azDoStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_JIRA")) { result.jiraStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_GITLAB")) { result.gitlabStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_DOCKER")) { result.dockerStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_TERRAFORM")) { result.terraformStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_TAILSCALE")) { result.tailscaleStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_CLAUDE")) { result.claudeStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_JQ")) { result.jqStatus = "failed"; }
-        else if (trimmed.startsWith("INSTALL_FAILED_RIPGREP")) { result.ripgrepStatus = "failed"; }
+      } else {
+        // Check dynamic tool failure markers
+        for (const [prefix, toolId] of FAILED_MARKER_PREFIX_TO_ID) {
+          if (trimmed.startsWith(prefix)) {
+            result.toolStatuses[toolId] = "failed";
+            break;
+          }
+        }
+      }
     }
 
     return result;
@@ -446,22 +459,23 @@ export async function launchOnVm(
     } else if (trimmed.startsWith("DAEMON_STARTED|")) {
       result.daemonPort = parseInt(trimmed.split("|")[1] ?? String(daemonPort), 10);
       result.loopTaskStatus = "started";
-    } else if (trimmed === "LOOP_TASK_INSTALLED") { result.loopTaskStatus = "installed"; }
-      else if (trimmed.startsWith("OPENCODE_STARTED|")) {
-        result.opencodePort = parseInt(trimmed.split("|")[1] ?? String(opencodePort), 10);
-        result.openCodeStatus = "started";
-      } else if (trimmed === "OPENCODE_INSTALLED") { result.openCodeStatus = "installed"; }
-        else if (trimmed.startsWith("OPENCODE_PORT_BUSY|")) { result.opencodePort = null; result.openCodeStatus = "already-running"; }
-        else if (trimmed === "GH_INSTALLED") { result.ghStatus = "installed"; }
-        else if (trimmed === "AZDO_INSTALLED") { result.azDoStatus = "installed"; }
-        else if (trimmed === "JIRA_INSTALLED") { result.jiraStatus = "installed"; }
-        else if (trimmed === "GITLAB_INSTALLED") { result.gitlabStatus = "installed"; }
-        else if (trimmed === "DOCKER_INSTALLED") { result.dockerStatus = "installed"; }
-        else if (trimmed === "TERRAFORM_INSTALLED") { result.terraformStatus = "installed"; }
-        else if (trimmed === "TAILSCALE_INSTALLED") { result.tailscaleStatus = "installed"; }
-        else if (trimmed === "CLAUDE_INSTALLED") { result.claudeStatus = "installed"; }
-        else if (trimmed === "JQ_INSTALLED") { result.jqStatus = "installed"; }
-        else if (trimmed === "RIPGREP_INSTALLED") { result.ripgrepStatus = "installed"; }
+    } else if (trimmed === "LOOP_TASK_INSTALLED") {
+      result.loopTaskStatus = "installed";
+    } else if (trimmed.startsWith("OPENCODE_STARTED|")) {
+      result.opencodePort = parseInt(trimmed.split("|")[1] ?? String(opencodePort), 10);
+      result.toolStatuses.openCode = "started";
+    } else if (trimmed === "OPENCODE_INSTALLED") {
+      result.toolStatuses.openCode = "installed";
+    } else if (trimmed.startsWith("OPENCODE_PORT_BUSY|")) {
+      result.opencodePort = null;
+      result.toolStatuses.openCode = "already-running";
+    } else {
+      // Check dynamic installed markers
+      const toolId = INSTALLED_MARKER_TO_ID.get(trimmed);
+      if (toolId) {
+        result.toolStatuses[toolId] = "installed";
+      }
+    }
   }
 
   result.started = true;
@@ -481,12 +495,12 @@ export async function createPairingCodeOnRemote(host: SshHost, daemonPort: numbe
   // daemonPort is validated as a safe integer 1–65535 above, so
   // String(daemonPort) can only contain digits.
   const script = `curl -s http://127.0.0.1:${String(daemonPort)}/api/pair/create 2>/dev/null || echo "PAIR_CREATE_FAILED"`;
-  const result = await sshExec(host, script);
+  const sshResult = await sshExec(host, script);
 
-  if (result.code !== 0) return null;
+  if (sshResult.code !== 0) return null;
 
   try {
-    const parsed = JSON.parse(result.stdout) as { ok?: boolean; code?: string; error?: { message?: string } };
+    const parsed = JSON.parse(sshResult.stdout) as { ok?: boolean; code?: string; error?: { message?: string } };
     if (parsed.ok && parsed.code) return parsed.code;
     return null;
   } catch {
@@ -509,8 +523,8 @@ export async function readRemoteLog(host: SshHost, hash: string): Promise<string
     return null;
   }
   const script = TAIL_LOG_SCRIPT.replace(/__HASH__/g, hash);
-  const result = await sshExec(host, script);
-  return result.stdout.trim() || null;
+  const sshResult = await sshExec(host, script);
+  return sshResult.stdout.trim() || null;
 }
 
 export { hashForHost, validateHash };
