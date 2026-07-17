@@ -40,10 +40,23 @@ function isValidHttpUrl(v: unknown): v is string {
   }
 }
 
-function isAllowedPath(v: unknown): v is string {
+export function isAllowedPath(v: unknown): v is string {
   if (!isString(v)) return false;
-  // Must start with / and must not contain path traversal
-  return v.startsWith("/") && !v.includes("..");
+  // Must start with /api/ — only API paths are valid targets
+  if (!v.startsWith("/api/")) return false;
+  // Reasonable length limit to prevent abuse
+  if (v.length > 512) return false;
+  // Decode to catch URL-encoded traversal (%2e%2e → ..)
+  try {
+    const decoded = decodeURIComponent(v);
+    if (decoded.includes("..")) return false;
+  } catch {
+    return false; // malformed encoding
+  }
+  // Reject raw encoded dot forms (%2e, %2E) and double-encoding (%25)
+  if (/%2e/i.test(v)) return false;
+  if (/%25/i.test(v)) return false;
+  return true;
 }
 
 function isEnum<T extends string>(v: unknown, values: readonly T[]): v is T {
@@ -87,7 +100,7 @@ const validators: Record<string, Validator> = {
     }
     const a = args[0] as Record<string, unknown>;
     if (!isValidHttpUrl(a.baseUrl)) issues.push("baseUrl must be a valid http/https URL");
-    if (!isAllowedPath(a.path)) issues.push("path must start with / and not contain ..");
+    if (!isAllowedPath(a.path)) issues.push("path must start with /api/ and not contain path traversal or encoded sequences");
     if (a.method !== undefined && !isEnum(a.method, API_METHODS))
       issues.push("method must be one of GET, POST, PATCH, DELETE");
     if (a.timeoutMs !== undefined && !isNumber(a.timeoutMs))
@@ -106,7 +119,7 @@ const validators: Record<string, Validator> = {
     const a = args[0] as Record<string, unknown>;
     if (!isNonEmptyString(a.subId)) issues.push("subId must be a non-empty string");
     if (!isValidHttpUrl(a.baseUrl)) issues.push("baseUrl must be a valid http/https URL");
-    if (!isAllowedPath(a.path)) issues.push("path must start with / and not contain ..");
+    if (!isAllowedPath(a.path)) issues.push("path must start with /api/ and not contain path traversal or encoded sequences");
     return issues;
   },
 

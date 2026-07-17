@@ -157,9 +157,6 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   if (!isAllowedBaseUrl(args.baseUrl)) {
     return { ok: false, status: 0, error: msg("vmWizard.mainInvalidEnvUrl", { url: args.baseUrl }) };
   }
-  if (!args.path.startsWith("/") || args.path.includes("..")) {
-    return { ok: false, status: 0, error: "Invalid API path" };
-  }
 
   const envId = findEnvironmentIdByUrl(args.baseUrl);
   const token = envId ? getSessionToken(envId) : null;
