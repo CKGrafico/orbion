@@ -452,5 +452,15 @@
     "invalidThreshold": "Threshold must be a positive number",
     "loopRequired": "Loop ID is required for loop-scope watches",
     "environmentRequired": "Environment is required for loop-scope watches"
+  },
+  "inbox": {
+    "title": "Inbox",
+    "emptyMessage": "All clear! Ask a question about your fleet below.",
+    "queryPlaceholder": "Ask about your fleet…",
+    "sendQuery": "Ask",
+    "itemNeedsAttention": "needs attention",
+    "breach": "budget breach",
+    "failedLoop": "failed loop",
+    "instanceOffline": "instance offline"
   }
 }

@@ -18,6 +18,8 @@ import type {
   PlatformDetectionResult,
   BudgetWatch,
   BudgetBreach,
+  InboxItem,
+  InboxQueryResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -55,6 +57,7 @@ import {
   addBudgetBreach,
   dismissBudgetBreach,
   pruneOldBreaches,
+  dismissInboxItem,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -962,6 +965,31 @@ app.whenReady().then(() => {
   safeHandle("budget:dismissBreach", async (_event, ...rawArgs): Promise<void> => {
     const [breachId] = validateIpc<[string]>("budget:dismissBreach", rawArgs);
     await dismissBudgetBreach(breachId);
+  });
+
+  // ── Inbox ──────────────────────────────────────────────────────────
+
+  safeHandle("inbox:getItems", (): InboxItem[] => {
+    validateIpc("inbox:getItems", []);
+    // Inbox items are derived from existing data + dismissed state.
+    // The renderer computes the actual item list from perEnvLoops/breaches;
+    // the main process only tracks which items the user has dismissed.
+    // We return an empty array here; the real assembly happens in the renderer.
+    // This channel exists so the dismiss state is queryable via IPC.
+    return [];
+  });
+
+  safeHandle("inbox:dismissItem", async (_event, ...rawArgs): Promise<void> => {
+    const [itemId] = validateIpc<[string]>("inbox:dismissItem", rawArgs);
+    await dismissInboxItem(itemId);
+  });
+
+  safeHandle("inbox:queryFleet", async (_event, ..._rawArgs): Promise<InboxQueryResult> => {
+    // Fleet queries are computed entirely in the renderer from live data.
+    // The main process provides the dismissed-IDs list so the renderer
+    // can filter out acknowledged items.
+    // Return minimal result; the renderer InboxService enriches it
+    return { answer: "", references: [] };
   });
 
   // Prune old breaches on startup

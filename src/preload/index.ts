@@ -21,6 +21,8 @@ import type {
   PlatformType,
   BudgetWatch,
   BudgetBreach,
+  InboxItem,
+  InboxQueryResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -182,6 +184,15 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("budget:addBreach", breach) as Promise<BudgetBreach>,
     dismissBreach: (breachId: string) =>
       ipcRenderer.invoke("budget:dismissBreach", breachId) as Promise<void>,
+  },
+
+  inbox: {
+    getItems: () =>
+      ipcRenderer.invoke("inbox:getItems") as Promise<InboxItem[]>,
+    dismissItem: (itemId: string) =>
+      ipcRenderer.invoke("inbox:dismissItem", itemId) as Promise<void>,
+    queryFleet: (question: string) =>
+      ipcRenderer.invoke("inbox:queryFleet", question) as Promise<InboxQueryResult>,
   },
 };
 

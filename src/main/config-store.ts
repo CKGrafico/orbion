@@ -40,6 +40,7 @@ interface ConfigSchema {
   sessionTokens: Record<string, EncryptedSessionToken>;
   budgetWatches: BudgetWatch[];
   budgetBreaches: BudgetBreach[];
+  inboxDismissedIds: string[];
   [key: string]: unknown;
 }
 
@@ -53,6 +54,7 @@ const store = new Store<ConfigSchema>({
     sessionTokens: {},
     budgetWatches: [],
     budgetBreaches: [],
+    inboxDismissedIds: [],
   },
 });
 
@@ -587,6 +589,36 @@ export function dismissBudgetBreach(breachId: string): Promise<void> {
 
 export function pruneOldBreaches(): Promise<void> {
   return serialize(() => _pruneOldBreaches());
+}
+
+// ---------------------------------------------------------------------------
+// Inbox dismissed items
+// ---------------------------------------------------------------------------
+
+function _getInboxDismissedIds(): string[] {
+  return store.get("inboxDismissedIds", []);
+}
+
+function _dismissInboxItem(itemId: string): void {
+  const ids = new Set(_getInboxDismissedIds());
+  ids.add(itemId);
+  store.set("inboxDismissedIds", [...ids]);
+}
+
+function _isInboxItemDismissed(itemId: string): boolean {
+  return _getInboxDismissedIds().includes(itemId);
+}
+
+export function getInboxDismissedIds(): string[] {
+  return _getInboxDismissedIds();
+}
+
+export function dismissInboxItem(itemId: string): Promise<void> {
+  return serialize(() => _dismissInboxItem(itemId));
+}
+
+export function isInboxItemDismissed(itemId: string): boolean {
+  return _isInboxItemDismissed(itemId);
 }
 
 // ---------------------------------------------------------------------------

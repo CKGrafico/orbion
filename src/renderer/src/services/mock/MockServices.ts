@@ -20,6 +20,8 @@ import type {
   PlatformType,
   BudgetWatch,
   BudgetBreach,
+  InboxItem,
+  InboxQueryResult,
 } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
@@ -33,6 +35,8 @@ import type {
   ITailscaleService,
   INotificationService,
   IBudgetService,
+  IInboxService,
+  InboxBuildParams,
 } from "../interfaces";
 
 const now = Date.now();
@@ -327,4 +331,87 @@ export class MockBudgetService implements IBudgetService {
   }
   async pauseLoop(): Promise<ApiResponse> { return { ok: true, status: 200 }; }
   async resumeLoop(): Promise<ApiResponse> { return { ok: true, status: 200 }; }
+}
+
+let mockDismissedIds: Set<string> = new Set();
+
+@injectable()
+export class MockInboxService implements IInboxService {
+  async getDismissedIds(): Promise<string[]> { return [...mockDismissedIds]; }
+  async dismissItem(itemId: string): Promise<void> { mockDismissedIds.add(itemId); }
+  buildItems(params: InboxBuildParams): InboxItem[] {
+    // Delegate to the real InboxService logic (imported statically)
+    // but for mock, we keep it simple with basic item derivation.
+    const { perEnvLoops, perEnvHealth, environments, breaches } = params;
+    const items: InboxItem[] = [];
+
+    for (const breach of breaches) {
+      if (breach.dismissed || mockDismissedIds.has(`breach:${breach.id}`)) continue;
+      items.push({
+        id: `breach:${breach.id}`,
+        kind: "breach",
+        environmentId: breach.environmentId,
+        environmentName: breach.environmentName,
+        loopId: breach.loopId,
+        title: breach.loopDescription,
+        detail: `${breach.runsToday}/${breach.threshold} runs`,
+        occurredAt: breach.breachedAt,
+        dismissed: false,
+      });
+    }
+
+    for (const env of environments) {
+      const health = perEnvHealth[env.id];
+      if (health === "offline" || health === "unknown") {
+        if (!mockDismissedIds.has(`offline:${env.id}`)) {
+          items.push({
+            id: `offline:${env.id}`,
+            kind: "instance-offline",
+            environmentId: env.id,
+            environmentName: env.name,
+            title: env.name,
+            detail: "offline",
+            occurredAt: new Date().toISOString(),
+            dismissed: false,
+          });
+        }
+        continue;
+      }
+      const envLoops = perEnvLoops[env.id] ?? [];
+      for (const loop of envLoops) {
+        if (loop.lastExitCode !== null && loop.lastExitCode !== 0) {
+          const itemId = `failed-loop:${env.id}:${loop.id}`;
+          if (mockDismissedIds.has(itemId)) continue;
+          items.push({
+            id: itemId,
+            kind: "failed-loop",
+            environmentId: env.id,
+            environmentName: env.name,
+            loopId: loop.id,
+            title: loop.description?.trim() || loop.id,
+            detail: `exit ${loop.lastExitCode}`,
+            occurredAt: loop.lastRunAt ?? new Date().toISOString(),
+            dismissed: false,
+          });
+        }
+      }
+    }
+
+    items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+    return items;
+  }
+
+  queryFleet(question: string, params: InboxBuildParams): InboxQueryResult {
+    const items = this.buildItems(params);
+    if (items.length === 0) {
+      return { answer: "All clear! Nothing needs your attention right now.", references: [] };
+    }
+    const lines: string[] = [`**${items.length} items need attention:**\n`];
+    const refs: InboxItem[] = [];
+    for (const item of items.slice(0, 10)) {
+      refs.push(item);
+      lines.push(`- [${item.title}](inbox://${item.id}) on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
+    }
+    return { answer: lines.join("\n"), references: refs };
+  }
 }
