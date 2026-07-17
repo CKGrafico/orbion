@@ -19,6 +19,8 @@ vi.mock("../ssh-tunnel.js", () => ({
   }),
   getTunnelId: vi.fn((host, remotePort) => `${host.user}@${host.hostName}:${remotePort}`),
   findExistingTunnel: vi.fn((_host, _remotePort) => undefined),
+  onTunnelExit: vi.fn(),
+  isTunnelAlive: vi.fn((_tunnelId: string) => true),
 }));
 
 vi.mock("../ssh-config.js", () => ({
@@ -49,6 +51,8 @@ import {
   getTunnelLocalPort,
   openTunnelsForEnvironment,
   getTunneledEnvironmentIds,
+  isTunnelReconnecting,
+  onTunnelReconnect,
 } from "../tunnel-registry";
 import type { AccessEndpoint } from "../../shared/ipc.js";
 
@@ -313,5 +317,26 @@ describe("closeAllRegistryTunnels", () => {
     expect(getTunnelLocalPort("env-1", "ep-1")).toBeNull();
     expect(getTunnelLocalPort("env-2", "ep-2")).toBeNull();
     expect(getTunneledEnvironmentIds()).toEqual(new Set());
+  });
+});
+
+// ── Tunnel auto-reconnect ─────────────────────────────────────────────
+
+describe("isTunnelReconnecting", () => {
+  it("returns false when no tunnel is registered", () => {
+    expect(isTunnelReconnecting("env-x", "ep-x")).toBe(false);
+  });
+
+  it("returns false when tunnel is open and not reconnecting", async () => {
+    const ep = makeSshEndpoint();
+    await openTunnelForEndpoint("env-1", ep);
+    expect(isTunnelReconnecting("env-1", "ep-1")).toBe(false);
+  });
+});
+
+describe("onTunnelReconnect callback", () => {
+  it("accepts a callback registration without error", () => {
+    const cb = vi.fn();
+    expect(() => onTunnelReconnect(cb)).not.toThrow();
   });
 });

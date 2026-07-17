@@ -142,6 +142,14 @@ There is no separate server; the **Electron main process is the backend**
   response body, splits on `\n\n`, and forwards `data:` / `event:` lines to the
   renderer as `stream:event` messages. Subscriptions are tracked in a
   `Map<subId, AbortController>` for clean teardown.
+- **Tunnel auto-reconnect** (`tunnel-registry.ts` + `ssh-tunnel.ts`) — when
+  an SSH tunnel process exits unexpectedly (network blip, keepalive timeout),
+  the registry automatically retries reopening it with exponential backoff
+  (1 s → 16 s cap, indefinite retry). `ssh-tunnel.ts` fires an `onTunnelExit`
+  callback for unexpected exits (distinguishing them from intentional closes
+  via `closeTunnel()`). On successful reconnect, `tunnel-registry.ts` invokes
+  the registered `onTunnelReconnect` callback, which `index.ts` uses to wake
+  up the connection supervisor so it probes immediately.
 - **Config store** (`config-store.ts`) — manages instance and selection state
   via `electron-store` (typed JSON in `userData`). Exposes CRUD operations
   (`getInstances`, `addInstance`, `removeInstance`, `getSelectedInstanceId`,
@@ -307,6 +315,13 @@ keys, writes them into electron-store, and clears the keys. The renderer's
 - **Failure behavior:** 10s request timeout → structured error; failed polls
   flip the instance health dot to `offline`; SSE `error`/`end` closes the
   subscription. Errors are surfaced in the UI rather than thrown.
+  SSH tunnel processes that exit unexpectedly are automatically reconnected
+  with exponential backoff (1 s → 2 s → 4 s → 8 s → 16 s cap, indefinite
+  retry). On successful tunnel reconnect, the connection supervisor is
+  woken up immediately so it probes and transitions to `connected` without
+  waiting for its own backoff timer. No error dialog is shown; the only
+  visual signal is the health dot transitioning through connecting/backoff
+  phases (orange) back to connected (green).
 - **Config location:** instance URLs are stored in `electron-store` (main process),
   entered via `AddInstanceModal`, and accessed through the typed IPC contract.
 

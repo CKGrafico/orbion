@@ -5,14 +5,32 @@ import { msg } from "./i18n.js";
 
 const TUNNEL_CONNECT_TIMEOUT_MS = 15_000;
 
+export interface TunnelExitEvent {
+  tunnelId: string;
+  host: SshHost;
+  localPort: number;
+  remotePort: number;
+  exitCode: number | null;
+}
+
 interface TunnelHandle {
   process: ChildProcess;
   localPort: number;
   remotePort: number;
   host: SshHost;
+  /** True if closeTunnel() was called intentionally (not an unexpected exit). */
+  intentionalClose: boolean;
 }
 
 const activeTunnels = new Map<string, TunnelHandle>();
+
+/** Global callback invoked when a tunnel process exits unexpectedly. */
+let tunnelExitCallback: ((event: TunnelExitEvent) => void) | null = null;
+
+/** Register a callback for unexpected tunnel exits. Only one listener is supported. */
+export function onTunnelExit(cb: (event: TunnelExitEvent) => void): void {
+  tunnelExitCallback = cb;
+}
 
 export function openTunnel(
   host: SshHost,
@@ -40,6 +58,11 @@ export function openTunnel(
       errorDetail: null,
     });
   }
+
+  // Track whether this handle has been registered yet (set after the promise resolves
+  // and the handle enters activeTunnels). This prevents the exit handler from firing
+  // for pre-resolution exits (auth failures, etc.).
+  let registered = false;
 
   const args: string[] = [];
 
@@ -72,8 +95,9 @@ export function openTunnel(
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        const handle: TunnelHandle = { process: proc, localPort, remotePort, host };
+        const handle: TunnelHandle = { process: proc, localPort, remotePort, host, intentionalClose: false };
         activeTunnels.set(tunnelId, handle);
+        registered = true;
         resolve({
           forwarded: true,
           localPort,
@@ -122,7 +146,10 @@ export function openTunnel(
     });
 
     proc.on("exit", (code) => {
+      const handle = activeTunnels.get(tunnelId);
+      const wasIntentional = handle?.intentionalClose ?? false;
       activeTunnels.delete(tunnelId);
+
       if (!resolved) {
         resolved = true;
         clearTimeout(timeout);
@@ -130,6 +157,18 @@ export function openTunnel(
           forwarded: false,
           localPort: null,
           errorDetail: msg("vmWizard.mainTunnelExited", { code: code ?? -1, detail: stderrBuf.trim() }),
+        });
+        return;
+      }
+
+      // After initial resolution: unexpected exit (not closeTunnel-initiated)
+      if (registered && !wasIntentional && tunnelExitCallback) {
+        tunnelExitCallback({
+          tunnelId,
+          host,
+          localPort,
+          remotePort,
+          exitCode: code,
         });
       }
     });
@@ -139,6 +178,7 @@ export function openTunnel(
 export function closeTunnel(tunnelId: string): void {
   const handle = activeTunnels.get(tunnelId);
   if (handle) {
+    handle.intentionalClose = true;
     handle.process.kill();
     activeTunnels.delete(tunnelId);
   }
@@ -160,4 +200,10 @@ export function findExistingTunnel(host: SshHost, remotePort: number): TunnelHan
   const handle = activeTunnels.get(tunnelId);
   if (handle && handle.process.exitCode === null) return handle;
   return undefined;
+}
+
+/** Check if a tunnel process is still alive by its tunnelId. */
+export function isTunnelAlive(tunnelId: string): boolean {
+  const handle = activeTunnels.get(tunnelId);
+  return handle !== undefined && handle.process.exitCode === null;
 }

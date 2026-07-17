@@ -95,6 +95,7 @@ import {
   closeTunnelsForEnvironment,
   resolveEffectiveUrl,
   closeAllRegistryTunnels,
+  onTunnelReconnect,
 } from "./tunnel-registry.js";
 
 const streams = new Map<string, AbortController>();
@@ -129,6 +130,21 @@ const outageTracker = new OutageTracker(
     }
   },
 );
+
+// Wire tunnel auto-reconnect into the connection supervisor.
+// When a tunnel drops, the supervisor will see probe failures and enter backoff.
+// When the tunnel reconnects, wake up the supervisor immediately so it probes
+// and transitions to "connected" without waiting for its own backoff timer.
+onTunnelReconnect((environmentId: string, _endpointId: string, reconnecting: boolean) => {
+  if (!reconnecting) {
+    // Tunnel is back — wake up the supervisor and endpoint tracker
+    const supervisor = supervisors.get(environmentId);
+    if (supervisor) supervisor.wakeup();
+
+    const tracker = endpointTrackers.get(environmentId);
+    if (tracker) tracker.wakeup();
+  }
+});
 
 /** Cache: `${environmentId}:${projectId}` → detected platform. In-memory, session-scoped. */
 const platformCache = new Map<string, PlatformType>();
