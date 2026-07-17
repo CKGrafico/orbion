@@ -50,10 +50,14 @@ const MOCK_LOOPS: LoopMeta[] = [
     { runNumber: 142, startedAt: iso(-300000), exitCode: 0, duration: 4500, logSize: 1024, status: "completed", logOffset: 0 },
     { runNumber: 141, startedAt: iso(-600000), exitCode: 0, duration: 4200, logSize: 980, status: "completed", logOffset: 0 },
     { runNumber: 140, startedAt: iso(-900000), exitCode: 1, duration: 1200, logSize: 512, status: "completed", logOffset: 0 },
+    { runNumber: 139, startedAt: iso(-1200000), exitCode: 0, duration: 4600, logSize: 1040, status: "completed", logOffset: 0 },
+    { runNumber: 138, startedAt: iso(-1500000), exitCode: 0, duration: 4300, logSize: 990, status: "completed", logOffset: 0 },
+    { runNumber: 137, startedAt: iso(-1800000), exitCode: 0, duration: 4100, logSize: 960, status: "completed", logOffset: 0 },
   ] }),
   mockLoop({ id: "loop-2", status: "waiting", command: "pnpm test", intervalHuman: "10m", runCount: 88, lastExitCode: 0, lastRunAt: iso(-600000), nextRunAt: iso(400000), runHistory: [
     { runNumber: 88, startedAt: iso(-600000), exitCode: 0, duration: 3200, logSize: 768, status: "completed", logOffset: 0 },
     { runNumber: 87, startedAt: iso(-1200000), exitCode: 0, duration: 2800, logSize: 720, status: "completed", logOffset: 0 },
+    { runNumber: 86, startedAt: iso(-1800000), exitCode: 0, duration: 3100, logSize: 740, status: "completed", logOffset: 0 },
   ] }),
   mockLoop({ id: "loop-3", status: "stopped", command: "docker compose up", intervalHuman: "1h", runCount: 12, lastExitCode: 1, lastRunAt: iso(-7200000), runHistory: [
     { runNumber: 12, startedAt: iso(-7200000), exitCode: 1, duration: 5400, logSize: 2048, status: "completed", logOffset: 0 },

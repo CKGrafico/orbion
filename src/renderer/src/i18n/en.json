@@ -283,7 +283,15 @@
     "statusWaiting": "waiting",
     "statusPaused": "paused",
     "statusIdle": "idle",
-    "statusStopped": "stopped"
+    "statusStopped": "stopped",
+    "activityToday": "Runs today",
+    "activityAvgDuration": "Avg duration",
+    "activityLastDuration": "Last run duration"
+  },
+  "activitySummary": {
+    "runsToday": "{count} today",
+    "avgDuration": "avg {value}",
+    "lastDuration": "last {value}"
   },
   "logs": {
     "title": "Logs",

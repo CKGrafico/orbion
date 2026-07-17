@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import type { Environment, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
-import { STATUS_COLORS, commandLine, timeAgo, timeUntil } from "../format";
+import { STATUS_COLORS, commandLine, timeAgo, timeUntil, runsToday, avgDuration, lastRunDuration, formatDurationShort } from "../format";
 import { LogViewer } from "./LogViewer";
 import { ArrowLeft } from "lucide-react";
 
@@ -84,6 +84,32 @@ export function LoopDetail(props: {
                 {loop.maxRuns ? ` / ${loop.maxRuns}` : ""}
               </div>
             </div>
+            {(() => {
+              const todayCount = runsToday(loop.runHistory);
+              const avg = avgDuration(loop.runHistory);
+              const lastDur = lastRunDuration(loop.runHistory);
+              if (todayCount === 0 && avg === null && lastDur === null) return null;
+              return (
+                <>
+                  <div className="meta-item">
+                    <div className="label">{intl.formatMessage({ id: "loopDetail.activityToday" })}</div>
+                    <div className="value">{todayCount}</div>
+                  </div>
+                  {avg !== null ? (
+                    <div className="meta-item">
+                      <div className="label">{intl.formatMessage({ id: "loopDetail.activityAvgDuration" })}</div>
+                      <div className="value">{formatDurationShort(avg)}</div>
+                    </div>
+                  ) : null}
+                  {lastDur !== null ? (
+                    <div className="meta-item">
+                      <div className="label">{intl.formatMessage({ id: "loopDetail.activityLastDuration" })}</div>
+                      <div className="value">{formatDurationShort(lastDur)}</div>
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()}
             <div className="meta-item">
               <div className="label">{intl.formatMessage({ id: "loopDetail.pid" })}</div>
               <div className="value">{loop.pid ?? "-"}</div>
