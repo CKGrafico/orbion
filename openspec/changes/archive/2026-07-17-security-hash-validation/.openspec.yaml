@@ -1,0 +1,3 @@
+name: security-hash-validation
+description: Fix command injection vulnerability via unvalidated hash parameter in readRemoteLog shell template
+status: archived
