@@ -4,12 +4,14 @@ import type { ConnectionStatus } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
-import { X, Plus, ChevronRight, Search, ArrowUpDown, Link } from "lucide-react";
+import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
+import { FleetHealthFooter } from "./FleetHealthFooter";
 import { translateMessage } from "../i18n";
 
 type View =
+  | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
   | { kind: "loop"; loopId: string };
@@ -65,6 +67,18 @@ function LoopStatusDot({ status, lastExitCode }: LoopStatusDotProps): React.Reac
   return <span className="tree-dot" style={{ background: color }} />;
 }
 
+/** Check whether a project-instance node has any failed loops on a reachable instance. */
+function projectHasFailedLoop(
+  loops: LoopMeta[],
+  envId: string,
+  health: Record<string, EnvironmentHealth>,
+): boolean {
+  const h = health[envId] ?? "unknown";
+  // Unreachable instances (offline, blocked, unknown) must NOT trigger the pip
+  if (h !== "ok" && h !== "connecting" && h !== "backoff") return false;
+  return loops.some((loop) => loopStatusToFleetItem(loop.status, loop.lastExitCode) === "failed");
+}
+
 /** A flattened project-instance node for the 2-level tree */
 interface ProjectInstanceNode {
   key: string;          // composite key: `${envId}::${projectId}`
@@ -88,11 +102,20 @@ export function Sidebar(props: {
   onNavigate: (view: View) => void;
   onAddVm?: () => void;
   fleetActivityEnabled?: boolean;
+  /** Number of unread inbox items (drives the badge). */
+  inboxItemCount?: number;
+  /** Navigate to a specific loop (env + loopId). */
+  onNavigateToLoop?: (envId: string, loopId: string) => void;
+  /** Navigate to a specific project (env + projectId). */
+  onNavigateToProject?: (envId: string, projectId: string) => void;
+  /** Navigate to the inbox view. */
+  onNavigateToInbox?: () => void;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
-    onSelect, onAddVm, fleetActivityEnabled,
+    onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
+    onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
   } = props;
   const intl = useIntl();
 
@@ -198,6 +221,22 @@ export function Sidebar(props: {
 
   return (
     <div className="sidebar">
+      {/* Inbox entry — fleet-wide, above projects */}
+      <div
+        className={`sidebar-inbox-entry${view.kind === "inbox" ? " selected" : ""}`}
+        onClick={() => onNavigate({ kind: "inbox" })}
+        role="button"
+        tabIndex={0}
+      >
+        <span className="sidebar-inbox-icon"><Inbox size={14} /></span>
+        <span className="sidebar-inbox-label">{intl.formatMessage({ id: "sidebar.inbox" })}</span>
+        {(inboxItemCount ?? 0) > 0 ? (
+          <span className="sidebar-inbox-badge">{inboxItemCount}</span>
+        ) : null}
+      </div>
+
+      <div className="sidebar-divider" />
+
       {/* Search input */}
       <div className="sidebar-search-wrap">
         <Search size={13} className="sidebar-search-icon" />
@@ -277,7 +316,12 @@ export function Sidebar(props: {
                     hasChildren={hasChildren}
                     onClick={(e) => { e.stopPropagation(); toggleProject(node.key); }}
                   />
-                  <span className="tree-dot" style={{ background: node.projectColor }} />
+                  <span className="tree-dot-wrap">
+                    <span className="tree-dot" style={{ background: node.projectColor }} />
+                    {projectHasFailedLoop(node.loops, node.envId, health) ? (
+                      <span className="tree-dot-pip" title={intl.formatMessage({ id: "sidebar.projectHasFailure" })} />
+                    ) : null}
+                  </span>
                   <span className="tree-label">{node.projectName}</span>
                   {hasMultipleEnvs ? (
                     <span className="tree-instance-badge">{node.envName}</span>
@@ -330,6 +374,25 @@ export function Sidebar(props: {
       </div>
 
       <div className="sidebar-footer">
+        <FleetHealthFooter
+          environments={environments}
+          health={health}
+          perEnvLoops={perEnvLoops}
+          onNavigateToLoop={(envId, loopId) => {
+            onSelect(envId);
+            onNavigateToLoop?.(envId, loopId);
+          }}
+          onNavigateToProject={(envId, projectId) => {
+            onSelect(envId);
+            onNavigateToProject?.(envId, projectId);
+          }}
+          onNavigateToInbox={() => {
+            onNavigateToInbox?.();
+          }}
+          onSelectEnvironment={(envId) => {
+            onSelect(envId);
+          }}
+        />
         {fleetActivityEnabled !== false ? (
           <FleetActivityReadout
             perEnvLoops={perEnvLoops}

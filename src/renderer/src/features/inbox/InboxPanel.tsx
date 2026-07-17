@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
-import type { InboxItem, InboxQueryResult } from "../../../../shared/ipc";
+import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem } from "../../../../shared/ipc";
 import type { BudgetBreach, ConditionWatch } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
-import { ArrowUp, Inbox, X, Search } from "lucide-react";
+import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
+import { timeAgo } from "../../format";
 
 interface InboxPanelProps {
   perEnvLoops: Record<string, LoopMeta[]>;
@@ -15,8 +16,11 @@ interface InboxPanelProps {
   environments: Environment[];
   breaches: BudgetBreach[];
   trippedWatches?: ConditionWatch[];
+  escalatedOutages: Map<string, OutageEscalation>;
   onClickItem: (item: InboxItem) => void;
   onDismissItem: (itemId: string) => void;
+  /** Called when the user triggers "Open in chat" on an inbox item. */
+  onOpenInChat: (item: InboxItem) => void;
 }
 
 interface QueryTurn {
@@ -31,8 +35,10 @@ export function InboxPanel({
   environments,
   breaches,
   trippedWatches,
+  escalatedOutages,
   onClickItem,
   onDismissItem,
+  onOpenInChat,
 }: InboxPanelProps): React.ReactNode {
   const intl = useIntl();
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
@@ -40,6 +46,8 @@ export function InboxPanel({
   const [queryText, setQueryText] = useState("");
   const [queryTurns, setQueryTurns] = useState<QueryTurn[]>([]);
   const [isQuerying, setIsQuerying] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const [resolvedItems, setResolvedItems] = useState<ResolvedInboxItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load dismissed IDs on mount
@@ -52,6 +60,17 @@ export function InboxPanel({
     return () => { cancelled = true; };
   }, [inboxService]);
 
+  // Load resolved items when Done tab is active
+  useEffect(() => {
+    if (!showDone) return;
+    let cancelled = false;
+    void inboxService.getResolvedItems().then((items) => {
+      if (cancelled) return;
+      setResolvedItems(items);
+    });
+    return () => { cancelled = true; };
+  }, [inboxService, showDone]);
+
   // Build inbox items from live data
   const buildParams = useMemo<InboxBuildParams>(() => ({
     perEnvLoops,
@@ -60,9 +79,26 @@ export function InboxPanel({
     breaches,
     dismissedIds,
     trippedWatches: trippedWatches ?? [],
-  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, trippedWatches]);
+    escalatedOutages,
+  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, trippedWatches, escalatedOutages]);
 
   const items = useMemo(() => inboxService.buildItems(buildParams), [inboxService, buildParams]);
+
+  // Auto-resolution detection: diff previous and current active items
+  const prevItemsRef = useRef<InboxItem[]>([]);
+  useEffect(() => {
+    const prevItems = prevItemsRef.current;
+    const currentIds = new Set(items.map((i) => i.id));
+    const autoResolved = inboxService.detectAutoResolutions(prevItems, currentIds, dismissedIds);
+
+    if (autoResolved.length > 0) {
+      for (const resolved of autoResolved) {
+        void inboxService.resolveItem(resolved);
+      }
+    }
+
+    prevItemsRef.current = items;
+  }, [items, inboxService, dismissedIds]);
 
   // Handle submitting a query
   const handleSubmitQuery = useCallback(() => {
@@ -107,6 +143,17 @@ export function InboxPanel({
     [inboxService, onDismissItem],
   );
 
+  const handleExecuteAction = useCallback(
+    async (item: InboxItem, action: InboxAction) => {
+      const result = await inboxService.executeInboxAction(item, action);
+      if (action === "dismiss" && result.ok) {
+        setDismissedIds((prev) => new Set([...prev, item.id]));
+      }
+      // Action results are reflected on next poll cycle (5s) per existing architecture
+    },
+    [inboxService],
+  );
+
   const activeItemCount = items.length;
 
   return (
@@ -114,49 +161,88 @@ export function InboxPanel({
       <div className="inbox-header">
         <Inbox size={14} />
         <span className="overline">{intl.formatMessage({ id: "inbox.title" })}</span>
-        {activeItemCount > 0 ? (
+        {activeItemCount > 0 && !showDone ? (
           <span className="chip inbox-count">{activeItemCount}</span>
         ) : null}
+        <div className="inbox-tabs">
+          <button
+            className={`inbox-tab ${!showDone ? "inbox-tab-active" : ""}`}
+            onClick={() => setShowDone(false)}
+          >
+            {intl.formatMessage({ id: "inbox.tabActive" })}
+          </button>
+          <button
+            className={`inbox-tab ${showDone ? "inbox-tab-active" : ""}`}
+            onClick={() => setShowDone(true)}
+          >
+            {intl.formatMessage({ id: "inbox.tabDone" })}
+          </button>
+        </div>
       </div>
 
       {/* Query conversation area */}
       <div className="inbox-scroll" ref={scrollRef}>
-        {/* Active items list */}
-        {items.length > 0 && queryTurns.length === 0 ? (
-          <div className="inbox-items-list">
-            {items.map((item) => (
-              <InboxItemRow
-                key={item.id}
-                item={item}
-                onClick={onClickItem}
-                onDismiss={handleDismiss}
-              />
+        {!showDone ? (
+          <>
+            {/* Active items list */}
+            {items.length > 0 && queryTurns.length === 0 ? (
+              <div className="inbox-items-list">
+                {items.map((item) => (
+                  <InboxItemRow
+                    key={item.id}
+                    item={item}
+                    onClick={onClickItem}
+                    onDismiss={handleDismiss}
+                    onExecuteAction={handleExecuteAction}
+                    onOpenInChat={onOpenInChat}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {/* Query turns */}
+            {queryTurns.map((turn) => (
+              <div key={turn.id} className="inbox-query-turn">
+                <div className="inbox-query-question">
+                  <span className="inbox-query-icon">?</span>
+                  <span>{turn.question}</span>
+                </div>
+                <div className="inbox-query-answer">
+                  <InboxAnswerContent
+                    answer={turn.result.answer}
+                    references={turn.result.references}
+                    onClickReference={onClickItem}
+                  />
+                </div>
+              </div>
             ))}
-          </div>
-        ) : null}
 
-        {/* Query turns */}
-        {queryTurns.map((turn) => (
-          <div key={turn.id} className="inbox-query-turn">
-            <div className="inbox-query-question">
-              <span className="inbox-query-icon">?</span>
-              <span>{turn.question}</span>
-            </div>
-            <div className="inbox-query-answer">
-              <InboxAnswerContent
-                answer={turn.result.answer}
-                references={turn.result.references}
-                onClickReference={onClickItem}
-              />
-            </div>
-          </div>
-        ))}
-
-        {items.length === 0 && queryTurns.length === 0 ? (
-          <div className="inbox-empty">
-            <p>{intl.formatMessage({ id: "inbox.emptyMessage" })}</p>
-          </div>
-        ) : null}
+            {items.length === 0 && queryTurns.length === 0 ? (
+              <div className="inbox-empty">
+                <p>{intl.formatMessage({ id: "inbox.emptyMessage" })}</p>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {/* Done / Resolved items list */}
+            {resolvedItems.length > 0 ? (
+              <div className="inbox-items-list">
+                {resolvedItems.map((ri) => (
+                  <ResolvedItemRow
+                    key={ri.item.id}
+                    resolved={ri}
+                    intl={intl}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="inbox-empty">
+                <p>{intl.formatMessage({ id: "inbox.doneEmptyMessage" })}</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Composer */}
@@ -191,19 +277,63 @@ function InboxItemRow({
   item,
   onClick,
   onDismiss,
+  onExecuteAction,
+  onOpenInChat,
 }: {
   item: InboxItem;
   onClick: (item: InboxItem) => void;
   onDismiss: (itemId: string) => void;
+  onExecuteAction: (item: InboxItem, action: InboxAction) => Promise<void>;
+  onOpenInChat: (item: InboxItem) => void;
 }): React.ReactNode {
-  const kindIcon = item.kind === "breach" ? "!" : item.kind === "failed-loop" ? "x" : item.kind === "instance-offline" ? "-" : item.kind === "watch-tripped" ? "w" : "?";
-  const kindClass = item.kind === "breach" || item.kind === "failed-loop"
+  const intl = useIntl();
+  const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
+
+  const typeIcon = item.notificationType === "failure" ? "!" : item.notificationType === "finished" ? "✓" : item.notificationType === "watch" ? "!" : item.notificationType === "digest" ? "≡" : "?";
+  const typeClass = item.notificationType === "failure"
     ? "inbox-item-dot-danger"
-    : item.kind === "instance-offline"
+    : item.notificationType === "finished"
+    ? "inbox-item-dot-success"
+    : item.notificationType === "watch"
     ? "inbox-item-dot-warning"
-    : item.kind === "watch-tripped"
+    : item.notificationType === "digest"
     ? "inbox-item-dot-info"
     : "inbox-item-dot-info";
+
+  const handleAction = useCallback(async (action: InboxAction, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (executingAction) return;
+
+    if (action === "open-in-chat") {
+      onOpenInChat(item);
+      return;
+    }
+
+    setExecutingAction(action);
+    try {
+      await onExecuteAction(item, action);
+    } finally {
+      setExecutingAction(null);
+    }
+  }, [executingAction, item, onExecuteAction, onOpenInChat]);
+
+  const actionIcon = (action: InboxAction): React.ReactNode => {
+    switch (action) {
+      case "run-now": return <Play size={10} />;
+      case "pause": return <Pause size={10} />;
+      case "resume": return <Play size={10} />;
+      case "restart": return <RotateCw size={10} />;
+      case "dismiss": return <X size={10} />;
+      case "open-in-chat": return <MessageSquare size={10} />;
+    }
+  };
+
+  const actionLabel = (action: InboxAction): string => {
+    return intl.formatMessage({ id: `inbox.action.${action}` });
+  };
+
+  // Filter out dismiss — it already has its own button position
+  const inlineActions = item.availableActions.filter((a) => a !== "dismiss");
 
   return (
     <div
@@ -212,7 +342,7 @@ function InboxItemRow({
       role="button"
       tabIndex={0}
     >
-      <span className={`inbox-item-dot ${kindClass}`}>{kindIcon}</span>
+      <span className={`inbox-item-dot ${typeClass}`}>{typeIcon}</span>
       <div className="inbox-item-info">
         <span className="inbox-item-title">{item.title}</span>
         <span className="inbox-item-meta">
@@ -220,16 +350,69 @@ function InboxItemRow({
           {item.detail ? ` · ${item.detail}` : ""}
         </span>
       </div>
-      <button
-        className="icon-btn inbox-item-dismiss"
-        title="Dismiss"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDismiss(item.id);
-        }}
-      >
-        <X size={11} />
-      </button>
+      {/* Inline action buttons */}
+      {inlineActions.length > 0 || item.availableActions.includes("dismiss") ? (
+        <div className="inbox-item-actions">
+          {inlineActions.map((action) => (
+            <button
+              key={action}
+              className={`inbox-action-btn ${executingAction === action ? "inbox-action-btn-loading" : ""}`}
+              title={actionLabel(action)}
+              onClick={(e) => handleAction(action, e)}
+              disabled={executingAction !== null}
+            >
+              {executingAction === action ? (
+                <span className="inbox-action-spinner" />
+              ) : (
+                actionIcon(action)
+              )}
+              <span className="inbox-action-label">{actionLabel(action)}</span>
+            </button>
+          ))}
+          {item.availableActions.includes("dismiss") ? (
+            <button
+              className="icon-btn inbox-item-dismiss"
+              title={intl.formatMessage({ id: "inbox.action.dismiss" })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss(item.id);
+              }}
+              disabled={executingAction !== null}
+            >
+              <X size={11} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Resolved inbox item row for the Done view */
+function ResolvedItemRow({
+  resolved,
+  intl,
+}: {
+  resolved: ResolvedInboxItem;
+  intl: ReturnType<typeof useIntl>;
+}): React.ReactNode {
+  const { item, resolvedAt, resolution } = resolved;
+  const reasonText = intl.formatMessage({ id: `inbox.resolution.${resolution}` });
+  const resolvedAgo = timeAgo(resolvedAt);
+
+  return (
+    <div className="inbox-item-row inbox-item-row-resolved">
+      <span className="inbox-item-dot inbox-item-dot-resolved">
+        <CheckCircle2 size={11} />
+      </span>
+      <div className="inbox-item-info">
+        <span className="inbox-item-title">{item.title}</span>
+        <span className="inbox-item-meta">
+          {item.environmentName}
+          {item.detail ? ` · ${item.detail}` : ""}
+          {" · "}{reasonText} · {resolvedAgo}
+        </span>
+      </div>
     </div>
   );
 }

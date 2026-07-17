@@ -14,6 +14,9 @@ import type {
   InfraActionResult,
   CreateIssueParams,
   CreateIssueResult,
+  ListIssuesParams,
+  ListIssuesResult,
+  IssueCard,
   PlatformType,
   PlatformDetectionResult,
   BudgetWatch,
@@ -21,8 +24,14 @@ import type {
   InboxItem,
   InboxQueryResult,
   ConditionWatch,
+  AddLabelParams,
+  AddLabelResult,
+  EditIssueParams,
+  EditIssueResult,
+  OutageEscalation,
+  ResolvedInboxItem,
 } from "../shared/ipc.js";
-import type { Environment, SessionScope } from "../shared/ipc.js";
+import type { Environment, SessionScope, NotificationSendArgs } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { classifyPlatform, parseGitRemoteOutput } from "./platform-classifier.js";
@@ -64,6 +73,11 @@ import {
   tripConditionWatch,
   pruneTrippedWatches,
   dismissInboxItem,
+  addResolvedItem,
+  getResolvedItems,
+  pruneResolvedItems,
+  getProjectPickupLabels,
+  setProjectPickupLabels,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -78,8 +92,41 @@ import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent
 import { msg } from "./i18n.js";
 import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
+import { NotificationService } from "./notification-service.js";
+import { OutageTracker } from "./outage-tracker.js";
 
 const streams = new Map<string, AbortController>();
+
+const notificationService = new NotificationService();
+
+const outageTracker = new OutageTracker(
+  (event: OutageEscalation) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("outage:escalation", event);
+    }
+
+    // Send OS notification for prolonged outage
+    const envs = getEnvironments();
+    const env = envs.find((e: Environment) => e.id === event.environmentId);
+    const envName = env?.name ?? event.environmentId;
+    const durationMin = Math.round(event.durationMs / 60_000);
+
+    notificationService.send({
+      title: `${envName} has been unreachable for ${durationMin}m`,
+      body: `The instance went offline at ${new Date(event.since).toLocaleTimeString()}. It will self-resolve when reconnected.`,
+      tag: `outage:${event.environmentId}`,
+      deepLink: { kind: "instance", environmentId: event.environmentId },
+      suppressIfFocused: false,
+    });
+  },
+  (environmentId: string) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("outage:resolve", environmentId);
+    }
+  },
+);
 
 /** Cache: `${environmentId}:${projectId}` → detected platform. In-memory, session-scoped. */
 const platformCache = new Map<string, PlatformType>();
@@ -98,6 +145,8 @@ function getOrCreateSupervisor(environmentId: string, baseUrl: string): Connecti
       if (win) {
         win.webContents.send("connection:status", environmentId, status);
       }
+      // Feed status changes to the outage tracker
+      outageTracker.handleStatusChange(environmentId, status);
     },
   );
   supervisors.set(environmentId, supervisor);
@@ -134,6 +183,7 @@ function removeSupervisor(environmentId: string): void {
     tracker.destroy();
     endpointTrackers.delete(environmentId);
   }
+  outageTracker.removeEnvironment(environmentId);
 }
 
 function wakeupAll(): void {
@@ -692,6 +742,16 @@ app.whenReady().then(() => {
     return getMainVmId();
   });
 
+  safeHandle("config:getProjectPickupLabels", (_event, ...rawArgs) => {
+    const [projectId] = validateIpc<[string]>("config:getProjectPickupLabels", rawArgs);
+    return getProjectPickupLabels(projectId);
+  });
+
+  safeHandle("config:setProjectPickupLabels", async (_event, ...rawArgs) => {
+    const [projectId, labels] = validateIpc<[string, string[]]>("config:setProjectPickupLabels", rawArgs);
+    await setProjectPickupLabels(projectId, labels);
+  });
+
   safeHandle("infra:executeAction", async (_event, ...rawArgs): Promise<InfraActionResult> => {
     const [args] = validateIpc<[InfraActionArgs]>("infra:executeAction", rawArgs);
     const mainVmEnv = getMainVm();
@@ -917,10 +977,242 @@ app.whenReady().then(() => {
           });
         });
       }
+      case "list-issues": {
+        return handleListIssues(args);
+      }
+      case "add-label": {
+        const params = args.params as AddLabelParams | undefined;
+        if (!params?.issueNumber || !params.labels?.length) {
+          return { ok: false, error: msg("labels.issueNumberAndLabelsRequired") };
+        }
+
+        const cliCheck = await checkPlatformCli();
+        if (!cliCheck || cliCheck.cli !== "gh" || !cliCheck.authenticated) {
+          return { ok: false, error: msg("labels.ghRequiredForLabels") };
+        }
+
+        const labelArgs: string[] = [
+          "issue", "edit", String(params.issueNumber),
+          "--add-label", params.labels.join(","),
+        ];
+        if (params.repo) {
+          labelArgs.push("--repo", params.repo);
+        }
+
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("gh", labelArgs, (err, _stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: msg("labels.addFailed", { detail: stderr || err.message }) });
+              return;
+            }
+            const result: AddLabelResult = {
+              issueNumber: params.issueNumber,
+              labels: params.labels,
+            };
+            resolve({ ok: true, data: result });
+          });
+        });
+      }
+      case "edit-issue": {
+        const params = args.params as EditIssueParams | undefined;
+        if (!params?.issueNumber) {
+          return { ok: false, error: msg("editIssue.issueNumberRequired") };
+        }
+        if (!params.title && !params.body && !params.addLabels?.length && !params.removeLabels?.length) {
+          return { ok: false, error: msg("editIssue.noChanges") };
+        }
+
+        const cachedPlatform = args.params?.projectId
+          ? platformCache.get(platformCacheKey(mainVmEnv.id, args.params.projectId as string))
+          : undefined;
+
+        let preferredCli: "gh" | "az" | null = null;
+        if (cachedPlatform === "github") {
+          preferredCli = "gh";
+        } else if (cachedPlatform === "ado") {
+          preferredCli = "az";
+        }
+
+        const cliCheck = await checkPlatformCli();
+        if (!cliCheck && !preferredCli) {
+          return { ok: false, error: msg("editIssue.noPlatformCli") };
+        }
+
+        let useCli: "gh" | "az";
+        if (preferredCli) {
+          if (preferredCli === "gh" && cliCheck?.cli === "gh" && cliCheck.authenticated) {
+            useCli = "gh";
+          } else if (preferredCli === "az" && cliCheck?.cli === "az" && cliCheck.authenticated) {
+            useCli = "az";
+          } else if (cliCheck && cliCheck.authenticated) {
+            useCli = cliCheck.cli;
+          } else {
+            if (!cliCheck) {
+              return { ok: false, error: msg("editIssue.noPlatformCli") };
+            }
+            if (cliCheck.cli === "gh") {
+              return { ok: false, error: msg("editIssue.ghNotAuth") };
+            }
+            return { ok: false, error: msg("editIssue.azNotAuth") };
+          }
+        } else {
+          if (!cliCheck) {
+            return { ok: false, error: msg("editIssue.noPlatformCli") };
+          }
+          if (!cliCheck.authenticated) {
+            if (cliCheck.cli === "gh") {
+              return { ok: false, error: msg("editIssue.ghNotAuth") };
+            }
+            return { ok: false, error: msg("editIssue.azNotAuth") };
+          }
+          useCli = cliCheck.cli;
+        }
+
+        // Azure DevOps: label operations are not supported via az boards CLI
+        if (useCli === "az" && (params.addLabels?.length || params.removeLabels?.length)) {
+          return { ok: false, error: msg("editIssue.adoLabelsNotSupported") };
+        }
+
+        if (useCli === "gh") {
+          const ghArgs: string[] = ["issue", "edit", String(params.issueNumber)];
+          if (params.title) {
+            ghArgs.push("--title", params.title);
+          }
+          if (params.body) {
+            ghArgs.push("--body", params.body);
+          }
+          if (params.addLabels?.length) {
+            ghArgs.push("--add-label", params.addLabels.join(","));
+          }
+          if (params.removeLabels?.length) {
+            ghArgs.push("--remove-label", params.removeLabels.join(","));
+          }
+          if (params.repo) {
+            ghArgs.push("--repo", params.repo);
+          }
+
+          const changes: EditIssueResult["changes"] = {};
+          if (params.title) changes.title = true;
+          if (params.body) changes.body = true;
+          if (params.addLabels?.length) changes.labelsAdded = params.addLabels;
+          if (params.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
+
+          return new Promise<InfraActionResult>((resolve) => {
+            execFile("gh", ghArgs, (err, _stdout, stderr) => {
+              if (err) {
+                resolve({ ok: false, error: msg("editIssue.editFailed", { detail: stderr || err.message }) });
+                return;
+              }
+              const result: EditIssueResult = {
+                platform: "github",
+                issueNumber: params.issueNumber,
+                changes,
+              };
+              resolve({ ok: true, data: result });
+            });
+          });
+        }
+
+        // az boards work-item update
+        const azArgs: string[] = [
+          "boards", "work-item", "update",
+          "--id", String(params.issueNumber),
+        ];
+        if (params.title) {
+          azArgs.push("--title", params.title);
+        }
+        if (params.body) {
+          azArgs.push("--description", params.body);
+        }
+
+        const changes: EditIssueResult["changes"] = {};
+        if (params.title) changes.title = true;
+        if (params.body) changes.body = true;
+
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("az", azArgs, (err, stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: msg("editIssue.editFailed", { detail: stderr || err.message }) });
+              return;
+            }
+            try {
+              const parsed = JSON.parse(stdout) as { id?: number };
+              const result: EditIssueResult = {
+                platform: "ado",
+                issueNumber: parsed.id ?? params.issueNumber,
+                changes,
+              };
+              resolve({ ok: true, data: result });
+            } catch {
+              resolve({ ok: false, error: msg("editIssue.editFailed", { detail: "Unexpected output from az CLI" }) });
+            }
+          });
+        });
+      }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
   });
+
+  // gh issue list JSON field names
+  interface GhIssueJson {
+    number: number;
+    title: string;
+    url: string;
+    labels: Array<{ name: string }>;
+    state: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  function handleListIssues(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as ListIssuesParams | undefined;
+    const labels = params?.labels;
+    const state = params?.state ?? "open";
+    const repo = params?.repo;
+    const limit = Math.min(params?.limit ?? 20, 100);
+
+    return new Promise<InfraActionResult>((resolve) => {
+      execFile("gh", ["issue", "list", "--json", "number,title,url,labels,state,createdAt,updatedAt", "--limit", String(limit), "--state", state, ...(labels ? ["--label", labels] : []), ...(repo ? ["--repo", repo] : [])], (err, stdout, stderr) => {
+        if (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code === "ENOENT") {
+            resolve({ ok: false, error: msg("issues.noPlatformCli") });
+            return;
+          }
+          resolve({ ok: false, error: msg("issues.listFailed", { detail: stderr || err.message }) });
+          return;
+        }
+
+        let parsed: GhIssueJson[];
+        try {
+          parsed = JSON.parse(stdout) as GhIssueJson[];
+        } catch {
+          resolve({ ok: false, error: msg("issues.listFailed", { detail: "Invalid output from gh CLI" }) });
+          return;
+        }
+
+        const issues: IssueCard[] = parsed.map((item) => ({
+          number: item.number,
+          title: item.title,
+          url: item.url,
+          labels: item.labels.map((l) => l.name),
+          state: (item.state === "closed" ? "closed" : "open") as "open" | "closed",
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        }));
+
+        const result: ListIssuesResult = {
+          platform: "github",
+          issues,
+          total: issues.length,
+          truncated: issues.length >= limit,
+        };
+
+        resolve({ ok: true, data: result });
+      });
+    });
+  }
 
   safeHandle("infra:getStatus", () => {
     validateIpc("infra:getStatus", []);
@@ -998,6 +1290,58 @@ app.whenReady().then(() => {
     return { answer: "", references: [] };
   });
 
+  safeHandle("inbox:resolveItem", async (_event, ...rawArgs): Promise<void> => {
+    const [resolved] = validateIpc<[ResolvedInboxItem]>("inbox:resolveItem", rawArgs);
+    await addResolvedItem(resolved);
+  });
+
+  safeHandle("inbox:getResolvedItems", (): ResolvedInboxItem[] => {
+    validateIpc("inbox:getResolvedItems", []);
+    return getResolvedItems();
+  });
+
+  safeHandle("inbox:pruneResolvedItems", async (): Promise<void> => {
+    await pruneResolvedItems();
+  });
+
+  // ── Native OS notifications ─────────────────────────────────────────
+
+  safeHandle("notification:send", (_event, ...rawArgs): void => {
+    const [args] = validateIpc<[NotificationSendArgs]>("notification:send", rawArgs);
+    notificationService.send(args);
+  });
+
+  safeHandle("notification:setMuted", (_event, ...rawArgs): void => {
+    const [muted] = validateIpc<[boolean]>("notification:setMuted", rawArgs);
+    notificationService.setMuted(muted);
+  });
+
+  safeHandle("notification:isMuted", (): boolean => {
+    validateIpc("notification:isMuted", []);
+    return notificationService.isMuted();
+  });
+
+  // ── Outage escalation ────────────────────────────────────────────
+
+  safeHandle("outage:getEscalations", (): OutageEscalation[] => {
+    validateIpc("outage:getEscalations", []);
+    const envs = getEnvironments();
+    const result: OutageEscalation[] = [];
+    for (const env of envs) {
+      if (outageTracker.isEscalated(env.id)) {
+        const since = outageTracker.getOutageSince(env.id);
+        if (since) {
+          result.push({
+            environmentId: env.id,
+            since: new Date(since).toISOString(),
+            durationMs: Date.now() - since,
+          });
+        }
+      }
+    }
+    return result;
+  });
+
   // Prune old breaches on startup
   void pruneOldBreaches();
 
@@ -1028,6 +1372,9 @@ app.whenReady().then(() => {
 
   void autoPromoteFirstEnvIfNeeded();
   createWindow();
+
+  // Dispatch any pending deep-link from a cold-start notification click
+  setTimeout(() => notificationService.dispatchPendingDeepLink(), 1500);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -23,7 +23,11 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ResolvedInboxItem,
   ConditionWatch,
+  NotificationSendArgs,
+  DeepLinkTarget,
+  OutageEscalation,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -73,6 +77,10 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:setMainVm", environmentId) as Promise<void>,
     getMainVmId: () =>
       ipcRenderer.invoke("config:getMainVmId") as Promise<string | null>,
+    getProjectPickupLabels: (projectId: string) =>
+      ipcRenderer.invoke("config:getProjectPickupLabels", projectId) as Promise<string[]>,
+    setProjectPickupLabels: (projectId: string, labels: string[]) =>
+      ipcRenderer.invoke("config:setProjectPickupLabels", projectId, labels) as Promise<void>,
   },
 
   connection: {
@@ -194,6 +202,12 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("inbox:dismissItem", itemId) as Promise<void>,
     queryFleet: (question: string) =>
       ipcRenderer.invoke("inbox:queryFleet", question) as Promise<InboxQueryResult>,
+    resolveItem: (resolved: ResolvedInboxItem) =>
+      ipcRenderer.invoke("inbox:resolveItem", resolved) as Promise<void>,
+    getResolvedItems: () =>
+      ipcRenderer.invoke("inbox:getResolvedItems") as Promise<ResolvedInboxItem[]>,
+    pruneResolvedItems: () =>
+      ipcRenderer.invoke("inbox:pruneResolvedItems") as Promise<void>,
   },
 
   watch: {
@@ -205,6 +219,56 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("watch:removeWatch", watchId) as Promise<void>,
     tripWatch: (watchId: string) =>
       ipcRenderer.invoke("watch:tripWatch", watchId) as Promise<void>,
+  },
+
+  notification: {
+    send: (args: NotificationSendArgs) =>
+      ipcRenderer.invoke("notification:send", args) as Promise<void>,
+    setMuted: (muted: boolean) =>
+      ipcRenderer.invoke("notification:setMuted", muted) as Promise<void>,
+    isMuted: () =>
+      ipcRenderer.invoke("notification:isMuted") as Promise<boolean>,
+    onClick: (cb: (deepLink: DeepLinkTarget) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        deepLink: DeepLinkTarget,
+      ): void => {
+        cb(deepLink);
+      };
+      ipcRenderer.on("notification:navigate", listener);
+      return () => {
+        ipcRenderer.removeListener("notification:navigate", listener);
+      };
+    },
+  },
+
+  outage: {
+    onEscalation: (cb: (event: OutageEscalation) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        event: OutageEscalation,
+      ): void => {
+        cb(event);
+      };
+      ipcRenderer.on("outage:escalation", listener);
+      return () => {
+        ipcRenderer.removeListener("outage:escalation", listener);
+      };
+    },
+    onResolve: (cb: (environmentId: string) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        environmentId: string,
+      ): void => {
+        cb(environmentId);
+      };
+      ipcRenderer.on("outage:resolve", listener);
+      return () => {
+        ipcRenderer.removeListener("outage:resolve", listener);
+      };
+    },
+    getEscalations: () =>
+      ipcRenderer.invoke("outage:getEscalations") as Promise<OutageEscalation[]>,
   },
 };
 

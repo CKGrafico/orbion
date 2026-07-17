@@ -79,6 +79,14 @@ export interface Environment {
   infraOpenCode?: OpenCodeEndpoint | null;
 }
 
+// ── Session home scope ──────────────────────────────────────────────
+
+/** The home scope of a chat session. When null, the session is un-homed (fleet tier). */
+export interface SessionHomeScope {
+  environmentId: string;
+  projectId: string;
+}
+
 export interface ConfigBridge {
   getEnvironments: () => Promise<Environment[]>;
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
@@ -95,6 +103,10 @@ export interface ConfigBridge {
   setInfraOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) => Promise<SetOpenCodeEndpointResult>;
   setMainVm: (environmentId: string) => Promise<void>;
   getMainVmId: () => Promise<string | null>;
+  getProjectPickupLabels: (projectId: string) => Promise<string[]>;
+  setProjectPickupLabels: (projectId: string, labels: string[]) => Promise<void>;
+  getSessionScopes: () => Promise<Record<string, SessionHomeScope | null>>;
+  setSessionScope: (sessionId: string, scope: SessionHomeScope | null) => Promise<void>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────
@@ -120,7 +132,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue";
 
 export interface CreateIssueParams {
   title: string;
@@ -136,11 +148,80 @@ export interface CreateIssueResult {
   number?: number;
 }
 
+export interface ListIssuesParams {
+  /** Filter by label (GitHub). Multiple labels comma-separated. */
+  labels?: string;
+  /** Filter by state: "open" (default), "closed", "all". */
+  state?: "open" | "closed" | "all";
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+  /** Maximum number of issues to return (default 20). */
+  limit?: number;
+}
+
+export interface IssueCard {
+  number: number;
+  title: string;
+  url: string;
+  labels: string[];
+  state: "open" | "closed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListIssuesResult {
+  platform: "github" | "ado";
+  issues: IssueCard[];
+  total: number;
+  truncated: boolean;
+}
+
 export interface MachineStatusEntry {
   id: string;
   name: string;
   health: string;
   endpoints: Array<{ url: string; kind: string }>;
+}
+
+export interface AddLabelParams {
+  /** Issue number on the platform. */
+  issueNumber: number;
+  /** Label(s) to apply. */
+  labels: string[];
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+}
+
+export interface AddLabelResult {
+  issueNumber: number;
+  labels: string[];
+}
+
+export interface EditIssueParams {
+  /** Issue number on the platform. */
+  issueNumber: number;
+  /** New title. Omit to keep the current title. */
+  title?: string;
+  /** New body/description. Omit to keep the current body. */
+  body?: string;
+  /** Labels to ADD (appended to existing). */
+  addLabels?: string[];
+  /** Labels to REMOVE from the issue. */
+  removeLabels?: string[];
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+}
+
+export interface EditIssueResult {
+  platform: "github" | "ado";
+  issueNumber: number;
+  /** Fields that were actually changed. */
+  changes: {
+    title?: boolean;
+    body?: boolean;
+    labelsAdded?: string[];
+    labelsRemoved?: string[];
+  };
 }
 
 export interface InfraActionArgs {
@@ -327,14 +408,50 @@ export interface VmWizardBridge {
 export type InboxItemKind =
   | "breach"
   | "failed-loop"
+  | "finished-loop"
   | "pending-approval"
   | "awaiting-input"
   | "instance-offline"
-  | "watch-tripped";
+  | "prolonged-offline"
+  | "watch-tripped"
+  | "digest";
+
+/** Broad notification category that groups item kinds for visual treatment. */
+export type NotificationType = "failure" | "finished" | "watch" | "digest";
+
+/** Map each InboxItemKind to its broad NotificationType. */
+export function kindToNotificationType(kind: InboxItemKind): NotificationType {
+  switch (kind) {
+    case "failed-loop":
+    case "instance-offline":
+    case "prolonged-offline":
+      return "failure";
+    case "finished-loop":
+      return "finished";
+    case "breach":
+    case "pending-approval":
+    case "awaiting-input":
+    case "watch-tripped":
+      return "watch";
+    case "digest":
+      return "digest";
+  }
+}
+
+/** Inline actions that can be performed on an inbox item without leaving the inbox. */
+export type InboxAction =
+  | "run-now"
+  | "pause"
+  | "resume"
+  | "restart"
+  | "dismiss"
+  | "open-in-chat";
 
 export interface InboxItem {
   id: string;
   kind: InboxItemKind;
+  /** Broad notification category for icon/color treatment. */
+  notificationType: NotificationType;
   environmentId: string;
   environmentName: string;
   /** Loop ID when the item refers to a specific loop. */
@@ -345,8 +462,31 @@ export interface InboxItem {
   detail?: string;
   /** ISO timestamp when the item was created or last updated. */
   occurredAt: string;
+  /** For prolonged-offline items: when the outage began. */
+  outageSince?: string;
   /** Whether the user has dismissed / acknowledged the item. */
   dismissed: boolean;
+  /** Actions available for this item, derived from its kind and loop status. */
+  availableActions: InboxAction[];
+  /** Project ID for the item's loop (used to scope "Open in chat"). */
+  projectId?: string;
+}
+
+export type InboxItemResolutionReason =
+  | "loop-recovered"
+  | "breach-cleared"
+  | "instance-online"
+  | "outage-resolved"
+  | "watch-cleared"
+  | "watch-tripped-cleared";
+
+export interface ResolvedInboxItem {
+  /** The original inbox item data at the time of resolution. */
+  item: InboxItem;
+  /** ISO timestamp when the item was auto-resolved. */
+  resolvedAt: string;
+  /** Machine-readable reason the item resolved. */
+  resolution: InboxItemResolutionReason;
 }
 
 export interface InboxQueryResult {
@@ -360,6 +500,31 @@ export interface InboxBridge {
   getItems: () => Promise<InboxItem[]>;
   dismissItem: (itemId: string) => Promise<void>;
   queryFleet: (question: string) => Promise<InboxQueryResult>;
+  /** Persist a resolved item to the Done archive. */
+  resolveItem: (resolved: ResolvedInboxItem) => Promise<void>;
+  /** Get all resolved items (within retention window). */
+  getResolvedItems: () => Promise<ResolvedInboxItem[]>;
+  /** Prune resolved items older than 30 days. */
+  pruneResolvedItems: () => Promise<void>;
+}
+
+// ── Prolonged-outage escalation ────────────────────────────────────
+
+export interface OutageEscalation {
+  environmentId: string;
+  /** ISO timestamp when the outage began. */
+  since: string;
+  /** Elapsed ms since the outage began (at time of escalation). */
+  durationMs: number;
+}
+
+export interface OutageBridge {
+  /** Subscribe to outage escalations (prolonged unreachability). */
+  onEscalation: (cb: (event: OutageEscalation) => void) => () => void;
+  /** Subscribe to outage self-resolutions (reconnect after escalation). */
+  onResolve: (cb: (environmentId: string) => void) => () => void;
+  /** Get current active escalated outages. */
+  getEscalations: () => Promise<OutageEscalation[]>;
 }
 
 // ── Budget watch ────────────────────────────────────────────────────
@@ -446,6 +611,31 @@ export interface ConditionWatchBridge {
   tripWatch: (watchId: string) => Promise<void>;
 }
 
+// ── Native OS notifications ─────────────────────────────────────────
+
+export type DeepLinkTarget =
+  | { kind: "loop"; environmentId: string; loopId: string }
+  | { kind: "instance"; environmentId: string }
+  | { kind: "inbox-item"; environmentId: string; itemKind: InboxItemKind; itemId: string };
+
+export interface NotificationSendArgs {
+  title: string;
+  body: string;
+  /** Tag prevents duplicate notifications for the same event. */
+  tag?: string;
+  /** Deep-link target: clicking the notification navigates here. */
+  deepLink?: DeepLinkTarget;
+  /** If true, skip the notification when the window is focused. */
+  suppressIfFocused?: boolean;
+}
+
+export interface NotificationBridge {
+  send: (args: NotificationSendArgs) => Promise<void>;
+  setMuted: (muted: boolean) => Promise<void>;
+  isMuted: () => Promise<boolean>;
+  onClick: (cb: (deepLink: DeepLinkTarget) => void) => () => void;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -477,4 +667,6 @@ export interface LoopTaskBridge {
   budget: BudgetBridge;
   inbox: InboxBridge;
   watch: ConditionWatchBridge;
+  notification: NotificationBridge;
+  outage: OutageBridge;
 }

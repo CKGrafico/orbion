@@ -1,5 +1,5 @@
 import { cid, container } from "inversify-hooks";
-import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IWatchService } from "./interfaces";
+import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IWatchService, IOutageService } from "./interfaces";
 import { ConfigService } from "./impl/ConfigService";
 import { ConnectionService } from "./impl/ConnectionService";
 import { OpenCodeService } from "./impl/OpenCodeService";
@@ -10,6 +10,7 @@ import { NotificationService } from "./impl/NotificationService";
 import { BudgetService } from "./impl/BudgetService";
 import { InboxService } from "./impl/InboxService";
 import { WatchService } from "./impl/WatchService";
+import { OutageService } from "./impl/OutageService";
 import {
   MockConfigService,
   MockConnectionService,
@@ -23,6 +24,7 @@ import {
   MockBudgetService,
   MockInboxService,
   MockWatchService,
+  MockOutageService,
 } from "./mock/MockServices";
 
 let built = false;
@@ -46,6 +48,7 @@ export function buildContainer(): void {
     container.addSingleton<IBudgetService>(BudgetService, cid.IBudgetService);
     container.addSingleton<IInboxService>(InboxService, cid.IInboxService);
     container.addSingleton<IWatchService>(WatchService, cid.IWatchService);
+    container.addSingleton<IOutageService>(OutageService, cid.IOutageService);
   } else {
     container.addSingleton<IConfigService>(MockConfigService, cid.IConfigService);
     container.addSingleton<IConnectionService>(MockConnectionService, cid.IConnectionService);
@@ -59,5 +62,6 @@ export function buildContainer(): void {
     container.addSingleton<IBudgetService>(MockBudgetService, cid.IBudgetService);
     container.addSingleton<IInboxService>(MockInboxService, cid.IInboxService);
     container.addSingleton<IWatchService>(MockWatchService, cid.IWatchService);
+    container.addSingleton<IOutageService>(MockOutageService, cid.IOutageService);
   }
 }

@@ -58,4 +58,10 @@ export class ConfigService implements IConfigService {
   async getMainVmId(): Promise<string | null> {
     return this.api.getMainVmId();
   }
+  async getProjectPickupLabels(projectId: string): Promise<string[]> {
+    return this.api.getProjectPickupLabels(projectId);
+  }
+  async setProjectPickupLabels(projectId: string, labels: string[]): Promise<void> {
+    return this.api.setProjectPickupLabels(projectId, labels);
+  }
 }

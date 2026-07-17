@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ConditionWatch } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ConditionWatch, ResolvedInboxItem, SessionHomeScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 
@@ -42,6 +42,8 @@ interface ConfigSchema {
   budgetBreaches: BudgetBreach[];
   conditionWatches: ConditionWatch[];
   inboxDismissedIds: string[];
+  inboxResolvedItems: ResolvedInboxItem[];
+  projectPickupLabels: Record<string, string[]>;
   [key: string]: unknown;
 }
 
@@ -57,6 +59,8 @@ const store = new Store<ConfigSchema>({
     budgetBreaches: [],
     conditionWatches: [],
     inboxDismissedIds: [],
+    inboxResolvedItems: [],
+    projectPickupLabels: {},
   },
 });
 
@@ -684,6 +688,64 @@ export function dismissInboxItem(itemId: string): Promise<void> {
 
 export function isInboxItemDismissed(itemId: string): boolean {
   return _isInboxItemDismissed(itemId);
+}
+
+// ---------------------------------------------------------------------------
+// Inbox resolved items (Done archive)
+// ---------------------------------------------------------------------------
+
+const RESOLVED_ITEMS_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000; // 30 days
+
+function _getResolvedItems(): ResolvedInboxItem[] {
+  return store.get("inboxResolvedItems", []);
+}
+
+function _addResolvedItem(resolved: ResolvedInboxItem): void {
+  const items = _getResolvedItems();
+  // Don't add duplicates
+  if (items.some((ri) => ri.item.id === resolved.item.id)) return;
+  items.push(resolved);
+  store.set("inboxResolvedItems", items);
+}
+
+function _pruneResolvedItems(): void {
+  const cutoff = Date.now() - RESOLVED_ITEMS_RETENTION_MS;
+  const items = _getResolvedItems().filter(
+    (ri) => new Date(ri.resolvedAt).getTime() >= cutoff
+  );
+  store.set("inboxResolvedItems", items);
+}
+
+export function addResolvedItem(resolved: ResolvedInboxItem): Promise<void> {
+  return serialize(() => _addResolvedItem(resolved));
+}
+
+export function getResolvedItems(): ResolvedInboxItem[] {
+  _pruneResolvedItems(); // auto-prune on read
+  return _getResolvedItems();
+}
+
+export function pruneResolvedItems(): Promise<void> {
+  return serialize(() => _pruneResolvedItems());
+}
+
+// ---------------------------------------------------------------------------
+// Project pickup labels persistence
+// ---------------------------------------------------------------------------
+
+export function getProjectPickupLabels(projectId: string): string[] {
+  const all = store.get("projectPickupLabels", {});
+  return all[projectId] ?? [];
+}
+
+function _setProjectPickupLabels(projectId: string, labels: string[]): void {
+  const all = store.get("projectPickupLabels", {});
+  all[projectId] = labels;
+  store.set("projectPickupLabels", all);
+}
+
+export function setProjectPickupLabels(projectId: string, labels: string[]): Promise<void> {
+  return serialize(() => _setProjectPickupLabels(projectId, labels));
 }
 
 // ---------------------------------------------------------------------------

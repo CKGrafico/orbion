@@ -21,9 +21,16 @@ import type {
   BudgetWatch,
   BudgetBreach,
   InboxItem,
+  InboxAction,
   InboxQueryResult,
+  ResolvedInboxItem,
+  InboxItemResolutionReason,
   ConditionWatch,
+  DeepLinkTarget,
+  NotificationSendArgs,
+  OutageEscalation,
 } from "../../../../shared/ipc";
+import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
   IConfigService,
@@ -39,6 +46,7 @@ import type {
   IInboxService,
   IWatchService,
   InboxBuildParams,
+  IOutageService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -187,6 +195,12 @@ export class MockConfigService implements IConfigService {
   async getMainVmId(): Promise<string | null> {
     return mockEnvironments.find((e) => e.role === "main-vm")?.id ?? null;
   }
+  async getProjectPickupLabels(_projectId: string): Promise<string[]> {
+    return ["to-implement"];
+  }
+  async setProjectPickupLabels(_projectId: string, _labels: string[]): Promise<void> {
+    // mock: no-op
+  }
 }
 
 @injectable()
@@ -253,6 +267,69 @@ export class MockInfraService implements IInfraService {
       };
       return { ok: true, data: result };
     }
+    if (args.action === "list-issues") {
+      const listResult: import("../../../../shared/ipc").ListIssuesResult = {
+        platform: "github",
+        issues: [
+          {
+            number: 42,
+            title: "Setup CI pipeline",
+            url: "https://github.com/mock-org/mock-repo/issues/42",
+            labels: ["to-implement", "devops"],
+            state: "open",
+            createdAt: new Date(now - 86400000 * 5).toISOString(),
+            updatedAt: new Date(now - 86400000).toISOString(),
+          },
+          {
+            number: 38,
+            title: "Add error boundary",
+            url: "https://github.com/mock-org/mock-repo/issues/38",
+            labels: ["to-implement"],
+            state: "open",
+            createdAt: new Date(now - 86400000 * 3).toISOString(),
+            updatedAt: new Date(now - 86400000 * 2).toISOString(),
+          },
+          {
+            number: 31,
+            title: "Implement auth flow",
+            url: "https://github.com/mock-org/mock-repo/issues/31",
+            labels: ["to-implement", "security"],
+            state: "open",
+            createdAt: new Date(now - 86400000 * 7).toISOString(),
+            updatedAt: new Date(now - 86400000 * 4).toISOString(),
+          },
+        ],
+        total: 3,
+        truncated: false,
+      };
+      return { ok: true, data: listResult };
+    }
+    if (args.action === "add-label") {
+      const params = args.params as { issueNumber?: number; labels?: string[] } | undefined;
+      return {
+        ok: true,
+        data: {
+          issueNumber: params?.issueNumber ?? 42,
+          labels: params?.labels ?? [],
+        },
+      };
+    }
+    if (args.action === "edit-issue") {
+      const params = args.params as { issueNumber?: number; title?: string; body?: string; addLabels?: string[]; removeLabels?: string[] } | undefined;
+      const changes: Record<string, unknown> = {};
+      if (params?.title) changes.title = true;
+      if (params?.body) changes.body = true;
+      if (params?.addLabels?.length) changes.labelsAdded = params.addLabels;
+      if (params?.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
+      return {
+        ok: true,
+        data: {
+          platform: "github",
+          issueNumber: params?.issueNumber ?? 42,
+          changes,
+        },
+      };
+    }
     return { ok: false, error: "mock" };
   }
   async getStatus(): Promise<{ mainVmId: string | null; connected: boolean }> { return { mainVmId: null, connected: false }; }
@@ -294,8 +371,34 @@ export class MockTailscaleService implements ITailscaleService {
 
 @injectable()
 export class MockNotificationService implements INotificationService {
-  sendNotification(): void {}
-  setMuted(): void {}
+  private muted = false;
+  private clickListeners: ((deepLink: DeepLinkTarget) => void)[] = [];
+
+  async send(_args: NotificationSendArgs): Promise<void> {
+    // Mock: no-op in browser dev mode
+  }
+
+  async setMuted(muted: boolean): Promise<void> {
+    this.muted = muted;
+  }
+
+  async isMuted(): Promise<boolean> {
+    return this.muted;
+  }
+
+  onClick(cb: (deepLink: DeepLinkTarget) => void): () => void {
+    this.clickListeners.push(cb);
+    return () => {
+      this.clickListeners = this.clickListeners.filter((l) => l !== cb);
+    };
+  }
+
+  /** Test helper: simulate a notification click. */
+  simulateClick(deepLink: DeepLinkTarget): void {
+    for (const listener of this.clickListeners) {
+      listener(deepLink);
+    }
+  }
 }
 
 let mockWatches: BudgetWatch[] = [];
@@ -336,14 +439,13 @@ export class MockBudgetService implements IBudgetService {
 }
 
 let mockDismissedIds: Set<string> = new Set();
+let mockResolvedItems: ResolvedInboxItem[] = [];
 
 @injectable()
 export class MockInboxService implements IInboxService {
   async getDismissedIds(): Promise<string[]> { return [...mockDismissedIds]; }
   async dismissItem(itemId: string): Promise<void> { mockDismissedIds.add(itemId); }
   buildItems(params: InboxBuildParams): InboxItem[] {
-    // Delegate to the real InboxService logic (imported statically)
-    // but for mock, we keep it simple with basic item derivation.
     const { perEnvLoops, perEnvHealth, environments, breaches, trippedWatches } = params;
     const items: InboxItem[] = [];
 
@@ -352,6 +454,7 @@ export class MockInboxService implements IInboxService {
       items.push({
         id: `breach:${breach.id}`,
         kind: "breach",
+        notificationType: kindToNotificationType("breach"),
         environmentId: breach.environmentId,
         environmentName: breach.environmentName,
         loopId: breach.loopId,
@@ -359,34 +462,63 @@ export class MockInboxService implements IInboxService {
         detail: `${breach.runsToday}/${breach.threshold} runs`,
         occurredAt: breach.breachedAt,
         dismissed: false,
+        availableActions: ["dismiss", "open-in-chat"],
       });
     }
 
     for (const env of environments) {
       const health = perEnvHealth[env.id];
+
+      // Prolonged-offline from escalated outages
+      const escalated = params.escalatedOutages.get(env.id);
+      if (escalated) {
+        if (!mockDismissedIds.has(`prolonged-offline:${env.id}`)) {
+          items.push({
+            id: `prolonged-offline:${env.id}`,
+            kind: "prolonged-offline",
+            notificationType: kindToNotificationType("prolonged-offline"),
+            environmentId: env.id,
+            environmentName: env.name,
+            title: env.name,
+            detail: "unreachable for 10m+",
+            occurredAt: escalated.since,
+            outageSince: escalated.since,
+            dismissed: false,
+            availableActions: ["dismiss"],
+          });
+        }
+        continue;
+      }
+
       if (health === "offline" || health === "unknown") {
         if (!mockDismissedIds.has(`offline:${env.id}`)) {
           items.push({
             id: `offline:${env.id}`,
             kind: "instance-offline",
+            notificationType: kindToNotificationType("instance-offline"),
             environmentId: env.id,
             environmentName: env.name,
             title: env.name,
             detail: "offline",
             occurredAt: new Date().toISOString(),
             dismissed: false,
+            availableActions: ["dismiss"],
           });
         }
         continue;
       }
       const envLoops = perEnvLoops[env.id] ?? [];
       for (const loop of envLoops) {
-        if (loop.lastExitCode !== null && loop.lastExitCode !== 0) {
+        const isFinished = loop.maxRuns !== null && loop.runCount >= loop.maxRuns;
+        const isFailed = loop.lastExitCode !== null && loop.lastExitCode !== 0;
+
+        if (isFailed && !isFinished) {
           const itemId = `failed-loop:${env.id}:${loop.id}`;
           if (mockDismissedIds.has(itemId)) continue;
           items.push({
             id: itemId,
             kind: "failed-loop",
+            notificationType: kindToNotificationType("failed-loop"),
             environmentId: env.id,
             environmentName: env.name,
             loopId: loop.id,
@@ -394,6 +526,25 @@ export class MockInboxService implements IInboxService {
             detail: `exit ${loop.lastExitCode}`,
             occurredAt: loop.lastRunAt ?? new Date().toISOString(),
             dismissed: false,
+            availableActions: ["run-now", "pause", "open-in-chat"],
+            projectId: loop.projectId,
+          });
+        } else if (isFinished) {
+          const itemId = `finished-loop:${env.id}:${loop.id}`;
+          if (mockDismissedIds.has(itemId)) continue;
+          items.push({
+            id: itemId,
+            kind: "finished-loop",
+            notificationType: kindToNotificationType("finished-loop"),
+            environmentId: env.id,
+            environmentName: env.name,
+            loopId: loop.id,
+            title: loop.description?.trim() || loop.id,
+            detail: `${loop.runCount}/${loop.maxRuns} runs`,
+            occurredAt: loop.lastRunAt ?? new Date().toISOString(),
+            dismissed: false,
+            availableActions: ["dismiss", "restart"],
+            projectId: loop.projectId,
           });
         }
       }
@@ -432,6 +583,89 @@ export class MockInboxService implements IInboxService {
       lines.push(`- [${item.title}](inbox://${item.id}) on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
     }
     return { answer: lines.join("\n"), references: refs };
+  }
+
+  async resolveItem(resolved: ResolvedInboxItem): Promise<void> {
+    if (!mockResolvedItems.some((ri) => ri.item.id === resolved.item.id)) {
+      mockResolvedItems.push(resolved);
+    }
+  }
+
+  async getResolvedItems(): Promise<ResolvedInboxItem[]> {
+    // Prune items older than 30 days
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1_000;
+    mockResolvedItems = mockResolvedItems.filter(
+      (ri) => new Date(ri.resolvedAt).getTime() >= cutoff,
+    );
+    return mockResolvedItems;
+  }
+
+  async pruneResolvedItems(): Promise<void> {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1_000;
+    mockResolvedItems = mockResolvedItems.filter(
+      (ri) => new Date(ri.resolvedAt).getTime() >= cutoff,
+    );
+  }
+
+  detectAutoResolutions(
+    previousItems: InboxItem[],
+    currentIds: Set<string>,
+    dismissedIds: Set<string>,
+  ): ResolvedInboxItem[] {
+    const resolved: ResolvedInboxItem[] = [];
+    const now = new Date().toISOString();
+
+    for (const item of previousItems) {
+      if (currentIds.has(item.id)) continue;
+      if (dismissedIds.has(item.id)) continue;
+
+      let reason: InboxItemResolutionReason = "loop-recovered";
+      switch (item.kind) {
+        case "failed-loop":
+        case "finished-loop":
+          reason = "loop-recovered";
+          break;
+        case "breach":
+        case "pending-approval":
+        case "awaiting-input":
+        case "digest":
+          reason = "watch-cleared";
+          break;
+        case "instance-offline":
+          reason = "instance-online";
+          break;
+        case "prolonged-offline":
+          reason = "outage-resolved";
+          break;
+      }
+
+      resolved.push({ item, resolvedAt: now, resolution: reason });
+    }
+
+    return resolved;
+  }
+
+  async executeInboxAction(item: InboxItem, action: InboxAction): Promise<ApiResponse> {
+    // Mock: all actions succeed immediately
+    if (action === "dismiss") {
+      mockDismissedIds.add(item.id);
+    }
+    return { ok: true, status: 200 };
+  }
+}
+
+@injectable()
+export class MockOutageService implements IOutageService {
+  async getEscalations(): Promise<OutageEscalation[]> {
+    return [];
+  }
+
+  onEscalation(): () => void {
+    return () => {};
+  }
+
+  onResolve(): () => void {
+    return () => {};
   }
 }
 

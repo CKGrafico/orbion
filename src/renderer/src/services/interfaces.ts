@@ -24,8 +24,14 @@ import type {
   BudgetWatch,
   BudgetBreach,
   InboxItem,
+  InboxAction,
   InboxQueryResult,
+  ResolvedInboxItem,
+  InboxItemResolutionReason,
   ConditionWatch,
+  DeepLinkTarget,
+  NotificationSendArgs,
+  OutageEscalation,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -44,6 +50,8 @@ export interface IConfigService {
   setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult>;
   setMainVm(environmentId: string): Promise<void>;
   getMainVmId(): Promise<string | null>;
+  getProjectPickupLabels(projectId: string): Promise<string[]>;
+  setProjectPickupLabels(projectId: string, labels: string[]): Promise<void>;
 }
 
 export interface IConnectionService {
@@ -91,15 +99,10 @@ export interface ITailscaleService {
 }
 
 export interface INotificationService {
-  sendNotification(opts: {
-    environmentId: string;
-    environmentName: string;
-    itemId: string;
-    itemType: string;
-    status: string;
-    message: string;
-  }): void;
-  setMuted(environmentId: string, muted: boolean): void;
+  send(args: NotificationSendArgs): Promise<void>;
+  setMuted(muted: boolean): Promise<void>;
+  isMuted(): Promise<boolean>;
+  onClick(cb: (deepLink: DeepLinkTarget) => void): () => void;
 }
 
 export interface IBudgetService {
@@ -119,6 +122,16 @@ export interface IInboxService {
   dismissItem(itemId: string): Promise<void>;
   buildItems(params: InboxBuildParams): InboxItem[];
   queryFleet(question: string, params: InboxBuildParams): InboxQueryResult;
+  /** Persist a resolved item to the Done archive. */
+  resolveItem(resolved: ResolvedInboxItem): Promise<void>;
+  /** Get all resolved items (within retention window). */
+  getResolvedItems(): Promise<ResolvedInboxItem[]>;
+  /** Prune resolved items older than 30 days. */
+  pruneResolvedItems(): Promise<void>;
+  /** Detect auto-resolved items by diffing previous and current active sets. Returns newly resolved items. */
+  detectAutoResolutions(previousItems: InboxItem[], currentIds: Set<string>, dismissedIds: Set<string>): ResolvedInboxItem[];
+  /** Execute an inline action on an inbox item (e.g. pause, run-now, resume). */
+  executeInboxAction(item: InboxItem, action: InboxAction): Promise<ApiResponse>;
 }
 
 export interface InboxBuildParams {
@@ -128,6 +141,8 @@ export interface InboxBuildParams {
   breaches: BudgetBreach[];
   dismissedIds: Set<string>;
   trippedWatches: ConditionWatch[];
+  /** Actively escalated prolonged outages, keyed by environmentId. */
+  escalatedOutages: Map<string, OutageEscalation>;
 }
 
 export interface IWatchService {
@@ -139,4 +154,10 @@ export interface IWatchService {
   getWatchesForLoop(environmentId: string, loopId: string): Promise<ConditionWatch[]>;
   /** Get active (non-tripped) watches targeting a specific instance. */
   getWatchesForInstance(environmentId: string): Promise<ConditionWatch[]>;
+}
+
+export interface IOutageService {
+  getEscalations(): Promise<OutageEscalation[]>;
+  onEscalation(cb: (event: OutageEscalation) => void): () => void;
+  onResolve(cb: (environmentId: string) => void): () => void;
 }

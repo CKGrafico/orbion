@@ -30,7 +30,9 @@
     "removeCancel": "Cancel",
     "removeConfirmBtn": "Remove",
     "markAsMainTooltip": "Mark as main VM, this environment will be used for the AI chat assistant",
-    "isMainTooltip": "This is your main VM (used for AI chat)"
+    "isMainTooltip": "This is your main VM (used for AI chat)",
+    "muteNotifications": "Mute notifications",
+    "unmuteNotifications": "Unmute notifications"
   },
   "sidebar": {
     "addEnvironment": "Add Environment",
@@ -79,7 +81,9 @@
     "noSearchResults": "No results",
     "sort": "Sort",
     "connectInstance": "Connect instance",
-    "newProject": "New project"
+    "newProject": "New project",
+    "inbox": "Inbox",
+    "projectHasFailure": "A loop in this project has failed"
   },
   "vmWizard": {
     "stepPickTarget": "Pick target",
@@ -322,7 +326,7 @@
     "botInitials": "INF",
     "noData": "No machine data available.",
     "unreachable": "Unable to reach the infrastructure runtime. Check that the main VM is connected.",
-    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item\n- detect-platform: identify a project's hosting platform from git remotes",
+    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item\n- edit issue: update an existing issue's title, body, or labels\n- detect-platform: identify a project's hosting platform from git remotes\n- list issues / what's labeled X?: view a filtered slice of the backlog as compact cards",
     "fleetStatusHeader": "Fleet Status",
     "cloneInitiated": "## Clone initiated\n\n{data}",
     "errorMessage": "**Error:** {detail}",
@@ -345,7 +349,49 @@
     "noPlatformCli": "No platform CLI found. Install `gh` (GitHub CLI) or `az` (Azure CLI) to create issues from chat.",
     "ghNotAuth": "GitHub CLI is not authenticated. Run `gh auth login` in a terminal first.",
     "azNotAuth": "Azure CLI is not authenticated. Run `az login` in a terminal first.",
-    "titleRequired": "Issue title is required. Start with a short title on the first line."
+    "titleRequired": "Issue title is required. Start with a short title on the first line.",
+    "stackTitle": "**{count} issue{count, plural, one {} other {s}}{label, select, false {} other { labeled {label}}}{state, select, all { (all)} closed { (closed)} other {}}:**",
+    "stackTruncated": "\nShowing {shown} of {total}. Refine your query to narrow results.",
+    "stackEmpty": "No issues found matching your query.",
+    "listFailed": "**Failed to list issues:** {detail}"
+  },
+  "labels": {
+    "pickupOffer": "Apply pickup label `{labels}` to issue #{number}?",
+    "optionApply": "Apply label",
+    "optionSkip": "Skip",
+    "applied": "Label `{labels}` applied to issue #{number}.",
+    "applyFailed": "**Failed to apply label:** {detail}",
+    "ghRequiredForLabels": "The GitHub CLI (`gh`) is required to add labels. Install and authenticate it first.",
+    "issueNumberAndLabelsRequired": "Issue number and labels are required.",
+    "addFailed": "**Failed to add label:** {detail}",
+    "setPickupLabel": "Pickup label for this project set to `{labels}`.",
+    "clearedPickupLabel": "Pickup label for this project cleared.",
+    "currentPickupLabel": "Current pickup label: `{labels}`.",
+    "noPickupLabel": "No pickup label configured for this project. Use \"set pickup label <name>\" to configure one."
+  },
+  "editIssue": {
+    "editTitle": "Edit issue #{number}",
+    "previewChanges": "**Proposed changes for issue #{number}:**\n\n{changes}",
+    "changeTitle": "Title: `{old}` -> `{new}`",
+    "changeBody": "Body updated",
+    "changeAddLabels": "Add labels: {labels}",
+    "changeRemoveLabels": "Remove labels: {labels}",
+    "applyQuestion": "Apply these changes?",
+    "optionApply": "Apply changes",
+    "optionCancel": "Cancel",
+    "applied": "Issue #{number} updated: {summary}",
+    "editFailed": "**Failed to edit issue:** {detail}",
+    "issueNumberRequired": "Issue number is required. Specify which issue to edit (e.g. \"edit issue #42\").",
+    "noChanges": "No changes specified. Tell me what to change: title, body, or labels.",
+    "noPlatformCli": "No platform CLI found. Install `gh` (GitHub CLI) or `az` (Azure CLI) to edit issues from chat.",
+    "ghNotAuth": "GitHub CLI is not authenticated. Run `gh auth login` in a terminal first.",
+    "azNotAuth": "Azure CLI is not authenticated. Run `az login` in a terminal first.",
+    "adoLabelsNotSupported": "Label operations are not supported for Azure DevOps via the CLI. You can edit the title and description, or manage labels in the web UI.",
+    "ambiguousReference": "I need a specific issue number to edit. Please provide one (e.g. \"edit issue #42\").",
+    "summaryTitle": "title changed",
+    "summaryBody": "body changed",
+    "summaryLabelsAdded": "added {labels}",
+    "summaryLabelsRemoved": "removed {labels}"
   },
   "pickMainVm": {
     "title": "Pick a new main VM",
@@ -455,14 +501,41 @@
   },
   "inbox": {
     "title": "Inbox",
-    "emptyMessage": "All clear! Ask a question about your fleet below.",
+    "emptyMessage": "The fleet is quiet — nothing needs you right now.",
     "queryPlaceholder": "Ask about your fleet…",
     "sendQuery": "Ask",
     "itemNeedsAttention": "needs attention",
     "breach": "budget breach",
     "failedLoop": "failed loop",
     "instanceOffline": "instance offline",
-    "watchTripped": "watch tripped"
+    "watchTripped": "watch tripped",
+    "finishedLoop": "finished loop",
+    "prolongedOffline": "prolonged outage",
+    "typeFailure": "failure",
+    "typeFinished": "finished",
+    "typeWatch": "watch",
+    "typeDigest": "digest",
+    "tabActive": "Active",
+    "tabDone": "Done",
+    "doneEmptyMessage": "No resolved items in the last 30 days.",
+    "resolution.loop-recovered": "loop recovered",
+    "resolution.breach-cleared": "runs dropped below threshold",
+    "resolution.instance-online": "instance came back online",
+    "resolution.outage-resolved": "instance reconnected after prolonged outage",
+    "resolution.watch-cleared": "watch condition cleared",
+    "resolution.watch-tripped-cleared": "watch condition cleared",
+    "action.run-now": "Run now",
+    "action.pause": "Pause",
+    "action.resume": "Resume",
+    "action.restart": "Restart",
+    "action.dismiss": "Dismiss",
+    "action.open-in-chat": "Chat",
+    "viewTitle": "Inbox",
+    "viewDescription": "Fleet-wide notifications — things that happened while you weren't looking.",
+    "itemTimestamp": "{time}",
+    "itemSourceProject": "{project} on {instance}",
+    "transitionFailed": "{loopName} failed (exit {exitCode})",
+    "transitionFinished": "{loopName} finished ({runCount}/{maxRuns} runs)"
   },
   "watch": {
     "chipLabel": "watching",
@@ -472,5 +545,12 @@
     "setWatch": "Watch set",
     "watchTripped": "Watch tripped",
     "disarmed": "Watch disarmed"
+  },
+  "fleetHealth": {
+    "instancesConnected": "{total} instances · {connected} connected",
+    "loopFailing": "1 loop failing",
+    "loopsFailing": "{count} loops failing",
+    "unreachable": "1 unreachable",
+    "unreachablePlural": "{count} unreachable"
   }
 }

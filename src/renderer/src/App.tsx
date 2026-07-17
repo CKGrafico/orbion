@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -10,25 +10,28 @@ import { OrbionMark } from "./components/OrbionMark";
 import { fetchLoops, fetchProjects, fetchSettings, isMock } from "./api";
 import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
-import { createNotificationBridge } from "./use-notifications";
+import { useNativeNotifications } from "./use-notifications";
 import { useBudgetWatch } from "./use-budget-watch";
 import { useConditionWatch } from "./use-condition-watch";
-import { PanelLeft, RotateCw, X, Star } from "lucide-react";
+import { useLoopTransitions } from "./use-loop-transitions";
+import type { LoopTransition } from "./use-loop-transitions";
+import { PanelLeft, RotateCw, X, Star, BellOff, Bell } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
 import { LoopDetail } from "./components/LoopDetail";
 import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
-import { InboxPanel } from "./features/inbox/InboxPanel";
+import { InboxView } from "./features/inbox/InboxView";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, InboxBuildParams } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 
 type View =
+  | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
   | { kind: "loop"; loopId: string };
@@ -68,6 +71,8 @@ export function App(): React.ReactNode {
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
+  const [outageService] = useInject<IOutageService>(cid.IOutageService);
+  const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -84,27 +89,60 @@ export function App(): React.ReactNode {
   const [perEnvProjects, setPerEnvProjects] = useState<Record<string, Project[]>>({});
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
+  const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
 
   const { isUnread, markVisited } = useUnreadTracker();
 
-  const notificationBridge = useMemo(
-    () => {
-      const bridge = createNotificationBridge((envId, itemId, itemType) => {
-        select(envId);
-        if (itemType === "loop") {
-          setView({ kind: "loop", loopId: itemId });
-        } else {
-          setView({ kind: "instance" });
-        }
-      });
-      return bridge;
-    },
-    [select],
-  );
+  // Deep-link navigation handler for notification clicks
+  const handleNotificationNavigate = useCallback((deepLink: DeepLinkTarget) => {
+    switch (deepLink.kind) {
+      case "loop":
+        select(deepLink.environmentId);
+        setView({ kind: "loop", loopId: deepLink.loopId });
+        break;
+      case "instance":
+        select(deepLink.environmentId);
+        setView({ kind: "instance" });
+        break;
+      case "inbox-item":
+        select(deepLink.environmentId);
+        // Navigate to the inbox view to show the item
+        setView({ kind: "inbox" });
+        break;
+    }
+  }, [select]);
+
+  const { notificationService, sendInboxNotification } = useNativeNotifications(handleNotificationNavigate);
+
+  const [globalMuted, setGlobalMuted] = useState(false);
+
+  // Load mute state on mount
+  useEffect(() => {
+    let cancelled = false;
+    void notificationService.isMuted().then((muted) => {
+      if (!cancelled) setGlobalMuted(muted);
+    });
+    return () => { cancelled = true; };
+  }, [notificationService]);
+
+  // Load inbox dismissed IDs on mount
+  useEffect(() => {
+    let cancelled = false;
+    void inboxService.getDismissedIds().then((ids) => {
+      if (!cancelled) setInboxDismissedIds(new Set(ids));
+    });
+    return () => { cancelled = true; };
+  }, [inboxService]);
+
+  const handleToggleGlobalMute = useCallback(() => {
+    const next = !globalMuted;
+    setGlobalMuted(next);
+    void notificationService.setMuted(next);
+  }, [globalMuted, notificationService]);
 
   // Budget watch — breach detection and notifications
   const handleBudgetBreach = useCallback((breach: BudgetBreach) => {
-    notificationBridge.sendNotification({
+    void sendInboxNotification({
       environmentId: breach.environmentId,
       environmentName: breach.environmentName,
       itemId: breach.loopId,
@@ -115,11 +153,75 @@ export function App(): React.ReactNode {
         { loopName: breach.loopDescription, threshold: breach.threshold, count: breach.runsToday, autoPause: breach.autoPaused },
       ),
     });
-  }, [notificationBridge]);
+  }, [sendInboxNotification]);
 
   const budgetWatch = useBudgetWatch(perEnvLoops, environments, handleBudgetBreach);
 
   const conditionWatch = useConditionWatch(perEnvLoops, health, environments);
+
+  // Loop state transition detection for inbox notifications
+  const handleLoopTransition = useCallback((transition: LoopTransition) => {
+    const env = environments.find((e) => e.id === transition.environmentId);
+    if (!env) return;
+    if (mutedEnvs.has(transition.environmentId)) return;
+
+    const isFailed = transition.lastExitCode !== null && transition.lastExitCode !== 0;
+    const type = isFailed ? "failure" : "finished";
+
+    void sendInboxNotification({
+      environmentId: transition.environmentId,
+      environmentName: env.name,
+      itemId: transition.loopId,
+      itemType: "loop",
+      status: type === "failure" ? "failed" : "completed",
+      message: standaloneIntl.formatMessage(
+        { id: type === "failure" ? "inbox.transitionFailed" : "inbox.transitionFinished" },
+        { loopName: transition.loopDescription, exitCode: transition.lastExitCode, maxRuns: transition.maxRuns, runCount: transition.runCount },
+      ),
+    });
+  }, [environments, mutedEnvs, sendInboxNotification]);
+
+  useLoopTransitions(perEnvLoops, handleLoopTransition);
+
+  // Outage escalation tracking
+  const [escalatedOutages, setEscalatedOutages] = useState<Map<string, OutageEscalation>>(new Map());
+
+  // Load existing escalations on mount and subscribe to live events
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async (): Promise<void> => {
+      const escalations = await outageService.getEscalations();
+      if (cancelled) return;
+      setEscalatedOutages(new Map(escalations.map((e) => [e.environmentId, e])));
+    };
+
+    void load();
+
+    const unsubEscalation = outageService.onEscalation((event) => {
+      if (cancelled) return;
+      setEscalatedOutages((prev) => {
+        const next = new Map(prev);
+        next.set(event.environmentId, event);
+        return next;
+      });
+    });
+
+    const unsubResolve = outageService.onResolve((environmentId) => {
+      if (cancelled) return;
+      setEscalatedOutages((prev) => {
+        const next = new Map(prev);
+        next.delete(environmentId);
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      unsubEscalation();
+      unsubResolve();
+    };
+  }, [outageService]);
 
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
@@ -236,6 +338,18 @@ export function App(): React.ReactNode {
     return ids;
   }, [environments, perEnvLoops, isUnread]);
 
+  // Compute inbox item count for the sidebar badge
+  const inboxBuildParams = useMemo<InboxBuildParams>(() => ({
+    perEnvLoops,
+    perEnvHealth: health,
+    environments,
+    breaches: budgetWatch.breaches,
+    dismissedIds: inboxDismissedIds,
+    escalatedOutages,
+  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages]);
+
+  const inboxItemCount = useMemo(() => inboxService.buildItems(inboxBuildParams).length, [inboxService, inboxBuildParams]);
+
   const prevFleetStatus = useRef<Record<string, FleetItemStatus>>({});
   useEffect(() => {
     for (const env of environments) {
@@ -243,7 +357,7 @@ export function App(): React.ReactNode {
       const prev = prevFleetStatus.current[env.id];
       if (current !== prev && isNotifiableStatus(current) && prev !== undefined) {
         if (!mutedEnvs.has(env.id)) {
-          notificationBridge.sendNotification({
+          void sendInboxNotification({
             environmentId: env.id,
             environmentName: env.name,
             itemId: env.id,
@@ -255,17 +369,16 @@ export function App(): React.ReactNode {
       }
     }
     prevFleetStatus.current = { ...fleetStatus };
-  }, [fleetStatus, environments, notificationBridge, mutedEnvs]);
+  }, [fleetStatus, environments, sendInboxNotification, mutedEnvs]);
 
   const handleToggleMute = useCallback((environmentId: string) => {
     setMutedEnvs((prev) => {
       const next = new Set(prev);
       if (next.has(environmentId)) next.delete(environmentId);
       else next.add(environmentId);
-      notificationBridge.setMuted(environmentId, next.has(environmentId));
       return next;
     });
-  }, [notificationBridge]);
+  }, []);
 
   // Fetch loops for the selected environment (polling every 5s)
   useEffect(() => {
@@ -388,6 +501,35 @@ export function App(): React.ReactNode {
 
   // Determine what to render in the content area
   const renderContent = (): React.ReactNode => {
+    // Inbox view is fleet-wide and accessible even without a selected environment
+    if (view.kind === "inbox") {
+      return (
+        <InboxView
+          perEnvLoops={perEnvLoops}
+          perEnvHealth={health}
+          environments={environments}
+          perEnvProjects={perEnvProjects}
+          breaches={budgetWatch.breaches}
+          escalatedOutages={escalatedOutages}
+          onClickItem={(item) => {
+            select(item.environmentId);
+            if (item.loopId) {
+              setView({ kind: "loop", loopId: item.loopId });
+            } else {
+              setView({ kind: "instance" });
+            }
+          }}
+          onDismissItem={(_itemId) => {
+            // Dismissal is handled internally by InboxView
+          }}
+          onOpenInChat={(item) => {
+            select(item.environmentId);
+            setView({ kind: "instance" });
+          }}
+        />
+      );
+    }
+
     if (!selected) {
       return (
         <div className="empty">
@@ -607,29 +749,20 @@ export function App(): React.ReactNode {
           {intl.formatMessage({ id: "app.brand" })}
         </span>
         <span className="titlebar-tag">{isMock ? intl.formatMessage({ id: "app.mock" }) : intl.formatMessage({ id: "app.preview" })}</span>
+        <span style={{ flex: 1 }} />
+        <button
+          className="icon-btn"
+          title={globalMuted ? intl.formatMessage({ id: "app.unmuteNotifications" }) : intl.formatMessage({ id: "app.muteNotifications" })}
+          onClick={handleToggleGlobalMute}
+          style={{ opacity: globalMuted ? 1 : 0.5, color: globalMuted ? "var(--danger)" : "var(--text-secondary)" }}
+        >
+          {globalMuted ? <BellOff size={14} /> : <Bell size={14} />}
+        </button>
       </div>
 
       <div className="body">
         {sidebarOpen ? (
           <aside className="panel sidebar-panel">
-            <InboxPanel
-              perEnvLoops={perEnvLoops}
-              perEnvHealth={health}
-              environments={environments}
-              breaches={budgetWatch.breaches}
-              trippedWatches={conditionWatch.watches.filter((w) => w.tripped)}
-              onClickItem={(item) => {
-                select(item.environmentId);
-                if (item.loopId) {
-                  setView({ kind: "loop", loopId: item.loopId });
-                } else {
-                  setView({ kind: "instance" });
-                }
-              }}
-              onDismissItem={(_itemId) => {
-                // Dismissal is handled internally by InboxPanel
-              }}
-            />
             <Sidebar
               environments={environments}
               selectedId={selectedId}
@@ -641,20 +774,32 @@ export function App(): React.ReactNode {
               onSelect={handleSelect}
               onNavigate={handleNavigate}
               onAddVm={() => setVmWizardOpen(true)}
+              inboxItemCount={inboxItemCount}
+              onNavigateToLoop={(envId, loopId) => {
+                select(envId);
+                setView({ kind: "loop", loopId });
+              }}
+              onNavigateToProject={(envId, projectId) => {
+                select(envId);
+                setView({ kind: "project", projectId });
+              }}
+              onNavigateToInbox={() => {
+                setView({ kind: "inbox" });
+              }}
             />
           </aside>
         ) : null}
 
         <div className="panel main-panel">
-          {renderInstanceHeader()}
-          {renderDetailHeader()}
+          {view.kind !== "inbox" ? renderInstanceHeader() : null}
+          {view.kind !== "inbox" ? renderDetailHeader() : null}
 
-          <div className="content">
+          <div className={`content${view.kind === "inbox" ? " content-full" : ""}`}>
             {renderContent()}
           </div>
 
-          {/* InfraChatPanel now shows on ALL views */}
-          {selected && mainVm ? (
+          {/* InfraChatPanel shows only on instance/project/loop views */}
+          {view.kind !== "inbox" && selected && mainVm ? (
             <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
           ) : null}
         </div>
