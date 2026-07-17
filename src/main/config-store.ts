@@ -324,7 +324,18 @@ function _removeSessionToken(environmentId: string): void {
   store.set("sessionTokens", tokens);
 }
 
-function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): SetOpenCodeEndpointResult {
+/**
+ * Shared implementation for setting an OpenCode-style endpoint with
+ * optional password encryption. Used by both `_setOpenCodeEndpoint` and
+ * `_setInfraOpenCodeEndpoint` to prevent security drift.
+ *
+ * @param field - The environment property to set (`"opencode"` or `"infraOpenCode"`).
+ */
+function _setEndpointWithEncryption(
+  environmentId: string,
+  endpoint: OpenCodeEndpoint | null,
+  field: "opencode" | "infraOpenCode",
+): SetOpenCodeEndpointResult {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
   if (!env) return { ok: true };
@@ -336,32 +347,20 @@ function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint 
     if (!encrypted) {
       return { ok: false, reason: "encryption-unavailable" };
     }
-    env.opencode = { ...endpoint, password: encrypted, wasEncrypted: true };
+    env[field] = { ...endpoint, password: encrypted, wasEncrypted: true };
   } else {
-    env.opencode = endpoint;
+    env[field] = endpoint;
   }
   store.set("environments", envs);
   return { ok: true };
 }
 
+function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): SetOpenCodeEndpointResult {
+  return _setEndpointWithEncryption(environmentId, endpoint, "opencode");
+}
+
 function _setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): SetOpenCodeEndpointResult {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return { ok: true };
-  if (endpoint && endpoint.password) {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return { ok: false, reason: "encryption-unavailable" };
-    }
-    const encrypted = encryptValue(endpoint.password);
-    if (!encrypted) {
-      return { ok: false, reason: "encryption-unavailable" };
-    }
-    env.infraOpenCode = { ...endpoint, password: encrypted, wasEncrypted: true };
-  } else {
-    env.infraOpenCode = endpoint;
-  }
-  store.set("environments", envs);
-  return { ok: true };
+  return _setEndpointWithEncryption(environmentId, endpoint, "infraOpenCode");
 }
 
 function _setMainVm(environmentId: string): void {

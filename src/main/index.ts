@@ -129,6 +129,16 @@ function setOsOffline(value: boolean): void {
   }
 }
 
+/** Shared warning dialog for when password encryption is unavailable. */
+function showEncryptionWarning(): void {
+  void dialog.showMessageBox({
+    type: "warning",
+    title: "Password Not Saved",
+    message: "Password storage requires a keychain.",
+    detail: "Install libsecret on Linux or ensure a keychain is available on your system. Your password was not saved.",
+  });
+}
+
 function isAllowedBaseUrl(baseUrl: string): boolean {
   try {
     const url = new URL(baseUrl);
@@ -552,12 +562,7 @@ app.whenReady().then(() => {
     const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setOpenCodeEndpoint", rawArgs);
     const result = await setOpenCodeEndpoint(environmentId, endpoint);
     if (!result.ok && result.reason === "encryption-unavailable") {
-      void dialog.showMessageBox({
-        type: "warning",
-        title: "Password Not Saved",
-        message: "Password storage requires a keychain.",
-        detail: "Install libsecret on Linux or ensure a keychain is available on your system. Your password was not saved.",
-      });
+      showEncryptionWarning();
       return result;
     }
     if (endpoint) {
@@ -572,12 +577,7 @@ app.whenReady().then(() => {
     const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setInfraOpenCodeEndpoint", rawArgs);
     const result = await setInfraOpenCodeEndpoint(environmentId, endpoint);
     if (!result.ok && result.reason === "encryption-unavailable") {
-      void dialog.showMessageBox({
-        type: "warning",
-        title: "Password Not Saved",
-        message: "Password storage requires a keychain.",
-        detail: "Install libsecret on Linux or ensure a keychain is available on your system. Your password was not saved.",
-      });
+      showEncryptionWarning();
     }
     return result;
   });

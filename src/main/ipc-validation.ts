@@ -77,9 +77,35 @@ export class IpcValidationError extends Error {
   }
 }
 
-// ── Per-channel validators ────────────────────────────────────────────
+// ── Shared validator factories ────────────────────────────────────────
 
 type Validator = (args: unknown[]) => string[];
+
+/**
+ * Validator for `config:setOpenCodeEndpoint` and `config:setInfraOpenCodeEndpoint`.
+ * Both channels accept identical arguments: (environmentId, endpoint | null).
+ * A shared factory prevents security drift — any new validation rule is applied
+ * to both channels automatically.
+ */
+function makeOpenCodeEndpointValidator(): Validator {
+  return (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    const ep = args[1];
+    if (ep !== null) {
+      if (!isObject(ep)) {
+        issues.push("endpoint must be an object or null");
+      } else {
+        if (!isNonEmptyString(ep.url)) issues.push("endpoint.url must be a non-empty string");
+        if (ep.password !== null && !isString(ep.password))
+          issues.push("endpoint.password must be a string or null");
+      }
+    }
+    return issues;
+  };
+}
+
+// ── Per-channel validators ────────────────────────────────────────────
 
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
 const SESSION_SCOPES = ["read-only", "operate", "admin"] as const;
@@ -293,37 +319,8 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:setOpenCodeEndpoint": (args) => {
-    const issues: string[] = [];
-    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
-    const ep = args[1];
-    if (ep !== null) {
-      if (!isObject(ep)) {
-        issues.push("endpoint must be an object or null");
-      } else {
-        if (!isNonEmptyString(ep.url)) issues.push("endpoint.url must be a non-empty string");
-        if (ep.password !== null && !isString(ep.password))
-          issues.push("endpoint.password must be a string or null");
-      }
-    }
-    return issues;
-  },
-
-  "config:setInfraOpenCodeEndpoint": (args) => {
-    const issues: string[] = [];
-    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
-    const ep = args[1];
-    if (ep !== null) {
-      if (!isObject(ep)) {
-        issues.push("endpoint must be an object or null");
-      } else {
-        if (!isNonEmptyString(ep.url)) issues.push("endpoint.url must be a non-empty string");
-        if (ep.password !== null && !isString(ep.password))
-          issues.push("endpoint.password must be a string or null");
-      }
-    }
-    return issues;
-  },
+  "config:setOpenCodeEndpoint": makeOpenCodeEndpointValidator(),
+  "config:setInfraOpenCodeEndpoint": makeOpenCodeEndpointValidator(),
 
   "config:setMainVm": (args) => {
     const issues: string[] = [];
