@@ -7,6 +7,7 @@ import { loopStatusToFleetItem } from "../fleet-mapping";
 import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
+import { FleetHealthFooter } from "./FleetHealthFooter";
 import { translateMessage } from "../i18n";
 
 type View =
@@ -91,11 +92,18 @@ export function Sidebar(props: {
   fleetActivityEnabled?: boolean;
   /** Number of unread inbox items (drives the badge). */
   inboxItemCount?: number;
+  /** Navigate to a specific loop (env + loopId). */
+  onNavigateToLoop?: (envId: string, loopId: string) => void;
+  /** Navigate to a specific project (env + projectId). */
+  onNavigateToProject?: (envId: string, projectId: string) => void;
+  /** Navigate to the inbox view. */
+  onNavigateToInbox?: () => void;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
+    onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
   } = props;
   const intl = useIntl();
 
@@ -349,6 +357,25 @@ export function Sidebar(props: {
       </div>
 
       <div className="sidebar-footer">
+        <FleetHealthFooter
+          environments={environments}
+          health={health}
+          perEnvLoops={perEnvLoops}
+          onNavigateToLoop={(envId, loopId) => {
+            onSelect(envId);
+            onNavigateToLoop?.(envId, loopId);
+          }}
+          onNavigateToProject={(envId, projectId) => {
+            onSelect(envId);
+            onNavigateToProject?.(envId, projectId);
+          }}
+          onNavigateToInbox={() => {
+            onNavigateToInbox?.();
+          }}
+          onSelectEnvironment={(envId) => {
+            onSelect(envId);
+          }}
+        />
         {fleetActivityEnabled !== false ? (
           <FleetActivityReadout
             perEnvLoops={perEnvLoops}

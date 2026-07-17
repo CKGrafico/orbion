@@ -768,6 +768,17 @@ export function App(): React.ReactNode {
               onNavigate={handleNavigate}
               onAddVm={() => setVmWizardOpen(true)}
               inboxItemCount={inboxItemCount}
+              onNavigateToLoop={(envId, loopId) => {
+                select(envId);
+                setView({ kind: "loop", loopId });
+              }}
+              onNavigateToProject={(envId, projectId) => {
+                select(envId);
+                setView({ kind: "project", projectId });
+              }}
+              onNavigateToInbox={() => {
+                setView({ kind: "inbox" });
+              }}
             />
           </aside>
         ) : null}

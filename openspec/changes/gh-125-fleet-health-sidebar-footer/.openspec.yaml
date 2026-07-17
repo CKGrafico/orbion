@@ -1,0 +1,10 @@
+{
+  "id": "gh-125-fleet-health-sidebar-footer",
+  "status": "in-progress",
+  "createdAt": "2026-07-17T19:00:00Z",
+  "source": {
+    "kind": "github-issue",
+    "issueNumber": 125,
+    "title": "Fleet health summary in the sidebar footer, click to jump"
+  }
+}
