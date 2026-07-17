@@ -63,6 +63,8 @@ orbion/
 │           │       └── InboxPanel.tsx  # Conversational inbox with fleet-scoped queries + inline actions
 │           └── components/
 │               ├── Sidebar.tsx           # Instance list + health dots
+│               ├── FleetHealthFooter.tsx # Fleet health summary (instance count, failures, unreachable) in sidebar footer
+│               ├── FleetActivityReadout.tsx # Agent-loop activity summary in sidebar footer
 │               ├── SegmentedTabs.tsx     # Loops/Tasks/Projects pill switcher
 │               ├── AddInstanceModal.tsx  # Register a new instance
 │               ├── LoopsView.tsx         # Loop list for the selected instance

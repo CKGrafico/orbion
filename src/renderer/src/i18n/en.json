@@ -533,5 +533,12 @@
     "itemSourceProject": "{project} on {instance}",
     "transitionFailed": "{loopName} failed (exit {exitCode})",
     "transitionFinished": "{loopName} finished ({runCount}/{maxRuns} runs)"
+  },
+  "fleetHealth": {
+    "instancesConnected": "{total} instances · {connected} connected",
+    "loopFailing": "1 loop failing",
+    "loopsFailing": "{count} loops failing",
+    "unreachable": "1 unreachable",
+    "unreachablePlural": "{count} unreachable"
   }
 }
