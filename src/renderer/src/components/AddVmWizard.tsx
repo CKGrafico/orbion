@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../shared/ipc";
+import { TOOL_DEFINITIONS, type ToolDefinition } from "../../shared/tool-definitions";
 import { ShieldCheck, X, Check, Loader, SkipForward, Lock } from "lucide-react";
 import { translateMessage } from "../i18n";
 import type { IVmWizardService, IConfigService } from "../services/interfaces";
@@ -55,18 +56,12 @@ export function AddVmWizard(props: {
   const [progress, setProgress] = useState<VmWizardProgress | null>(null);
   const [running, setRunning] = useState(false);
   const [doneResult, setDoneResult] = useState<{ environmentId: string; environmentName: string; daemonUrl: string } | null>(null);
-  const [serviceSelection, setServiceSelection] = useState<VmWizardServiceSelection>({
-    installOpenCode: true,
-    installGh: true,
-    installAzDo: true,
-    installJira: true,
-    installGitlab: true,
-    installDocker: true,
-    installTerraform: true,
-    installTailscale: true,
-    installClaudeCli: true,
-    installJq: true,
-    installRipgrep: true,
+  const [serviceSelection, setServiceSelection] = useState<VmWizardServiceSelection>(() => {
+    const installTools: Record<string, boolean> = {};
+    for (const tool of TOOL_DEFINITIONS) {
+      installTools[tool.id] = true;
+    }
+    return { installTools };
   });
 
   useEffect(() => {
@@ -171,33 +166,19 @@ export function AddVmWizard(props: {
   type ServiceCategory = "core" | "ai" | "platform" | "devops" | "networking" | "utilities";
 
   interface ServiceDef {
-    key: keyof VmWizardServiceSelection;
+    toolId: string;
     nameKey: string;
     descKey: string;
     category: ServiceCategory;
     mandatory?: boolean;
-    probeField?: string;
-    launchField?: string;
   }
 
-  const SERVICES: ServiceDef[] = [
-    // AI
-    { key: "installOpenCode", nameKey: "vmWizard.serviceOpenCode", descKey: "vmWizard.serviceOpenCodeDesc", category: "ai", probeField: "opencodeRunning", launchField: "openCodeStatus" },
-    { key: "installClaudeCli", nameKey: "vmWizard.serviceClaudeCli", descKey: "vmWizard.serviceClaudeCliDesc", category: "ai", probeField: "claudeInstalled", launchField: "claudeStatus" },
-    // Platform CLIs
-    { key: "installGh", nameKey: "vmWizard.serviceGh", descKey: "vmWizard.serviceGhDesc", category: "platform", probeField: "ghInstalled", launchField: "ghStatus" },
-    { key: "installAzDo", nameKey: "vmWizard.serviceAzDo", descKey: "vmWizard.serviceAzDoDesc", category: "platform", probeField: "azDoInstalled", launchField: "azDoStatus" },
-    { key: "installJira", nameKey: "vmWizard.serviceJira", descKey: "vmWizard.serviceJiraDesc", category: "platform", probeField: "jiraInstalled", launchField: "jiraStatus" },
-    { key: "installGitlab", nameKey: "vmWizard.serviceGitlab", descKey: "vmWizard.serviceGitlabDesc", category: "platform", probeField: "gitlabInstalled", launchField: "gitlabStatus" },
-    // DevOps
-    { key: "installDocker", nameKey: "vmWizard.serviceDocker", descKey: "vmWizard.serviceDockerDesc", category: "devops", probeField: "dockerInstalled", launchField: "dockerStatus" },
-    { key: "installTerraform", nameKey: "vmWizard.serviceTerraform", descKey: "vmWizard.serviceTerraformDesc", category: "devops", probeField: "terraformInstalled", launchField: "terraformStatus" },
-    // Networking
-    { key: "installTailscale", nameKey: "vmWizard.serviceTailscale", descKey: "vmWizard.serviceTailscaleDesc", category: "networking", probeField: "tailscaleInstalled", launchField: "tailscaleStatus" },
-    // Utilities
-    { key: "installJq", nameKey: "vmWizard.serviceJq", descKey: "vmWizard.serviceJqDesc", category: "utilities", probeField: "jqInstalled", launchField: "jqStatus" },
-    { key: "installRipgrep", nameKey: "vmWizard.serviceRipgrep", descKey: "vmWizard.serviceRipgrepDesc", category: "utilities", probeField: "ripgrepInstalled", launchField: "ripgrepStatus" },
-  ];
+  const SERVICES: ServiceDef[] = TOOL_DEFINITIONS.map((t: ToolDefinition) => ({
+    toolId: t.id,
+    nameKey: t.nameKey,
+    descKey: t.descKey,
+    category: t.category,
+  }));
 
   const CATEGORY_KEYS: Record<ServiceCategory, string> = {
     core: "vmWizard.categoryCore",
@@ -216,12 +197,12 @@ export function AddVmWizard(props: {
 
   function isServiceInstalled(svc: ServiceDef): boolean {
     if (!progress?.probe) return false;
-    return Boolean((progress.probe as Record<string, unknown>)[svc.probeField ?? ""]);
+    return Boolean(progress.probe.installedTools[svc.toolId]);
   }
 
   function getLaunchStatus(svc: ServiceDef): VmWizardServiceStatus | null {
     if (!progress?.launch) return null;
-    return (progress.launch as Record<string, unknown>)[svc.launchField ?? ""] as VmWizardServiceStatus | null;
+    return progress.launch.toolStatuses[svc.toolId] ?? null;
   }
 
   return (
@@ -380,7 +361,7 @@ export function AddVmWizard(props: {
                     const installed = isServiceInstalled(svc);
                     return (
                       <label
-                        key={svc.key}
+                        key={svc.toolId}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -391,9 +372,9 @@ export function AddVmWizard(props: {
                       >
                         <input
                           type="checkbox"
-                          checked={serviceSelection[svc.key]}
+                          checked={serviceSelection.installTools[svc.toolId] ?? false}
                           disabled={installed}
-                          onChange={(e) => setServiceSelection((s) => ({ ...s, [svc.key]: e.target.checked }))}
+                          onChange={(e) => setServiceSelection((s) => ({ installTools: { ...s.installTools, [svc.toolId]: e.target.checked } }))}
                           style={{ marginTop: 3, flexShrink: 0 }}
                         />
                         <div style={{ minWidth: 0 }}>
@@ -450,7 +431,7 @@ export function AddVmWizard(props: {
                       const status = getLaunchStatus(svc);
                       if (!status) return null;
                       return (
-                        <div key={svc.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                        <div key={svc.toolId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                           {serviceStatusIcon(status)}
                           <span>{intl.formatMessage({ id: svc.nameKey })}</span>
                           {status !== "pending" ? (

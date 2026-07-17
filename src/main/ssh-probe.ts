@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import type { SshHost, VmWizardProbeResult, I18nMessage } from "../shared/ipc.js";
+import { TOOL_DEFINITIONS } from "../shared/tool-definitions.js";
 import { compareSemver } from "../shared/utils.js";
 import { buildSshArgs } from "./ssh-config.js";
 import { msg } from "./i18n.js";
@@ -97,6 +98,8 @@ fi
 `;
 
 // Detects which optional tools are already installed on the VM.
+// Generated dynamically from TOOL_DEFINITIONS — adding a tool there
+// automatically adds a check_tool line here.
 const TOOLS_PROBE_SCRIPT = `
 # Each line: TOOL_INSTALLED|<name> or TOOL_MISSING|<name>
 check_tool() {
@@ -109,19 +112,15 @@ check_tool() {
   fi
 }
 
-check_tool gh gh
-check_tool azDo az
-check_tool jira acli
-check_tool gitlab glab
-check_tool docker docker
-check_tool terraform terraform
-check_tool tailscale tailscale
-check_tool claude claude
-check_tool jq jq
-check_tool ripgrep rg
+${TOOL_DEFINITIONS.map((t) => `check_tool ${t.id} ${t.binary}`).join("\n")}
 `;
 
 export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
+  const installedTools: Record<string, boolean> = {};
+  for (const tool of TOOL_DEFINITIONS) {
+    installedTools[tool.id] = false;
+  }
+
   const result: VmWizardProbeResult = {
     reachable: false,
     authOk: false,
@@ -131,16 +130,7 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
     daemonPort: null,
     opencodeRunning: false,
     opencodePort: null,
-    ghInstalled: false,
-    azDoInstalled: false,
-    jiraInstalled: false,
-    gitlabInstalled: false,
-    dockerInstalled: false,
-    terraformInstalled: false,
-    tailscaleInstalled: false,
-    claudeInstalled: false,
-    jqInstalled: false,
-    ripgrepInstalled: false,
+    installedTools,
     errorDetail: null,
   };
 
@@ -199,18 +189,9 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
   for (const line of toolsResult.stdout.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed.startsWith("TOOL_INSTALLED|")) continue;
-    const tool = trimmed.split("|")[1];
-    switch (tool) {
-      case "gh": result.ghInstalled = true; break;
-      case "azDo": result.azDoInstalled = true; break;
-      case "jira": result.jiraInstalled = true; break;
-      case "gitlab": result.gitlabInstalled = true; break;
-      case "docker": result.dockerInstalled = true; break;
-      case "terraform": result.terraformInstalled = true; break;
-      case "tailscale": result.tailscaleInstalled = true; break;
-      case "claude": result.claudeInstalled = true; break;
-      case "jq": result.jqInstalled = true; break;
-      case "ripgrep": result.ripgrepInstalled = true; break;
+    const toolId = trimmed.split("|")[1];
+    if (toolId) {
+      result.installedTools[toolId] = true;
     }
   }
 

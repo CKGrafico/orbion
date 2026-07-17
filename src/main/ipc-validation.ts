@@ -72,20 +72,6 @@ const API_METHODS = ["GET", "POST", "PATCH", "DELETE"] as const;
 const INFRA_ACTIONS = ["machine-status", "clone-repo"] as const;
 const CONSENT_DECISIONS = ["install", "skip"] as const;
 
-const SERVICE_SELECTION_KEYS = [
-  "installOpenCode",
-  "installGh",
-  "installAzDo",
-  "installJira",
-  "installGitlab",
-  "installDocker",
-  "installTerraform",
-  "installTailscale",
-  "installClaudeCli",
-  "installJq",
-  "installRipgrep",
-] as const;
-
 /**
  * Registry: channel name → argument validator.
  * Each validator receives the raw args array and returns an array of issue
@@ -264,9 +250,16 @@ const validators: Record<string, Validator> = {
       return issues;
     }
     const sel = args[0] as Record<string, unknown>;
-    for (const key of SERVICE_SELECTION_KEYS) {
-      if (sel[key] !== undefined && !isBoolean(sel[key])) {
-        issues.push(`${key} must be a boolean`);
+    if (sel.installTools !== undefined) {
+      if (!isObject(sel.installTools)) {
+        issues.push("installTools must be an object");
+      } else {
+        const tools = sel.installTools as Record<string, unknown>;
+        for (const [key, val] of Object.entries(tools)) {
+          if (!isBoolean(val)) {
+            issues.push(`installTools.${key} must be a boolean`);
+          }
+        }
       }
     }
     return issues;
