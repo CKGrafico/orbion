@@ -380,5 +380,10 @@
     "done": "done",
     "failed": "failed",
     "idle": "idle"
+  },
+  "store": {
+    "configError": "Configuration operation failed",
+    "configErrorDetail": "{operation} failed: {detail}",
+    "setOpenCodeEndpointRejected": "OpenCode endpoint rejected: {reason}"
   }
 }
