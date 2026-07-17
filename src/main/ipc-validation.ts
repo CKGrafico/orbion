@@ -110,7 +110,7 @@ function makeOpenCodeEndpointValidator(): Validator {
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
 const SESSION_SCOPES = ["read-only", "operate", "admin"] as const;
 const API_METHODS = ["GET", "POST", "PATCH", "DELETE"] as const;
-const INFRA_ACTIONS = ["machine-status", "clone-repo"] as const;
+const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-platform", "list-issues", "add-label"] as const;
 const CONSENT_DECISIONS = ["install", "skip"] as const;
 
 /**
@@ -330,6 +330,28 @@ const validators: Record<string, Validator> = {
 
   "config:getMainVmId": () => [],
 
+  "config:getProjectPickupLabels": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("projectId must be a non-empty string");
+    return issues;
+  },
+
+  "config:setProjectPickupLabels": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("projectId must be a non-empty string");
+    if (!Array.isArray(args[1])) {
+      issues.push("labels must be an array");
+    } else {
+      for (let i = 0; i < args[1].length; i++) {
+        if (!isString(args[1][i])) {
+          issues.push(`labels[${i}] must be a string`);
+          break;
+        }
+      }
+    }
+    return issues;
+  },
+
   // ── Infra ───────────────────────────────────────────────
   "infra:executeAction": (args) => {
     const issues: string[] = [];
@@ -339,7 +361,7 @@ const validators: Record<string, Validator> = {
     }
     const a = args[0] as Record<string, unknown>;
     if (!isEnum(a.action, INFRA_ACTIONS))
-      issues.push("action must be 'machine-status' or 'clone-repo'");
+      issues.push("action must be a valid infra action");
     if (a.params !== undefined && !isObject(a.params))
       issues.push("params must be an object if provided");
     if (a.action === "clone-repo") {

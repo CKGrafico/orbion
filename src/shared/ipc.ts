@@ -95,6 +95,8 @@ export interface ConfigBridge {
   setInfraOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) => Promise<SetOpenCodeEndpointResult>;
   setMainVm: (environmentId: string) => Promise<void>;
   getMainVmId: () => Promise<string | null>;
+  getProjectPickupLabels: (projectId: string) => Promise<string[]>;
+  setProjectPickupLabels: (projectId: string, labels: string[]) => Promise<void>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────
@@ -120,7 +122,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label";
 
 export interface CreateIssueParams {
   title: string;
@@ -169,6 +171,20 @@ export interface MachineStatusEntry {
   name: string;
   health: string;
   endpoints: Array<{ url: string; kind: string }>;
+}
+
+export interface AddLabelParams {
+  /** Issue number on the platform. */
+  issueNumber: number;
+  /** Label(s) to apply. */
+  labels: string[];
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+}
+
+export interface AddLabelResult {
+  issueNumber: number;
+  labels: string[];
 }
 
 export interface InfraActionArgs {

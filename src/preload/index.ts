@@ -72,6 +72,10 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:setMainVm", environmentId) as Promise<void>,
     getMainVmId: () =>
       ipcRenderer.invoke("config:getMainVmId") as Promise<string | null>,
+    getProjectPickupLabels: (projectId: string) =>
+      ipcRenderer.invoke("config:getProjectPickupLabels", projectId) as Promise<string[]>,
+    setProjectPickupLabels: (projectId: string, labels: string[]) =>
+      ipcRenderer.invoke("config:setProjectPickupLabels", projectId, labels) as Promise<void>,
   },
 
   connection: {
