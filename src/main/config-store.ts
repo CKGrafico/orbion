@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ConditionWatch } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 
@@ -40,6 +40,7 @@ interface ConfigSchema {
   sessionTokens: Record<string, EncryptedSessionToken>;
   budgetWatches: BudgetWatch[];
   budgetBreaches: BudgetBreach[];
+  conditionWatches: ConditionWatch[];
   inboxDismissedIds: string[];
   [key: string]: unknown;
 }
@@ -54,6 +55,7 @@ const store = new Store<ConfigSchema>({
     sessionTokens: {},
     budgetWatches: [],
     budgetBreaches: [],
+    conditionWatches: [],
     inboxDismissedIds: [],
   },
 });
@@ -589,6 +591,69 @@ export function dismissBudgetBreach(breachId: string): Promise<void> {
 
 export function pruneOldBreaches(): Promise<void> {
   return serialize(() => _pruneOldBreaches());
+}
+
+// ---------------------------------------------------------------------------
+// Condition watch persistence (ping-me-when)
+// ---------------------------------------------------------------------------
+
+export function getConditionWatches(): ConditionWatch[] {
+  return store.get("conditionWatches", []);
+}
+
+function _addConditionWatch(watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">): ConditionWatch {
+  const newWatch: ConditionWatch = {
+    ...watch,
+    id: crypto.randomUUID().slice(0, 8),
+    tripped: false,
+    trippedAt: null,
+    createdAt: new Date().toISOString(),
+  };
+  const watches = store.get("conditionWatches", []);
+  watches.push(newWatch);
+  store.set("conditionWatches", watches);
+  return newWatch;
+}
+
+function _removeConditionWatch(watchId: string): void {
+  const watches = store.get("conditionWatches", []);
+  store.set("conditionWatches", watches.filter((w) => w.id !== watchId));
+}
+
+function _tripConditionWatch(watchId: string): void {
+  const watches = store.get("conditionWatches", []);
+  const idx = watches.findIndex((w) => w.id === watchId);
+  if (idx !== -1) {
+    watches[idx] = { ...watches[idx], tripped: true, trippedAt: new Date().toISOString() };
+    store.set("conditionWatches", watches);
+  }
+}
+
+function _pruneTrippedWatches(): void {
+  const watches = store.get("conditionWatches", []);
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000; // 24 hours
+  const pruned = watches.filter(
+    (w) => !w.tripped || new Date(w.trippedAt!).getTime() > cutoff,
+  );
+  if (pruned.length !== watches.length) {
+    store.set("conditionWatches", pruned);
+  }
+}
+
+export function addConditionWatch(watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">): Promise<ConditionWatch> {
+  return serialize(() => _addConditionWatch(watch));
+}
+
+export function removeConditionWatch(watchId: string): Promise<void> {
+  return serialize(() => _removeConditionWatch(watchId));
+}
+
+export function tripConditionWatch(watchId: string): Promise<void> {
+  return serialize(() => _tripConditionWatch(watchId));
+}
+
+export function pruneTrippedWatches(): Promise<void> {
+  return serialize(() => _pruneTrippedWatches());
 }
 
 // ---------------------------------------------------------------------------

@@ -2,8 +2,8 @@ import React, { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode } from "../types";
-import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult } from "../../../shared/ipc";
-import type { IInfraService } from "../services/interfaces";
+import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, WatchTarget, WatchCondition } from "../../../shared/ipc";
+import type { IInfraService, IWatchService, IConfigService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
 
@@ -34,9 +34,133 @@ function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
   return lines.join("\n");
 }
 
+/**
+ * Parse a watch intent from natural language and create a ConditionWatch.
+ * Returns a human-readable response string.
+ *
+ * Supported conditions (limited to what Orbion can actually observe):
+ * - "ping me when loop-1 is running/stopped/failed/paused"
+ * - "ping me when the instance is back online"
+ * - "watch for loop-1 to fail/stop" (status-transition to stopped/failed)
+ *
+ * The agent declines conditions it cannot monitor.
+ */
+async function parseWatchIntent(
+  text: string,
+  watchService: IWatchService,
+  configService: IConfigService,
+): Promise<string> {
+  const lower = text.toLowerCase();
+
+  // Supported loop statuses that Orbion can observe
+  const observableStatuses = ["running", "waiting", "paused", "idle", "stopped", "failed"];
+
+  // Try to match status-transition to a specific loop
+  for (const status of observableStatuses) {
+    const patterns = [
+      new RegExp(`(?:ping|tell|notify|alert)\\s+me\\s+when\\s+.+?\\s+(?:is|goes|becomes)\\s+${status}`, "i"),
+      new RegExp(`watch\\s+(?:for\\s+)?(.+?)\\s+to\\s+(?:be\\s+)?${status}`, "i"),
+      new RegExp(`watch\\s+when\\s+.+?\\s+(?:is|goes|becomes)\\s+${status}`, "i"),
+    ];
+
+    let matched = false;
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        matched = true;
+        break;
+      }
+    }
+
+    if (matched) {
+      const loopRef = extractLoopRef(text);
+      const envId = await resolveDefaultEnvId(configService);
+
+      if (!envId) {
+        return "I can't set a watch because no environment is configured. Add a VM first.";
+      }
+
+      if (loopRef) {
+        const target: WatchTarget = {
+          kind: "loop",
+          loopId: loopRef,
+          environmentId: envId,
+        };
+        const condition: WatchCondition = {
+          kind: "status-transition",
+          targetStatus: status,
+          description: `status becomes ${status}`,
+        };
+
+        await watchService.addWatch({ target, condition });
+        return `Watching for **${loopRef}** to become **${status}**. I'll notify you when it happens. One-shot: the watch disarms after firing.`;
+      }
+
+      return `I understood you want to watch for something becoming **${status}**, but I couldn't identify which loop. Try: "ping me when loop-1 is ${status}" or reference a specific loop ID.`;
+    }
+  }
+
+  // Try to match reachability-change (instance back online / offline)
+  const isReachabilityIntent =
+    lower.includes("back up") ||
+    lower.includes("back online") ||
+    lower.includes("goes offline") ||
+    lower.includes("comes back") ||
+    lower.includes("instance down") ||
+    lower.includes("instance offline");
+
+  if (isReachabilityIntent) {
+    const envId = await resolveDefaultEnvId(configService);
+    if (!envId) {
+      return "I can't set a watch because no environment is configured. Add a VM first.";
+    }
+
+    const target: WatchTarget = {
+      kind: "instance",
+      environmentId: envId,
+    };
+    const condition: WatchCondition = {
+      kind: "reachability-change",
+      description: lower.includes("offline") || lower.includes("down")
+        ? "instance goes offline"
+        : "instance comes back online",
+    };
+
+    await watchService.addWatch({ target, condition });
+    return `Watching for **reachability change** on your environment. I'll notify you when it happens. One-shot: the watch disarms after firing.`;
+  }
+
+  // Decline: condition not in the observable vocabulary
+  return "I can only watch for conditions Orbion can actually observe: a loop's status changing (running, waiting, paused, stopped, failed) or an instance's reachability. Try: \"ping me when loop-1 is running\" or \"tell me when the instance is back online.\"";
+}
+
+/** Extract a loop reference (ID or substring) from free text. */
+function extractLoopRef(text: string): string | null {
+  // Match patterns like "loop-1", "loop-42"
+  const loopIdMatch = text.match(/loop[- ]?(\w+)/i);
+  if (loopIdMatch) return `loop-${loopIdMatch[1]}`;
+
+  // Match quoted references: when "the build" is ...
+  const quotedMatch = text.match(/when\s+"([^"]+)"\s/i) ?? text.match(/when\s+([^\s]+(?:\s+(?:is|goes|becomes)))/i);
+  if (quotedMatch && quotedMatch[1]) {
+    const ref = quotedMatch[1].replace(/\s+(is|goes|becomes)$/i, "").trim();
+    if (ref && ref.length > 1 && ref.length < 40) return ref;
+  }
+
+  return null;
+}
+
+/** Resolve the default environment ID for the watch target. */
+async function resolveDefaultEnvId(configService: IConfigService): Promise<string | null> {
+  const selected = await configService.getSelectedEnvironmentId();
+  if (selected) return selected;
+  const envs = await configService.getEnvironments();
+  return envs.length > 0 ? envs[0].id : null;
+}
+
 export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): React.ReactNode {
   const intl = useIntl();
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
   const {
     turns,
     rows,
@@ -53,6 +177,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
     setTurnAccessMode,
   } = useTranscript();
 
+  const [watchService] = useInject<IWatchService>(cid.IWatchService);
+
   const [accessMode, setAccessMode] = useState<AccessMode>("supervised");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
@@ -65,6 +191,51 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
       const now = Date.now();
       const turnId = `infra-turn-${now}`;
       const lower = text.toLowerCase();
+
+      // Detect "ping me when / tell me when / watch for" intent
+      const isWatchIntent =
+        lower.includes("ping me when") ||
+        lower.includes("tell me when") ||
+        lower.includes("notify me when") ||
+        lower.includes("watch for") ||
+        lower.includes("alert me when") ||
+        lower.includes("alert when") ||
+        lower.includes("watch when");
+
+      if (isWatchIntent) {
+        const turn: ChatTurn = {
+          id: turnId,
+          userMessage: {
+            id: `infra-msg-${now}-u`,
+            role: "user",
+            content: text,
+            startedAt: now,
+          },
+          assistantMessage: {
+            id: `infra-msg-${now}-a`,
+            role: "assistant",
+            content: "",
+            toolCalls: [],
+            startedAt: now + 100,
+            finishedAt: undefined,
+          },
+          finished: false,
+          collapsed: false,
+          accessMode,
+        };
+        addTurn(turn);
+        setActiveTurnId(turnId);
+
+        // Parse the watch intent
+        void (async () => {
+          const result = await parseWatchIntent(text, watchService, configService);
+          appendAssistantContent(turnId, result);
+          finishTurn(turnId);
+          setActiveTurnId(null);
+        })();
+
+        return;
+      }
 
       // Detect "create issue" intent
       const isCreateIssue =
@@ -215,7 +386,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         }, 30);
       }
     },
-    [intl, accessMode, addTurn, appendAssistantContent, finishTurn, infraService],
+    [intl, accessMode, addTurn, appendAssistantContent, finishTurn, infraService, watchService, configService],
   );
 
   const handleInterrupt = useCallback(

@@ -25,6 +25,7 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ConditionWatch,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -126,4 +127,16 @@ export interface InboxBuildParams {
   environments: Array<{ id: string; name: string }>;
   breaches: BudgetBreach[];
   dismissedIds: Set<string>;
+  trippedWatches: ConditionWatch[];
+}
+
+export interface IWatchService {
+  getWatches(): Promise<ConditionWatch[]>;
+  addWatch(watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">): Promise<ConditionWatch>;
+  removeWatch(watchId: string): Promise<void>;
+  tripWatch(watchId: string): Promise<void>;
+  /** Get active (non-tripped) watches targeting a specific loop. */
+  getWatchesForLoop(environmentId: string, loopId: string): Promise<ConditionWatch[]>;
+  /** Get active (non-tripped) watches targeting a specific instance. */
+  getWatchesForInstance(environmentId: string): Promise<ConditionWatch[]>;
 }

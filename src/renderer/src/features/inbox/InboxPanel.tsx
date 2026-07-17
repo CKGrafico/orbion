@@ -3,7 +3,7 @@ import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
 import type { InboxItem, InboxQueryResult } from "../../../../shared/ipc";
-import type { BudgetBreach } from "../../../../shared/ipc";
+import type { BudgetBreach, ConditionWatch } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
 import { ArrowUp, Inbox, X, Search } from "lucide-react";
 import { Suspense } from "react";
@@ -14,6 +14,7 @@ interface InboxPanelProps {
   perEnvHealth: Record<string, EnvironmentHealth>;
   environments: Environment[];
   breaches: BudgetBreach[];
+  trippedWatches?: ConditionWatch[];
   onClickItem: (item: InboxItem) => void;
   onDismissItem: (itemId: string) => void;
 }
@@ -29,6 +30,7 @@ export function InboxPanel({
   perEnvHealth,
   environments,
   breaches,
+  trippedWatches,
   onClickItem,
   onDismissItem,
 }: InboxPanelProps): React.ReactNode {
@@ -57,7 +59,8 @@ export function InboxPanel({
     environments,
     breaches,
     dismissedIds,
-  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds]);
+    trippedWatches: trippedWatches ?? [],
+  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, trippedWatches]);
 
   const items = useMemo(() => inboxService.buildItems(buildParams), [inboxService, buildParams]);
 
@@ -193,11 +196,13 @@ function InboxItemRow({
   onClick: (item: InboxItem) => void;
   onDismiss: (itemId: string) => void;
 }): React.ReactNode {
-  const kindIcon = item.kind === "breach" ? "!" : item.kind === "failed-loop" ? "x" : item.kind === "instance-offline" ? "-" : "?";
+  const kindIcon = item.kind === "breach" ? "!" : item.kind === "failed-loop" ? "x" : item.kind === "instance-offline" ? "-" : item.kind === "watch-tripped" ? "w" : "?";
   const kindClass = item.kind === "breach" || item.kind === "failed-loop"
     ? "inbox-item-dot-danger"
     : item.kind === "instance-offline"
     ? "inbox-item-dot-warning"
+    : item.kind === "watch-tripped"
+    ? "inbox-item-dot-info"
     : "inbox-item-dot-info";
 
   return (

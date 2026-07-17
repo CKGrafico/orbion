@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import type { Environment, LoopMeta, Project } from "../types";
+import type { ConditionWatch } from "../../../shared/ipc";
 import { fetchProjects } from "../api";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { PILL_COLORS, getPillLabel } from "../fleet-status";
@@ -36,8 +37,10 @@ export function InstanceDetail(props: {
   connectionPhase?: string;
   onOpenLoop: (loopId: string) => void;
   onOpenProject: (projectId: string) => void;
+  watchesByLoop?: Map<string, ConditionWatch[]>;
+  onDisarmWatch?: (watchId: string) => void;
 }): React.ReactNode {
-  const { instance, loops, connectionPhase, onOpenLoop, onOpenProject } = props;
+  const { instance, loops, connectionPhase, onOpenLoop, onOpenProject, watchesByLoop, onDisarmWatch } = props;
   const intl = useIntl();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -119,6 +122,8 @@ export function InstanceDetail(props: {
                   projectLoops.map((loop) => {
                     const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
                     const loopTitle = loop.description?.trim() || loop.id;
+                    const watchKey = `${instance.id}:${loop.id}`;
+                    const loopWatches = watchesByLoop?.get(watchKey) ?? [];
                     return (
                       <button
                         key={loop.id}
@@ -128,6 +133,9 @@ export function InstanceDetail(props: {
                         <span className="tree-dot" style={{ background: PILL_COLORS[fleetItem] }} />
                         <span className="desc">{loopTitle}</span>
                         <span className="right">
+                          {loopWatches.length > 0 ? (
+                            <WatchChip watches={loopWatches} onDisarm={onDisarmWatch} />
+                          ) : null}
                           <LoopActivitySummary loop={loop} />
                           <span className="status" style={{ color: PILL_COLORS[fleetItem] }}>
                             {getPillLabel(fleetItem)}
@@ -160,6 +168,8 @@ export function InstanceDetail(props: {
               {unassignedLoops.map((loop) => {
                 const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
                 const loopTitle = loop.description?.trim() || loop.id;
+                const watchKey = `${instance.id}:${loop.id}`;
+                const loopWatches = watchesByLoop?.get(watchKey) ?? [];
                 return (
                   <button
                     key={loop.id}
@@ -169,6 +179,9 @@ export function InstanceDetail(props: {
                     <span className="tree-dot" style={{ background: PILL_COLORS[fleetItem] }} />
                     <span className="desc">{loopTitle}</span>
                     <span className="right">
+                      {loopWatches.length > 0 ? (
+                        <WatchChip watches={loopWatches} onDisarm={onDisarmWatch} />
+                      ) : null}
                       <LoopActivitySummary loop={loop} />
                       <span className="status" style={{ color: PILL_COLORS[fleetItem] }}>
                         {getPillLabel(fleetItem)}
@@ -185,5 +198,52 @@ export function InstanceDetail(props: {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** "watching" chip shown on loop rows when a condition watch targets that loop. */
+function WatchChip({ watches, onDisarm }: { watches: ConditionWatch[]; onDisarm?: (watchId: string) => void }): React.ReactNode {
+  const intl = useIntl();
+  const [expanded, setExpanded] = useState(false);
+
+  if (watches.length === 0) return null;
+
+  const conditionSummary = watches
+    .map((w) => w.condition.description)
+    .join(", ");
+
+  return (
+    <span
+      className="chip watch-chip"
+      title={conditionSummary}
+      onClick={(e) => {
+        e.stopPropagation();
+        setExpanded((v) => !v);
+      }}
+    >
+      <span className="watch-chip-dot" />
+      {intl.formatMessage({ id: "watch.chipLabel" })}
+      {expanded ? (
+        <span className="watch-chip-detail">
+          {watches.map((w) => (
+            <span key={w.id} className="watch-chip-item">
+              <span>{w.condition.description}</span>
+              {onDisarm ? (
+                <button
+                  className="watch-chip-disarm"
+                  title={intl.formatMessage({ id: "watch.disarmTooltip" })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDisarm(w.id);
+                  }}
+                >
+                  x
+                </button>
+              ) : null}
+            </span>
+          ))}
+        </span>
+      ) : null}
+    </span>
   );
 }

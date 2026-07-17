@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
-import type { BudgetWatch } from "../../../shared/ipc";
+import type { BudgetWatch, ConditionWatch } from "../../../shared/ipc";
 import type { Environment, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil, runsToday, avgDuration, lastRunDuration, formatDurationShort } from "../format";
@@ -15,8 +15,10 @@ export function LoopDetail(props: {
   loopId: string;
   initial: LoopMeta | null;
   onBack: () => void;
+  watchesByLoop?: Map<string, ConditionWatch[]>;
+  onDisarmWatch?: (watchId: string) => void;
 }): React.ReactNode {
-  const { instance, loopId, initial, onBack } = props;
+  const { instance, loopId, initial, onBack, watchesByLoop, onDisarmWatch } = props;
   const intl = useIntl();
   const [loop, setLoop] = useState<LoopMeta | null>(initial);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
@@ -71,6 +73,29 @@ export function LoopDetail(props: {
             ● {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
           </span>
         ) : null}
+        {(() => {
+          const watchKey = `${instance.id}:${loopId}`;
+          const condWatches = watchesByLoop?.get(watchKey) ?? [];
+          if (condWatches.length === 0) return null;
+          return (
+            <span className="chip watch-chip" title={condWatches.map((w) => w.condition.description).join(", ")}>
+              <span className="watch-chip-dot" />
+              {intl.formatMessage({ id: "watch.chipLabel" })}
+              {onDisarmWatch ? (
+                <button
+                  className="watch-chip-disarm"
+                  title={intl.formatMessage({ id: "watch.disarmTooltip" })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    for (const w of condWatches) onDisarmWatch(w.id);
+                  }}
+                >
+                  x
+                </button>
+              ) : null}
+            </span>
+          );
+        })()}
         <span style={{ flex: 1 }} />
         <button
           className="icon-btn"

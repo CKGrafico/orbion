@@ -22,6 +22,7 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ConditionWatch,
 } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
@@ -36,6 +37,7 @@ import type {
   INotificationService,
   IBudgetService,
   IInboxService,
+  IWatchService,
   InboxBuildParams,
 } from "../interfaces";
 
@@ -342,7 +344,7 @@ export class MockInboxService implements IInboxService {
   buildItems(params: InboxBuildParams): InboxItem[] {
     // Delegate to the real InboxService logic (imported statically)
     // but for mock, we keep it simple with basic item derivation.
-    const { perEnvLoops, perEnvHealth, environments, breaches } = params;
+    const { perEnvLoops, perEnvHealth, environments, breaches, trippedWatches } = params;
     const items: InboxItem[] = [];
 
     for (const breach of breaches) {
@@ -397,6 +399,23 @@ export class MockInboxService implements IInboxService {
       }
     }
 
+    // Tripped condition watches
+    for (const watch of trippedWatches ?? []) {
+      if (mockDismissedIds.has(`watch-tripped:${watch.id}`)) continue;
+      const env = environments.find((e) => e.id === watch.target.environmentId);
+      items.push({
+        id: `watch-tripped:${watch.id}`,
+        kind: "watch-tripped",
+        environmentId: watch.target.environmentId,
+        environmentName: env?.name ?? watch.target.environmentId,
+        loopId: watch.target.kind === "loop" ? watch.target.loopId : undefined,
+        title: watch.condition.description,
+        detail: watch.target.kind === "loop" ? watch.target.loopId : env?.name ?? watch.target.environmentId,
+        occurredAt: watch.trippedAt ?? new Date().toISOString(),
+        dismissed: false,
+      });
+    }
+
     items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
     return items;
   }
@@ -413,5 +432,45 @@ export class MockInboxService implements IInboxService {
       lines.push(`- [${item.title}](inbox://${item.id}) on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
     }
     return { answer: lines.join("\n"), references: refs };
+  }
+}
+
+let mockConditionWatches: ConditionWatch[] = [];
+
+@injectable()
+export class MockWatchService implements IWatchService {
+  async getWatches(): Promise<ConditionWatch[]> { return mockConditionWatches; }
+  async addWatch(watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">): Promise<ConditionWatch> {
+    const newWatch: ConditionWatch = {
+      ...watch,
+      id: Math.random().toString(36).slice(2, 10),
+      tripped: false,
+      trippedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    mockConditionWatches = [...mockConditionWatches, newWatch];
+    return newWatch;
+  }
+  async removeWatch(watchId: string): Promise<void> {
+    mockConditionWatches = mockConditionWatches.filter((w) => w.id !== watchId);
+  }
+  async tripWatch(watchId: string): Promise<void> {
+    mockConditionWatches = mockConditionWatches.map((w) =>
+      w.id === watchId ? { ...w, tripped: true, trippedAt: new Date().toISOString() } : w,
+    );
+  }
+  async getWatchesForLoop(environmentId: string, loopId: string): Promise<ConditionWatch[]> {
+    return mockConditionWatches.filter((w) => {
+      if (w.tripped) return false;
+      if (w.target.kind !== "loop") return false;
+      return w.target.environmentId === environmentId && w.target.loopId === loopId;
+    });
+  }
+  async getWatchesForInstance(environmentId: string): Promise<ConditionWatch[]> {
+    return mockConditionWatches.filter((w) => {
+      if (w.tripped) return false;
+      if (w.target.kind !== "instance") return false;
+      return w.target.environmentId === environmentId;
+    });
   }
 }

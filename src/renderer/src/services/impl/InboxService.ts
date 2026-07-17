@@ -11,7 +11,7 @@ import { loopStatusToFleetItem } from "../../fleet-mapping";
  * the set of dismissed item IDs.
  */
 function deriveItems(params: InboxBuildParams): InboxItem[] {
-  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds } = params;
+  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, trippedWatches } = params;
   const items: InboxItem[] = [];
 
   // 1. Budget breaches
@@ -73,6 +73,29 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
     }
   }
 
+  // 3. Tripped condition watches
+  for (const watch of trippedWatches) {
+    const watchItemId = `watch-tripped:${watch.id}`;
+    if (dismissedIds.has(watchItemId)) continue;
+
+    const env = environments.find((e) => e.id === (
+      watch.target.kind === "loop" ? watch.target.environmentId : watch.target.environmentId
+    ));
+    const loopLabel = watch.target.kind === "loop" ? watch.target.loopId : undefined;
+
+    items.push({
+      id: watchItemId,
+      kind: "watch-tripped",
+      environmentId: watch.target.environmentId,
+      environmentName: env?.name ?? watch.target.environmentId,
+      loopId: loopLabel,
+      title: watch.condition.description,
+      detail: watch.target.kind === "loop" ? loopLabel : env?.name ?? watch.target.environmentId,
+      occurredAt: watch.trippedAt ?? new Date().toISOString(),
+      dismissed: false,
+    });
+  }
+
   // Sort by occurredAt descending
   items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   return items;
@@ -126,6 +149,8 @@ function answerFleetQuery(
         ? "failed loop"
         : item.kind === "instance-offline"
         ? "instance offline"
+        : item.kind === "watch-tripped"
+        ? "watch tripped"
         : item.kind;
 
       if (item.loopId) {
@@ -197,6 +222,27 @@ function answerFleetQuery(
     }
     const lines: string[] = [`**${breachItems.length} budget breach${breachItems.length !== 1 ? "es" : ""}:**\n`];
     for (const item of breachItems) {
+      references.push(item);
+      const link = `[${item.title}](inbox://${item.id})`;
+      lines.push(`- ${link} on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
+    }
+    return { answer: lines.join("\n"), references };
+  }
+
+  // "watches" / "watch tripped" / "alerts"
+  const isWatchQuery =
+    q.includes("watch") ||
+    q.includes("tripped") ||
+    q.includes("alert") ||
+    q.includes("ping");
+
+  if (isWatchQuery) {
+    const watchItems = items.filter((i) => i.kind === "watch-tripped");
+    if (watchItems.length === 0) {
+      return { answer: "No watches have tripped.", references: [] };
+    }
+    const lines: string[] = [`**${watchItems.length} watch${watchItems.length !== 1 ? "es" : ""} tripped:**\n`];
+    for (const item of watchItems) {
       references.push(item);
       const link = `[${item.title}](inbox://${item.id})`;
       lines.push(`- ${link} on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);

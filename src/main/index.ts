@@ -20,6 +20,7 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ConditionWatch,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -57,6 +58,11 @@ import {
   addBudgetBreach,
   dismissBudgetBreach,
   pruneOldBreaches,
+  getConditionWatches,
+  addConditionWatch,
+  removeConditionWatch,
+  tripConditionWatch,
+  pruneTrippedWatches,
   dismissInboxItem,
 } from "./config-store.js";
 import {
@@ -994,6 +1000,31 @@ app.whenReady().then(() => {
 
   // Prune old breaches on startup
   void pruneOldBreaches();
+
+  // Prune old tripped watches on startup
+  void pruneTrippedWatches();
+
+  // ── Condition watch IPC handlers ───────────────────────────────────────
+
+  safeHandle("watch:getWatches", (): ConditionWatch[] => {
+    validateIpc("watch:getWatches", []);
+    return getConditionWatches();
+  });
+
+  safeHandle("watch:addWatch", async (_event, ...rawArgs): Promise<ConditionWatch> => {
+    const [watch] = validateIpc<[Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">]>("watch:addWatch", rawArgs);
+    return addConditionWatch(watch);
+  });
+
+  safeHandle("watch:removeWatch", async (_event, ...rawArgs): Promise<void> => {
+    const [watchId] = validateIpc<[string]>("watch:removeWatch", rawArgs);
+    await removeConditionWatch(watchId);
+  });
+
+  safeHandle("watch:tripWatch", async (_event, ...rawArgs): Promise<void> => {
+    const [watchId] = validateIpc<[string]>("watch:tripWatch", rawArgs);
+    await tripConditionWatch(watchId);
+  });
 
   void autoPromoteFirstEnvIfNeeded();
   createWindow();

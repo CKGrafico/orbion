@@ -23,6 +23,7 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ConditionWatch,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -193,6 +194,17 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("inbox:dismissItem", itemId) as Promise<void>,
     queryFleet: (question: string) =>
       ipcRenderer.invoke("inbox:queryFleet", question) as Promise<InboxQueryResult>,
+  },
+
+  watch: {
+    getWatches: () =>
+      ipcRenderer.invoke("watch:getWatches") as Promise<ConditionWatch[]>,
+    addWatch: (watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">) =>
+      ipcRenderer.invoke("watch:addWatch", watch) as Promise<ConditionWatch>,
+    removeWatch: (watchId: string) =>
+      ipcRenderer.invoke("watch:removeWatch", watchId) as Promise<void>,
+    tripWatch: (watchId: string) =>
+      ipcRenderer.invoke("watch:tripWatch", watchId) as Promise<void>,
   },
 };
 

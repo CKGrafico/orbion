@@ -329,7 +329,8 @@ export type InboxItemKind =
   | "failed-loop"
   | "pending-approval"
   | "awaiting-input"
-  | "instance-offline";
+  | "instance-offline"
+  | "watch-tripped";
 
 export interface InboxItem {
   id: string;
@@ -403,6 +404,48 @@ export interface BudgetBridge {
   dismissBreach: (breachId: string) => Promise<void>;
 }
 
+// ── Condition watch (ping-me-when) ──────────────────────────────────────
+
+/** Conditions Orbion can actually observe. The agent must decline others. */
+export type WatchConditionKind =
+  | "status-transition"   // a loop transitions to a specific status
+  | "reachability-change"; // an instance goes offline or comes back online
+
+/** Target for a watch — which loop/instance to monitor. */
+export type WatchTarget =
+  | { kind: "loop"; loopId: string; environmentId: string }
+  | { kind: "instance"; environmentId: string };
+
+export interface WatchCondition {
+  /** Which kind of observable condition to watch for. */
+  kind: WatchConditionKind;
+  /** For status-transition: the target status (e.g. "running", "stopped", "failed"). */
+  targetStatus?: string;
+  /** Human-readable summary of the condition, shown in the chip tooltip. */
+  description: string;
+}
+
+export interface ConditionWatch {
+  id: string;
+  /** What to watch — loop or instance. */
+  target: WatchTarget;
+  /** What condition to watch for. */
+  condition: WatchCondition;
+  /** One-shot: after firing, the watch auto-disarms and is removed. */
+  tripped: boolean;
+  /** ISO timestamp when the watch was created. */
+  createdAt: string;
+  /** ISO timestamp when the watch was tripped (null until tripped). */
+  trippedAt: string | null;
+}
+
+export interface ConditionWatchBridge {
+  getWatches: () => Promise<ConditionWatch[]>;
+  addWatch: (watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">) => Promise<ConditionWatch>;
+  removeWatch: (watchId: string) => Promise<void>;
+  tripWatch: (watchId: string) => Promise<void>;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -433,4 +476,5 @@ export interface LoopTaskBridge {
   infra: InfraBridge;
   budget: BudgetBridge;
   inbox: InboxBridge;
+  watch: ConditionWatchBridge;
 }

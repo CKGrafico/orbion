@@ -12,6 +12,7 @@ import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
 import { useBudgetWatch } from "./use-budget-watch";
+import { useConditionWatch } from "./use-condition-watch";
 import { PanelLeft, RotateCw, X, Star } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
@@ -117,6 +118,8 @@ export function App(): React.ReactNode {
   }, [notificationBridge]);
 
   const budgetWatch = useBudgetWatch(perEnvLoops, environments, handleBudgetBreach);
+
+  const conditionWatch = useConditionWatch(perEnvLoops, health, environments);
 
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
@@ -411,6 +414,8 @@ export function App(): React.ReactNode {
             connectionPhase={connectionStatus[selected.id]?.phase}
             onOpenLoop={openLoop}
             onOpenProject={openProject}
+            watchesByLoop={conditionWatch.watchesByLoop}
+            onDisarmWatch={conditionWatch.disarmWatch}
           />
         );
       case "project": {
@@ -441,6 +446,8 @@ export function App(): React.ReactNode {
             loopId={view.loopId}
             initial={loops.find((l) => l.id === view.loopId) ?? null}
             onBack={() => setView({ kind: "instance" })}
+            watchesByLoop={conditionWatch.watchesByLoop}
+            onDisarmWatch={conditionWatch.disarmWatch}
           />
         );
     }
@@ -610,6 +617,7 @@ export function App(): React.ReactNode {
               perEnvHealth={health}
               environments={environments}
               breaches={budgetWatch.breaches}
+              trippedWatches={conditionWatch.watches.filter((w) => w.tripped)}
               onClickItem={(item) => {
                 select(item.environmentId);
                 if (item.loopId) {

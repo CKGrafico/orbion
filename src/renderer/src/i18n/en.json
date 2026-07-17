@@ -461,6 +461,16 @@
     "itemNeedsAttention": "needs attention",
     "breach": "budget breach",
     "failedLoop": "failed loop",
-    "instanceOffline": "instance offline"
+    "instanceOffline": "instance offline",
+    "watchTripped": "watch tripped"
+  },
+  "watch": {
+    "chipLabel": "watching",
+    "disarmTooltip": "Disarm this watch",
+    "loopStatusTripped": "{loopName} is now {status} on {envName}",
+    "instanceOfflineTripped": "{envName} is now offline",
+    "setWatch": "Watch set",
+    "watchTripped": "Watch tripped",
+    "disarmed": "Watch disarmed"
   }
 }
