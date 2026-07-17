@@ -61,6 +61,8 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:removeSessionToken", environmentId),
     setOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) =>
       ipcRenderer.invoke("config:setOpenCodeEndpoint", environmentId, endpoint) as Promise<SetOpenCodeEndpointResult>,
+    setInfraOpenCodeEndpoint: (environmentId: string, endpoint: OpenCodeEndpoint | null) =>
+      ipcRenderer.invoke("config:setInfraOpenCodeEndpoint", environmentId, endpoint) as Promise<SetOpenCodeEndpointResult>,
     setMainVm: (environmentId: string) =>
       ipcRenderer.invoke("config:setMainVm", environmentId) as Promise<void>,
     getMainVmId: () =>

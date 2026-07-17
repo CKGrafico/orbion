@@ -13,9 +13,16 @@ interface LegacyInstance {
 interface EnvironmentWithFingerprint extends Environment {
   fingerprintId?: string;
   authState?: EnvironmentAuthState;
-  opencode?: OpenCodeEndpoint | null;
-  infraOpenCode?: OpenCodeEndpoint | null;
+  opencode?: InternalOpenCodeEndpoint | null;
+  infraOpenCode?: InternalOpenCodeEndpoint | null;
   role?: EnvironmentRole;
+}
+
+/** Internal-only endpoint type with encryption metadata — never sent to renderer. */
+export interface InternalOpenCodeEndpoint {
+  url: string;
+  password: string | null;
+  wasEncrypted?: boolean;
 }
 
 interface EncryptedSessionToken {
@@ -98,6 +105,23 @@ function ensureMigrated(): void {
 export function getEnvironments(): EnvironmentWithFingerprint[] {
   ensureMigrated();
   return store.get("environments", []);
+}
+
+/** Strip wasEncrypted from internal endpoints before sending to renderer. */
+function sanitizeEndpoint(ep: InternalOpenCodeEndpoint | null | undefined): OpenCodeEndpoint | null | undefined {
+  if (!ep) return ep;
+  const { wasEncrypted: _, ...rest } = ep;
+  return rest;
+}
+
+/** Get environments with wasEncrypted stripped from OpenCodeEndpoint fields (for IPC/renderer). */
+export function getEnvironmentsForRenderer(): Environment[] {
+  const envs = getEnvironments();
+  return envs.map((env) => ({
+    ...env,
+    opencode: sanitizeEndpoint(env.opencode),
+    infraOpenCode: sanitizeEndpoint(env.infraOpenCode),
+  }));
 }
 
 export function findEnvironmentByFingerprint(fingerprintId: string): EnvironmentWithFingerprint | undefined {
@@ -320,25 +344,24 @@ function _setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint 
   return { ok: true };
 }
 
-function _setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): void {
+function _setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): SetOpenCodeEndpointResult {
   const envs = store.get("environments", []);
   const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
+  if (!env) return { ok: true };
   if (endpoint && endpoint.password) {
-    if (safeStorage.isEncryptionAvailable()) {
-      const encrypted = encryptValue(endpoint.password);
-      if (encrypted) {
-        env.infraOpenCode = { ...endpoint, password: encrypted, wasEncrypted: true };
-      } else {
-        env.infraOpenCode = { ...endpoint, wasEncrypted: false };
-      }
-    } else {
-      env.infraOpenCode = { ...endpoint, wasEncrypted: false };
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { ok: false, reason: "encryption-unavailable" };
     }
+    const encrypted = encryptValue(endpoint.password);
+    if (!encrypted) {
+      return { ok: false, reason: "encryption-unavailable" };
+    }
+    env.infraOpenCode = { ...endpoint, password: encrypted, wasEncrypted: true };
   } else {
     env.infraOpenCode = endpoint;
   }
   store.set("environments", envs);
+  return { ok: true };
 }
 
 function _setMainVm(environmentId: string): void {
@@ -421,7 +444,7 @@ export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEnd
   return serialize(() => _setOpenCodeEndpoint(environmentId, endpoint));
 }
 
-export function setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<void> {
+export function setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult> {
   return serialize(() => _setInfraOpenCodeEndpoint(environmentId, endpoint));
 }
 

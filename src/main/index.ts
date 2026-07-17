@@ -33,6 +33,8 @@ import {
   removeSessionToken,
   exchangePairingCode,
   setOpenCodeEndpoint,
+  setInfraOpenCodeEndpoint,
+  getEnvironmentsForRenderer,
   getMainVmId,
   getMainVm,
   setMainVm,
@@ -376,7 +378,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle("config:getEnvironments", () => {
     validateIpc("config:getEnvironments", []);
-    return getEnvironments();
+    return getEnvironmentsForRenderer();
   });
   ipcMain.handle("config:addEnvironment", async (_event, ...rawArgs) => {
     const [name, url, kind] = validateIpc<[string, string, string | undefined]>("config:addEnvironment", rawArgs);
@@ -557,6 +559,20 @@ app.whenReady().then(() => {
       await refreshOpenCodeStatus(environmentId, endpoint);
     } else {
       clearOpenCodeStatus(environmentId);
+    }
+    return result;
+  });
+
+  ipcMain.handle("config:setInfraOpenCodeEndpoint", async (_event, ...rawArgs) => {
+    const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setInfraOpenCodeEndpoint", rawArgs);
+    const result = await setInfraOpenCodeEndpoint(environmentId, endpoint);
+    if (!result.ok && result.reason === "encryption-unavailable") {
+      void dialog.showMessageBox({
+        type: "warning",
+        title: "Password Not Saved",
+        message: "Password storage requires a keychain.",
+        detail: "Install libsecret on Linux or ensure a keychain is available on your system. Your password was not saved.",
+      });
     }
     return result;
   });

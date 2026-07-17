@@ -3,6 +3,7 @@ import type {
   OpenCodeConnectionStatus,
   OpenCodeEndpoint,
 } from "../shared/ipc.js";
+import type { InternalOpenCodeEndpoint } from "./config-store.js";
 import { compareSemver, trimTrailingSlash } from "../shared/utils.js";
 import { BrowserWindow } from "electron";
 import { msg } from "./i18n.js";
@@ -26,7 +27,7 @@ function emptyStatus(): OpenCodeConnectionStatus {
   };
 }
 
-function makeClient(endpoint: OpenCodeEndpoint): OpencodeClient {
+function makeClient(endpoint: InternalOpenCodeEndpoint): OpencodeClient {
   const baseUrl = trimTrailingSlash(endpoint.url.trim());
   const headers: Record<string, string> = {};
 
@@ -177,7 +178,7 @@ export function getOpenCodeStatus(environmentId: string): OpenCodeConnectionStat
 
 export async function refreshOpenCodeStatus(
   environmentId: string,
-  endpoint: OpenCodeEndpoint,
+  endpoint: InternalOpenCodeEndpoint,
 ): Promise<OpenCodeConnectionStatus> {
   const client = makeClient(endpoint);
   const status = await probeWithClient(client);
