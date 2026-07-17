@@ -19,7 +19,7 @@ import { LoopDetail } from "./components/LoopDetail";
 import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
-import { BreachInbox } from "./components/BreachInbox";
+import { InboxPanel } from "./features/inbox/InboxPanel";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
@@ -605,13 +605,21 @@ export function App(): React.ReactNode {
       <div className="body">
         {sidebarOpen ? (
           <aside className="panel sidebar-panel">
-            <BreachInbox
+            <InboxPanel
+              perEnvLoops={perEnvLoops}
+              perEnvHealth={health}
+              environments={environments}
               breaches={budgetWatch.breaches}
-              onDismiss={budgetWatch.dismissBreach}
-              onResume={budgetWatch.resumeLoop}
-              onClickBreach={(breach) => {
-                select(breach.environmentId);
-                setView({ kind: "loop", loopId: breach.loopId });
+              onClickItem={(item) => {
+                select(item.environmentId);
+                if (item.loopId) {
+                  setView({ kind: "loop", loopId: item.loopId });
+                } else {
+                  setView({ kind: "instance" });
+                }
+              }}
+              onDismissItem={(_itemId) => {
+                // Dismissal is handled internally by InboxPanel
               }}
             />
             <Sidebar

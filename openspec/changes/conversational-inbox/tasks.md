@@ -1,0 +1,12 @@
+- [ ] 1.1 Add InboxItem and InboxQuery types to shared/ipc.ts <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/shared/ipc.ts] -->
+- [ ] 1.2 Add InboxBridge to LoopTaskBridge in shared/ipc.ts <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/shared/ipc.ts] -->
+- [ ] 2.1 Add inbox IPC handlers in main process (inbox:getItems) <!-- agent: frontend-engineer.build, depends_on: [1.2], touches: [src/main/index.ts] -->
+- [ ] 2.2 Add inbox bridge methods to preload <!-- agent: frontend-engineer.build, depends_on: [1.2], touches: [src/preload/index.ts] -->
+- [ ] 3.1 Add IInboxService interface <!-- agent: frontend-engineer.build, depends_on: [1.2], touches: [src/renderer/src/services/interfaces.ts] -->
+- [ ] 3.2 Implement InboxService (real + mock) and register in container <!-- agent: frontend-engineer.build, depends_on: [3.1], touches: [src/renderer/src/services/impl/InboxService.ts, src/renderer/src/services/mock/MockServices.ts, src/renderer/src/services/container.ts] -->
+- [ ] 4.1 Create InboxQueryEngine pure function for fleet-scoped queries <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/renderer/src/features/inbox/inbox-query-engine.ts] -->
+- [ ] 4.2 Create InboxPanel component with composer and item list <!-- agent: frontend-engineer.build, depends_on: [4.1, 3.2], touches: [src/renderer/src/features/inbox/InboxPanel.tsx] -->
+- [ ] 4.3 Add i18n keys for inbox UI <!-- agent: frontend-engineer.fast, depends_on: [4.2], touches: [src/renderer/src/i18n/en.json] -->
+- [ ] 4.4 Add CSS styles for InboxPanel <!-- agent: frontend-engineer.build, depends_on: [4.2], touches: [src/renderer/src/theme.css] -->
+- [ ] 5.1 Integrate InboxPanel in App.tsx, replace BreachInbox <!-- agent: frontend-engineer.build, depends_on: [4.2], touches: [src/renderer/src/App.tsx] -->
+- [ ] 6.1 Run typecheck and fix errors <!-- agent: frontend-engineer.fast, depends_on: [5.1, 4.3, 4.4], touches: [] -->

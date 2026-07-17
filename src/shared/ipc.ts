@@ -322,6 +322,45 @@ export interface VmWizardBridge {
   respondServiceSelection: (selection: VmWizardServiceSelection) => void;
 }
 
+// ── Conversational inbox ────────────────────────────────────────────
+
+export type InboxItemKind =
+  | "breach"
+  | "failed-loop"
+  | "pending-approval"
+  | "awaiting-input"
+  | "instance-offline";
+
+export interface InboxItem {
+  id: string;
+  kind: InboxItemKind;
+  environmentId: string;
+  environmentName: string;
+  /** Loop ID when the item refers to a specific loop. */
+  loopId?: string;
+  /** Human-readable description of the item. */
+  title: string;
+  /** Short secondary detail (e.g. "5/10 runs", "exit 1"). */
+  detail?: string;
+  /** ISO timestamp when the item was created or last updated. */
+  occurredAt: string;
+  /** Whether the user has dismissed / acknowledged the item. */
+  dismissed: boolean;
+}
+
+export interface InboxQueryResult {
+  /** Markdown-formatted answer. */
+  answer: string;
+  /** Items referenced in the answer (for click-through navigation). */
+  references: InboxItem[];
+}
+
+export interface InboxBridge {
+  getItems: () => Promise<InboxItem[]>;
+  dismissItem: (itemId: string) => Promise<void>;
+  queryFleet: (question: string) => Promise<InboxQueryResult>;
+}
+
 // ── Budget watch ────────────────────────────────────────────────────
 
 export interface BudgetWatch {
@@ -393,4 +432,5 @@ export interface LoopTaskBridge {
   vmWizard: VmWizardBridge;
   infra: InfraBridge;
   budget: BudgetBridge;
+  inbox: InboxBridge;
 }

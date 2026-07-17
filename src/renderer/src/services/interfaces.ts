@@ -23,7 +23,10 @@ import type {
   PlatformType,
   BudgetWatch,
   BudgetBreach,
+  InboxItem,
+  InboxQueryResult,
 } from "../../../shared/ipc";
+import type { LoopMeta, EnvironmentHealth } from "../types";
 
 export interface IConfigService {
   getEnvironments(): Promise<Environment[]>;
@@ -108,4 +111,19 @@ export interface IBudgetService {
   dismissBreach(breachId: string): Promise<void>;
   pauseLoop(environmentId: string, loopId: string): Promise<ApiResponse>;
   resumeLoop(environmentId: string, loopId: string): Promise<ApiResponse>;
+}
+
+export interface IInboxService {
+  getDismissedIds(): Promise<string[]>;
+  dismissItem(itemId: string): Promise<void>;
+  buildItems(params: InboxBuildParams): InboxItem[];
+  queryFleet(question: string, params: InboxBuildParams): InboxQueryResult;
+}
+
+export interface InboxBuildParams {
+  perEnvLoops: Record<string, LoopMeta[]>;
+  perEnvHealth: Record<string, EnvironmentHealth>;
+  environments: Array<{ id: string; name: string }>;
+  breaches: BudgetBreach[];
+  dismissedIds: Set<string>;
 }
