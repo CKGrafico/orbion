@@ -21,6 +21,8 @@ import type {
   StreamSubscribeArgs,
   StreamEventPayload,
   PlatformType,
+  BudgetWatch,
+  BudgetBreach,
 } from "../../../shared/ipc";
 
 export interface IConfigService {
@@ -94,4 +96,16 @@ export interface INotificationService {
     message: string;
   }): void;
   setMuted(environmentId: string, muted: boolean): void;
+}
+
+export interface IBudgetService {
+  getWatches(): Promise<BudgetWatch[]>;
+  addWatch(watch: Omit<BudgetWatch, "id" | "createdAt">): Promise<BudgetWatch>;
+  removeWatch(watchId: string): Promise<void>;
+  updateWatch(watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>): Promise<void>;
+  getBreaches(): Promise<BudgetBreach[]>;
+  addBreach(breach: Omit<BudgetBreach, "id">): Promise<BudgetBreach>;
+  dismissBreach(breachId: string): Promise<void>;
+  pauseLoop(environmentId: string, loopId: string): Promise<ApiResponse>;
+  resumeLoop(environmentId: string, loopId: string): Promise<ApiResponse>;
 }

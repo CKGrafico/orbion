@@ -19,6 +19,8 @@ import type {
   InfraActionArgs,
   InfraActionResult,
   PlatformType,
+  BudgetWatch,
+  BudgetBreach,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -163,6 +165,23 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("infra:getStatus") as Promise<{ mainVmId: string | null; connected: boolean }>,
     getPlatform: (environmentId: string, projectId: string) =>
       ipcRenderer.invoke("infra:getPlatform", environmentId, projectId) as Promise<PlatformType>,
+  },
+
+  budget: {
+    getWatches: () =>
+      ipcRenderer.invoke("budget:getWatches") as Promise<BudgetWatch[]>,
+    addWatch: (watch: Omit<BudgetWatch, "id" | "createdAt">) =>
+      ipcRenderer.invoke("budget:addWatch", watch) as Promise<BudgetWatch>,
+    removeWatch: (watchId: string) =>
+      ipcRenderer.invoke("budget:removeWatch", watchId) as Promise<void>,
+    updateWatch: (watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>) =>
+      ipcRenderer.invoke("budget:updateWatch", watchId, updates) as Promise<void>,
+    getBreaches: () =>
+      ipcRenderer.invoke("budget:getBreaches") as Promise<BudgetBreach[]>,
+    addBreach: (breach: Omit<BudgetBreach, "id">) =>
+      ipcRenderer.invoke("budget:addBreach", breach) as Promise<BudgetBreach>,
+    dismissBreach: (breachId: string) =>
+      ipcRenderer.invoke("budget:dismissBreach", breachId) as Promise<void>,
   },
 };
 

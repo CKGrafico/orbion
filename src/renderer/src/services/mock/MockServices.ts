@@ -18,6 +18,8 @@ import type {
   SessionScope,
   SetOpenCodeEndpointResult,
   PlatformType,
+  BudgetWatch,
+  BudgetBreach,
 } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
@@ -30,6 +32,7 @@ import type {
   IStreamService,
   ITailscaleService,
   INotificationService,
+  IBudgetService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -287,4 +290,41 @@ export class MockTailscaleService implements ITailscaleService {
 export class MockNotificationService implements INotificationService {
   sendNotification(): void {}
   setMuted(): void {}
+}
+
+let mockWatches: BudgetWatch[] = [];
+let mockBreaches: BudgetBreach[] = [];
+
+@injectable()
+export class MockBudgetService implements IBudgetService {
+  async getWatches(): Promise<BudgetWatch[]> { return mockWatches; }
+  async addWatch(watch: Omit<BudgetWatch, "id" | "createdAt">): Promise<BudgetWatch> {
+    const newWatch: BudgetWatch = {
+      ...watch,
+      id: Math.random().toString(36).slice(2, 10),
+      createdAt: new Date().toISOString(),
+    };
+    mockWatches = [...mockWatches, newWatch];
+    return newWatch;
+  }
+  async removeWatch(watchId: string): Promise<void> {
+    mockWatches = mockWatches.filter((w) => w.id !== watchId);
+  }
+  async updateWatch(watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>): Promise<void> {
+    mockWatches = mockWatches.map((w) => w.id === watchId ? { ...w, ...updates } : w);
+  }
+  async getBreaches(): Promise<BudgetBreach[]> { return mockBreaches; }
+  async addBreach(breach: Omit<BudgetBreach, "id">): Promise<BudgetBreach> {
+    const newBreach: BudgetBreach = {
+      ...breach,
+      id: Math.random().toString(36).slice(2, 10),
+    };
+    mockBreaches = [...mockBreaches, newBreach];
+    return newBreach;
+  }
+  async dismissBreach(breachId: string): Promise<void> {
+    mockBreaches = mockBreaches.map((b) => b.id === breachId ? { ...b, dismissed: true } : b);
+  }
+  async pauseLoop(): Promise<ApiResponse> { return { ok: true, status: 200 }; }
+  async resumeLoop(): Promise<ApiResponse> { return { ok: true, status: 200 }; }
 }

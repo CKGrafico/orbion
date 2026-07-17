@@ -1,5 +1,5 @@
 import { cid, container } from "inversify-hooks";
-import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService } from "./interfaces";
+import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService } from "./interfaces";
 import { ConfigService } from "./impl/ConfigService";
 import { ConnectionService } from "./impl/ConnectionService";
 import { OpenCodeService } from "./impl/OpenCodeService";
@@ -7,6 +7,7 @@ import { VmWizardService } from "./impl/VmWizardService";
 import { InfraService } from "./impl/InfraService";
 import { ApiService, StreamService, TailscaleService } from "./impl/ApiStreamTailscale";
 import { NotificationService } from "./impl/NotificationService";
+import { BudgetService } from "./impl/BudgetService";
 import {
   MockConfigService,
   MockConnectionService,
@@ -17,6 +18,7 @@ import {
   MockStreamService,
   MockTailscaleService,
   MockNotificationService,
+  MockBudgetService,
 } from "./mock/MockServices";
 
 let built = false;
@@ -37,6 +39,7 @@ export function buildContainer(): void {
     container.addSingleton<IStreamService>(StreamService, cid.IStreamService);
     container.addSingleton<ITailscaleService>(TailscaleService, cid.ITailscaleService);
     container.addSingleton<INotificationService>(NotificationService, cid.INotificationService);
+    container.addSingleton<IBudgetService>(BudgetService, cid.IBudgetService);
   } else {
     container.addSingleton<IConfigService>(MockConfigService, cid.IConfigService);
     container.addSingleton<IConnectionService>(MockConnectionService, cid.IConnectionService);
@@ -47,5 +50,6 @@ export function buildContainer(): void {
     container.addSingleton<IStreamService>(MockStreamService, cid.IStreamService);
     container.addSingleton<ITailscaleService>(MockTailscaleService, cid.ITailscaleService);
     container.addSingleton<INotificationService>(MockNotificationService, cid.INotificationService);
+    container.addSingleton<IBudgetService>(MockBudgetService, cid.IBudgetService);
   }
 }

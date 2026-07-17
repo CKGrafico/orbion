@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
+import type { BudgetWatch } from "../../../shared/ipc";
 import type { Environment, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil, runsToday, avgDuration, lastRunDuration, formatDurationShort } from "../format";
 import { LogViewer } from "./LogViewer";
-import { ArrowLeft } from "lucide-react";
+import { BudgetWatchPanel } from "./BudgetWatchPanel";
+import { ArrowLeft, Clock } from "lucide-react";
+import { cid, useInject } from "inversify-hooks";
+import type { IBudgetService } from "../services/interfaces";
 
 export function LoopDetail(props: {
   instance: Environment;
@@ -15,6 +19,9 @@ export function LoopDetail(props: {
   const { instance, loopId, initial, onBack } = props;
   const intl = useIntl();
   const [loop, setLoop] = useState<LoopMeta | null>(initial);
+  const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
+  const [budgetService] = useInject<IBudgetService>(cid.IBudgetService);
+  const [watches, setWatches] = useState<BudgetWatch[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +36,21 @@ export function LoopDetail(props: {
       clearInterval(timer);
     };
   }, [instance.id, instance.activeEndpointId, loopId]);
+
+  // Load watches for this loop
+  useEffect(() => {
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      const all = await budgetService.getWatches();
+      if (cancelled) return;
+      setWatches(all.filter((w) =>
+        w.enabled && (w.scope === "fleet" || (w.loopId === loopId && w.environmentId === instance.id)),
+      ));
+    };
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [budgetService, loopId, instance.id]);
 
   const title =
     loop?.description?.trim() || (loop ? commandLine(loop.command, loop.commandArgs) : loopId);
@@ -49,6 +71,15 @@ export function LoopDetail(props: {
             ● {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
           </span>
         ) : null}
+        <span style={{ flex: 1 }} />
+        <button
+          className="icon-btn"
+          title={intl.formatMessage({ id: "budget.title" })}
+          onClick={() => setBudgetPanelOpen(true)}
+          style={{ opacity: watches.length > 0 ? 1 : 0.5, color: watches.length > 0 ? "var(--warning)" : undefined }}
+        >
+          <Clock size={14} />
+        </button>
       </div>
 
       {loop ? (
@@ -127,6 +158,33 @@ export function LoopDetail(props: {
       ) : null}
 
       <LogViewer instance={instance} loopId={loopId} runHistory={loop?.runHistory} />
+
+      {budgetPanelOpen ? (
+        <BudgetWatchPanel
+          watches={watches}
+          breaches={[]}
+          environments={[instance]}
+          perEnvLoops={{ [instance.id]: loop ? [loop] : [] }}
+          onAddWatch={async (watch) => {
+            await budgetService.addWatch(watch);
+            const all = await budgetService.getWatches();
+            setWatches(all.filter((w) =>
+              w.enabled && (w.scope === "fleet" || (w.loopId === loopId && w.environmentId === instance.id)),
+            ));
+          }}
+          onRemoveWatch={async (id) => {
+            await budgetService.removeWatch(id);
+            setWatches((prev) => prev.filter((w) => w.id !== id));
+          }}
+          onToggleWatch={async (id, enabled) => {
+            await budgetService.updateWatch(id, { enabled });
+            setWatches((prev) => prev.map((w) => w.id === id ? { ...w, enabled } : w));
+          }}
+          onDismissBreach={async () => {}}
+          onResumeLoop={async () => {}}
+          onClose={() => setBudgetPanelOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

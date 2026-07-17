@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage } from "../shared/ipc.js";
+import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 
@@ -38,6 +38,8 @@ interface ConfigSchema {
   selectedInstanceId: string | null;
   instancesMigrated: boolean;
   sessionTokens: Record<string, EncryptedSessionToken>;
+  budgetWatches: BudgetWatch[];
+  budgetBreaches: BudgetBreach[];
   [key: string]: unknown;
 }
 
@@ -49,6 +51,8 @@ const store = new Store<ConfigSchema>({
     selectedInstanceId: null,
     instancesMigrated: false,
     sessionTokens: {},
+    budgetWatches: [],
+    budgetBreaches: [],
   },
 });
 
@@ -486,6 +490,103 @@ export function setMainVm(environmentId: string): Promise<void> {
 
 export function autoPromoteFirstEnvIfNeeded(): Promise<void> {
   return serialize(() => _autoPromoteFirstEnvIfNeeded());
+}
+
+// ---------------------------------------------------------------------------
+// Budget watch persistence
+// ---------------------------------------------------------------------------
+
+export function getBudgetWatches(): BudgetWatch[] {
+  return store.get("budgetWatches", []);
+}
+
+function _addBudgetWatch(watch: Omit<BudgetWatch, "id" | "createdAt">): BudgetWatch {
+  const newWatch: BudgetWatch = {
+    ...watch,
+    id: crypto.randomUUID().slice(0, 8),
+    createdAt: new Date().toISOString(),
+  };
+  const watches = store.get("budgetWatches", []);
+  watches.push(newWatch);
+  store.set("budgetWatches", watches);
+  return newWatch;
+}
+
+function _removeBudgetWatch(watchId: string): void {
+  const watches = store.get("budgetWatches", []);
+  store.set("budgetWatches", watches.filter((w) => w.id !== watchId));
+}
+
+function _updateBudgetWatch(watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>): void {
+  const watches = store.get("budgetWatches", []);
+  const idx = watches.findIndex((w) => w.id === watchId);
+  if (idx !== -1) {
+    watches[idx] = { ...watches[idx], ...updates };
+    store.set("budgetWatches", watches);
+  }
+}
+
+export function addBudgetWatch(watch: Omit<BudgetWatch, "id" | "createdAt">): Promise<BudgetWatch> {
+  return serialize(() => _addBudgetWatch(watch));
+}
+
+export function removeBudgetWatch(watchId: string): Promise<void> {
+  return serialize(() => _removeBudgetWatch(watchId));
+}
+
+export function updateBudgetWatch(watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>): Promise<void> {
+  return serialize(() => _updateBudgetWatch(watchId, updates));
+}
+
+// ---------------------------------------------------------------------------
+// Budget breach persistence
+// ---------------------------------------------------------------------------
+
+export function getBudgetBreaches(): BudgetBreach[] {
+  return store.get("budgetBreaches", []);
+}
+
+function _addBudgetBreach(breach: Omit<BudgetBreach, "id">): BudgetBreach {
+  const newBreach: BudgetBreach = {
+    ...breach,
+    id: crypto.randomUUID().slice(0, 8),
+  };
+  const breaches = store.get("budgetBreaches", []);
+  breaches.push(newBreach);
+  store.set("budgetBreaches", breaches);
+  return newBreach;
+}
+
+function _dismissBudgetBreach(breachId: string): void {
+  const breaches = store.get("budgetBreaches", []);
+  const idx = breaches.findIndex((b) => b.id === breachId);
+  if (idx !== -1) {
+    breaches[idx] = { ...breaches[idx], dismissed: true };
+    store.set("budgetBreaches", breaches);
+  }
+}
+
+function _pruneOldBreaches(): void {
+  const breaches = store.get("budgetBreaches", []);
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
+  const pruned = breaches.filter(
+    (b) => !b.dismissed || new Date(b.breachedAt).getTime() > cutoff,
+  );
+  if (pruned.length !== breaches.length) {
+    store.set("budgetBreaches", pruned);
+  }
+}
+
+export function addBudgetBreach(breach: Omit<BudgetBreach, "id">): Promise<BudgetBreach> {
+  return serialize(() => _addBudgetBreach(breach));
+}
+
+export function dismissBudgetBreach(breachId: string): Promise<void> {
+  return serialize(() => _dismissBudgetBreach(breachId));
+}
+
+export function pruneOldBreaches(): Promise<void> {
+  return serialize(() => _pruneOldBreaches());
 }
 
 // ---------------------------------------------------------------------------

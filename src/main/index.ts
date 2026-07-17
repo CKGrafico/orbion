@@ -16,6 +16,8 @@ import type {
   CreateIssueResult,
   PlatformType,
   PlatformDetectionResult,
+  BudgetWatch,
+  BudgetBreach,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -45,6 +47,14 @@ import {
   getMainVm,
   setMainVm,
   autoPromoteFirstEnvIfNeeded,
+  getBudgetWatches,
+  addBudgetWatch,
+  removeBudgetWatch,
+  updateBudgetWatch,
+  getBudgetBreaches,
+  addBudgetBreach,
+  dismissBudgetBreach,
+  pruneOldBreaches,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -916,6 +926,46 @@ app.whenReady().then(() => {
     const key = platformCacheKey(environmentId, projectId);
     return platformCache.get(key) ?? "unknown";
   });
+
+  // ── Budget watch IPC handlers ───────────────────────────────────────
+
+  safeHandle("budget:getWatches", (): BudgetWatch[] => {
+    validateIpc("budget:getWatches", []);
+    return getBudgetWatches();
+  });
+
+  safeHandle("budget:addWatch", async (_event, ...rawArgs): Promise<BudgetWatch> => {
+    const [watch] = validateIpc<[Omit<BudgetWatch, "id" | "createdAt">]>("budget:addWatch", rawArgs);
+    return addBudgetWatch(watch);
+  });
+
+  safeHandle("budget:removeWatch", async (_event, ...rawArgs): Promise<void> => {
+    const [watchId] = validateIpc<[string]>("budget:removeWatch", rawArgs);
+    await removeBudgetWatch(watchId);
+  });
+
+  safeHandle("budget:updateWatch", async (_event, ...rawArgs): Promise<void> => {
+    const [watchId, updates] = validateIpc<[string, Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>]>("budget:updateWatch", rawArgs);
+    await updateBudgetWatch(watchId, updates);
+  });
+
+  safeHandle("budget:getBreaches", (): BudgetBreach[] => {
+    validateIpc("budget:getBreaches", []);
+    return getBudgetBreaches();
+  });
+
+  safeHandle("budget:addBreach", async (_event, ...rawArgs): Promise<BudgetBreach> => {
+    const [breach] = validateIpc<[Omit<BudgetBreach, "id">]>("budget:addBreach", rawArgs);
+    return addBudgetBreach(breach);
+  });
+
+  safeHandle("budget:dismissBreach", async (_event, ...rawArgs): Promise<void> => {
+    const [breachId] = validateIpc<[string]>("budget:dismissBreach", rawArgs);
+    await dismissBudgetBreach(breachId);
+  });
+
+  // Prune old breaches on startup
+  void pruneOldBreaches();
 
   void autoPromoteFirstEnvIfNeeded();
   createWindow();

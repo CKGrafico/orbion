@@ -322,6 +322,48 @@ export interface VmWizardBridge {
   respondServiceSelection: (selection: VmWizardServiceSelection) => void;
 }
 
+// ── Budget watch ────────────────────────────────────────────────────
+
+export interface BudgetWatch {
+  id: string;
+  scope: "loop" | "fleet";
+  /** Required when scope = "loop" — which loop to watch. */
+  loopId?: string;
+  /** Required when scope = "loop" — which environment the loop belongs to. */
+  environmentId?: string;
+  /** Max runs per day before the watch triggers. */
+  threshold: number;
+  /** Opt-in auto-pause on breach. Never default. */
+  autoPause: boolean;
+  /** Can be toggled off without deleting. */
+  enabled: boolean;
+  createdAt: string;
+}
+
+export interface BudgetBreach {
+  id: string;
+  watchId: string;
+  loopId: string;
+  environmentId: string;
+  environmentName: string;
+  loopDescription: string;
+  runsToday: number;
+  threshold: number;
+  autoPaused: boolean;
+  breachedAt: string;
+  dismissed: boolean;
+}
+
+export interface BudgetBridge {
+  getWatches: () => Promise<BudgetWatch[]>;
+  addWatch: (watch: Omit<BudgetWatch, "id" | "createdAt">) => Promise<BudgetWatch>;
+  removeWatch: (watchId: string) => Promise<void>;
+  updateWatch: (watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>) => Promise<void>;
+  getBreaches: () => Promise<BudgetBreach[]>;
+  addBreach: (breach: Omit<BudgetBreach, "id">) => Promise<BudgetBreach>;
+  dismissBreach: (breachId: string) => Promise<void>;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -350,4 +392,5 @@ export interface LoopTaskBridge {
   tailscalePeers: () => Promise<TailscalePeersResponse>;
   vmWizard: VmWizardBridge;
   infra: InfraBridge;
+  budget: BudgetBridge;
 }

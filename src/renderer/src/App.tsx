@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -11,6 +11,7 @@ import { fetchLoops, fetchProjects, fetchSettings, isMock } from "./api";
 import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
 import { createNotificationBridge } from "./use-notifications";
+import { useBudgetWatch } from "./use-budget-watch";
 import { PanelLeft, RotateCw, X, Star } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
@@ -18,6 +19,8 @@ import { LoopDetail } from "./components/LoopDetail";
 import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
+import { BreachInbox } from "./components/BreachInbox";
+import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
@@ -79,6 +82,7 @@ export function App(): React.ReactNode {
   const [perEnvLoops, setPerEnvLoops] = useState<Record<string, LoopMeta[]>>({});
   const [perEnvProjects, setPerEnvProjects] = useState<Record<string, Project[]>>({});
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
+  const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -96,6 +100,23 @@ export function App(): React.ReactNode {
     },
     [select],
   );
+
+  // Budget watch — breach detection and notifications
+  const handleBudgetBreach = useCallback((breach: BudgetBreach) => {
+    notificationBridge.sendNotification({
+      environmentId: breach.environmentId,
+      environmentName: breach.environmentName,
+      itemId: breach.loopId,
+      itemType: "loop",
+      status: "failed",
+      message: standaloneIntl.formatMessage(
+        { id: "budget.breachNotification" },
+        { loopName: breach.loopDescription, threshold: breach.threshold, count: breach.runsToday, autoPause: breach.autoPaused },
+      ),
+    });
+  }, [notificationBridge]);
+
+  const budgetWatch = useBudgetWatch(perEnvLoops, environments, handleBudgetBreach);
 
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
@@ -584,6 +605,15 @@ export function App(): React.ReactNode {
       <div className="body">
         {sidebarOpen ? (
           <aside className="panel sidebar-panel">
+            <BreachInbox
+              breaches={budgetWatch.breaches}
+              onDismiss={budgetWatch.dismissBreach}
+              onResume={budgetWatch.resumeLoop}
+              onClickBreach={(breach) => {
+                select(breach.environmentId);
+                setView({ kind: "loop", loopId: breach.loopId });
+              }}
+            />
             <Sidebar
               environments={environments}
               selectedId={selectedId}
@@ -659,6 +689,21 @@ export function App(): React.ReactNode {
           </div>
         );
       })() : null}
+
+      {budgetPanelOpen ? (
+        <BudgetWatchPanel
+          watches={budgetWatch.watches}
+          breaches={budgetWatch.breaches}
+          environments={environments}
+          perEnvLoops={perEnvLoops}
+          onAddWatch={(watch) => void budgetWatch.addWatch(watch)}
+          onRemoveWatch={(id) => void budgetWatch.removeWatch(id)}
+          onToggleWatch={(id, enabled) => void budgetWatch.toggleWatch(id, enabled)}
+          onDismissBreach={(id) => void budgetWatch.dismissBreach(id)}
+          onResumeLoop={(envId, loopId) => void budgetWatch.resumeLoop(envId, loopId)}
+          onClose={() => setBudgetPanelOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
