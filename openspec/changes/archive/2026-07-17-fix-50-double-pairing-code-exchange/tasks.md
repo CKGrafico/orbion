@@ -1,0 +1,3 @@
+- [x] 1.1 Save exchangeResult.token into a pendingToken variable in the first exchange branch <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/main/vm-wizard.ts] -->
+- [x] 1.2 Remove the second exchangePairingCode call and replace with storeSessionToken using pendingToken <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/main/vm-wizard.ts] -->
+- [x] 1.3 Run TypeScript check and fix errors <!-- agent: frontend-engineer.fast, depends_on: [1.2], touches: [] -->
