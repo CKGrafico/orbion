@@ -8,6 +8,8 @@
  * No external dependencies — manual validation only.
  */
 
+import { ipcMain } from "electron";
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 function isString(v: unknown): v is string {
@@ -354,18 +356,30 @@ const validators: Record<string, Validator> = {
   "infra:getStatus": () => [],
 };
 
+// ── Structured IPC error result ───────────────────────────────────────
+
+/**
+ * Shape returned to the renderer when `validateIpc()` rejects input.
+ * Every IPC channel can return this as a fallback — check `ok` before
+ * reading type-specific fields.
+ */
+export interface IpcErrorResult {
+  ok: false;
+  error: string;
+}
+
 // ── Public API ─────────────────────────────────────────────────────────
 
 /**
  * Validate IPC handler arguments against the registered schema for `channel`.
  *
  * - Returns the validated args array (pass-through, for ergonomics).
- * - Throws `IpcValidationError` on failure — the caller should catch it and
- *   return a structured error to the renderer.
+ * - Throws `IpcValidationError` on failure — catch it via `safeHandle()`
+ *   to return a structured error to the renderer.
  *
  * Usage:
  * ```ts
- * ipcMain.handle("foo", (_event, ...rawArgs) => {
+ * safeHandle("foo", (_event, ...rawArgs) => {
  *   const args = validateIpc("foo", rawArgs); // throws on invalid input
  *   // ... safe to use args ...
  * });
@@ -385,4 +399,36 @@ export function validateIpc<T = unknown[]>(channel: string, args: unknown[]): T 
   }
 
   return args as T;
+}
+
+/**
+ * Drop-in replacement for `ipcMain.handle()` that catches `IpcValidationError`
+ * and returns a structured `{ ok: false, error }` object to the renderer
+ * instead of letting the exception propagate as an unhandled rejection.
+ *
+ * Non-validation errors are re-thrown so they still surface as true failures.
+ *
+ * Usage:
+ * ```ts
+ * // Before:
+ * ipcMain.handle("api:request", (_event, ...rawArgs) => { ... });
+ *
+ * // After:
+ * safeHandle("api:request", (_event, ...rawArgs) => { ... });
+ * ```
+ */
+export function safeHandle(
+  channel: string,
+  handler: (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown,
+): void {
+  ipcMain.handle(channel, async (event, ...rawArgs: unknown[]) => {
+    try {
+      return await handler(event, ...rawArgs);
+    } catch (err) {
+      if (err instanceof IpcValidationError) {
+        return { ok: false, error: err.message } satisfies IpcErrorResult;
+      }
+      throw err; // re-throw unexpected errors
+    }
+  });
 }
