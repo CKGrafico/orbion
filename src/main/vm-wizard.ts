@@ -1,4 +1,4 @@
-import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage } from "../shared/ipc.js";
+import type { SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage, ReachMethod } from "../shared/ipc.js";
 import { TOOL_DEFINITIONS } from "../shared/tool-definitions.js";
 import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
@@ -6,6 +6,8 @@ import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
 import { getEnvironments, addEnvironment, exchangePairingCode, storeSessionToken, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded } from "./config-store.js";
 import { getMainWindow } from "./main-window.js";
 import { msg } from "./i18n.js";
+import { fetchAndUnwrap } from "./http-utils.js";
+import { trimTrailingSlash } from "../shared/utils.js";
 
 let wizardCancelled = false;
 let consentResolver: ((decision: "install" | "skip") => void) | null = null;
@@ -48,7 +50,7 @@ function emitProgress(progress: VmWizardProgress): void {
   }
 }
 
-async function askServiceSelection(probe: VmWizardProbeResult): Promise<VmWizardServiceSelection> {
+async function askServiceSelection(probe: VmWizardProbeResult, reachMethod: ReachMethod = "ssh"): Promise<VmWizardServiceSelection> {
   // loop-task is mandatory (always installed). Defaults: install if not already detected.
   const installTools: Record<string, boolean> = {};
   for (const tool of TOOL_DEFINITIONS) {
@@ -61,6 +63,7 @@ async function askServiceSelection(probe: VmWizardProbeResult): Promise<VmWizard
   emitProgress({
     step: "pick-services",
     message: msg("vmWizard.stepPickServices"),
+    reachMethod,
     probe,
     serviceSelection: defaultSelection,
   });
@@ -76,10 +79,12 @@ async function askServiceSelection(probe: VmWizardProbeResult): Promise<VmWizard
 async function askConsent(
   prompt: I18nMessage,
   probe: VmWizardProbeResult,
+  reachMethod: ReachMethod = "ssh",
 ): Promise<"install" | "skip"> {
   emitProgress({
     step: "consent",
     message: prompt,
+    reachMethod,
     probe,
     consentPrompt: prompt,
   });
@@ -95,9 +100,14 @@ async function askConsent(
   return decision;
 }
 
-export async function runWizard(target: string, name?: string): Promise<VmWizardResult> {
+export async function runWizard(target: string, name?: string, reachMethod: ReachMethod = "ssh", directUrl?: string): Promise<VmWizardResult> {
   resetWizardState();
 
+  if (reachMethod === "local") {
+    return runLocalWizard(name ?? "Local", directUrl);
+  }
+
+  // ── SSH path (original logic) ──────────────────────────────────────
   let host: SshHost | null = parseTarget(target);
   if (!host) {
     const knownHosts = listSshHosts();
@@ -108,6 +118,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     emitProgress({
       step: "error",
       message: msg("vmWizard.mainInvalidTarget", { target }),
+      reachMethod: "ssh",
       probe: null,
     });
     throw new Error("vmWizard.mainInvalidTarget");
@@ -124,26 +135,28 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     emitProgress({
       step: "error",
       message: msg("vmWizard.mainAlreadyExists", { name: duplicateBySshTarget.name }),
+      reachMethod: "ssh",
       probe: null,
     });
     throw new Error("vmWizard.mainAlreadyExists");
   }
 
   // Step 1: Probe
-  emitProgress({ step: "probing", message: msg("vmWizard.mainProbing", { label: host.label }) });
+  emitProgress({ step: "probing", message: msg("vmWizard.mainProbing", { label: host.label }), reachMethod: "ssh" });
 
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
     throw new Error("vmWizard.mainCancelled");
   }
 
   const probe = await probeVm(host);
-  emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe });
+  emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe });
 
   if (!probe.reachable || !probe.authOk) {
     emitProgress({
       step: "error",
       message: probe.errorDetail ?? msg("vmWizard.mainCannotReach"),
+      reachMethod: "ssh",
       probe,
     });
     throw new Error("vmWizard.mainCannotReach");
@@ -159,12 +172,13 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: msg("vmWizard.mainNodeNotFoundFinal"),
+        reachMethod: "ssh",
         probe,
       });
       throw new Error("vmWizard.mainNodeNotFoundFinal");
     }
 
-    emitProgress({ step: "installing", message: msg("vmWizard.mainInstallingMise"), probe });
+    emitProgress({ step: "installing", message: msg("vmWizard.mainInstallingMise"), reachMethod: "ssh", probe });
 
     const miseResult = await installNodeViaMise(host);
 
@@ -172,6 +186,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: miseResult.errorDetail ?? msg("vmWizard.mainMiseFailed"),
+        reachMethod: "ssh",
         probe,
       });
       throw new Error("vmWizard.mainMiseFailed");
@@ -180,6 +195,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     emitProgress({
       step: "probing",
       message: msg("vmWizard.mainNodeInstalledReprobing", { version: miseResult.nodeVersion ?? "" }),
+      reachMethod: "ssh",
       probe,
     });
 
@@ -189,6 +205,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: msg("vmWizard.mainMiseNodeStillMissing"),
+        reachMethod: "ssh",
         probe: reprobe,
       });
       throw new Error("vmWizard.mainNodeStillNotFoundAfterMise");
@@ -198,6 +215,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: reprobe.errorDetail,
+        reachMethod: "ssh",
         probe: reprobe,
       });
       throw new Error("vmWizard.mainNodeStillNotFoundAfterMise");
@@ -205,7 +223,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
     probe.nodeFound = true;
     probe.nodeVersion = reprobe.nodeVersion;
-    emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe: reprobe });
+    emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe: reprobe });
   }
 
   if (probe.nodeVersion && probe.errorDetail) {
@@ -218,12 +236,13 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: probe.errorDetail,
+        reachMethod: "ssh",
         probe,
       });
       throw new Error("vmWizard.mainConsentNodeOld");
     }
 
-    emitProgress({ step: "installing", message: msg("vmWizard.mainUpgradingViaMise"), probe });
+    emitProgress({ step: "installing", message: msg("vmWizard.mainUpgradingViaMise"), reachMethod: "ssh", probe });
 
     const miseResult = await installNodeViaMise(host);
 
@@ -231,6 +250,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: miseResult.errorDetail ?? msg("vmWizard.mainMiseUpgradeFailed"),
+        reachMethod: "ssh",
         probe,
       });
       throw new Error("vmWizard.mainMiseUpgradeFailed");
@@ -239,6 +259,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     emitProgress({
       step: "probing",
       message: msg("vmWizard.mainNodeInstalledReprobing", { version: miseResult.nodeVersion ?? "" }),
+      reachMethod: "ssh",
       probe,
     });
 
@@ -248,6 +269,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: msg("vmWizard.mainMiseUpgradeStillMissing"),
+        reachMethod: "ssh",
         probe: reprobe,
       });
       throw new Error("vmWizard.mainNodeStillNotFoundAfterUpgrade");
@@ -257,6 +279,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
       emitProgress({
         step: "error",
         message: reprobe.errorDetail,
+        reachMethod: "ssh",
         probe: reprobe,
       });
       throw new Error("vmWizard.mainNodeStillNotFoundAfterUpgrade");
@@ -264,12 +287,12 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
     probe.nodeVersion = reprobe.nodeVersion;
     probe.errorDetail = null;
-    emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), probe: reprobe });
+    emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe: reprobe });
   }
 
   // Step 2: Pick services
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
     throw new Error("vmWizard.mainCancelled");
   }
 
@@ -277,11 +300,11 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   // Step 3: Install / Start
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
     throw new Error("vmWizard.mainCancelled");
   }
 
-  emitProgress({ step: "installing", message: msg("vmWizard.mainInstallingServices"), probe });
+  emitProgress({ step: "installing", message: msg("vmWizard.mainInstallingServices"), reachMethod: "ssh", probe });
 
   const launch = await launchOnVm(host, {
     daemonRunning: probe.daemonRunning,
@@ -291,12 +314,13 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     installTools: serviceSelection.installTools,
   });
 
-  emitProgress({ step: "installing", message: msg("vmWizard.mainServicesReady"), probe, launch });
+  emitProgress({ step: "installing", message: msg("vmWizard.mainServicesReady"), reachMethod: "ssh", probe, launch });
 
   if (!launch.started) {
     emitProgress({
       step: "error",
       message: launch.errorDetail ?? msg("vmWizard.mainFailedToStartServices"),
+      reachMethod: "ssh",
       probe,
       launch,
     });
@@ -311,11 +335,11 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   // Step 4: Pair
   if (wizardCancelled) {
-    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled") });
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
     throw new Error("vmWizard.mainCancelled");
   }
 
-  emitProgress({ step: "pairing", message: msg("vmWizard.mainCreatingPairing"), probe, launch });
+  emitProgress({ step: "pairing", message: msg("vmWizard.mainCreatingPairing"), reachMethod: "ssh", probe, launch });
 
   const remoteCode = await createPairingCodeOnRemote(host, daemonPort);
   const pair: VmWizardPairResult = { paired: false, pairingCode: remoteCode, errorDetail: null };
@@ -336,14 +360,14 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
 
   if (remoteCode && !pair.paired) {
     // Pairing was attempted but failed, show the failure before continuing.
-    emitProgress({ step: "pairing", message: msg("vmWizard.mainPairingFailed"), probe, launch, pair });
+    emitProgress({ step: "pairing", message: msg("vmWizard.mainPairingFailed"), reachMethod: "ssh", probe, launch, pair });
   } else if (pair.paired) {
-    emitProgress({ step: "pairing", message: msg("vmWizard.mainPaired"), probe, launch, pair });
+    emitProgress({ step: "pairing", message: msg("vmWizard.mainPaired"), reachMethod: "ssh", probe, launch, pair });
   }
   // If no remoteCode, skip pairing progress entirely.
 
   // Step 4: Save environment (direct URL, daemon is reachable on the VM's IP)
-  const env = await addEnvironment(envName, daemonUrl, "direct", host.label);
+  const env = await addEnvironment(envName, daemonUrl, "ssh", host.label);
   await autoPromoteFirstEnvIfNeeded();
 
   if (pair.paired && pendingToken) {
@@ -360,6 +384,7 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   emitProgress({
     step: "done",
     message: msg("vmWizard.mainEnvReady", { name: envName, url: daemonUrl }),
+    reachMethod: "ssh",
     probe,
     launch,
     pair,
@@ -369,5 +394,74 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
     environmentId: env.id,
     environmentName: envName,
     daemonUrl,
+  };
+}
+
+/**
+ * Local/reachable wizard path — the daemon is already running and reachable
+ * at a known URL (e.g. http://localhost:8845). No SSH, no install, no tunnel.
+ * Validates reachability before persisting.
+ */
+async function runLocalWizard(name: string, directUrl?: string): Promise<VmWizardResult> {
+  const url = directUrl ? trimTrailingSlash(directUrl.trim()) : "";
+
+  // Validate URL format
+  if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+    emitProgress({
+      step: "error",
+      message: msg("vmWizard.mainInvalidDirectUrl"),
+      reachMethod: "local",
+      probe: null,
+    });
+    throw new Error("vmWizard.mainInvalidDirectUrl");
+  }
+
+  emitProgress({ step: "probing", message: msg("vmWizard.stepProbing"), reachMethod: "local" });
+
+  // Quick health check: can we reach the daemon?
+  const healthResult = await fetchAndUnwrap<{ ok: boolean }>(
+    `${url}/api/projects`,
+    { timeoutMs: 10_000 },
+  );
+
+  if (!healthResult.ok) {
+    emitProgress({
+      step: "error",
+      message: msg("vmWizard.mainDirectUrlUnreachable", { url }),
+      reachMethod: "local",
+      probe: null,
+    });
+    throw new Error("vmWizard.mainDirectUrlUnreachable");
+  }
+
+  // Duplicate guard: reject if an environment with this URL already exists
+  const existingEnvs = getEnvironments();
+  const duplicateByUrl = existingEnvs.find((e) =>
+    e.endpoints.some((ep) => ep.url === url)
+  );
+  if (duplicateByUrl) {
+    emitProgress({
+      step: "error",
+      message: msg("vmWizard.mainAlreadyExists", { name: duplicateByUrl.name }),
+      reachMethod: "local",
+      probe: null,
+    });
+    throw new Error("vmWizard.mainAlreadyExists");
+  }
+
+  // Save environment — local/direct, no SSH target
+  const env = await addEnvironment(name, url, "direct");
+  await autoPromoteFirstEnvIfNeeded();
+
+  emitProgress({
+    step: "done",
+    message: msg("vmWizard.mainEnvReady", { name, url }),
+    reachMethod: "local",
+  });
+
+  return {
+    environmentId: env.id,
+    environmentName: name,
+    daemonUrl: url,
   };
 }

@@ -18,6 +18,9 @@ import type {
   SessionScope,
   SetOpenCodeEndpointResult,
   PlatformType,
+  ReachMethod,
+  SshHost,
+  VmWizardResult,
   BudgetWatch,
   BudgetBreach,
   InboxItem,
@@ -236,7 +239,7 @@ export class MockOpenCodeService implements IOpenCodeService {
 @injectable()
 export class MockVmWizardService implements IVmWizardService {
   async listSshHosts(): Promise<SshHost[]> { return []; }
-  async startWizard(): Promise<VmWizardResult> {
+  async startWizard(_target: string, _name?: string, _reachMethod?: ReachMethod, _directUrl?: string): Promise<VmWizardResult> {
     return { environmentId: "mock", environmentName: "Mock", daemonUrl: "http://localhost:8845" };
   }
   onProgress(): () => void { return () => {}; }

@@ -668,8 +668,8 @@ app.whenReady().then(() => {
   });
 
   safeHandle("vmWizard:start", async (_event, ...rawArgs) => {
-    const [target, name] = validateIpc<[string, string | undefined]>("vmWizard:start", rawArgs);
-    return runWizard(target, name);
+    const [target, name, reachMethod, directUrl] = validateIpc<[string, string | undefined, import("../shared/ipc.js").ReachMethod | undefined, string | undefined]>("vmWizard:start", rawArgs);
+    return runWizard(target, name, reachMethod ?? "ssh", directUrl);
   });
 
   safeHandle("vmWizard:cancel", () => {

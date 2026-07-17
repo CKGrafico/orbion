@@ -147,8 +147,8 @@ const bridge: LoopTaskBridge = {
   vmWizard: {
     listSshHosts: () =>
       ipcRenderer.invoke("vmWizard:listSshHosts") as Promise<SshHost[]>,
-    startWizard: (target: string, name?: string) =>
-      ipcRenderer.invoke("vmWizard:start", target, name) as Promise<VmWizardResult>,
+    startWizard: (target: string, name?: string, reachMethod?: string, directUrl?: string) =>
+      ipcRenderer.invoke("vmWizard:start", target, name, reachMethod, directUrl) as Promise<VmWizardResult>,
     onProgress: (cb: (progress: VmWizardProgress) => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,

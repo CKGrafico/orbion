@@ -298,8 +298,11 @@ export type SetOpenCodeEndpointResult =
 
 // ── Add-VM wizard ───────────────────────────────────────────────────
 
+export type ReachMethod = "local" | "ssh";
+
 export type VmWizardStep =
   | "idle"
+  | "pick-reach-method"
   | "pick-target"
   | "probing"
   | "pick-services"
@@ -370,6 +373,7 @@ export interface VmWizardPairResult {
 export interface VmWizardProgress {
   step: VmWizardStep;
   message: I18nMessage;
+  reachMethod?: ReachMethod | null;
   probe?: VmWizardProbeResult | null;
   launch?: VmWizardLaunchResult | null;
   tunnel?: VmWizardTunnelResult | null;
@@ -386,7 +390,7 @@ export interface VmWizardResult {
 
 export interface VmWizardBridge {
   listSshHosts: () => Promise<SshHost[]>;
-  startWizard: (target: string, name?: string) => Promise<VmWizardResult>;
+  startWizard: (target: string, name?: string, reachMethod?: ReachMethod, directUrl?: string) => Promise<VmWizardResult>;
   onProgress: (cb: (progress: VmWizardProgress) => void) => () => void;
   cancelWizard: () => void;
   respondConsent: (decision: "install" | "skip") => void;

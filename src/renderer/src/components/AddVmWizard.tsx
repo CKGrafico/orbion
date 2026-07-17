@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../shared/ipc";
+import type { ReachMethod, SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../shared/ipc";
 import { TOOL_DEFINITIONS, type ToolDefinition } from "../../shared/tool-definitions";
-import { ShieldCheck, X, Check, Loader, SkipForward, Lock } from "lucide-react";
+import { ShieldCheck, X, Check, Loader, SkipForward, Lock, Globe, Terminal } from "lucide-react";
 import { translateMessage } from "../i18n";
 import type { IVmWizardService, IConfigService } from "../services/interfaces";
 
 const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   idle: "",
+  "pick-reach-method": "vmWizard.stepPickReachMethod",
   "pick-target": "vmWizard.stepPickTarget",
   probing: "vmWizard.stepProbing",
   "pick-services": "vmWizard.stepPickServices",
@@ -26,6 +27,7 @@ function stepLabel(intl: IntlShape, step: VmWizardStep): string {
 }
 
 const STEP_ORDER: VmWizardStep[] = [
+  "pick-reach-method",
   "pick-target",
   "probing",
   "pick-services",
@@ -51,6 +53,8 @@ export function AddVmWizard(props: {
 
   const [target, setTarget] = useState("");
   const [envName, setEnvName] = useState("");
+  const [reachMethod, setReachMethod] = useState<ReachMethod>("ssh");
+  const [localUrl, setLocalUrl] = useState("");
   const [hosts, setHosts] = useState<SshHost[]>([]);
   const [hostsLoaded, setHostsLoaded] = useState(false);
   const [progress, setProgress] = useState<VmWizardProgress | null>(null);
@@ -89,17 +93,28 @@ export function AddVmWizard(props: {
   }, [vmWizardService]);
 
   const startWizard = async (): Promise<void> => {
-    const trimmed = target.trim();
-    if (!trimmed) return;
-
-    setRunning(true);
-    setProgress(null);
-
-    try {
-      const result = await vmWizardService.startWizard(trimmed, envName.trim() || undefined);
-      setDoneResult(result);
-    } catch {
-      // progress already set via onProgress
+    if (reachMethod === "local") {
+      const url = localUrl.trim();
+      if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) return;
+      setRunning(true);
+      setProgress(null);
+      try {
+        const result = await vmWizardService.startWizard("", envName.trim() || undefined, "local", url);
+        setDoneResult(result);
+      } catch {
+        // progress already set via onProgress
+      }
+    } else {
+      const trimmed = target.trim();
+      if (!trimmed) return;
+      setRunning(true);
+      setProgress(null);
+      try {
+        const result = await vmWizardService.startWizard(trimmed, envName.trim() || undefined, "ssh");
+        setDoneResult(result);
+      } catch {
+        // progress already set via onProgress
+      }
     }
   };
 
@@ -224,43 +239,92 @@ export function AddVmWizard(props: {
           />
         </div>
 
+        {/* ── Reach method choice ────────────────────────────── */}
         <div className="field">
-          <label>{intl.formatMessage({ id: "vmWizard.target" })}</label>
-          <input
-            placeholder={intl.formatMessage({ id: "vmWizard.targetPlaceholder" })}
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !running && target.trim()) void startWizard();
-            }}
-            disabled={running}
-            className="mono"
-          />
-          <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginTop: 6, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            <ShieldCheck size={13} />
-            <span>
-              {intl.formatMessage({ id: "vmWizard.securityNote" })}
-            </span>
+          <label>{intl.formatMessage({ id: "vmWizard.reachMethodLabel" })}</label>
+          <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+            <button
+              type="button"
+              className={`btn ${reachMethod === "local" ? "primary" : ""}`}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "12px 8px", background: reachMethod === "local" ? "var(--bg-active)" : "var(--bg-input)", border: reachMethod === "local" ? "1px solid var(--accent)" : "1px solid var(--border-subtle)", borderRadius: 8 }}
+              onClick={() => { if (!running) setReachMethod("local"); }}
+              disabled={running}
+            >
+              <Globe size={18} style={{ color: reachMethod === "local" ? "var(--accent)" : "var(--text-muted)" }} />
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: reachMethod === "local" ? "var(--text-primary)" : "var(--text-secondary)" }}>{intl.formatMessage({ id: "vmWizard.reachMethodLocal" })}</span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.3 }}>{intl.formatMessage({ id: "vmWizard.reachMethodLocalDesc" })}</span>
+            </button>
+            <button
+              type="button"
+              className={`btn ${reachMethod === "ssh" ? "primary" : ""}`}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "12px 8px", background: reachMethod === "ssh" ? "var(--bg-active)" : "var(--bg-input)", border: reachMethod === "ssh" ? "1px solid var(--accent)" : "1px solid var(--border-subtle)", borderRadius: 8 }}
+              onClick={() => { if (!running) setReachMethod("ssh"); }}
+              disabled={running}
+            >
+              <Terminal size={18} style={{ color: reachMethod === "ssh" ? "var(--accent)" : "var(--text-muted)" }} />
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: reachMethod === "ssh" ? "var(--text-primary)" : "var(--text-secondary)" }}>{intl.formatMessage({ id: "vmWizard.reachMethodSsh" })}</span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.3 }}>{intl.formatMessage({ id: "vmWizard.reachMethodSshDesc" })}</span>
+            </button>
           </div>
         </div>
 
-        {hostsLoaded && hosts.length > 0 && !running ? (
+        {/* ── Conditional fields based on reach method ─────── */}
+        {reachMethod === "local" ? (
           <div className="field">
-            <label>{intl.formatMessage({ id: "vmWizard.sshConfigHosts" })}</label>
-            <div className="tailscale-peers" style={{ maxHeight: 160 }}>
-              {hosts.map((h) => (
-                <div
-                  key={h.host}
-                  className={`tailscale-peer ${target === h.label ? "selected" : ""}`}
-                  onClick={() => selectHost(h)}
-                >
-                  <span className="peer-name">{h.host}</span>
-                  <span className="peer-ip mono">{h.label}</span>
-                </div>
-              ))}
-            </div>
+            <label>{intl.formatMessage({ id: "vmWizard.localUrlLabel" })}</label>
+            <input
+              placeholder={intl.formatMessage({ id: "vmWizard.localUrlPlaceholder" })}
+              value={localUrl}
+              onChange={(e) => setLocalUrl(e.target.value)}
+              onKeyDown={(e) => {
+                const url = localUrl.trim();
+                if (e.key === "Enter" && !running && url && (url.startsWith("http://") || url.startsWith("https://"))) void startWizard();
+              }}
+              disabled={running}
+              className="mono"
+            />
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="field">
+              <label>{intl.formatMessage({ id: "vmWizard.target" })}</label>
+              <input
+                placeholder={intl.formatMessage({ id: "vmWizard.targetPlaceholder" })}
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !running && target.trim()) void startWizard();
+                }}
+                disabled={running}
+                className="mono"
+              />
+              <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginTop: 6, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                <ShieldCheck size={13} />
+                <span>
+                  {intl.formatMessage({ id: "vmWizard.securityNote" })}
+                </span>
+              </div>
+            </div>
+
+            {hostsLoaded && hosts.length > 0 && !running ? (
+              <div className="field">
+                <label>{intl.formatMessage({ id: "vmWizard.sshConfigHosts" })}</label>
+                <div className="tailscale-peers" style={{ maxHeight: 160 }}>
+                  {hosts.map((h) => (
+                    <div
+                      key={h.host}
+                      className={`tailscale-peer ${target === h.label ? "selected" : ""}`}
+                      onClick={() => selectHost(h)}
+                    >
+                      <span className="peer-name">{h.host}</span>
+                      <span className="peer-ip mono">{h.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
 
         {progress ? (
           <div className="vm-wizard-progress" style={{ marginTop: 12 }}>
@@ -522,7 +586,7 @@ export function AddVmWizard(props: {
             <button
               className="btn primary"
               onClick={() => void startWizard()}
-              disabled={running || !target.trim()}
+              disabled={running || (reachMethod === "local" ? !localUrl.trim() || (!localUrl.trim().startsWith("http://") && !localUrl.trim().startsWith("https://")) : !target.trim())}
             >
               {running ? intl.formatMessage({ id: "vmWizard.running" }) : intl.formatMessage({ id: "vmWizard.startWizard" })}
             </button>
