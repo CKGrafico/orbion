@@ -376,13 +376,16 @@ export class EndpointHealthTracker {
   private health = new Map<string, EndpointHealthEntry>();
   private supervisors = new Map<string, ConnectionSupervisor>();
   private readonly onHealthChange: (health: EndpointHealth[]) => void;
+  private readonly resolveUrl: ((endpointId: string, rawUrl: string) => string) | null;
 
   constructor(
     environmentId: string,
     onHealthChange: (health: EndpointHealth[]) => void,
+    resolveUrl?: (endpointId: string, rawUrl: string) => string,
   ) {
     this._environmentId = environmentId;
     this.onHealthChange = onHealthChange;
+    this.resolveUrl = resolveUrl ?? null;
   }
 
   private _environmentId: string;
@@ -401,8 +404,9 @@ export class EndpointHealthTracker {
 
     for (const ep of endpoints) {
       if (!this.supervisors.has(ep.id)) {
+        const probeUrl = this.resolveUrl ? this.resolveUrl(ep.id, ep.url) : ep.url;
         const supervisor = new ConnectionSupervisor(
-          makeEndpointProbe(ep.url, this._environmentId),
+          makeEndpointProbe(probeUrl, this._environmentId),
           (status) => {
             this.health.set(ep.id, {
               lastError: status.lastError,

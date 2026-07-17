@@ -88,6 +88,14 @@ import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
 import { OutageTracker } from "./outage-tracker.js";
+import {
+  openTunnelsForEnvironment,
+  openTunnelForEndpoint,
+  closeTunnelForEndpoint,
+  closeTunnelsForEnvironment,
+  resolveEffectiveUrl,
+  closeAllRegistryTunnels,
+} from "./tunnel-registry.js";
 
 const streams = new Map<string, AbortController>();
 
@@ -155,12 +163,21 @@ function syncEndpointTracker(environmentId: string): void {
 
   let tracker = endpointTrackers.get(environmentId);
   if (!tracker) {
-    tracker = new EndpointHealthTracker(environmentId, (health) => {
-      const win = getMainWindow();
-      if (win) {
-        win.webContents.send("connection:endpointHealth", environmentId, health);
-      }
-    });
+    tracker = new EndpointHealthTracker(
+      environmentId,
+      (health) => {
+        const win = getMainWindow();
+        if (win) {
+          win.webContents.send("connection:endpointHealth", environmentId, health);
+        }
+      },
+      // Resolve effective URLs through the tunnel registry for SSH endpoints
+      (endpointId: string, rawUrl: string): string => {
+        const ep = env.endpoints.find((e) => e.id === endpointId);
+        if (ep) return resolveEffectiveUrl(environmentId, ep);
+        return rawUrl;
+      },
+    );
     endpointTrackers.set(environmentId, tracker);
   }
   tracker.syncEndpoints(env.endpoints);
@@ -178,6 +195,7 @@ function removeSupervisor(environmentId: string): void {
     endpointTrackers.delete(environmentId);
   }
   outageTracker.removeEnvironment(environmentId);
+  closeTunnelsForEnvironment(environmentId);
 }
 
 function wakeupAll(): void {
@@ -289,6 +307,25 @@ function findEnvironmentIdByUrl(baseUrl: string): string | null {
   return null;
 }
 
+/**
+ * For a raw baseUrl from the renderer, find the corresponding endpoint
+ * and return the effective URL (tunneled for SSH, original for others).
+ */
+function resolveEffectiveUrlForBaseUrl(environmentId: string, baseUrl: string): string {
+  const normalized = trimTrailingSlash(baseUrl.trim());
+  const envs = getEnvironments();
+  const env = envs.find((e: Environment) => e.id === environmentId);
+  if (env) {
+    for (const ep of env.endpoints) {
+      if (trimTrailingSlash(ep.url.trim()) === normalized) {
+        return resolveEffectiveUrl(environmentId, ep);
+      }
+    }
+  }
+  // Fallback: return the original URL (non-SSH or not found in registry)
+  return baseUrl;
+}
+
 async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   if (!isAllowedBaseUrl(args.baseUrl)) {
     return { ok: false, status: 0, error: msg("vmWizard.mainInvalidEnvUrl", { url: args.baseUrl }) };
@@ -304,7 +341,11 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token.accessToken}`;
 
-  return fetchAndUnwrap(joinUrl(args.baseUrl, args.path), {
+  // For SSH endpoints, resolve the effective (tunneled) URL so the request
+  // goes through the local forwarded port instead of the unreachable remote host.
+  const effectiveBaseUrl = resolveEffectiveUrlForBaseUrl(envId, args.baseUrl);
+
+  return fetchAndUnwrap(joinUrl(effectiveBaseUrl, args.path), {
     method: args.method,
     headers,
     body: args.body,
@@ -348,8 +389,11 @@ async function handleStreamSubscribe(
   const streamHeaders: Record<string, string> = { Accept: "text/event-stream" };
   if (token) streamHeaders["Authorization"] = `Bearer ${token.accessToken}`;
 
+  // For SSH endpoints, resolve the effective (tunneled) URL.
+  const effectiveBaseUrl = resolveEffectiveUrlForBaseUrl(envId, args.baseUrl);
+
   try {
-    const res = await fetch(joinUrl(args.baseUrl, args.path), {
+    const res = await fetch(joinUrl(effectiveBaseUrl, args.path), {
       signal: controller.signal,
       headers: streamHeaders,
     });
@@ -422,9 +466,17 @@ function saveBounds(win: BrowserWindow): void {
   }
 }
 
-function seedSupervisors(): void {
+async function seedSupervisors(): Promise<void> {
   for (const env of getEnvironments()) {
-    const url = resolveActiveUrl(env.endpoints, env.activeEndpointId);
+    // Open SSH tunnels for all SSH-reach endpoints before resolving the URL.
+    // The tunnel translates the remote host:port into a local loopback port.
+    await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
+
+    // Use the effective URL (tunneled for SSH endpoints, raw for others).
+    const activeEp = env.activeEndpointId
+      ? env.endpoints.find((e) => e.id === env.activeEndpointId)
+      : env.endpoints[0];
+    const url = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
     if (url) {
       getOrCreateSupervisor(env.id, url);
     }
@@ -465,7 +517,7 @@ function createWindow(): void {
   win.once("ready-to-show", () => {
     if (saved.maximized) win.maximize();
     win.show();
-    seedSupervisors();
+    void seedSupervisors();
   });
 
   let saveTimer: NodeJS.Timeout | null = null;
@@ -540,7 +592,12 @@ app.whenReady().then(() => {
       if (existing) {
         const ep = await addEndpoint(existing.id, url, endpointKind);
         syncEndpointTracker(existing.id);
-        const activeUrl = resolveActiveUrl(existing.endpoints, ep?.id ?? existing.activeEndpointId);
+        // Open SSH tunnel if needed
+        if (ep) {
+          await openTunnelsForEnvironment(existing.id, [...existing.endpoints, ep], ep.id);
+        }
+        const activeEp = ep ?? existing.endpoints.find((e) => e.id === existing.activeEndpointId);
+        const activeUrl = activeEp ? resolveEffectiveUrl(existing.id, activeEp) : resolveActiveUrl(existing.endpoints, ep?.id ?? existing.activeEndpointId);
         if (activeUrl) getOrCreateSupervisor(existing.id, activeUrl);
         return existing;
       }
@@ -550,7 +607,12 @@ app.whenReady().then(() => {
       await setEnvironmentFingerprintId(env.id, fingerprint.id);
     }
     await autoPromoteFirstEnvIfNeeded();
-    const activeUrl = resolveActiveUrl(env.endpoints, env.activeEndpointId);
+    // Open SSH tunnel if needed
+    await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
+    const activeEp = env.activeEndpointId
+      ? env.endpoints.find((e) => e.id === env.activeEndpointId)
+      : env.endpoints[0];
+    const activeUrl = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
     if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
     syncEndpointTracker(env.id);
     return env;
@@ -579,11 +641,21 @@ app.whenReady().then(() => {
   safeHandle("config:addEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, url, kind] = validateIpc<[string, string, string]>("config:addEndpoint", rawArgs);
     const ep = await addEndpoint(environmentId, url, kind as "direct" | "ssh" | "tailscale");
+    if (ep && ep.kind === "ssh") {
+      await openTunnelForEndpoint(environmentId, ep);
+    }
     syncEndpointTracker(environmentId);
     return ep;
   });
   safeHandle("config:removeEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, endpointId] = validateIpc<[string, string]>("config:removeEndpoint", rawArgs);
+    // Close tunnel before removing endpoint (need the endpoint data still present)
+    const envsBefore = getEnvironments();
+    const envBefore = envsBefore.find((e: Environment) => e.id === environmentId);
+    const epBefore = envBefore?.endpoints.find((e) => e.id === endpointId);
+    if (epBefore?.kind === "ssh") {
+      closeTunnelForEndpoint(environmentId, endpointId);
+    }
     await removeEndpoint(environmentId, endpointId);
     syncEndpointTracker(environmentId);
   });
@@ -593,10 +665,19 @@ app.whenReady().then(() => {
     const envs = getEnvironments();
     const env = envs.find((e: Environment) => e.id === environmentId);
     if (env) {
-      const url = resolveActiveUrl(env.endpoints, endpointId);
+      // Open SSH tunnel for the new active endpoint if needed
+      await openTunnelsForEnvironment(environmentId, env.endpoints, endpointId);
+      const activeEp = env.endpoints.find((e) => e.id === endpointId);
+      const url = activeEp ? resolveEffectiveUrl(environmentId, activeEp) : resolveActiveUrl(env.endpoints, endpointId);
       if (url) {
         removeSupervisor(environmentId);
-        getOrCreateSupervisor(environmentId, url);
+        // Re-open tunnels since removeSupervisor closed them
+        await openTunnelsForEnvironment(environmentId, env.endpoints, endpointId);
+        const activeEpRetry = env.endpoints.find((e) => e.id === endpointId);
+        const tunnelUrl = activeEpRetry ? resolveEffectiveUrl(environmentId, activeEpRetry) : resolveActiveUrl(env.endpoints, endpointId);
+        if (tunnelUrl) {
+          getOrCreateSupervisor(environmentId, tunnelUrl);
+        }
       }
     }
     syncEndpointTracker(environmentId);
@@ -669,7 +750,21 @@ app.whenReady().then(() => {
 
   safeHandle("vmWizard:start", async (_event, ...rawArgs) => {
     const [target, name, reachMethod, directUrl] = validateIpc<[string, string | undefined, import("../shared/ipc.js").ReachMethod | undefined, string | undefined]>("vmWizard:start", rawArgs);
-    return runWizard(target, name, reachMethod ?? "ssh", directUrl);
+    const result = await runWizard(target, name, reachMethod ?? "ssh", directUrl);
+    // After the wizard creates the environment, open SSH tunnels and
+    // seed the connection supervisor so the new environment is immediately live.
+    const envs = getEnvironments();
+    const env = envs.find((e: Environment) => e.id === result.environmentId);
+    if (env) {
+      await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
+      const activeEp = env.activeEndpointId
+        ? env.endpoints.find((e) => e.id === env.activeEndpointId)
+        : env.endpoints[0];
+      const activeUrl = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
+      if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
+      syncEndpointTracker(env.id);
+    }
+    return result;
   });
 
   safeHandle("vmWizard:cancel", () => {
@@ -1357,5 +1452,6 @@ app.on("window-all-closed", () => {
   supervisors.clear();
   for (const tracker of endpointTrackers.values()) tracker.destroy();
   endpointTrackers.clear();
+  closeAllRegistryTunnels();
   if (process.platform !== "darwin") app.quit();
 });
