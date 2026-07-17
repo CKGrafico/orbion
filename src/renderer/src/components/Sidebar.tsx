@@ -6,6 +6,7 @@ import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { X, Plus, ChevronRight, Search, ArrowUpDown, Link } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
+import { FleetActivityReadout } from "./FleetActivityReadout";
 import { translateMessage } from "../i18n";
 
 type View =
@@ -86,11 +87,12 @@ export function Sidebar(props: {
   onSelect: (id: string) => void;
   onNavigate: (view: View) => void;
   onAddVm?: () => void;
+  fleetActivityEnabled?: boolean;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
-    onSelect, onAddVm,
+    onSelect, onAddVm, fleetActivityEnabled,
   } = props;
   const intl = useIntl();
 
@@ -328,6 +330,14 @@ export function Sidebar(props: {
       </div>
 
       <div className="sidebar-footer">
+        {fleetActivityEnabled !== false ? (
+          <FleetActivityReadout
+            perEnvLoops={perEnvLoops}
+            perEnvHealth={health}
+            environments={environments}
+          />
+        ) : null}
+        <span style={{ flex: 1 }} />
         <OrbionMark size={24} />
         <span>{intl.formatMessage({ id: "sidebar.orbion" })}</span>
       </div>

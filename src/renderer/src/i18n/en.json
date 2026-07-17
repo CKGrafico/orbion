@@ -413,5 +413,12 @@
     "configError": "Configuration operation failed",
     "configErrorDetail": "{operation} failed: {detail}",
     "setOpenCodeEndpointRejected": "OpenCode endpoint rejected: {reason}"
+  },
+  "fleetActivity": {
+    "tooltip": "{count} agent-loop runs today across the fleet",
+    "runsToday": "{count}r today",
+    "topContributors": "Top contributors",
+    "noContributors": "No runs recorded today",
+    "runCount": "{count}r"
   }
 }

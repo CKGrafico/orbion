@@ -62,6 +62,15 @@ const MOCK_LOOPS: LoopMeta[] = [
   mockLoop({ id: "loop-3", status: "stopped", command: "docker compose up", intervalHuman: "1h", runCount: 12, lastExitCode: 1, lastRunAt: iso(-7200000), runHistory: [
     { runNumber: 12, startedAt: iso(-7200000), exitCode: 1, duration: 5400, logSize: 2048, status: "completed", logOffset: 0 },
   ] }),
+  mockLoop({ id: "loop-4", status: "running", command: "opencode agent run", description: "AI code review agent", intervalHuman: "15m", runCount: 67, lastExitCode: 0, lastRunAt: iso(-180000), nextRunAt: iso(720000), pid: 23456, projectId: "agents", runHistory: [
+    { runNumber: 67, startedAt: iso(-180000), exitCode: 0, duration: 8500, logSize: 2048, status: "completed", logOffset: 0 },
+    { runNumber: 66, startedAt: iso(-1080000), exitCode: 0, duration: 9200, logSize: 1920, status: "completed", logOffset: 0 },
+    { runNumber: 65, startedAt: iso(-1980000), exitCode: 0, duration: 7800, logSize: 1800, status: "completed", logOffset: 0 },
+  ] }),
+  mockLoop({ id: "loop-5", status: "waiting", command: "claude-code --auto-approve", description: "Claude automated fixes", intervalHuman: "30m", runCount: 23, lastExitCode: 0, lastRunAt: iso(-600000), nextRunAt: iso(1200000), projectId: "agents", runHistory: [
+    { runNumber: 23, startedAt: iso(-600000), exitCode: 0, duration: 12000, logSize: 2560, status: "completed", logOffset: 0 },
+    { runNumber: 22, startedAt: iso(-2400000), exitCode: 0, duration: 11500, logSize: 2400, status: "completed", logOffset: 0 },
+  ] }),
 ];
 
 const MOCK_TASKS: TaskDefinition[] = [
