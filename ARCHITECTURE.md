@@ -244,9 +244,10 @@ them, using OS-native encryption (DPAPI on Windows, Keychain on macOS,
 libsecret on Linux). If `safeStorage.isEncryptionAvailable()` returns `false`,
 password storage is rejected — the `setOpenCodeEndpoint` IPC returns
 `{ ok: false, reason: "encryption-unavailable" }` and a dialog is shown to the
-user. The `wasEncrypted` flag on `OpenCodeEndpoint` tracks whether a password
-was encrypted, enabling correct decryption behavior and backward compatibility
-with legacy unencrypted entries.
+user. The `wasEncrypted` flag on the internal `InternalOpenCodeEndpoint`
+type (main-process only, never exposed to renderer via IPC) tracks whether
+a password was encrypted, enabling correct decryption behavior and backward
+compatibility with legacy unencrypted entries.
 
 **Migration:** on first launch after upgrade, `config:migrateFromLocalStorage`
 reads the old `lta.instances.v1` and `lta.selectedInstance.v1` localStorage
@@ -315,8 +316,9 @@ keys, writes them into electron-store, and clears the keys. The renderer's
   tokens and OpenCode endpoint passwords are encrypted via this wrapper. If
   `safeStorage.isEncryptionAvailable()` returns `false` (e.g. Linux without
   libsecret), password storage is **rejected** with a user-facing error —
-  passwords are never stored in plaintext. The `OpenCodeEndpoint.wasEncrypted`
-  flag distinguishes encrypted entries from legacy unencrypted ones.
+  passwords are never stored in plaintext. The `wasEncrypted` flag is kept on
+  an internal-only `InternalOpenCodeEndpoint` type and is stripped before
+  environments are sent to the renderer via IPC.
 - **URL validation:** the main process rejects any base URL that is not
   `http:`/`https:` before making a request.
 - **External links:** `setWindowOpenHandler` denies in-app navigation and opens
@@ -324,8 +326,10 @@ keys, writes them into electron-store, and clears the keys. The renderer's
 - **Trust boundary:** renderer ⇄ preload ⇄ main. Only the main process performs
   network and filesystem I/O.
 - **Auth/secrets:** OpenCode endpoint passwords are encrypted at rest via
-  `safeStorage`. Session tokens are similarly encrypted. Plaintext storage is
-  rejected when the OS keychain is unavailable.
+  `safeStorage`. Session tokens are similarly encrypted. Both `setOpenCodeEndpoint`
+  and `setInfraOpenCodeEndpoint` reject plaintext storage when the OS keychain
+  is unavailable. The `wasEncrypted` metadata is internal-only and never crosses
+  the IPC boundary.
 
 ## 10. Monitoring & Observability
 

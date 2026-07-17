@@ -1,0 +1,9 @@
+- [x] 1.1 Fix _setInfraOpenCodeEndpoint to return SetOpenCodeEndpointResult and refuse storage when encryption unavailable <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/main/config-store.ts] -->
+- [x] 1.2 Remove wasEncrypted from OpenCodeEndpoint IPC type <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/shared/ipc.ts] -->
+- [x] 1.3 Remove wasEncrypted from renderer types <!-- agent: frontend-engineer.fast, depends_on: [1.2], touches: [src/renderer/src/types.ts] -->
+- [x] 1.4 Strip wasEncrypted from environment data in getEnvironmentsForRenderer output <!-- agent: frontend-engineer.build, depends_on: [1.2], touches: [src/main/config-store.ts] -->
+- [x] 1.5 Add setInfraOpenCodeEndpoint to ConfigBridge and preload <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/shared/ipc.ts, src/preload/index.ts] -->
+- [x] 1.6 Wire IPC handler for config:setInfraOpenCodeEndpoint with dialog on encryption failure <!-- agent: frontend-engineer.build, depends_on: [1.1, 1.5], touches: [src/main/index.ts] -->
+- [x] 1.7 Add IPC validation for config:setInfraOpenCodeEndpoint <!-- agent: frontend-engineer.fast, depends_on: [1.5], touches: [src/main/ipc-validation.ts] -->
+- [x] 1.8 Remove wasEncrypted validation from config:setOpenCodeEndpoint validation <!-- agent: frontend-engineer.fast, depends_on: [1.2], touches: [src/main/ipc-validation.ts] -->
+- [x] 1.9 Run TypeScript check and fix errors <!-- agent: frontend-engineer.fast, depends_on: [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8], touches: [] -->
