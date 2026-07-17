@@ -25,6 +25,9 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ConditionWatch,
+  DeepLinkTarget,
+  NotificationSendArgs,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -92,15 +95,10 @@ export interface ITailscaleService {
 }
 
 export interface INotificationService {
-  sendNotification(opts: {
-    environmentId: string;
-    environmentName: string;
-    itemId: string;
-    itemType: string;
-    status: string;
-    message: string;
-  }): void;
-  setMuted(environmentId: string, muted: boolean): void;
+  send(args: NotificationSendArgs): Promise<void>;
+  setMuted(muted: boolean): Promise<void>;
+  isMuted(): Promise<boolean>;
+  onClick(cb: (deepLink: DeepLinkTarget) => void): () => void;
 }
 
 export interface IBudgetService {

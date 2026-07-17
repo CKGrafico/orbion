@@ -22,6 +22,9 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ConditionWatch,
+  DeepLinkTarget,
+  NotificationSendArgs,
 } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
@@ -361,8 +364,34 @@ export class MockTailscaleService implements ITailscaleService {
 
 @injectable()
 export class MockNotificationService implements INotificationService {
-  sendNotification(): void {}
-  setMuted(): void {}
+  private muted = false;
+  private clickListeners: ((deepLink: DeepLinkTarget) => void)[] = [];
+
+  async send(_args: NotificationSendArgs): Promise<void> {
+    // Mock: no-op in browser dev mode
+  }
+
+  async setMuted(muted: boolean): Promise<void> {
+    this.muted = muted;
+  }
+
+  async isMuted(): Promise<boolean> {
+    return this.muted;
+  }
+
+  onClick(cb: (deepLink: DeepLinkTarget) => void): () => void {
+    this.clickListeners.push(cb);
+    return () => {
+      this.clickListeners = this.clickListeners.filter((l) => l !== cb);
+    };
+  }
+
+  /** Test helper: simulate a notification click. */
+  simulateClick(deepLink: DeepLinkTarget): void {
+    for (const listener of this.clickListeners) {
+      listener(deepLink);
+    }
+  }
 }
 
 let mockWatches: BudgetWatch[] = [];
