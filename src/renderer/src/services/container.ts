@@ -1,5 +1,5 @@
 import { cid, container } from "inversify-hooks";
-import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService } from "./interfaces";
+import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IOutageService } from "./interfaces";
 import { ConfigService } from "./impl/ConfigService";
 import { ConnectionService } from "./impl/ConnectionService";
 import { OpenCodeService } from "./impl/OpenCodeService";
@@ -9,6 +9,7 @@ import { ApiService, StreamService, TailscaleService } from "./impl/ApiStreamTai
 import { NotificationService } from "./impl/NotificationService";
 import { BudgetService } from "./impl/BudgetService";
 import { InboxService } from "./impl/InboxService";
+import { OutageService } from "./impl/OutageService";
 import {
   MockConfigService,
   MockConnectionService,
@@ -21,6 +22,7 @@ import {
   MockNotificationService,
   MockBudgetService,
   MockInboxService,
+  MockOutageService,
 } from "./mock/MockServices";
 
 let built = false;
@@ -43,6 +45,7 @@ export function buildContainer(): void {
     container.addSingleton<INotificationService>(NotificationService, cid.INotificationService);
     container.addSingleton<IBudgetService>(BudgetService, cid.IBudgetService);
     container.addSingleton<IInboxService>(InboxService, cid.IInboxService);
+    container.addSingleton<IOutageService>(OutageService, cid.IOutageService);
   } else {
     container.addSingleton<IConfigService>(MockConfigService, cid.IConfigService);
     container.addSingleton<IConnectionService>(MockConnectionService, cid.IConnectionService);
@@ -55,5 +58,6 @@ export function buildContainer(): void {
     container.addSingleton<INotificationService>(MockNotificationService, cid.INotificationService);
     container.addSingleton<IBudgetService>(MockBudgetService, cid.IBudgetService);
     container.addSingleton<IInboxService>(MockInboxService, cid.IInboxService);
+    container.addSingleton<IOutageService>(MockOutageService, cid.IOutageService);
   }
 }

@@ -3,15 +3,32 @@ import type { IInboxService, InboxBuildParams } from "../interfaces";
 import type { InboxItem, InboxQueryResult } from "../../../../shared/ipc";
 import { loopStatusToFleetItem } from "../../fleet-mapping";
 
+function formatDuration(ms: number): string {
+  const totalMin = Math.round(ms / 60_000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const hours = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  if (hours < 24) return min > 0 ? `${hours}h ${min}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+}
+
 /**
  * Build inbox items from live fleet data.
  *
  * Items are derived (not persisted): they are computed on every call from
  * perEnvLoops, breaches, and health status. The only persisted state is
  * the set of dismissed item IDs.
+ *
+ * Prolonged-offline items (kind "prolonged-offline") appear only when
+ * the main-process OutageTracker escalates an outage. They self-resolve
+ * when the instance reconnects (the OutageTracker fires onResolve, which
+ * clears the entry from escalatedOutages). Short outages under the
+ * threshold (~10 min) never create an inbox item.
  */
 function deriveItems(params: InboxBuildParams): InboxItem[] {
-  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds } = params;
+  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages } = params;
   const items: InboxItem[] = [];
 
   // 1. Budget breaches
@@ -34,8 +51,30 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
   // 2. Failed loops across reachable instances
   for (const env of environments) {
     const health = perEnvHealth[env.id];
+
+    // Prolonged-offline takes precedence over instance-offline
+    const escalated = escalatedOutages.get(env.id);
+    if (escalated) {
+      if (!dismissedIds.has(`prolonged-offline:${env.id}`)) {
+        items.push({
+          id: `prolonged-offline:${env.id}`,
+          kind: "prolonged-offline",
+          environmentId: env.id,
+          environmentName: env.name,
+          title: env.name,
+          detail: `unreachable for ${formatDuration(escalated.durationMs)}`,
+          occurredAt: escalated.since,
+          outageSince: escalated.since,
+          dismissed: false,
+        });
+      }
+      // Skip failed-loop scanning for unreachable instances
+      continue;
+    }
+
+    // Short outages (under threshold) show as instance-offline
+    // — but only if they're actually showing offline in the health
     if (health === "offline" || health === "blocked" || health === "unknown") {
-      // Instance offline is a separate inbox item
       if (!dismissedIds.has(`offline:${env.id}`)) {
         items.push({
           id: `offline:${env.id}`,
@@ -126,6 +165,8 @@ function answerFleetQuery(
         ? "failed loop"
         : item.kind === "instance-offline"
         ? "instance offline"
+        : item.kind === "prolonged-offline"
+        ? "prolonged outage"
         : item.kind;
 
       if (item.loopId) {
@@ -170,7 +211,7 @@ function answerFleetQuery(
     q.includes("down");
 
   if (isOfflineQuery) {
-    const offline = items.filter((i) => i.kind === "instance-offline");
+    const offline = items.filter((i) => i.kind === "instance-offline" || i.kind === "prolonged-offline");
     if (offline.length === 0) {
       return { answer: "All instances are reachable.", references: [] };
     }

@@ -26,6 +26,7 @@ import type {
   ConditionWatch,
   NotificationSendArgs,
   DeepLinkTarget,
+  OutageEscalation,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -232,6 +233,35 @@ const bridge: LoopTaskBridge = {
         ipcRenderer.removeListener("notification:navigate", listener);
       };
     },
+  },
+
+  outage: {
+    onEscalation: (cb: (event: OutageEscalation) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        event: OutageEscalation,
+      ): void => {
+        cb(event);
+      };
+      ipcRenderer.on("outage:escalation", listener);
+      return () => {
+        ipcRenderer.removeListener("outage:escalation", listener);
+      };
+    },
+    onResolve: (cb: (environmentId: string) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        environmentId: string,
+      ): void => {
+        cb(environmentId);
+      };
+      ipcRenderer.on("outage:resolve", listener);
+      return () => {
+        ipcRenderer.removeListener("outage:resolve", listener);
+      };
+    },
+    getEscalations: () =>
+      ipcRenderer.invoke("outage:getEscalations") as Promise<OutageEscalation[]>,
   },
 };
 

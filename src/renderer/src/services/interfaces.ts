@@ -28,6 +28,7 @@ import type {
   ConditionWatch,
   DeepLinkTarget,
   NotificationSendArgs,
+  OutageEscalation,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -126,4 +127,12 @@ export interface InboxBuildParams {
   environments: Array<{ id: string; name: string }>;
   breaches: BudgetBreach[];
   dismissedIds: Set<string>;
+  /** Actively escalated prolonged outages, keyed by environmentId. */
+  escalatedOutages: Map<string, OutageEscalation>;
+}
+
+export interface IOutageService {
+  getEscalations(): Promise<OutageEscalation[]>;
+  onEscalation(cb: (event: OutageEscalation) => void): () => void;
+  onResolve(cb: (environmentId: string) => void): () => void;
 }

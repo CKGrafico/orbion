@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -24,7 +24,7 @@ import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 
 type View =
@@ -67,6 +67,7 @@ export function App(): React.ReactNode {
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
+  const [outageService] = useInject<IOutageService>(cid.IOutageService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -102,6 +103,8 @@ export function App(): React.ReactNode {
         if (deepLink.itemKind === "failed-loop" || deepLink.itemKind === "breach") {
           // These items reference a loop, but we don't have the loopId in inbox-item kind.
           // Navigate to the instance view where the inbox panel is visible.
+          setView({ kind: "instance" });
+        } else if (deepLink.itemKind === "prolonged-offline") {
           setView({ kind: "instance" });
         } else {
           setView({ kind: "instance" });
@@ -145,6 +148,46 @@ export function App(): React.ReactNode {
   }, [sendInboxNotification]);
 
   const budgetWatch = useBudgetWatch(perEnvLoops, environments, handleBudgetBreach);
+
+  // Outage escalation tracking
+  const [escalatedOutages, setEscalatedOutages] = useState<Map<string, OutageEscalation>>(new Map());
+
+  // Load existing escalations on mount and subscribe to live events
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async (): Promise<void> => {
+      const escalations = await outageService.getEscalations();
+      if (cancelled) return;
+      setEscalatedOutages(new Map(escalations.map((e) => [e.environmentId, e])));
+    };
+
+    void load();
+
+    const unsubEscalation = outageService.onEscalation((event) => {
+      if (cancelled) return;
+      setEscalatedOutages((prev) => {
+        const next = new Map(prev);
+        next.set(event.environmentId, event);
+        return next;
+      });
+    });
+
+    const unsubResolve = outageService.onResolve((environmentId) => {
+      if (cancelled) return;
+      setEscalatedOutages((prev) => {
+        const next = new Map(prev);
+        next.delete(environmentId);
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      unsubEscalation();
+      unsubResolve();
+    };
+  }, [outageService]);
 
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
@@ -646,6 +689,7 @@ export function App(): React.ReactNode {
               perEnvHealth={health}
               environments={environments}
               breaches={budgetWatch.breaches}
+              escalatedOutages={escalatedOutages}
               onClickItem={(item) => {
                 select(item.environmentId);
                 if (item.loopId) {

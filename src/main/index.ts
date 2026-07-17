@@ -27,6 +27,7 @@ import type {
   AddLabelResult,
   EditIssueParams,
   EditIssueResult,
+  OutageEscalation,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -82,10 +83,40 @@ import { msg } from "./i18n.js";
 import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
+import { OutageTracker } from "./outage-tracker.js";
 
 const streams = new Map<string, AbortController>();
 
 const notificationService = new NotificationService();
+
+const outageTracker = new OutageTracker(
+  (event: OutageEscalation) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("outage:escalation", event);
+    }
+
+    // Send OS notification for prolonged outage
+    const envs = getEnvironments();
+    const env = envs.find((e: Environment) => e.id === event.environmentId);
+    const envName = env?.name ?? event.environmentId;
+    const durationMin = Math.round(event.durationMs / 60_000);
+
+    notificationService.send({
+      title: `${envName} has been unreachable for ${durationMin}m`,
+      body: `The instance went offline at ${new Date(event.since).toLocaleTimeString()}. It will self-resolve when reconnected.`,
+      tag: `outage:${event.environmentId}`,
+      deepLink: { kind: "instance", environmentId: event.environmentId },
+      suppressIfFocused: false,
+    });
+  },
+  (environmentId: string) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("outage:resolve", environmentId);
+    }
+  },
+);
 
 /** Cache: `${environmentId}:${projectId}` → detected platform. In-memory, session-scoped. */
 const platformCache = new Map<string, PlatformType>();
@@ -104,6 +135,8 @@ function getOrCreateSupervisor(environmentId: string, baseUrl: string): Connecti
       if (win) {
         win.webContents.send("connection:status", environmentId, status);
       }
+      // Feed status changes to the outage tracker
+      outageTracker.handleStatusChange(environmentId, status);
     },
   );
   supervisors.set(environmentId, supervisor);
@@ -140,6 +173,7 @@ function removeSupervisor(environmentId: string): void {
     tracker.destroy();
     endpointTrackers.delete(environmentId);
   }
+  outageTracker.removeEnvironment(environmentId);
 }
 
 function wakeupAll(): void {
@@ -1261,6 +1295,27 @@ app.whenReady().then(() => {
   safeHandle("notification:isMuted", (): boolean => {
     validateIpc("notification:isMuted", []);
     return notificationService.isMuted();
+  });
+
+  // ── Outage escalation ────────────────────────────────────────────
+
+  safeHandle("outage:getEscalations", (): OutageEscalation[] => {
+    validateIpc("outage:getEscalations", []);
+    const envs = getEnvironments();
+    const result: OutageEscalation[] = [];
+    for (const env of envs) {
+      if (outageTracker.isEscalated(env.id)) {
+        const since = outageTracker.getOutageSince(env.id);
+        if (since) {
+          result.push({
+            environmentId: env.id,
+            since: new Date(since).toISOString(),
+            durationMs: Date.now() - since,
+          });
+        }
+      }
+    }
+    return result;
   });
 
   // Prune old breaches on startup

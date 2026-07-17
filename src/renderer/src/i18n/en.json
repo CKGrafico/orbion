@@ -505,6 +505,7 @@
     "itemNeedsAttention": "needs attention",
     "breach": "budget breach",
     "failedLoop": "failed loop",
-    "instanceOffline": "instance offline"
+    "instanceOffline": "instance offline",
+    "prolongedOffline": "prolonged outage"
   }
 }

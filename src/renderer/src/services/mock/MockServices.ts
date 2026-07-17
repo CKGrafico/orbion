@@ -25,6 +25,7 @@ import type {
   ConditionWatch,
   DeepLinkTarget,
   NotificationSendArgs,
+  OutageEscalation,
 } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
@@ -40,6 +41,7 @@ import type {
   IBudgetService,
   IInboxService,
   InboxBuildParams,
+  IOutageService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -460,6 +462,26 @@ export class MockInboxService implements IInboxService {
 
     for (const env of environments) {
       const health = perEnvHealth[env.id];
+
+      // Prolonged-offline from escalated outages
+      const escalated = params.escalatedOutages.get(env.id);
+      if (escalated) {
+        if (!mockDismissedIds.has(`prolonged-offline:${env.id}`)) {
+          items.push({
+            id: `prolonged-offline:${env.id}`,
+            kind: "prolonged-offline",
+            environmentId: env.id,
+            environmentName: env.name,
+            title: env.name,
+            detail: "unreachable for 10m+",
+            occurredAt: escalated.since,
+            outageSince: escalated.since,
+            dismissed: false,
+          });
+        }
+        continue;
+      }
+
       if (health === "offline" || health === "unknown") {
         if (!mockDismissedIds.has(`offline:${env.id}`)) {
           items.push({
@@ -511,5 +533,20 @@ export class MockInboxService implements IInboxService {
       lines.push(`- [${item.title}](inbox://${item.id}) on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
     }
     return { answer: lines.join("\n"), references: refs };
+  }
+}
+
+@injectable()
+export class MockOutageService implements IOutageService {
+  async getEscalations(): Promise<OutageEscalation[]> {
+    return [];
+  }
+
+  onEscalation(): () => void {
+    return () => {};
+  }
+
+  onResolve(): () => void {
+    return () => {};
   }
 }

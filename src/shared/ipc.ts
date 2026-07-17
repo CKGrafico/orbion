@@ -400,7 +400,8 @@ export type InboxItemKind =
   | "failed-loop"
   | "pending-approval"
   | "awaiting-input"
-  | "instance-offline";
+  | "instance-offline"
+  | "prolonged-offline";
 
 export interface InboxItem {
   id: string;
@@ -415,6 +416,8 @@ export interface InboxItem {
   detail?: string;
   /** ISO timestamp when the item was created or last updated. */
   occurredAt: string;
+  /** For prolonged-offline items: when the outage began. */
+  outageSince?: string;
   /** Whether the user has dismissed / acknowledged the item. */
   dismissed: boolean;
 }
@@ -430,6 +433,25 @@ export interface InboxBridge {
   getItems: () => Promise<InboxItem[]>;
   dismissItem: (itemId: string) => Promise<void>;
   queryFleet: (question: string) => Promise<InboxQueryResult>;
+}
+
+// ── Prolonged-outage escalation ────────────────────────────────────
+
+export interface OutageEscalation {
+  environmentId: string;
+  /** ISO timestamp when the outage began. */
+  since: string;
+  /** Elapsed ms since the outage began (at time of escalation). */
+  durationMs: number;
+}
+
+export interface OutageBridge {
+  /** Subscribe to outage escalations (prolonged unreachability). */
+  onEscalation: (cb: (event: OutageEscalation) => void) => () => void;
+  /** Subscribe to outage self-resolutions (reconnect after escalation). */
+  onResolve: (cb: (environmentId: string) => void) => () => void;
+  /** Get current active escalated outages. */
+  getEscalations: () => Promise<OutageEscalation[]>;
 }
 
 // ── Budget watch ────────────────────────────────────────────────────
@@ -565,4 +587,5 @@ export interface LoopTaskBridge {
   inbox: InboxBridge;
   watch: ConditionWatchBridge;
   notification: NotificationBridge;
+  outage: OutageBridge;
 }
