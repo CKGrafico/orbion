@@ -8,10 +8,20 @@ import type { IConfigService } from "./services/interfaces";
 /**
  * Shared error handler for config CRUD operations.
  * Logs the operation name and error details so IPC-layer failures are
- * visible in the developer console instead of being silently swallowed.
+ * visible in the developer console, and dispatches a custom event so
+ * the UI can surface the failure to the user (e.g. via a toast/alert).
  */
 function handleConfigError(operation: string, error: unknown): void {
   console.error(`[ConfigService] ${operation} failed:`, error);
+  try {
+    window.dispatchEvent(
+      new CustomEvent("orbion:config-error", {
+        detail: { operation, error: error instanceof Error ? error.message : String(error) },
+      }),
+    );
+  } catch {
+    // dispatchEvent must not throw — if it does, just log and move on
+  }
 }
 
 export function useEnvironments(): {
