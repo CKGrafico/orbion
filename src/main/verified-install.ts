@@ -123,15 +123,38 @@ export const MISE_INSTALL = {
 export const NPM_PACKAGES = {
   /** loop-task daemon — mandatory on every VM */
   loopTask: { pkg: "loop-task", version: "2.2.2" },
-  /** opencode CLI — optional */
-  openCode: { pkg: "opencode", version: "latest" }, // NOTE: not on public npm; kept unversioned until upstream publishes
-  /** Atlassian CLI (Jira) — optional */
-  jira: { pkg: "@atlassian/acli", version: "latest" }, // NOTE: not on public npm; kept unversioned until upstream publishes
-  /** GitLab CLI — optional */
-  gitlab: { pkg: "@gitlab-org/cli", version: "latest" }, // NOTE: not on public npm; kept unversioned until upstream publishes
+  /** opencode CLI — optional. Placeholder 0.0.0: not on public npm yet; update when upstream publishes. */
+  openCode: { pkg: "opencode", version: "0.0.0" },
+  /** Atlassian CLI (Jira) — optional. Placeholder 0.0.0: not on public npm yet; update when upstream publishes. */
+  jira: { pkg: "@atlassian/acli", version: "0.0.0" },
+  /** GitLab CLI — optional. Placeholder 0.0.0: not on public npm yet; update when upstream publishes. */
+  gitlab: { pkg: "@gitlab-org/cli", version: "0.0.0" },
   /** Claude Code CLI — optional */
   claude: { pkg: "@anthropic-ai/claude-code", version: "2.1.212" },
 } as const;
+
+/**
+ * Validate that no NPM_PACKAGES entry uses `version: "latest"`.
+ * Unversioned installs are a supply-chain attack vector on remote VMs.
+ * This guard fails fast at startup rather than silently emitting insecure commands.
+ *
+ * @throws {Error} if any entry has version "latest"
+ */
+function validateNpmPackages(): void {
+  for (const [key, entry] of Object.entries(NPM_PACKAGES)) {
+    // Cast to string to satisfy strict `as const` type narrowing — the guard
+    // must still run at runtime in case the const assertion is removed later.
+    const version = entry.version as string;
+    if (version === "latest") {
+      throw new Error(
+        `NPM_PACKAGES.${key} uses version "latest" — pinned version required for supply-chain safety. ` +
+          `See src/main/verified-install.ts.`,
+      );
+    }
+  }
+}
+
+validateNpmPackages();
 
 /**
  * Build an `npm install -g <pkg>@<version>` string for a pinned package.
