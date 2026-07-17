@@ -41,6 +41,7 @@ interface ConfigSchema {
   budgetWatches: BudgetWatch[];
   budgetBreaches: BudgetBreach[];
   inboxDismissedIds: string[];
+  projectPickupLabels: Record<string, string[]>;
   [key: string]: unknown;
 }
 
@@ -55,6 +56,7 @@ const store = new Store<ConfigSchema>({
     budgetWatches: [],
     budgetBreaches: [],
     inboxDismissedIds: [],
+    projectPickupLabels: {},
   },
 });
 
@@ -619,6 +621,25 @@ export function dismissInboxItem(itemId: string): Promise<void> {
 
 export function isInboxItemDismissed(itemId: string): boolean {
   return _isInboxItemDismissed(itemId);
+}
+
+// ---------------------------------------------------------------------------
+// Project pickup labels persistence
+// ---------------------------------------------------------------------------
+
+export function getProjectPickupLabels(projectId: string): string[] {
+  const all = store.get("projectPickupLabels", {});
+  return all[projectId] ?? [];
+}
+
+function _setProjectPickupLabels(projectId: string, labels: string[]): void {
+  const all = store.get("projectPickupLabels", {});
+  all[projectId] = labels;
+  store.set("projectPickupLabels", all);
+}
+
+export function setProjectPickupLabels(projectId: string, labels: string[]): Promise<void> {
+  return serialize(() => _setProjectPickupLabels(projectId, labels));
 }
 
 // ---------------------------------------------------------------------------

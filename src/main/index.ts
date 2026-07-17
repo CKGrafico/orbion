@@ -23,6 +23,8 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  AddLabelParams,
+  AddLabelResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -61,6 +63,8 @@ import {
   dismissBudgetBreach,
   pruneOldBreaches,
   dismissInboxItem,
+  getProjectPickupLabels,
+  setProjectPickupLabels,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -689,6 +693,16 @@ app.whenReady().then(() => {
     return getMainVmId();
   });
 
+  safeHandle("config:getProjectPickupLabels", (_event, ...rawArgs) => {
+    const [projectId] = validateIpc<[string]>("config:getProjectPickupLabels", rawArgs);
+    return getProjectPickupLabels(projectId);
+  });
+
+  safeHandle("config:setProjectPickupLabels", async (_event, ...rawArgs) => {
+    const [projectId, labels] = validateIpc<[string, string[]]>("config:setProjectPickupLabels", rawArgs);
+    await setProjectPickupLabels(projectId, labels);
+  });
+
   safeHandle("infra:executeAction", async (_event, ...rawArgs): Promise<InfraActionResult> => {
     const [args] = validateIpc<[InfraActionArgs]>("infra:executeAction", rawArgs);
     const mainVmEnv = getMainVm();
@@ -916,6 +930,39 @@ app.whenReady().then(() => {
       }
       case "list-issues": {
         return handleListIssues(args);
+      }
+      case "add-label": {
+        const params = args.params as AddLabelParams | undefined;
+        if (!params?.issueNumber || !params.labels?.length) {
+          return { ok: false, error: msg("labels.issueNumberAndLabelsRequired") };
+        }
+
+        const cliCheck = await checkPlatformCli();
+        if (!cliCheck || cliCheck.cli !== "gh" || !cliCheck.authenticated) {
+          return { ok: false, error: msg("labels.ghRequiredForLabels") };
+        }
+
+        const labelArgs: string[] = [
+          "issue", "edit", String(params.issueNumber),
+          "--add-label", params.labels.join(","),
+        ];
+        if (params.repo) {
+          labelArgs.push("--repo", params.repo);
+        }
+
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("gh", labelArgs, (err, _stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: msg("labels.addFailed", { detail: stderr || err.message }) });
+              return;
+            }
+            const result: AddLabelResult = {
+              issueNumber: params.issueNumber,
+              labels: params.labels,
+            };
+            resolve({ ok: true, data: result });
+          });
+        });
       }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };

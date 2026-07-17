@@ -2,8 +2,8 @@ import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode } from "../types";
-import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult } from "../../../shared/ipc";
-import type { IInfraService } from "../services/interfaces";
+import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult } from "../../../shared/ipc";
+import type { IInfraService, IConfigService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
 
@@ -69,6 +69,7 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
 export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): React.ReactNode {
   const intl = useIntl();
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
   const {
     turns,
     rows,
@@ -90,6 +91,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   /** Pending issue drafts keyed by turnId, awaiting user confirmation */
   const [pendingIssues, setPendingIssues] = useState<Record<string, { title: string; body: string }>>({});
+  /** Pending label offers keyed by turnId, awaiting user acceptance */
+  const [pendingLabelOffers, setPendingLabelOffers] = useState<Record<string, { issueNumber: number; labels: string[]; repo?: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Map from issue number to URL, used for issue:// link click-through */
   const issueUrlMap = useRef<Map<number, string>>(new Map());
@@ -124,6 +127,68 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
       const now = Date.now();
       const turnId = `infra-turn-${now}`;
       const lower = text.toLowerCase();
+
+      // Detect "set pickup label" intent
+      const setPickupLabelMatch = text.match(/^set\s+pickup\s+label\s+(?:to\s+)?[:\-]?\s*([a-zA-Z0-9\-_,\s]+)/i);
+      const isClearPickupLabel = lower.includes("clear pickup label") || lower.includes("remove pickup label");
+      const isShowPickupLabel = lower === "pickup label" || lower === "show pickup label" || lower === "what pickup label" || lower === "what's the pickup label" || lower === "whats the pickup label";
+
+      if (setPickupLabelMatch || isClearPickupLabel || isShowPickupLabel) {
+        const turn: ChatTurn = {
+          id: turnId,
+          userMessage: {
+            id: `infra-msg-${now}-u`,
+            role: "user",
+            content: text,
+            startedAt: now,
+          },
+          assistantMessage: {
+            id: `infra-msg-${now}-a`,
+            role: "assistant",
+            content: "",
+            toolCalls: [],
+            startedAt: now + 100,
+            finishedAt: undefined,
+          },
+          finished: false,
+          collapsed: false,
+          accessMode,
+        };
+        addTurn(turn);
+        setActiveTurnId(turnId);
+
+        if (isClearPickupLabel) {
+          void configService.setProjectPickupLabels("__default__", []).then(() => {
+            const responseText = intl.formatMessage({ id: "labels.clearedPickupLabel" });
+            appendAssistantContent(turnId, responseText);
+            finishTurn(turnId);
+            setActiveTurnId(null);
+          });
+        } else if (setPickupLabelMatch) {
+          // Parse labels: split by comma, trim each
+          const rawLabels = setPickupLabelMatch[1].split(",").map((l) => l.trim()).filter((l) => l.length > 0);
+          void configService.setProjectPickupLabels("__default__", rawLabels).then(() => {
+            const responseText = intl.formatMessage(
+              { id: "labels.setPickupLabel" },
+              { labels: rawLabels.join("`, `") },
+            );
+            appendAssistantContent(turnId, responseText);
+            finishTurn(turnId);
+            setActiveTurnId(null);
+          });
+        } else {
+          // Show current pickup label
+          void configService.getProjectPickupLabels("__default__").then((labels) => {
+            const responseText = labels.length > 0
+              ? intl.formatMessage({ id: "labels.currentPickupLabel" }, { labels: labels.join("`, `") })
+              : intl.formatMessage({ id: "labels.noPickupLabel" });
+            appendAssistantContent(turnId, responseText);
+            finishTurn(turnId);
+            setActiveTurnId(null);
+          });
+        }
+        return;
+      }
 
       // Detect "create issue" intent
       const isCreateIssue =
@@ -307,7 +372,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         }, 30);
       }
     },
-    [intl, accessMode, addTurn, appendAssistantContent, finishTurn, infraService],
+    [intl, accessMode, addTurn, appendAssistantContent, finishTurn, infraService, configService],
   );
 
   const handleInterrupt = useCallback(
@@ -331,6 +396,52 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
 
       answerQuestion(activeTurnId, answer);
 
+      // Check for pending label offer first
+      const pendingLabel = pendingLabelOffers[activeTurnId];
+      if (pendingLabel) {
+        if (answer === "apply-label") {
+          void infraService
+            .executeAction({
+              action: "add-label",
+              params: { issueNumber: pendingLabel.issueNumber, labels: pendingLabel.labels, repo: pendingLabel.repo },
+            })
+            .then((result) => {
+              let responseText: string;
+              if (result.ok) {
+                const labelResult = result.data as AddLabelResult;
+                responseText = intl.formatMessage(
+                  { id: "labels.applied" },
+                  { labels: labelResult.labels.join("`, `"), number: labelResult.issueNumber },
+                );
+              } else {
+                responseText = intl.formatMessage(
+                  { id: "labels.applyFailed" },
+                  { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+                );
+              }
+              appendAssistantContent(activeTurnId!, responseText);
+              finishTurn(activeTurnId!);
+              setActiveTurnId(null);
+              setPendingLabelOffers((prev) => {
+                const next = { ...prev };
+                delete next[activeTurnId!];
+                return next;
+              });
+            });
+        } else {
+          // Skip label
+          appendAssistantContent(activeTurnId, intl.formatMessage({ id: "labels.optionSkip" }));
+          finishTurn(activeTurnId);
+          setActiveTurnId(null);
+          setPendingLabelOffers((prev) => {
+            const next = { ...prev };
+            delete next[activeTurnId!];
+            return next;
+          });
+        }
+        return;
+      }
+
       const pending = pendingIssues[activeTurnId];
       if (!pending) return;
 
@@ -340,7 +451,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             action: "create-issue",
             params: { title: pending.title, body: pending.body },
           })
-          .then((result) => {
+          .then(async (result) => {
             let responseText: string;
             if (result.ok) {
               const issueResult = result.data as CreateIssueResult;
@@ -348,15 +459,100 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                 { id: "issues.created" },
                 { url: issueResult.url },
               );
+
+              // Check if pickup labels are configured for this project
+              const pickupLabels = await configService.getProjectPickupLabels("__default__");
+              if (pickupLabels.length > 0 && issueResult.number) {
+                // Finish this response, then offer the pickup label as a new question
+                appendAssistantContent(activeTurnId!, responseText);
+
+                // Add a follow-up question offering the pickup label
+                const labelQuestionId = `label-q-${Date.now()}`;
+                const labelsStr = pickupLabels.join("`, `");
+                // We need to add a new question on the same turn
+                // The turn already has a question resolved, but we can append content + new question
+                appendAssistantContent(
+                  activeTurnId!,
+                  "\n\n" + intl.formatMessage(
+                    { id: "labels.pickupOffer" },
+                    { labels: labelsStr, number: issueResult.number },
+                  ),
+                );
+
+                // Track the pending label offer
+                setPendingLabelOffers((prev) => ({
+                  ...prev,
+                  [activeTurnId!]: { issueNumber: issueResult.number!, labels: pickupLabels },
+                }));
+
+                // We need to set a new question on the turn — but useTranscript
+                // doesn't support updating a turn's question after creation.
+                // Instead, we'll finish this turn and start a new turn for the label offer.
+                // However, the simpler approach is to keep the turn open with a new question.
+                // Since the existing architecture creates a turn with a question, let's create
+                // a child turn for the label offer.
+
+                const labelTurnId = `infra-label-turn-${Date.now()}`;
+                const labelTurn: ChatTurn = {
+                  id: labelTurnId,
+                  userMessage: {
+                    id: `infra-msg-${Date.now()}-u`,
+                    role: "user",
+                    content: intl.formatMessage(
+                      { id: "labels.pickupOffer" },
+                      { labels: labelsStr, number: issueResult.number },
+                    ),
+                    startedAt: Date.now(),
+                  },
+                  assistantMessage: {
+                    id: `infra-msg-${Date.now()}-a`,
+                    role: "assistant",
+                    content: "",
+                    toolCalls: [],
+                    startedAt: Date.now() + 100,
+                    finishedAt: undefined,
+                  },
+                  finished: false,
+                  collapsed: false,
+                  accessMode,
+                  question: {
+                    id: labelQuestionId,
+                    turnId: labelTurnId,
+                    text: intl.formatMessage(
+                      { id: "labels.pickupOffer" },
+                      { labels: labelsStr, number: issueResult.number },
+                    ),
+                    options: [
+                      { key: "apply-label", label: intl.formatMessage({ id: "labels.optionApply" }) },
+                      { key: "skip-label", label: intl.formatMessage({ id: "labels.optionSkip" }) },
+                    ],
+                    singleChoice: true,
+                    allowFreeText: false,
+                    resolved: false,
+                  },
+                };
+                finishTurn(activeTurnId!);
+                addTurn(labelTurn);
+                setActiveTurnId(labelTurnId);
+                setPendingLabelOffers((prev) => {
+                  const next = { ...prev };
+                  delete next[activeTurnId!];
+                  return { ...next, [labelTurnId]: { issueNumber: issueResult.number!, labels: pickupLabels } };
+                });
+              } else {
+                appendAssistantContent(activeTurnId!, responseText);
+                finishTurn(activeTurnId!);
+                setActiveTurnId(null);
+              }
             } else {
               responseText = intl.formatMessage(
                 { id: "issues.createFailed" },
                 { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
               );
+              appendAssistantContent(activeTurnId!, responseText);
+              finishTurn(activeTurnId!);
+              setActiveTurnId(null);
             }
-            appendAssistantContent(activeTurnId!, responseText);
-            finishTurn(activeTurnId!);
-            setActiveTurnId(null);
             setPendingIssues((prev) => {
               const next = { ...prev };
               delete next[activeTurnId!];
@@ -374,7 +570,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         });
       }
     },
-    [activeTurnId, answerQuestion, pendingIssues, infraService, intl, appendAssistantContent, finishTurn],
+    [activeTurnId, answerQuestion, pendingIssues, pendingLabelOffers, infraService, configService, intl, appendAssistantContent, finishTurn, addTurn, accessMode],
   );
 
   const handleAccessModeChange = useCallback(

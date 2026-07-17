@@ -185,6 +185,12 @@ export class MockConfigService implements IConfigService {
   async getMainVmId(): Promise<string | null> {
     return mockEnvironments.find((e) => e.role === "main-vm")?.id ?? null;
   }
+  async getProjectPickupLabels(_projectId: string): Promise<string[]> {
+    return ["to-implement"];
+  }
+  async setProjectPickupLabels(_projectId: string, _labels: string[]): Promise<void> {
+    // mock: no-op
+  }
 }
 
 @injectable()
@@ -287,6 +293,16 @@ export class MockInfraService implements IInfraService {
         truncated: false,
       };
       return { ok: true, data: listResult };
+    }
+    if (args.action === "add-label") {
+      const params = args.params as { issueNumber?: number; labels?: string[] } | undefined;
+      return {
+        ok: true,
+        data: {
+          issueNumber: params?.issueNumber ?? 42,
+          labels: params?.labels ?? [],
+        },
+      };
     }
     return { ok: false, error: "mock" };
   }

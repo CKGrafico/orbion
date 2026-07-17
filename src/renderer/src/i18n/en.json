@@ -351,6 +351,20 @@
     "stackEmpty": "No issues found matching your query.",
     "listFailed": "**Failed to list issues:** {detail}"
   },
+  "labels": {
+    "pickupOffer": "Apply pickup label `{labels}` to issue #{number}?",
+    "optionApply": "Apply label",
+    "optionSkip": "Skip",
+    "applied": "Label `{labels}` applied to issue #{number}.",
+    "applyFailed": "**Failed to apply label:** {detail}",
+    "ghRequiredForLabels": "The GitHub CLI (`gh`) is required to add labels. Install and authenticate it first.",
+    "issueNumberAndLabelsRequired": "Issue number and labels are required.",
+    "addFailed": "**Failed to add label:** {detail}",
+    "setPickupLabel": "Pickup label for this project set to `{labels}`.",
+    "clearedPickupLabel": "Pickup label for this project cleared.",
+    "currentPickupLabel": "Current pickup label: `{labels}`.",
+    "noPickupLabel": "No pickup label configured for this project. Use \"set pickup label <name>\" to configure one."
+  },
   "pickMainVm": {
     "title": "Pick a new main VM",
     "description": "The infrastructure assistant needs a main VM to run on. Choose one of your environments or skip to disable it.",

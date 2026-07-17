@@ -43,6 +43,8 @@ export interface IConfigService {
   setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult>;
   setMainVm(environmentId: string): Promise<void>;
   getMainVmId(): Promise<string | null>;
+  getProjectPickupLabels(projectId: string): Promise<string[]>;
+  setProjectPickupLabels(projectId: string, labels: string[]): Promise<void>;
 }
 
 export interface IConnectionService {
