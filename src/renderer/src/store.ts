@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
-import type { Environment, OpenCodeEndpoint, AccessEndpoint } from "./types";
+import type { Environment, OpenCodeEndpoint } from "./types";
 import type { EndpointKind } from "../../shared/ipc";
 import { trimTrailingSlash } from "../../shared/utils";
 import type { IConfigService } from "./services/interfaces";
+
+/**
+ * Shared error handler for config CRUD operations.
+ * Logs the operation name and error details so IPC-layer failures are
+ * visible in the developer console instead of being silently swallowed.
+ */
+function handleConfigError(operation: string, error: unknown): void {
+  console.error(`[ConfigService] ${operation} failed:`, error);
+}
 
 export function useEnvironments(): {
   environments: Environment[];
@@ -52,7 +61,7 @@ export function useEnvironments(): {
   const select = useCallback(
     (id: string | null) => {
       setSelectedId(id);
-      void configService.setSelectedEnvironmentId(id).catch(() => {});
+      void configService.setSelectedEnvironmentId(id).catch((err) => handleConfigError("setSelectedEnvironmentId", err));
     },
     [configService],
   );
@@ -69,7 +78,7 @@ export function useEnvironments(): {
       void configService.removeEnvironment(id).then(async () => {
         setEnvironments(await configService.getEnvironments());
         setSelectedId(await configService.getSelectedEnvironmentId());
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("removeEnvironment", err));
     },
     [configService],
   );
@@ -78,7 +87,7 @@ export function useEnvironments(): {
     (environmentId: string, url: string, kind: EndpointKind) => {
       void configService.addEndpoint(environmentId, url, kind).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("addEndpoint", err));
     },
     [configService],
   );
@@ -87,7 +96,7 @@ export function useEnvironments(): {
     (environmentId: string, endpointId: string) => {
       void configService.removeEndpoint(environmentId, endpointId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("removeEndpoint", err));
     },
     [configService],
   );
@@ -96,7 +105,7 @@ export function useEnvironments(): {
     (environmentId: string, endpointId: string) => {
       void configService.setActiveEndpoint(environmentId, endpointId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("setActiveEndpoint", err));
     },
     [configService],
   );
@@ -105,7 +114,7 @@ export function useEnvironments(): {
     (environmentId: string) => {
       void configService.removeSessionToken(environmentId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("removeSessionToken", err));
     },
     [configService],
   );
@@ -116,9 +125,10 @@ export function useEnvironments(): {
       void configService.setOpenCodeEndpoint(environmentId, endpoint).then(async (result) => {
         if (result.ok) {
           setEnvironments(await configService.getEnvironments());
+        } else {
+          handleConfigError("setOpenCodeEndpoint", `operation rejected: ${result.reason}`);
         }
-        // If !result.ok, the main process already showed a dialog — nothing to do here
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("setOpenCodeEndpoint", err));
     },
     [configService],
   );
@@ -127,7 +137,7 @@ export function useEnvironments(): {
     (environmentId: string) => {
       void configService.setMainVm(environmentId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch(() => {});
+      }).catch((err) => handleConfigError("setMainVm", err));
     },
     [configService],
   );
