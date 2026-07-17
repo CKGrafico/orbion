@@ -398,10 +398,20 @@ export interface VmWizardBridge {
 export type InboxItemKind =
   | "breach"
   | "failed-loop"
+  | "finished-loop"
   | "pending-approval"
   | "awaiting-input"
   | "instance-offline"
   | "prolonged-offline";
+
+/** Inline actions that can be performed on an inbox item without leaving the inbox. */
+export type InboxAction =
+  | "run-now"
+  | "pause"
+  | "resume"
+  | "restart"
+  | "dismiss"
+  | "open-in-chat";
 
 export interface InboxItem {
   id: string;
@@ -420,6 +430,10 @@ export interface InboxItem {
   outageSince?: string;
   /** Whether the user has dismissed / acknowledged the item. */
   dismissed: boolean;
+  /** Actions available for this item, derived from its kind and loop status. */
+  availableActions: InboxAction[];
+  /** Project ID for the item's loop (used to scope "Open in chat"). */
+  projectId?: string;
 }
 
 export type InboxItemResolutionReason =

@@ -100,7 +100,7 @@ export function App(): React.ReactNode {
         break;
       case "inbox-item":
         select(deepLink.environmentId);
-        if (deepLink.itemKind === "failed-loop" || deepLink.itemKind === "breach") {
+        if (deepLink.itemKind === "failed-loop" || deepLink.itemKind === "breach" || deepLink.itemKind === "finished-loop") {
           // These items reference a loop, but we don't have the loopId in inbox-item kind.
           // Navigate to the instance view where the inbox panel is visible.
           setView({ kind: "instance" });
@@ -700,6 +700,13 @@ export function App(): React.ReactNode {
               }}
               onDismissItem={(_itemId) => {
                 // Dismissal is handled internally by InboxPanel
+              }}
+              onOpenInChat={(item) => {
+                // Navigate to the item's environment so the chat panel is visible
+                select(item.environmentId);
+                setView({ kind: "instance" });
+                // The infra chat panel is already rendered in the main panel;
+                // selecting the environment scopes it to that instance.
               }}
             />
             <Sidebar

@@ -1,11 +1,15 @@
 import { injectable } from "inversify-hooks";
-import type { IInboxService, InboxBuildParams } from "../interfaces";
-import type { InboxItem, InboxQueryResult, ResolvedInboxItem, InboxItemResolutionReason } from "../../../../shared/ipc";
+import type { IInboxService, InboxBuildParams, IApiService, IConfigService } from "../interfaces";
+import type { InboxItem, InboxAction, InboxQueryResult, ResolvedInboxItem, InboxItemResolutionReason, ApiResponse } from "../../../../shared/ipc";
+import { cid, container } from "inversify-hooks";
 import { loopStatusToFleetItem } from "../../fleet-mapping";
+import type { LoopStatus } from "../../types";
 
 function getResolutionReasonForItem(item: InboxItem): InboxItemResolutionReason {
   switch (item.kind) {
     case "failed-loop":
+      return "loop-recovered";
+    case "finished-loop":
       return "loop-recovered";
     case "breach":
       return "breach-cleared";
@@ -27,6 +31,36 @@ function formatDuration(ms: number): string {
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
   return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+}
+
+/**
+ * Determine the available inline actions for an inbox item based on its kind
+ * and the loop's current status.
+ *
+ * Action mapping per the issue acceptance criteria:
+ * - Failure (failed-loop): Run now, Pause, Open in chat
+ * - Finished (finished-loop): Dismiss, Restart
+ * - Watch (breach): Dismiss, Open in chat
+ * - Offline (instance-offline, prolonged-offline): Dismiss only
+ * - Pending-approval / Awaiting-input: Open in chat
+ */
+function getAvailableActions(kind: InboxItem["kind"], _loopStatus?: LoopStatus): InboxAction[] {
+  switch (kind) {
+    case "failed-loop":
+      return ["run-now", "pause", "open-in-chat"];
+    case "finished-loop":
+      return ["dismiss", "restart"];
+    case "breach":
+      return ["dismiss", "open-in-chat"];
+    case "instance-offline":
+    case "prolonged-offline":
+      return ["dismiss"];
+    case "pending-approval":
+    case "awaiting-input":
+      return ["open-in-chat"];
+    default:
+      return ["dismiss"];
+  }
 }
 
 /**
@@ -57,13 +91,14 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
       environmentName: breach.environmentName,
       loopId: breach.loopId,
       title: breach.loopDescription,
-      detail: `${breach.runsToday}/${breach.threshold} runs${breach.autoPaused ? " · paused" : ""}`,
+      detail: `${breach.runsToday}/${breach.threshold} runs${breach.autoPaused ? " \u00b7 paused" : ""}`,
       occurredAt: breach.breachedAt,
       dismissed: false,
+      availableActions: getAvailableActions("breach"),
     });
   }
 
-  // 2. Failed loops across reachable instances
+  // 2. Loop-derived items across reachable instances
   for (const env of environments) {
     const health = perEnvHealth[env.id];
 
@@ -81,9 +116,10 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
           occurredAt: escalated.since,
           outageSince: escalated.since,
           dismissed: false,
+          availableActions: getAvailableActions("prolonged-offline"),
         });
       }
-      // Skip failed-loop scanning for unreachable instances
+      // Skip loop scanning for unreachable instances
       continue;
     }
 
@@ -100,6 +136,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
           detail: health === "blocked" ? "blocked" : "offline",
           occurredAt: new Date().toISOString(),
           dismissed: false,
+          availableActions: getAvailableActions("instance-offline"),
         });
       }
       continue;
@@ -107,23 +144,46 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
 
     const envLoops = perEnvLoops[env.id] ?? [];
     for (const loop of envLoops) {
-      const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
-      if (fleetItem !== "failed") continue;
+      // Finished loop: hit max-runs
+      const isFinished = loop.maxRuns !== null && loop.runCount >= loop.maxRuns;
+      // Failed loop: last run exited non-zero
+      const isFailed = loop.lastExitCode !== null && loop.lastExitCode !== 0;
 
-      const itemId = `failed-loop:${env.id}:${loop.id}`;
-      if (dismissedIds.has(itemId)) continue;
+      if (isFailed && !isFinished) {
+        const itemId = `failed-loop:${env.id}:${loop.id}`;
+        if (dismissedIds.has(itemId)) continue;
 
-      items.push({
-        id: itemId,
-        kind: "failed-loop",
-        environmentId: env.id,
-        environmentName: env.name,
-        loopId: loop.id,
-        title: loop.description?.trim() || loop.id,
-        detail: loop.lastExitCode !== null ? `exit ${loop.lastExitCode}` : undefined,
-        occurredAt: loop.lastRunAt ?? new Date().toISOString(),
-        dismissed: false,
-      });
+        items.push({
+          id: itemId,
+          kind: "failed-loop",
+          environmentId: env.id,
+          environmentName: env.name,
+          loopId: loop.id,
+          title: loop.description?.trim() || loop.id,
+          detail: loop.lastExitCode !== null ? `exit ${loop.lastExitCode}` : undefined,
+          occurredAt: loop.lastRunAt ?? new Date().toISOString(),
+          dismissed: false,
+          availableActions: getAvailableActions("failed-loop", loop.status),
+          projectId: loop.projectId,
+        });
+      } else if (isFinished) {
+        const itemId = `finished-loop:${env.id}:${loop.id}`;
+        if (dismissedIds.has(itemId)) continue;
+
+        items.push({
+          id: itemId,
+          kind: "finished-loop",
+          environmentId: env.id,
+          environmentName: env.name,
+          loopId: loop.id,
+          title: loop.description?.trim() || loop.id,
+          detail: `${loop.runCount}/${loop.maxRuns} runs`,
+          occurredAt: loop.lastRunAt ?? new Date().toISOString(),
+          dismissed: false,
+          availableActions: getAvailableActions("finished-loop"),
+          projectId: loop.projectId,
+        });
+      }
     }
   }
 
@@ -178,6 +238,8 @@ function answerFleetQuery(
         ? "budget breach"
         : item.kind === "failed-loop"
         ? "failed loop"
+        : item.kind === "finished-loop"
+        ? "finished loop"
         : item.kind === "instance-offline"
         ? "instance offline"
         : item.kind === "prolonged-offline"
@@ -292,6 +354,25 @@ function answerFleetQuery(
 
 @injectable()
 export class InboxService implements IInboxService {
+  private getConfigService(): IConfigService {
+    return container.resolve<IConfigService>(cid.IConfigService as unknown as string);
+  }
+
+  private getApiService(): IApiService {
+    return container.resolve<IApiService>(cid.IApiService as unknown as string);
+  }
+
+  private async resolveBaseUrl(environmentId: string): Promise<string> {
+    const envs = await this.getConfigService().getEnvironments();
+    const env = envs.find((e) => e.id === environmentId);
+    if (!env) return "";
+    if (env.activeEndpointId) {
+      const ep = env.endpoints.find((e) => e.id === env.activeEndpointId);
+      if (ep) return ep.url;
+    }
+    return env.endpoints.length > 0 ? env.endpoints[0].url : "";
+  }
+
   async getDismissedIds(): Promise<string[]> {
     if (!window.api) return [];
     // Dismissed IDs are tracked via inbox:dismissItem IPC
@@ -352,5 +433,66 @@ export class InboxService implements IInboxService {
     }
 
     return resolved;
+  }
+
+  async executeInboxAction(item: InboxItem, action: InboxAction): Promise<ApiResponse> {
+    // Dismiss is handled locally (no API call to loop-task)
+    if (action === "dismiss") {
+      await this.dismissItem(item.id);
+      return { ok: true, status: 200 };
+    }
+
+    // Open-in-chat is a navigation action, not an API call
+    // The caller handles it by navigating; we just confirm
+    if (action === "open-in-chat") {
+      return { ok: true, status: 200 };
+    }
+
+    // All other actions require a loop ID and environment
+    if (!item.loopId) {
+      return { ok: false, status: 400, error: "Item has no loop reference" };
+    }
+
+    const baseUrl = await this.resolveBaseUrl(item.environmentId);
+    if (!baseUrl) {
+      return { ok: false, status: 0, error: "Environment not found" };
+    }
+
+    switch (action) {
+      case "run-now":
+        return this.getApiService().request({
+          baseUrl,
+          path: `/api/loops/${encodeURIComponent(item.loopId)}/trigger`,
+          method: "POST",
+        });
+      case "pause":
+        return this.getApiService().request({
+          baseUrl,
+          path: `/api/loops/${encodeURIComponent(item.loopId)}/pause`,
+          method: "POST",
+        });
+      case "resume":
+        return this.getApiService().request({
+          baseUrl,
+          path: `/api/loops/${encodeURIComponent(item.loopId)}/resume`,
+          method: "POST",
+        });
+      case "restart": {
+        // Restart = resume a stopped/finished loop, then trigger it
+        const resumeResult = await this.getApiService().request({
+          baseUrl,
+          path: `/api/loops/${encodeURIComponent(item.loopId)}/resume`,
+          method: "POST",
+        });
+        if (!resumeResult.ok) return resumeResult;
+        return this.getApiService().request({
+          baseUrl,
+          path: `/api/loops/${encodeURIComponent(item.loopId)}/trigger`,
+          method: "POST",
+        });
+      }
+      default:
+        return { ok: false, status: 400, error: `Unknown action: ${action}` };
+    }
   }
 }

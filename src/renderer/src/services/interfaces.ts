@@ -24,6 +24,7 @@ import type {
   BudgetWatch,
   BudgetBreach,
   InboxItem,
+  InboxAction,
   InboxQueryResult,
   ResolvedInboxItem,
   InboxItemResolutionReason,
@@ -129,6 +130,8 @@ export interface IInboxService {
   pruneResolvedItems(): Promise<void>;
   /** Detect auto-resolved items by diffing previous and current active sets. Returns newly resolved items. */
   detectAutoResolutions(previousItems: InboxItem[], currentIds: Set<string>, dismissedIds: Set<string>): ResolvedInboxItem[];
+  /** Execute an inline action on an inbox item (e.g. pause, run-now, resume). */
+  executeInboxAction(item: InboxItem, action: InboxAction): Promise<ApiResponse>;
 }
 
 export interface InboxBuildParams {

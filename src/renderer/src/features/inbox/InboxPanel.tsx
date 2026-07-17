@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
-import type { InboxItem, InboxQueryResult, OutageEscalation, ResolvedInboxItem } from "../../../../shared/ipc";
+import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
-import { ArrowUp, CheckCircle2, Inbox, X, Search } from "lucide-react";
+import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
 import { timeAgo } from "../../format";
@@ -18,6 +18,8 @@ interface InboxPanelProps {
   escalatedOutages: Map<string, OutageEscalation>;
   onClickItem: (item: InboxItem) => void;
   onDismissItem: (itemId: string) => void;
+  /** Called when the user triggers "Open in chat" on an inbox item. */
+  onOpenInChat: (item: InboxItem) => void;
 }
 
 interface QueryTurn {
@@ -34,6 +36,7 @@ export function InboxPanel({
   escalatedOutages,
   onClickItem,
   onDismissItem,
+  onOpenInChat,
 }: InboxPanelProps): React.ReactNode {
   const intl = useIntl();
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
@@ -137,6 +140,17 @@ export function InboxPanel({
     [inboxService, onDismissItem],
   );
 
+  const handleExecuteAction = useCallback(
+    async (item: InboxItem, action: InboxAction) => {
+      const result = await inboxService.executeInboxAction(item, action);
+      if (action === "dismiss" && result.ok) {
+        setDismissedIds((prev) => new Set([...prev, item.id]));
+      }
+      // Action results are reflected on next poll cycle (5s) per existing architecture
+    },
+    [inboxService],
+  );
+
   const activeItemCount = items.length;
 
   return (
@@ -176,6 +190,8 @@ export function InboxPanel({
                     item={item}
                     onClick={onClickItem}
                     onDismiss={handleDismiss}
+                    onExecuteAction={handleExecuteAction}
+                    onOpenInChat={onOpenInChat}
                   />
                 ))}
               </div>
@@ -258,19 +274,63 @@ function InboxItemRow({
   item,
   onClick,
   onDismiss,
+  onExecuteAction,
+  onOpenInChat,
 }: {
   item: InboxItem;
   onClick: (item: InboxItem) => void;
   onDismiss: (itemId: string) => void;
+  onExecuteAction: (item: InboxItem, action: InboxAction) => Promise<void>;
+  onOpenInChat: (item: InboxItem) => void;
 }): React.ReactNode {
-  const kindIcon = item.kind === "breach" ? "!" : item.kind === "failed-loop" ? "x" : item.kind === "instance-offline" ? "-" : item.kind === "prolonged-offline" ? "⏻" : "?";
+  const intl = useIntl();
+  const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
+
+  const kindIcon = item.kind === "breach" ? "!" : item.kind === "failed-loop" ? "x" : item.kind === "finished-loop" ? "✓" : item.kind === "instance-offline" ? "-" : item.kind === "prolonged-offline" ? "⏻" : "?";
   const kindClass = item.kind === "breach" || item.kind === "failed-loop"
     ? "inbox-item-dot-danger"
+    : item.kind === "finished-loop"
+    ? "inbox-item-dot-success"
     : item.kind === "prolonged-offline"
     ? "inbox-item-dot-warning"
     : item.kind === "instance-offline"
     ? "inbox-item-dot-info"
     : "inbox-item-dot-info";
+
+  const handleAction = useCallback(async (action: InboxAction, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (executingAction) return;
+
+    if (action === "open-in-chat") {
+      onOpenInChat(item);
+      return;
+    }
+
+    setExecutingAction(action);
+    try {
+      await onExecuteAction(item, action);
+    } finally {
+      setExecutingAction(null);
+    }
+  }, [executingAction, item, onExecuteAction, onOpenInChat]);
+
+  const actionIcon = (action: InboxAction): React.ReactNode => {
+    switch (action) {
+      case "run-now": return <Play size={10} />;
+      case "pause": return <Pause size={10} />;
+      case "resume": return <Play size={10} />;
+      case "restart": return <RotateCw size={10} />;
+      case "dismiss": return <X size={10} />;
+      case "open-in-chat": return <MessageSquare size={10} />;
+    }
+  };
+
+  const actionLabel = (action: InboxAction): string => {
+    return intl.formatMessage({ id: `inbox.action.${action}` });
+  };
+
+  // Filter out dismiss — it already has its own button position
+  const inlineActions = item.availableActions.filter((a) => a !== "dismiss");
 
   return (
     <div
@@ -287,16 +347,40 @@ function InboxItemRow({
           {item.detail ? ` · ${item.detail}` : ""}
         </span>
       </div>
-      <button
-        className="icon-btn inbox-item-dismiss"
-        title="Dismiss"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDismiss(item.id);
-        }}
-      >
-        <X size={11} />
-      </button>
+      {/* Inline action buttons */}
+      {inlineActions.length > 0 || item.availableActions.includes("dismiss") ? (
+        <div className="inbox-item-actions">
+          {inlineActions.map((action) => (
+            <button
+              key={action}
+              className={`inbox-action-btn ${executingAction === action ? "inbox-action-btn-loading" : ""}`}
+              title={actionLabel(action)}
+              onClick={(e) => handleAction(action, e)}
+              disabled={executingAction !== null}
+            >
+              {executingAction === action ? (
+                <span className="inbox-action-spinner" />
+              ) : (
+                actionIcon(action)
+              )}
+              <span className="inbox-action-label">{actionLabel(action)}</span>
+            </button>
+          ))}
+          {item.availableActions.includes("dismiss") ? (
+            <button
+              className="icon-btn inbox-item-dismiss"
+              title={intl.formatMessage({ id: "inbox.action.dismiss" })}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss(item.id);
+              }}
+              disabled={executingAction !== null}
+            >
+              <X size={11} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

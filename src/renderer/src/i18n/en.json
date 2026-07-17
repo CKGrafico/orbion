@@ -505,6 +505,7 @@
     "itemNeedsAttention": "needs attention",
     "breach": "budget breach",
     "failedLoop": "failed loop",
+    "finishedLoop": "finished loop",
     "instanceOffline": "instance offline",
     "prolongedOffline": "prolonged outage",
     "tabActive": "Active",
@@ -513,6 +514,12 @@
     "resolution.loop-recovered": "loop recovered",
     "resolution.breach-cleared": "runs dropped below threshold",
     "resolution.instance-online": "instance came back online",
-    "resolution.outage-resolved": "instance reconnected after prolonged outage"
+    "resolution.outage-resolved": "instance reconnected after prolonged outage",
+    "action.run-now": "Run now",
+    "action.pause": "Pause",
+    "action.resume": "Resume",
+    "action.restart": "Restart",
+    "action.dismiss": "Dismiss",
+    "action.open-in-chat": "Chat"
   }
 }

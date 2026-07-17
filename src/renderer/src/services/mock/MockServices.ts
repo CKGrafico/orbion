@@ -21,6 +21,7 @@ import type {
   BudgetWatch,
   BudgetBreach,
   InboxItem,
+  InboxAction,
   InboxQueryResult,
   ResolvedInboxItem,
   InboxItemResolutionReason,
@@ -443,8 +444,6 @@ export class MockInboxService implements IInboxService {
   async getDismissedIds(): Promise<string[]> { return [...mockDismissedIds]; }
   async dismissItem(itemId: string): Promise<void> { mockDismissedIds.add(itemId); }
   buildItems(params: InboxBuildParams): InboxItem[] {
-    // Delegate to the real InboxService logic (imported statically)
-    // but for mock, we keep it simple with basic item derivation.
     const { perEnvLoops, perEnvHealth, environments, breaches } = params;
     const items: InboxItem[] = [];
 
@@ -460,6 +459,7 @@ export class MockInboxService implements IInboxService {
         detail: `${breach.runsToday}/${breach.threshold} runs`,
         occurredAt: breach.breachedAt,
         dismissed: false,
+        availableActions: ["dismiss", "open-in-chat"],
       });
     }
 
@@ -480,6 +480,7 @@ export class MockInboxService implements IInboxService {
             occurredAt: escalated.since,
             outageSince: escalated.since,
             dismissed: false,
+            availableActions: ["dismiss"],
           });
         }
         continue;
@@ -496,13 +497,17 @@ export class MockInboxService implements IInboxService {
             detail: "offline",
             occurredAt: new Date().toISOString(),
             dismissed: false,
+            availableActions: ["dismiss"],
           });
         }
         continue;
       }
       const envLoops = perEnvLoops[env.id] ?? [];
       for (const loop of envLoops) {
-        if (loop.lastExitCode !== null && loop.lastExitCode !== 0) {
+        const isFinished = loop.maxRuns !== null && loop.runCount >= loop.maxRuns;
+        const isFailed = loop.lastExitCode !== null && loop.lastExitCode !== 0;
+
+        if (isFailed && !isFinished) {
           const itemId = `failed-loop:${env.id}:${loop.id}`;
           if (mockDismissedIds.has(itemId)) continue;
           items.push({
@@ -515,6 +520,24 @@ export class MockInboxService implements IInboxService {
             detail: `exit ${loop.lastExitCode}`,
             occurredAt: loop.lastRunAt ?? new Date().toISOString(),
             dismissed: false,
+            availableActions: ["run-now", "pause", "open-in-chat"],
+            projectId: loop.projectId,
+          });
+        } else if (isFinished) {
+          const itemId = `finished-loop:${env.id}:${loop.id}`;
+          if (mockDismissedIds.has(itemId)) continue;
+          items.push({
+            id: itemId,
+            kind: "finished-loop",
+            environmentId: env.id,
+            environmentName: env.name,
+            loopId: loop.id,
+            title: loop.description?.trim() || loop.id,
+            detail: `${loop.runCount}/${loop.maxRuns} runs`,
+            occurredAt: loop.lastRunAt ?? new Date().toISOString(),
+            dismissed: false,
+            availableActions: ["dismiss", "restart"],
+            projectId: loop.projectId,
           });
         }
       }
@@ -575,6 +598,7 @@ export class MockInboxService implements IInboxService {
       let reason: InboxItemResolutionReason = "loop-recovered";
       switch (item.kind) {
         case "failed-loop":
+        case "finished-loop":
           reason = "loop-recovered";
           break;
         case "breach":
@@ -592,6 +616,14 @@ export class MockInboxService implements IInboxService {
     }
 
     return resolved;
+  }
+
+  async executeInboxAction(item: InboxItem, action: InboxAction): Promise<ApiResponse> {
+    // Mock: all actions succeed immediately
+    if (action === "dismiss") {
+      mockDismissedIds.add(item.id);
+    }
+    return { ok: true, status: 200 };
   }
 }
 
