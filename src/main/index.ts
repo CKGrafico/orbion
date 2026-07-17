@@ -28,7 +28,7 @@ import type {
   EditIssueParams,
   EditIssueResult,
 } from "../shared/ipc.js";
-import type { Environment, SessionScope } from "../shared/ipc.js";
+import type { Environment, SessionScope, NotificationSendArgs } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { classifyPlatform, parseGitRemoteOutput } from "./platform-classifier.js";
@@ -81,8 +81,11 @@ import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent
 import { msg } from "./i18n.js";
 import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
+import { NotificationService } from "./notification-service.js";
 
 const streams = new Map<string, AbortController>();
+
+const notificationService = new NotificationService();
 
 /** Cache: `${environmentId}:${projectId}` → detected platform. In-memory, session-scoped. */
 const platformCache = new Map<string, PlatformType>();
@@ -1243,11 +1246,31 @@ app.whenReady().then(() => {
     return { answer: "", references: [] };
   });
 
+  // ── Native OS notifications ─────────────────────────────────────────
+
+  safeHandle("notification:send", (_event, ...rawArgs): void => {
+    const [args] = validateIpc<[NotificationSendArgs]>("notification:send", rawArgs);
+    notificationService.send(args);
+  });
+
+  safeHandle("notification:setMuted", (_event, ...rawArgs): void => {
+    const [muted] = validateIpc<[boolean]>("notification:setMuted", rawArgs);
+    notificationService.setMuted(muted);
+  });
+
+  safeHandle("notification:isMuted", (): boolean => {
+    validateIpc("notification:isMuted", []);
+    return notificationService.isMuted();
+  });
+
   // Prune old breaches on startup
   void pruneOldBreaches();
 
   void autoPromoteFirstEnvIfNeeded();
   createWindow();
+
+  // Dispatch any pending deep-link from a cold-start notification click
+  setTimeout(() => notificationService.dispatchPendingDeepLink(), 1500);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

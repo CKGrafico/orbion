@@ -1,0 +1,14 @@
+- [ ] 1.1 Add NotificationBridge type and IPC channel types to src/shared/ipc.ts <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/shared/ipc.ts] -->
+- [ ] 1.2 Add notification:send, notification:setMuted, notification:isMuted IPC handlers in src/main/index.ts <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/main/index.ts] -->
+- [ ] 1.3 Create src/main/notification-service.ts with Electron Notification, DND check, deep-link dispatch, mute persistence, and cold-start pending-link <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/main/notification-service.ts] -->
+- [ ] 1.4 Wire notification-service into src/main/index.ts and add notification:navigate renderer listener <!-- agent: frontend-engineer.build, depends_on: [1.3, 1.2], touches: [src/main/index.ts] -->
+- [ ] 2.1 Add notification bridge methods to src/preload/index.ts <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/preload/index.ts] -->
+- [ ] 3.1 Update INotificationService interface in src/renderer/src/services/interfaces.ts with deep-link, mute, and onFocusItem <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/renderer/src/services/interfaces.ts] -->
+- [ ] 3.2 Rewrite NotificationService impl to use IPC bridge (notification:send, etc.) <!-- agent: frontend-engineer.build, depends_on: [3.1, 2.1], touches: [src/renderer/src/services/impl/NotificationService.ts] -->
+- [ ] 3.3 Update MockNotificationService to match new interface <!-- agent: frontend-engineer.fast, depends_on: [3.1], touches: [src/renderer/src/services/mock/MockServices.ts] -->
+- [ ] 3.4 Remove old use-notifications.ts bridge (NotificationBridge, createNotificationBridge, fireNotification) <!-- agent: frontend-engineer.fast, depends_on: [3.2], touches: [src/renderer/src/use-notifications.ts] -->
+- [ ] 4.1 Update App.tsx to use INotificationService instead of createNotificationBridge, wire onFocusItem for deep-link navigation, add global mute toggle UI <!-- agent: frontend-engineer.build, depends_on: [3.2, 3.4], touches: [src/renderer/src/App.tsx] -->
+- [ ] 4.2 Add i18n keys for notification mute toggle and deep-link labels <!-- agent: frontend-engineer.fast, depends_on: [4.1], touches: [src/renderer/src/i18n/**] -->
+- [ ] 5.1 Add pendingDeepLink to config-store schema and cold-start recovery <!-- agent: frontend-engineer.build, depends_on: [1.3], touches: [src/main/config-store.ts] -->
+- [ ] 6.1 Add mute+globalMute persistence to config-store and IPC handlers <!-- agent: frontend-engineer.build, depends_on: [1.1, 5.1], touches: [src/main/config-store.ts, src/main/index.ts] -->
+- [ ] 7.1 Run pnpm typecheck and fix errors <!-- agent: frontend-engineer.fast, depends_on: [4.1, 4.2, 5.1, 6.1], touches: [] -->

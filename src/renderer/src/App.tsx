@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -10,9 +10,9 @@ import { OrbionMark } from "./components/OrbionMark";
 import { fetchLoops, fetchProjects, fetchSettings, isMock } from "./api";
 import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
-import { createNotificationBridge } from "./use-notifications";
+import { useNativeNotifications } from "./use-notifications";
 import { useBudgetWatch } from "./use-budget-watch";
-import { PanelLeft, RotateCw, X, Star } from "lucide-react";
+import { PanelLeft, RotateCw, X, Star, BellOff, Bell } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
 import { LoopDetail } from "./components/LoopDetail";
@@ -86,24 +86,52 @@ export function App(): React.ReactNode {
 
   const { isUnread, markVisited } = useUnreadTracker();
 
-  const notificationBridge = useMemo(
-    () => {
-      const bridge = createNotificationBridge((envId, itemId, itemType) => {
-        select(envId);
-        if (itemType === "loop") {
-          setView({ kind: "loop", loopId: itemId });
+  // Deep-link navigation handler for notification clicks
+  const handleNotificationNavigate = useCallback((deepLink: DeepLinkTarget) => {
+    switch (deepLink.kind) {
+      case "loop":
+        select(deepLink.environmentId);
+        setView({ kind: "loop", loopId: deepLink.loopId });
+        break;
+      case "instance":
+        select(deepLink.environmentId);
+        setView({ kind: "instance" });
+        break;
+      case "inbox-item":
+        select(deepLink.environmentId);
+        if (deepLink.itemKind === "failed-loop" || deepLink.itemKind === "breach") {
+          // These items reference a loop, but we don't have the loopId in inbox-item kind.
+          // Navigate to the instance view where the inbox panel is visible.
+          setView({ kind: "instance" });
         } else {
           setView({ kind: "instance" });
         }
-      });
-      return bridge;
-    },
-    [select],
-  );
+        break;
+    }
+  }, [select]);
+
+  const { notificationService, sendInboxNotification } = useNativeNotifications(handleNotificationNavigate);
+
+  const [globalMuted, setGlobalMuted] = useState(false);
+
+  // Load mute state on mount
+  useEffect(() => {
+    let cancelled = false;
+    void notificationService.isMuted().then((muted) => {
+      if (!cancelled) setGlobalMuted(muted);
+    });
+    return () => { cancelled = true; };
+  }, [notificationService]);
+
+  const handleToggleGlobalMute = useCallback(() => {
+    const next = !globalMuted;
+    setGlobalMuted(next);
+    void notificationService.setMuted(next);
+  }, [globalMuted, notificationService]);
 
   // Budget watch — breach detection and notifications
   const handleBudgetBreach = useCallback((breach: BudgetBreach) => {
-    notificationBridge.sendNotification({
+    void sendInboxNotification({
       environmentId: breach.environmentId,
       environmentName: breach.environmentName,
       itemId: breach.loopId,
@@ -114,7 +142,7 @@ export function App(): React.ReactNode {
         { loopName: breach.loopDescription, threshold: breach.threshold, count: breach.runsToday, autoPause: breach.autoPaused },
       ),
     });
-  }, [notificationBridge]);
+  }, [sendInboxNotification]);
 
   const budgetWatch = useBudgetWatch(perEnvLoops, environments, handleBudgetBreach);
 
@@ -240,7 +268,7 @@ export function App(): React.ReactNode {
       const prev = prevFleetStatus.current[env.id];
       if (current !== prev && isNotifiableStatus(current) && prev !== undefined) {
         if (!mutedEnvs.has(env.id)) {
-          notificationBridge.sendNotification({
+          void sendInboxNotification({
             environmentId: env.id,
             environmentName: env.name,
             itemId: env.id,
@@ -252,17 +280,16 @@ export function App(): React.ReactNode {
       }
     }
     prevFleetStatus.current = { ...fleetStatus };
-  }, [fleetStatus, environments, notificationBridge, mutedEnvs]);
+  }, [fleetStatus, environments, sendInboxNotification, mutedEnvs]);
 
   const handleToggleMute = useCallback((environmentId: string) => {
     setMutedEnvs((prev) => {
       const next = new Set(prev);
       if (next.has(environmentId)) next.delete(environmentId);
       else next.add(environmentId);
-      notificationBridge.setMuted(environmentId, next.has(environmentId));
       return next;
     });
-  }, [notificationBridge]);
+  }, []);
 
   // Fetch loops for the selected environment (polling every 5s)
   useEffect(() => {
@@ -600,6 +627,15 @@ export function App(): React.ReactNode {
           {intl.formatMessage({ id: "app.brand" })}
         </span>
         <span className="titlebar-tag">{isMock ? intl.formatMessage({ id: "app.mock" }) : intl.formatMessage({ id: "app.preview" })}</span>
+        <span style={{ flex: 1 }} />
+        <button
+          className="icon-btn"
+          title={globalMuted ? intl.formatMessage({ id: "app.unmuteNotifications" }) : intl.formatMessage({ id: "app.muteNotifications" })}
+          onClick={handleToggleGlobalMute}
+          style={{ opacity: globalMuted ? 1 : 0.5, color: globalMuted ? "var(--danger)" : "var(--text-secondary)" }}
+        >
+          {globalMuted ? <BellOff size={14} /> : <Bell size={14} />}
+        </button>
       </div>
 
       <div className="body">

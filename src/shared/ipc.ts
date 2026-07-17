@@ -474,6 +474,65 @@ export interface BudgetBridge {
   dismissBreach: (breachId: string) => Promise<void>;
 }
 
+// ── Condition watch (ping-me-when) ────────────────────────────────────
+
+/** Conditions Orbion can actually observe. The agent must decline others. */
+export type WatchConditionKind =
+  | "status-transition"
+  | "reachability-change";
+
+/** Target for a watch: which loop/instance to monitor. */
+export type WatchTarget =
+  | { kind: "loop"; loopId: string; environmentId: string }
+  | { kind: "instance"; environmentId: string };
+
+export interface WatchCondition {
+  kind: WatchConditionKind;
+  targetStatus?: string;
+  description: string;
+}
+
+export interface ConditionWatch {
+  id: string;
+  target: WatchTarget;
+  condition: WatchCondition;
+  tripped: boolean;
+  createdAt: string;
+  trippedAt: string | null;
+}
+
+export interface ConditionWatchBridge {
+  getWatches: () => Promise<ConditionWatch[]>;
+  addWatch: (watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">) => Promise<ConditionWatch>;
+  removeWatch: (watchId: string) => Promise<void>;
+  tripWatch: (watchId: string) => Promise<void>;
+}
+
+// ── Native OS notifications ─────────────────────────────────────────
+
+export type DeepLinkTarget =
+  | { kind: "loop"; environmentId: string; loopId: string }
+  | { kind: "instance"; environmentId: string }
+  | { kind: "inbox-item"; environmentId: string; itemKind: InboxItemKind; itemId: string };
+
+export interface NotificationSendArgs {
+  title: string;
+  body: string;
+  /** Tag prevents duplicate notifications for the same event. */
+  tag?: string;
+  /** Deep-link target: clicking the notification navigates here. */
+  deepLink?: DeepLinkTarget;
+  /** If true, skip the notification when the window is focused. */
+  suppressIfFocused?: boolean;
+}
+
+export interface NotificationBridge {
+  send: (args: NotificationSendArgs) => Promise<void>;
+  setMuted: (muted: boolean) => Promise<void>;
+  isMuted: () => Promise<boolean>;
+  onClick: (cb: (deepLink: DeepLinkTarget) => void) => () => void;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -504,4 +563,6 @@ export interface LoopTaskBridge {
   infra: InfraBridge;
   budget: BudgetBridge;
   inbox: InboxBridge;
+  watch: ConditionWatchBridge;
+  notification: NotificationBridge;
 }

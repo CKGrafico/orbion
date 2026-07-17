@@ -30,7 +30,9 @@
     "removeCancel": "Cancel",
     "removeConfirmBtn": "Remove",
     "markAsMainTooltip": "Mark as main VM, this environment will be used for the AI chat assistant",
-    "isMainTooltip": "This is your main VM (used for AI chat)"
+    "isMainTooltip": "This is your main VM (used for AI chat)",
+    "muteNotifications": "Mute notifications",
+    "unmuteNotifications": "Unmute notifications"
   },
   "sidebar": {
     "addEnvironment": "Add Environment",
