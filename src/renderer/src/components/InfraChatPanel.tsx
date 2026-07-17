@@ -51,7 +51,7 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
   }
 
   const labelFilter = result.issues.length > 0 && result.issues[0].labels.length > 0
-    ? result.issues[0].labels[0]
+    ? escapeMd(result.issues[0].labels[0])
     : undefined;
 
   const lines: string[] = [
@@ -64,9 +64,9 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
 
   for (const issue of result.issues) {
     const labelChips = issue.labels.length > 0
-      ? " " + issue.labels.map((l) => `\`${l}\``).join(" ")
+      ? " " + issue.labels.map((l) => `\`${escapeMd(l)}\``).join(" ")
       : "";
-    lines.push(`- [#${issue.number}](issue://${issue.number}) ${issue.title}${labelChips}`);
+    lines.push(`- [#${issue.number}](issue://${issue.number}) ${escapeMd(issue.title)}${labelChips}`);
   }
 
   if (result.truncated) {
