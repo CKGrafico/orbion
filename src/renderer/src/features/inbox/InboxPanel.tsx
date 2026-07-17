@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
-import type { InboxItem, InboxQueryResult, OutageEscalation } from "../../../../shared/ipc";
+import type { InboxItem, InboxQueryResult, OutageEscalation, ResolvedInboxItem } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
-import { ArrowUp, Inbox, X, Search } from "lucide-react";
+import { ArrowUp, CheckCircle2, Inbox, X, Search } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
+import { timeAgo } from "../../format";
 
 interface InboxPanelProps {
   perEnvLoops: Record<string, LoopMeta[]>;
@@ -40,6 +41,8 @@ export function InboxPanel({
   const [queryText, setQueryText] = useState("");
   const [queryTurns, setQueryTurns] = useState<QueryTurn[]>([]);
   const [isQuerying, setIsQuerying] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const [resolvedItems, setResolvedItems] = useState<ResolvedInboxItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load dismissed IDs on mount
@@ -52,6 +55,17 @@ export function InboxPanel({
     return () => { cancelled = true; };
   }, [inboxService]);
 
+  // Load resolved items when Done tab is active
+  useEffect(() => {
+    if (!showDone) return;
+    let cancelled = false;
+    void inboxService.getResolvedItems().then((items) => {
+      if (cancelled) return;
+      setResolvedItems(items);
+    });
+    return () => { cancelled = true; };
+  }, [inboxService, showDone]);
+
   // Build inbox items from live data
   const buildParams = useMemo<InboxBuildParams>(() => ({
     perEnvLoops,
@@ -63,6 +77,22 @@ export function InboxPanel({
   }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages]);
 
   const items = useMemo(() => inboxService.buildItems(buildParams), [inboxService, buildParams]);
+
+  // Auto-resolution detection: diff previous and current active items
+  const prevItemsRef = useRef<InboxItem[]>([]);
+  useEffect(() => {
+    const prevItems = prevItemsRef.current;
+    const currentIds = new Set(items.map((i) => i.id));
+    const autoResolved = inboxService.detectAutoResolutions(prevItems, currentIds, dismissedIds);
+
+    if (autoResolved.length > 0) {
+      for (const resolved of autoResolved) {
+        void inboxService.resolveItem(resolved);
+      }
+    }
+
+    prevItemsRef.current = items;
+  }, [items, inboxService, dismissedIds]);
 
   // Handle submitting a query
   const handleSubmitQuery = useCallback(() => {
@@ -114,49 +144,86 @@ export function InboxPanel({
       <div className="inbox-header">
         <Inbox size={14} />
         <span className="overline">{intl.formatMessage({ id: "inbox.title" })}</span>
-        {activeItemCount > 0 ? (
+        {activeItemCount > 0 && !showDone ? (
           <span className="chip inbox-count">{activeItemCount}</span>
         ) : null}
+        <div className="inbox-tabs">
+          <button
+            className={`inbox-tab ${!showDone ? "inbox-tab-active" : ""}`}
+            onClick={() => setShowDone(false)}
+          >
+            {intl.formatMessage({ id: "inbox.tabActive" })}
+          </button>
+          <button
+            className={`inbox-tab ${showDone ? "inbox-tab-active" : ""}`}
+            onClick={() => setShowDone(true)}
+          >
+            {intl.formatMessage({ id: "inbox.tabDone" })}
+          </button>
+        </div>
       </div>
 
       {/* Query conversation area */}
       <div className="inbox-scroll" ref={scrollRef}>
-        {/* Active items list */}
-        {items.length > 0 && queryTurns.length === 0 ? (
-          <div className="inbox-items-list">
-            {items.map((item) => (
-              <InboxItemRow
-                key={item.id}
-                item={item}
-                onClick={onClickItem}
-                onDismiss={handleDismiss}
-              />
+        {!showDone ? (
+          <>
+            {/* Active items list */}
+            {items.length > 0 && queryTurns.length === 0 ? (
+              <div className="inbox-items-list">
+                {items.map((item) => (
+                  <InboxItemRow
+                    key={item.id}
+                    item={item}
+                    onClick={onClickItem}
+                    onDismiss={handleDismiss}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {/* Query turns */}
+            {queryTurns.map((turn) => (
+              <div key={turn.id} className="inbox-query-turn">
+                <div className="inbox-query-question">
+                  <span className="inbox-query-icon">?</span>
+                  <span>{turn.question}</span>
+                </div>
+                <div className="inbox-query-answer">
+                  <InboxAnswerContent
+                    answer={turn.result.answer}
+                    references={turn.result.references}
+                    onClickReference={onClickItem}
+                  />
+                </div>
+              </div>
             ))}
-          </div>
-        ) : null}
 
-        {/* Query turns */}
-        {queryTurns.map((turn) => (
-          <div key={turn.id} className="inbox-query-turn">
-            <div className="inbox-query-question">
-              <span className="inbox-query-icon">?</span>
-              <span>{turn.question}</span>
-            </div>
-            <div className="inbox-query-answer">
-              <InboxAnswerContent
-                answer={turn.result.answer}
-                references={turn.result.references}
-                onClickReference={onClickItem}
-              />
-            </div>
-          </div>
-        ))}
-
-        {items.length === 0 && queryTurns.length === 0 ? (
-          <div className="inbox-empty">
-            <p>{intl.formatMessage({ id: "inbox.emptyMessage" })}</p>
-          </div>
-        ) : null}
+            {items.length === 0 && queryTurns.length === 0 ? (
+              <div className="inbox-empty">
+                <p>{intl.formatMessage({ id: "inbox.emptyMessage" })}</p>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {/* Done / Resolved items list */}
+            {resolvedItems.length > 0 ? (
+              <div className="inbox-items-list">
+                {resolvedItems.map((ri) => (
+                  <ResolvedItemRow
+                    key={ri.item.id}
+                    resolved={ri}
+                    intl={intl}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="inbox-empty">
+                <p>{intl.formatMessage({ id: "inbox.doneEmptyMessage" })}</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Composer */}
@@ -230,6 +297,35 @@ function InboxItemRow({
       >
         <X size={11} />
       </button>
+    </div>
+  );
+}
+
+/** Resolved inbox item row for the Done view */
+function ResolvedItemRow({
+  resolved,
+  intl,
+}: {
+  resolved: ResolvedInboxItem;
+  intl: ReturnType<typeof useIntl>;
+}): React.ReactNode {
+  const { item, resolvedAt, resolution } = resolved;
+  const reasonText = intl.formatMessage({ id: `inbox.resolution.${resolution}` });
+  const resolvedAgo = timeAgo(resolvedAt);
+
+  return (
+    <div className="inbox-item-row inbox-item-row-resolved">
+      <span className="inbox-item-dot inbox-item-dot-resolved">
+        <CheckCircle2 size={11} />
+      </span>
+      <div className="inbox-item-info">
+        <span className="inbox-item-title">{item.title}</span>
+        <span className="inbox-item-meta">
+          {item.environmentName}
+          {item.detail ? ` · ${item.detail}` : ""}
+          {" · "}{reasonText} · {resolvedAgo}
+        </span>
+      </div>
     </div>
   );
 }

@@ -422,6 +422,21 @@ export interface InboxItem {
   dismissed: boolean;
 }
 
+export type InboxItemResolutionReason =
+  | "loop-recovered"
+  | "breach-cleared"
+  | "instance-online"
+  | "outage-resolved";
+
+export interface ResolvedInboxItem {
+  /** The original inbox item data at the time of resolution. */
+  item: InboxItem;
+  /** ISO timestamp when the item was auto-resolved. */
+  resolvedAt: string;
+  /** Machine-readable reason the item resolved. */
+  resolution: InboxItemResolutionReason;
+}
+
 export interface InboxQueryResult {
   /** Markdown-formatted answer. */
   answer: string;
@@ -433,6 +448,12 @@ export interface InboxBridge {
   getItems: () => Promise<InboxItem[]>;
   dismissItem: (itemId: string) => Promise<void>;
   queryFleet: (question: string) => Promise<InboxQueryResult>;
+  /** Persist a resolved item to the Done archive. */
+  resolveItem: (resolved: ResolvedInboxItem) => Promise<void>;
+  /** Get all resolved items (within retention window). */
+  getResolvedItems: () => Promise<ResolvedInboxItem[]>;
+  /** Prune resolved items older than 30 days. */
+  pruneResolvedItems: () => Promise<void>;
 }
 
 // ── Prolonged-outage escalation ────────────────────────────────────

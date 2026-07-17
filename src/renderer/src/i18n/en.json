@@ -506,6 +506,13 @@
     "breach": "budget breach",
     "failedLoop": "failed loop",
     "instanceOffline": "instance offline",
-    "prolongedOffline": "prolonged outage"
+    "prolongedOffline": "prolonged outage",
+    "tabActive": "Active",
+    "tabDone": "Done",
+    "doneEmptyMessage": "No resolved items in the last 30 days.",
+    "resolution.loop-recovered": "loop recovered",
+    "resolution.breach-cleared": "runs dropped below threshold",
+    "resolution.instance-online": "instance came back online",
+    "resolution.outage-resolved": "instance reconnected after prolonged outage"
   }
 }

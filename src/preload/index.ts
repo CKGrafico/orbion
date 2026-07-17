@@ -23,6 +23,7 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ResolvedInboxItem,
   ConditionWatch,
   NotificationSendArgs,
   DeepLinkTarget,
@@ -201,6 +202,12 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("inbox:dismissItem", itemId) as Promise<void>,
     queryFleet: (question: string) =>
       ipcRenderer.invoke("inbox:queryFleet", question) as Promise<InboxQueryResult>,
+    resolveItem: (resolved: ResolvedInboxItem) =>
+      ipcRenderer.invoke("inbox:resolveItem", resolved) as Promise<void>,
+    getResolvedItems: () =>
+      ipcRenderer.invoke("inbox:getResolvedItems") as Promise<ResolvedInboxItem[]>,
+    pruneResolvedItems: () =>
+      ipcRenderer.invoke("inbox:pruneResolvedItems") as Promise<void>,
   },
 
   watch: {

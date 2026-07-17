@@ -22,6 +22,8 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ResolvedInboxItem,
+  InboxItemResolutionReason,
   ConditionWatch,
   DeepLinkTarget,
   NotificationSendArgs,
@@ -434,6 +436,7 @@ export class MockBudgetService implements IBudgetService {
 }
 
 let mockDismissedIds: Set<string> = new Set();
+let mockResolvedItems: ResolvedInboxItem[] = [];
 
 @injectable()
 export class MockInboxService implements IInboxService {
@@ -533,6 +536,62 @@ export class MockInboxService implements IInboxService {
       lines.push(`- [${item.title}](inbox://${item.id}) on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
     }
     return { answer: lines.join("\n"), references: refs };
+  }
+
+  async resolveItem(resolved: ResolvedInboxItem): Promise<void> {
+    if (!mockResolvedItems.some((ri) => ri.item.id === resolved.item.id)) {
+      mockResolvedItems.push(resolved);
+    }
+  }
+
+  async getResolvedItems(): Promise<ResolvedInboxItem[]> {
+    // Prune items older than 30 days
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1_000;
+    mockResolvedItems = mockResolvedItems.filter(
+      (ri) => new Date(ri.resolvedAt).getTime() >= cutoff,
+    );
+    return mockResolvedItems;
+  }
+
+  async pruneResolvedItems(): Promise<void> {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1_000;
+    mockResolvedItems = mockResolvedItems.filter(
+      (ri) => new Date(ri.resolvedAt).getTime() >= cutoff,
+    );
+  }
+
+  detectAutoResolutions(
+    previousItems: InboxItem[],
+    currentIds: Set<string>,
+    dismissedIds: Set<string>,
+  ): ResolvedInboxItem[] {
+    const resolved: ResolvedInboxItem[] = [];
+    const now = new Date().toISOString();
+
+    for (const item of previousItems) {
+      if (currentIds.has(item.id)) continue;
+      if (dismissedIds.has(item.id)) continue;
+
+      let reason: InboxItemResolutionReason = "loop-recovered";
+      switch (item.kind) {
+        case "failed-loop":
+          reason = "loop-recovered";
+          break;
+        case "breach":
+          reason = "breach-cleared";
+          break;
+        case "instance-offline":
+          reason = "instance-online";
+          break;
+        case "prolonged-offline":
+          reason = "outage-resolved";
+          break;
+      }
+
+      resolved.push({ item, resolvedAt: now, resolution: reason });
+    }
+
+    return resolved;
   }
 }
 

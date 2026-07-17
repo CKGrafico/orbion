@@ -25,6 +25,8 @@ import type {
   BudgetBreach,
   InboxItem,
   InboxQueryResult,
+  ResolvedInboxItem,
+  InboxItemResolutionReason,
   ConditionWatch,
   DeepLinkTarget,
   NotificationSendArgs,
@@ -119,6 +121,14 @@ export interface IInboxService {
   dismissItem(itemId: string): Promise<void>;
   buildItems(params: InboxBuildParams): InboxItem[];
   queryFleet(question: string, params: InboxBuildParams): InboxQueryResult;
+  /** Persist a resolved item to the Done archive. */
+  resolveItem(resolved: ResolvedInboxItem): Promise<void>;
+  /** Get all resolved items (within retention window). */
+  getResolvedItems(): Promise<ResolvedInboxItem[]>;
+  /** Prune resolved items older than 30 days. */
+  pruneResolvedItems(): Promise<void>;
+  /** Detect auto-resolved items by diffing previous and current active sets. Returns newly resolved items. */
+  detectAutoResolutions(previousItems: InboxItem[], currentIds: Set<string>, dismissedIds: Set<string>): ResolvedInboxItem[];
 }
 
 export interface InboxBuildParams {

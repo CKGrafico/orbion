@@ -1,7 +1,22 @@
 import { injectable } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../interfaces";
-import type { InboxItem, InboxQueryResult } from "../../../../shared/ipc";
+import type { InboxItem, InboxQueryResult, ResolvedInboxItem, InboxItemResolutionReason } from "../../../../shared/ipc";
 import { loopStatusToFleetItem } from "../../fleet-mapping";
+
+function getResolutionReasonForItem(item: InboxItem): InboxItemResolutionReason {
+  switch (item.kind) {
+    case "failed-loop":
+      return "loop-recovered";
+    case "breach":
+      return "breach-cleared";
+    case "instance-offline":
+      return "instance-online";
+    case "prolonged-offline":
+      return "outage-resolved";
+    default:
+      return "loop-recovered";
+  }
+}
 
 function formatDuration(ms: number): string {
   const totalMin = Math.round(ms / 60_000);
@@ -298,5 +313,44 @@ export class InboxService implements IInboxService {
   queryFleet(question: string, params: InboxBuildParams): InboxQueryResult {
     const items = this.buildItems(params);
     return answerFleetQuery(question, items, params);
+  }
+
+  async resolveItem(resolved: ResolvedInboxItem): Promise<void> {
+    if (!window.api) return;
+    await window.api.inbox.resolveItem(resolved);
+  }
+
+  async getResolvedItems(): Promise<ResolvedInboxItem[]> {
+    if (!window.api) return [];
+    return window.api.inbox.getResolvedItems();
+  }
+
+  async pruneResolvedItems(): Promise<void> {
+    if (!window.api) return;
+    await window.api.inbox.pruneResolvedItems();
+  }
+
+  detectAutoResolutions(
+    previousItems: InboxItem[],
+    currentIds: Set<string>,
+    dismissedIds: Set<string>,
+  ): ResolvedInboxItem[] {
+    const resolved: ResolvedInboxItem[] = [];
+    const now = new Date().toISOString();
+
+    for (const item of previousItems) {
+      // Skip if still active in current set
+      if (currentIds.has(item.id)) continue;
+      // Skip if the user explicitly dismissed it (that's not auto-resolution)
+      if (dismissedIds.has(item.id)) continue;
+
+      resolved.push({
+        item,
+        resolvedAt: now,
+        resolution: getResolutionReasonForItem(item),
+      });
+    }
+
+    return resolved;
   }
 }

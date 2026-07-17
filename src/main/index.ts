@@ -28,6 +28,7 @@ import type {
   EditIssueParams,
   EditIssueResult,
   OutageEscalation,
+  ResolvedInboxItem,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -66,6 +67,9 @@ import {
   dismissBudgetBreach,
   pruneOldBreaches,
   dismissInboxItem,
+  addResolvedItem,
+  getResolvedItems,
+  pruneResolvedItems,
   getProjectPickupLabels,
   setProjectPickupLabels,
 } from "./config-store.js";
@@ -1278,6 +1282,20 @@ app.whenReady().then(() => {
     // can filter out acknowledged items.
     // Return minimal result; the renderer InboxService enriches it
     return { answer: "", references: [] };
+  });
+
+  safeHandle("inbox:resolveItem", async (_event, ...rawArgs): Promise<void> => {
+    const [resolved] = validateIpc<[ResolvedInboxItem]>("inbox:resolveItem", rawArgs);
+    await addResolvedItem(resolved);
+  });
+
+  safeHandle("inbox:getResolvedItems", (): ResolvedInboxItem[] => {
+    validateIpc("inbox:getResolvedItems", []);
+    return getResolvedItems();
+  });
+
+  safeHandle("inbox:pruneResolvedItems", async (): Promise<void> => {
+    await pruneResolvedItems();
   });
 
   // ── Native OS notifications ─────────────────────────────────────────
