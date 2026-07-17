@@ -1,7 +1,7 @@
 # Fleet Activity Readout for Agent Loops
 
 **Issue:** #135
-**Status:** in-progress
+**Status:** done
 
 ## Problem
 
