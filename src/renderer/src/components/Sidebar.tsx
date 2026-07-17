@@ -4,12 +4,13 @@ import type { ConnectionStatus } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
-import { X, Plus, ChevronRight, Search, ArrowUpDown, Link } from "lucide-react";
+import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
 import { translateMessage } from "../i18n";
 
 type View =
+  | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
   | { kind: "loop"; loopId: string };
@@ -88,11 +89,13 @@ export function Sidebar(props: {
   onNavigate: (view: View) => void;
   onAddVm?: () => void;
   fleetActivityEnabled?: boolean;
+  /** Number of unread inbox items (drives the badge). */
+  inboxItemCount?: number;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
-    onSelect, onAddVm, fleetActivityEnabled,
+    onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
   } = props;
   const intl = useIntl();
 
@@ -198,6 +201,22 @@ export function Sidebar(props: {
 
   return (
     <div className="sidebar">
+      {/* Inbox entry — fleet-wide, above projects */}
+      <div
+        className={`sidebar-inbox-entry${view.kind === "inbox" ? " selected" : ""}`}
+        onClick={() => onNavigate({ kind: "inbox" })}
+        role="button"
+        tabIndex={0}
+      >
+        <span className="sidebar-inbox-icon"><Inbox size={14} /></span>
+        <span className="sidebar-inbox-label">{intl.formatMessage({ id: "sidebar.inbox" })}</span>
+        {(inboxItemCount ?? 0) > 0 ? (
+          <span className="sidebar-inbox-badge">{inboxItemCount}</span>
+        ) : null}
+      </div>
+
+      <div className="sidebar-divider" />
+
       {/* Search input */}
       <div className="sidebar-search-wrap">
         <Search size={13} className="sidebar-search-icon" />

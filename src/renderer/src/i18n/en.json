@@ -81,7 +81,8 @@
     "noSearchResults": "No results",
     "sort": "Sort",
     "connectInstance": "Connect instance",
-    "newProject": "New project"
+    "newProject": "New project",
+    "inbox": "Inbox"
   },
   "vmWizard": {
     "stepPickTarget": "Pick target",
@@ -499,7 +500,7 @@
   },
   "inbox": {
     "title": "Inbox",
-    "emptyMessage": "All clear! Ask a question about your fleet below.",
+    "emptyMessage": "The fleet is quiet — nothing needs you right now.",
     "queryPlaceholder": "Ask about your fleet…",
     "sendQuery": "Ask",
     "itemNeedsAttention": "needs attention",
@@ -520,6 +521,10 @@
     "action.resume": "Resume",
     "action.restart": "Restart",
     "action.dismiss": "Dismiss",
-    "action.open-in-chat": "Chat"
+    "action.open-in-chat": "Chat",
+    "viewTitle": "Inbox",
+    "viewDescription": "Fleet-wide notifications — things that happened while you weren't looking.",
+    "itemTimestamp": "{time}",
+    "itemSourceProject": "{project} on {instance}"
   }
 }

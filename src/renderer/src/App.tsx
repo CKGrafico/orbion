@@ -19,15 +19,16 @@ import { LoopDetail } from "./components/LoopDetail";
 import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
-import { InboxPanel } from "./features/inbox/InboxPanel";
+import { InboxView } from "./features/inbox/InboxView";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, InboxBuildParams } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 
 type View =
+  | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
   | { kind: "loop"; loopId: string };
@@ -68,6 +69,7 @@ export function App(): React.ReactNode {
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
   const [outageService] = useInject<IOutageService>(cid.IOutageService);
+  const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -84,6 +86,7 @@ export function App(): React.ReactNode {
   const [perEnvProjects, setPerEnvProjects] = useState<Record<string, Project[]>>({});
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
+  const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -100,15 +103,8 @@ export function App(): React.ReactNode {
         break;
       case "inbox-item":
         select(deepLink.environmentId);
-        if (deepLink.itemKind === "failed-loop" || deepLink.itemKind === "breach" || deepLink.itemKind === "finished-loop") {
-          // These items reference a loop, but we don't have the loopId in inbox-item kind.
-          // Navigate to the instance view where the inbox panel is visible.
-          setView({ kind: "instance" });
-        } else if (deepLink.itemKind === "prolonged-offline") {
-          setView({ kind: "instance" });
-        } else {
-          setView({ kind: "instance" });
-        }
+        // Navigate to the inbox view to show the item
+        setView({ kind: "inbox" });
         break;
     }
   }, [select]);
@@ -125,6 +121,15 @@ export function App(): React.ReactNode {
     });
     return () => { cancelled = true; };
   }, [notificationService]);
+
+  // Load inbox dismissed IDs on mount
+  useEffect(() => {
+    let cancelled = false;
+    void inboxService.getDismissedIds().then((ids) => {
+      if (!cancelled) setInboxDismissedIds(new Set(ids));
+    });
+    return () => { cancelled = true; };
+  }, [inboxService]);
 
   const handleToggleGlobalMute = useCallback(() => {
     const next = !globalMuted;
@@ -304,6 +309,18 @@ export function App(): React.ReactNode {
     return ids;
   }, [environments, perEnvLoops, isUnread]);
 
+  // Compute inbox item count for the sidebar badge
+  const inboxBuildParams = useMemo<InboxBuildParams>(() => ({
+    perEnvLoops,
+    perEnvHealth: health,
+    environments,
+    breaches: budgetWatch.breaches,
+    dismissedIds: inboxDismissedIds,
+    escalatedOutages,
+  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages]);
+
+  const inboxItemCount = useMemo(() => inboxService.buildItems(inboxBuildParams).length, [inboxService, inboxBuildParams]);
+
   const prevFleetStatus = useRef<Record<string, FleetItemStatus>>({});
   useEffect(() => {
     for (const env of environments) {
@@ -455,6 +472,35 @@ export function App(): React.ReactNode {
 
   // Determine what to render in the content area
   const renderContent = (): React.ReactNode => {
+    // Inbox view is fleet-wide and accessible even without a selected environment
+    if (view.kind === "inbox") {
+      return (
+        <InboxView
+          perEnvLoops={perEnvLoops}
+          perEnvHealth={health}
+          environments={environments}
+          perEnvProjects={perEnvProjects}
+          breaches={budgetWatch.breaches}
+          escalatedOutages={escalatedOutages}
+          onClickItem={(item) => {
+            select(item.environmentId);
+            if (item.loopId) {
+              setView({ kind: "loop", loopId: item.loopId });
+            } else {
+              setView({ kind: "instance" });
+            }
+          }}
+          onDismissItem={(_itemId) => {
+            // Dismissal is handled internally by InboxView
+          }}
+          onOpenInChat={(item) => {
+            select(item.environmentId);
+            setView({ kind: "instance" });
+          }}
+        />
+      );
+    }
+
     if (!selected) {
       return (
         <div className="empty">
@@ -684,31 +730,6 @@ export function App(): React.ReactNode {
       <div className="body">
         {sidebarOpen ? (
           <aside className="panel sidebar-panel">
-            <InboxPanel
-              perEnvLoops={perEnvLoops}
-              perEnvHealth={health}
-              environments={environments}
-              breaches={budgetWatch.breaches}
-              escalatedOutages={escalatedOutages}
-              onClickItem={(item) => {
-                select(item.environmentId);
-                if (item.loopId) {
-                  setView({ kind: "loop", loopId: item.loopId });
-                } else {
-                  setView({ kind: "instance" });
-                }
-              }}
-              onDismissItem={(_itemId) => {
-                // Dismissal is handled internally by InboxPanel
-              }}
-              onOpenInChat={(item) => {
-                // Navigate to the item's environment so the chat panel is visible
-                select(item.environmentId);
-                setView({ kind: "instance" });
-                // The infra chat panel is already rendered in the main panel;
-                // selecting the environment scopes it to that instance.
-              }}
-            />
             <Sidebar
               environments={environments}
               selectedId={selectedId}
@@ -720,20 +741,21 @@ export function App(): React.ReactNode {
               onSelect={handleSelect}
               onNavigate={handleNavigate}
               onAddVm={() => setVmWizardOpen(true)}
+              inboxItemCount={inboxItemCount}
             />
           </aside>
         ) : null}
 
         <div className="panel main-panel">
-          {renderInstanceHeader()}
-          {renderDetailHeader()}
+          {view.kind !== "inbox" ? renderInstanceHeader() : null}
+          {view.kind !== "inbox" ? renderDetailHeader() : null}
 
-          <div className="content">
+          <div className={`content${view.kind === "inbox" ? " content-full" : ""}`}>
             {renderContent()}
           </div>
 
-          {/* InfraChatPanel now shows on ALL views */}
-          {selected && mainVm ? (
+          {/* InfraChatPanel shows only on instance/project/loop views */}
+          {view.kind !== "inbox" && selected && mainVm ? (
             <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
           ) : null}
         </div>
