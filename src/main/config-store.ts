@@ -66,6 +66,55 @@ function serialize<T>(fn: () => T): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
+// Shared mutation helpers — eliminate read-modify-write duplication
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-find-mutate-write helper for a single environment.
+ * Encapsulates: read environments array → find by ID → apply callback → write back.
+ * Returns the mutated environment, or null if not found.
+ *
+ * Guarantees `store.set("environments", envs)` is always called after the callback,
+ * eliminating the risk of a forgotten write.
+ */
+function mutateEnvironment(
+  id: string,
+  fn: (env: EnvironmentWithFingerprint) => void,
+): EnvironmentWithFingerprint | null {
+  const envs = store.get("environments", []);
+  const env = envs.find((e) => e.id === id);
+  if (!env) return null;
+  fn(env);
+  store.set("environments", envs);
+  return env;
+}
+
+/**
+ * Read-mutate-write helper for the full environments array.
+ * Encapsulates: read → apply callback → write back.
+ * Use when the mutation spans multiple environments or adds/removes entries.
+ */
+function mutateEnvironments(
+  fn: (envs: EnvironmentWithFingerprint[]) => void,
+): void {
+  const envs = store.get("environments", []);
+  fn(envs);
+  store.set("environments", envs);
+}
+
+/**
+ * Read-mutate-write helper for the session tokens record.
+ * Encapsulates: read → apply callback → write back.
+ */
+function mutateSessionTokens(
+  fn: (tokens: Record<string, EncryptedSessionToken>) => void,
+): void {
+  const tokens = store.get("sessionTokens", {});
+  fn(tokens);
+  store.set("sessionTokens", tokens);
+}
+
+// ---------------------------------------------------------------------------
 // Migration (synchronous — only runs once at startup before IPC is active)
 // ---------------------------------------------------------------------------
 
@@ -174,11 +223,7 @@ export function getSessionToken(environmentId: string): SessionToken | null {
 // ---------------------------------------------------------------------------
 
 function _setEnvironmentFingerprintId(environmentId: string, fingerprintId: string): void {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
-  env.fingerprintId = fingerprintId;
-  store.set("environments", envs);
+  mutateEnvironment(environmentId, (env) => { env.fingerprintId = fingerprintId; });
 }
 
 function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Environment {
@@ -198,14 +243,15 @@ function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct
     endpoints: [endpoint],
     activeEndpointId: endpointId,
   };
-  const envs = store.get("environments", []);
-  store.set("environments", [...envs, env]);
+  mutateEnvironments((envs) => { envs.push(env as EnvironmentWithFingerprint); });
   return env;
 }
 
 function _removeEnvironment(id: string): void {
-  const envs = store.get("environments", []).filter((e) => e.id !== id);
-  store.set("environments", envs);
+  mutateEnvironments((envs) => {
+    const idx = envs.findIndex((e) => e.id === id);
+    if (idx !== -1) envs.splice(idx, 1);
+  });
   const selectedId = store.get("selectedEnvironmentId");
   if (selectedId === id) {
     store.set("selectedEnvironmentId", null);
@@ -213,41 +259,35 @@ function _removeEnvironment(id: string): void {
 }
 
 function _addEndpoint(environmentId: string, url: string, kind: EndpointKind): AccessEndpoint | null {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return null;
-
-  const endpoint: AccessEndpoint = {
-    id: crypto.randomUUID().slice(0, 8),
-    kind,
-    url: trimTrailingSlash(url.trim()),
-    lastError: null,
-    failureCount: 0,
-  };
-  env.endpoints = [...env.endpoints, endpoint];
-  store.set("environments", envs);
-  return endpoint;
+  let result: AccessEndpoint | null = null;
+  const found = mutateEnvironment(environmentId, (env) => {
+    const endpoint: AccessEndpoint = {
+      id: crypto.randomUUID().slice(0, 8),
+      kind,
+      url: trimTrailingSlash(url.trim()),
+      lastError: null,
+      failureCount: 0,
+    };
+    env.endpoints = [...env.endpoints, endpoint];
+    result = endpoint;
+  });
+  return found ? result : null;
 }
 
 function _removeEndpoint(environmentId: string, endpointId: string): void {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
-
-  env.endpoints = env.endpoints.filter((ep) => ep.id !== endpointId);
-  if (env.activeEndpointId === endpointId) {
-    env.activeEndpointId = env.endpoints.length > 0 ? env.endpoints[0].id : null;
-  }
-  store.set("environments", envs);
+  mutateEnvironment(environmentId, (env) => {
+    env.endpoints = env.endpoints.filter((ep) => ep.id !== endpointId);
+    if (env.activeEndpointId === endpointId) {
+      env.activeEndpointId = env.endpoints.length > 0 ? env.endpoints[0].id : null;
+    }
+  });
 }
 
 function _setActiveEndpoint(environmentId: string, endpointId: string): void {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
-  if (!env.endpoints.some((ep) => ep.id === endpointId)) return;
-  env.activeEndpointId = endpointId;
-  store.set("environments", envs);
+  mutateEnvironment(environmentId, (env) => {
+    if (!env.endpoints.some((ep) => ep.id === endpointId)) return;
+    env.activeEndpointId = endpointId;
+  });
 }
 
 function _setSelectedEnvironmentId(id: string | null): void {
@@ -288,42 +328,34 @@ function _migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | 
 }
 
 function _updateEndpointHealth(environmentId: string, endpointId: string, lastError: string | I18nMessage | null, failureCount: number): void {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
-  const ep = env.endpoints.find((e) => e.id === endpointId);
-  if (!ep) return;
-  ep.lastError = lastError;
-  ep.failureCount = failureCount;
-  store.set("environments", envs);
+  mutateEnvironment(environmentId, (env) => {
+    const ep = env.endpoints.find((e) => e.id === endpointId);
+    if (!ep) return;
+    ep.lastError = lastError;
+    ep.failureCount = failureCount;
+  });
 }
 
 function _setEnvironmentAuthState(environmentId: string, authState: EnvironmentAuthState): void {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return;
-  env.authState = authState;
-  store.set("environments", envs);
+  mutateEnvironment(environmentId, (env) => { env.authState = authState; });
 }
 
 function _storeSessionToken(environmentId: string, token: SessionToken): boolean {
   const encrypted = encryptValue(token.accessToken);
   if (!encrypted) return false;
-  const tokens = store.get("sessionTokens", {});
-  tokens[environmentId] = {
-    encryptedAccessToken: encrypted,
-    scope: token.scope,
-    expiresAt: token.expiresAt,
-  };
-  store.set("sessionTokens", tokens);
+  mutateSessionTokens((tokens) => {
+    tokens[environmentId] = {
+      encryptedAccessToken: encrypted,
+      scope: token.scope,
+      expiresAt: token.expiresAt,
+    };
+  });
   _setEnvironmentAuthState(environmentId, "paired");
   return true;
 }
 
 function _removeSessionToken(environmentId: string): void {
-  const tokens = store.get("sessionTokens", {});
-  delete tokens[environmentId];
-  store.set("sessionTokens", tokens);
+  mutateSessionTokens((tokens) => { delete tokens[environmentId]; });
 }
 
 /**
@@ -338,9 +370,6 @@ function _setEndpointWithEncryption(
   endpoint: OpenCodeEndpoint | null,
   field: "opencode" | "infraOpenCode",
 ): SetOpenCodeEndpointResult {
-  const envs = store.get("environments", []);
-  const env = envs.find((e) => e.id === environmentId);
-  if (!env) return { ok: true };
   if (endpoint && endpoint.password) {
     if (!safeStorage.isEncryptionAvailable()) {
       return { ok: false, reason: "encryption-unavailable" };
@@ -349,11 +378,14 @@ function _setEndpointWithEncryption(
     if (!encrypted) {
       return { ok: false, reason: "encryption-unavailable" };
     }
-    env[field] = { ...endpoint, password: encrypted, wasEncrypted: true };
-  } else {
-    env[field] = endpoint;
+    const found = mutateEnvironment(environmentId, (env) => {
+      env[field] = { ...endpoint, password: encrypted, wasEncrypted: true };
+    });
+    return { ok: true };
   }
-  store.set("environments", envs);
+  mutateEnvironment(environmentId, (env) => {
+    env[field] = endpoint as InternalOpenCodeEndpoint | null;
+  });
   return { ok: true };
 }
 
@@ -366,27 +398,26 @@ function _setInfraOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndp
 }
 
 function _setMainVm(environmentId: string): void {
-  const envs = store.get("environments", []);
-  for (const env of envs) {
-    if (env.role === "main-vm") {
-      env.role = "coding";
+  mutateEnvironments((envs) => {
+    for (const env of envs) {
+      if (env.role === "main-vm") {
+        env.role = "coding";
+      }
     }
-  }
-  const target = envs.find((e) => e.id === environmentId);
-  if (target) {
-    target.role = "main-vm";
-  }
-  store.set("environments", envs);
+    const target = envs.find((e) => e.id === environmentId);
+    if (target) {
+      target.role = "main-vm";
+    }
+  });
 }
 
 function _autoPromoteFirstEnvIfNeeded(): void {
-  const envs = store.get("environments", []);
-  if (envs.length === 0) return;
-  const hasMainVm = envs.some((e) => e.role === "main-vm");
-  if (!hasMainVm) {
-    envs[0].role = "main-vm";
-    store.set("environments", envs);
-  }
+  mutateEnvironments((envs) => {
+    if (envs.length === 0) return;
+    if (!envs.some((e) => e.role === "main-vm")) {
+      envs[0].role = "main-vm";
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
