@@ -334,11 +334,14 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   const remoteCode = await createPairingCodeOnRemote(host, daemonPort);
   const pair: VmWizardPairResult = { paired: false, pairingCode: remoteCode, errorDetail: null };
 
+  let pendingToken: string | null = null;
+
   if (remoteCode) {
     pair.pairingCode = remoteCode;
     const exchangeResult = await exchangePairingCode(daemonUrl, remoteCode, "operate");
     if (exchangeResult.ok && exchangeResult.token) {
       pair.paired = true;
+      pendingToken = exchangeResult.token;
     } else {
       pair.errorDetail = msg("vmWizard.mainPairingExchangeFailed");
     }
@@ -357,12 +360,8 @@ export async function runWizard(target: string, name?: string): Promise<VmWizard
   const env = await addEnvironment(envName, daemonUrl, "direct", host.label);
   await autoPromoteFirstEnvIfNeeded();
 
-  if (pair.paired) {
-    const envIdByUrl = env.id;
-    const exchangeAgain = await exchangePairingCode(daemonUrl, remoteCode ?? "", "operate");
-    if (exchangeAgain.ok && exchangeAgain.token) {
-      await storeSessionToken(envIdByUrl, exchangeAgain.token);
-    }
+  if (pair.paired && pendingToken) {
+    await storeSessionToken(env.id, pendingToken);
   }
 
   if (opencodePort) {
