@@ -1,8 +1,8 @@
-import React, { lazy, Suspense, useCallback, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode } from "../types";
-import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult } from "../../../shared/ipc";
+import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult } from "../../../shared/ipc";
 import type { IInfraService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
@@ -34,6 +34,38 @@ function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
   return lines.join("\n");
 }
 
+function formatIssueStack(intl: IntlShape, data: unknown): string {
+  const result = data as ListIssuesResult;
+  if (!result?.issues || result.issues.length === 0) {
+    return intl.formatMessage({ id: "issues.stackEmpty" });
+  }
+
+  const labelFilter = result.issues.length > 0 && result.issues[0].labels.length > 0
+    ? result.issues[0].labels[0]
+    : undefined;
+
+  const lines: string[] = [
+    intl.formatMessage(
+      { id: "issues.stackTitle" },
+      { count: result.issues.length, label: labelFilter ?? false, state: "open" },
+    ),
+    "",
+  ];
+
+  for (const issue of result.issues) {
+    const labelChips = issue.labels.length > 0
+      ? " " + issue.labels.map((l) => `\`${l}\``).join(" ")
+      : "";
+    lines.push(`- [#${issue.number}](issue://${issue.number}) ${issue.title}${labelChips}`);
+  }
+
+  if (result.truncated) {
+    lines.push(intl.formatMessage({ id: "issues.stackTruncated" }, { shown: result.issues.length, total: result.total }));
+  }
+
+  return lines.join("\n");
+}
+
 export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): React.ReactNode {
   const intl = useIntl();
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
@@ -59,6 +91,33 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   /** Pending issue drafts keyed by turnId, awaiting user confirmation */
   const [pendingIssues, setPendingIssues] = useState<Record<string, { title: string; body: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Map from issue number to URL, used for issue:// link click-through */
+  const issueUrlMap = useRef<Map<number, string>>(new Map());
+
+  // Intercept clicks on issue:// links in the chat scroll area
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleClick = (e: MouseEvent): void => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (!href.startsWith("issue://")) return;
+
+      e.preventDefault();
+      const numberStr = href.slice("issue://".length);
+      const number = parseInt(numberStr, 10);
+      const url = issueUrlMap.current.get(number);
+      if (url) {
+        window.open(url, "_blank", "noopener");
+      }
+    };
+
+    el.addEventListener("click", handleClick);
+    return () => el.removeEventListener("click", handleClick);
+  }, []);
 
   const handleSendPrompt = useCallback(
     (text: string) => {
@@ -173,11 +232,35 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
 
       let action: InfraActionArgs | null = null;
 
+      // Detect "list issues" / backlog query intent
+      const isListIssues =
+        lower.includes("list issue") ||
+        lower.includes("show issue") ||
+        lower.includes("what's labeled") ||
+        lower.includes("whats labeled") ||
+        lower.includes("labeled ") ||
+        lower.includes("backlog") ||
+        lower.includes("ready to implement") ||
+        lower.includes("to-implement") ||
+        (lower.includes("issue") && (lower.includes("filter") || lower.includes("query") || lower.includes("search"))) ||
+        (lower.includes("what") && lower.includes("issue"));
+
       if (lower.includes("status") || lower.includes("health") || lower.includes("machine")) {
         action = { action: "machine-status" };
       } else if (lower.includes("clone") || lower.includes("repo")) {
         const repoMatch = text.match(/(https?:\/\/[^\s]+)/);
         action = { action: "clone-repo", params: { repoUrl: repoMatch?.[1] ?? "" } };
+      } else if (isListIssues) {
+        // Extract label filter from text (e.g. "what's labeled to-implement?" → "to-implement")
+        let labels: string | undefined;
+        const labelMatch = text.match(/labeled\s+[:\-]?\s*([a-zA-Z0-9\-_]+)/i);
+        if (labelMatch) {
+          labels = labelMatch[1];
+        } else if (lower.includes("to-implement")) {
+          labels = "to-implement";
+        }
+
+        action = { action: "list-issues", params: { labels, state: "open" } };
       }
 
       if (action) {
@@ -189,6 +272,15 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               responseText = formatMachineStatusReport(intl, result.data);
             } else if (action!.action === "clone-repo") {
               responseText = intl.formatMessage({ id: "infra.cloneInitiated" }, { data: JSON.stringify(result.data, null, 2) });
+            } else if (action!.action === "list-issues") {
+              responseText = formatIssueStack(intl, result.data);
+              // Register issue URLs for click-through
+              const issueResult = result.data as ListIssuesResult;
+              if (issueResult?.issues) {
+                for (const issue of issueResult.issues) {
+                  issueUrlMap.current.set(issue.number, issue.url);
+                }
+              }
             } else {
               responseText = JSON.stringify(result.data, null, 2);
             }

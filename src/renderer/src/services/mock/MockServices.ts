@@ -251,6 +251,43 @@ export class MockInfraService implements IInfraService {
       };
       return { ok: true, data: result };
     }
+    if (args.action === "list-issues") {
+      const listResult: import("../../../../shared/ipc").ListIssuesResult = {
+        platform: "github",
+        issues: [
+          {
+            number: 42,
+            title: "Setup CI pipeline",
+            url: "https://github.com/mock-org/mock-repo/issues/42",
+            labels: ["to-implement", "devops"],
+            state: "open",
+            createdAt: new Date(now - 86400000 * 5).toISOString(),
+            updatedAt: new Date(now - 86400000).toISOString(),
+          },
+          {
+            number: 38,
+            title: "Add error boundary",
+            url: "https://github.com/mock-org/mock-repo/issues/38",
+            labels: ["to-implement"],
+            state: "open",
+            createdAt: new Date(now - 86400000 * 3).toISOString(),
+            updatedAt: new Date(now - 86400000 * 2).toISOString(),
+          },
+          {
+            number: 31,
+            title: "Implement auth flow",
+            url: "https://github.com/mock-org/mock-repo/issues/31",
+            labels: ["to-implement", "security"],
+            state: "open",
+            createdAt: new Date(now - 86400000 * 7).toISOString(),
+            updatedAt: new Date(now - 86400000 * 4).toISOString(),
+          },
+        ],
+        total: 3,
+        truncated: false,
+      };
+      return { ok: true, data: listResult };
+    }
     return { ok: false, error: "mock" };
   }
   async getStatus(): Promise<{ mainVmId: string | null; connected: boolean }> { return { mainVmId: null, connected: false }; }

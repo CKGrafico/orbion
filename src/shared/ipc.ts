@@ -120,7 +120,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues";
 
 export interface CreateIssueParams {
   title: string;
@@ -134,6 +134,34 @@ export interface CreateIssueResult {
   platform: "github" | "ado";
   url: string;
   number?: number;
+}
+
+export interface ListIssuesParams {
+  /** Filter by label (GitHub). Multiple labels comma-separated. */
+  labels?: string;
+  /** Filter by state: "open" (default), "closed", "all". */
+  state?: "open" | "closed" | "all";
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+  /** Maximum number of issues to return (default 20). */
+  limit?: number;
+}
+
+export interface IssueCard {
+  number: number;
+  title: string;
+  url: string;
+  labels: string[];
+  state: "open" | "closed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListIssuesResult {
+  platform: "github" | "ado";
+  issues: IssueCard[];
+  total: number;
+  truncated: boolean;
 }
 
 export interface MachineStatusEntry {

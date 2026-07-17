@@ -322,7 +322,7 @@
     "botInitials": "INF",
     "noData": "No machine data available.",
     "unreachable": "Unable to reach the infrastructure runtime. Check that the main VM is connected.",
-    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item\n- detect-platform: identify a project's hosting platform from git remotes",
+    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item\n- detect-platform: identify a project's hosting platform from git remotes\n- list issues / what's labeled X?: view a filtered slice of the backlog as compact cards",
     "fleetStatusHeader": "Fleet Status",
     "cloneInitiated": "## Clone initiated\n\n{data}",
     "errorMessage": "**Error:** {detail}",
@@ -345,7 +345,11 @@
     "noPlatformCli": "No platform CLI found. Install `gh` (GitHub CLI) or `az` (Azure CLI) to create issues from chat.",
     "ghNotAuth": "GitHub CLI is not authenticated. Run `gh auth login` in a terminal first.",
     "azNotAuth": "Azure CLI is not authenticated. Run `az login` in a terminal first.",
-    "titleRequired": "Issue title is required. Start with a short title on the first line."
+    "titleRequired": "Issue title is required. Start with a short title on the first line.",
+    "stackTitle": "**{count} issue{count, plural, one {} other {s}}{label, select, false {} other { labeled {label}}}{state, select, all { (all)} closed { (closed)} other {}}:**",
+    "stackTruncated": "\nShowing {shown} of {total}. Refine your query to narrow results.",
+    "stackEmpty": "No issues found matching your query.",
+    "listFailed": "**Failed to list issues:** {detail}"
   },
   "pickMainVm": {
     "title": "Pick a new main VM",

@@ -14,6 +14,9 @@ import type {
   InfraActionResult,
   CreateIssueParams,
   CreateIssueResult,
+  ListIssuesParams,
+  ListIssuesResult,
+  IssueCard,
   PlatformType,
   PlatformDetectionResult,
   BudgetWatch,
@@ -911,10 +914,73 @@ app.whenReady().then(() => {
           });
         });
       }
+      case "list-issues": {
+        return handleListIssues(args);
+      }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
   });
+
+  // gh issue list JSON field names
+  interface GhIssueJson {
+    number: number;
+    title: string;
+    url: string;
+    labels: Array<{ name: string }>;
+    state: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  function handleListIssues(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as ListIssuesParams | undefined;
+    const labels = params?.labels;
+    const state = params?.state ?? "open";
+    const repo = params?.repo;
+    const limit = Math.min(params?.limit ?? 20, 100);
+
+    return new Promise<InfraActionResult>((resolve) => {
+      execFile("gh", ["issue", "list", "--json", "number,title,url,labels,state,createdAt,updatedAt", "--limit", String(limit), "--state", state, ...(labels ? ["--label", labels] : []), ...(repo ? ["--repo", repo] : [])], (err, stdout, stderr) => {
+        if (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code === "ENOENT") {
+            resolve({ ok: false, error: msg("issues.noPlatformCli") });
+            return;
+          }
+          resolve({ ok: false, error: msg("issues.listFailed", { detail: stderr || err.message }) });
+          return;
+        }
+
+        let parsed: GhIssueJson[];
+        try {
+          parsed = JSON.parse(stdout) as GhIssueJson[];
+        } catch {
+          resolve({ ok: false, error: msg("issues.listFailed", { detail: "Invalid output from gh CLI" }) });
+          return;
+        }
+
+        const issues: IssueCard[] = parsed.map((item) => ({
+          number: item.number,
+          title: item.title,
+          url: item.url,
+          labels: item.labels.map((l) => l.name),
+          state: (item.state === "closed" ? "closed" : "open") as "open" | "closed",
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        }));
+
+        const result: ListIssuesResult = {
+          platform: "github",
+          issues,
+          total: issues.length,
+          truncated: issues.length >= limit,
+        };
+
+        resolve({ ok: true, data: result });
+      });
+    });
+  }
 
   safeHandle("infra:getStatus", () => {
     validateIpc("infra:getStatus", []);
