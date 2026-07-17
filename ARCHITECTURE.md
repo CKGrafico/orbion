@@ -159,7 +159,9 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `budget:getWatches`, `budget:addWatch`, `budget:removeWatch`,
 `budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
 `budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
-`inbox:queryFleet`.
+`inbox:queryFleet`. The `infra:executeAction` handler supports
+actions: `machine-status`, `clone-repo`, `create-issue`,
+`detect-platform`, `list-issues`.
 
 ### 3.3 Shared Libraries / Common Code
 
@@ -168,7 +170,8 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
   `StreamEventPayload`, `Instance`, `ConfigBridge`, `LoopTaskBridge`
   (the shape of `window.api`, including the `config` sub-bridge),
   `PlatformType`, `PlatformDetectionResult`, `DetectPlatformParams`,
-  and the `InfraBridge` (including `getPlatform`).
+  and the `InfraBridge` (including `getPlatform`), `ListIssuesParams`,
+  `IssueCard`, `ListIssuesResult`, `CreateIssueParams`, `CreateIssueResult`.
   Imported by all three layers so the boundary stays type-safe.
 - **`src/renderer/src/types.ts`** — domain types (`LoopMeta`, `RunRecord`,
   `Project`, `TaskDefinition`, `Instance`, `LoopStatus`, `InstanceHealth`)
@@ -277,6 +280,10 @@ keys, writes them into electron-store, and clears the keys. The renderer's
 - **Endpoints consumed:** `GET /api/loops`, `GET /api/loops/:id`,
   `GET /api/projects`, `GET /api/tasks`, `GET /api/loops/:id/logs?tail=N`,
   `GET /api/loops/:id/logs/stream` (SSE).
+- **Issues integration:** the `list-issues` infra action queries the
+  platform CLI (gh / az) for filtered issue lists, rendered as compact
+  card stacks in the InfraChatPanel. No persistent backlog surface is
+  introduced; issues appear only through the conversational chat.
 - **Envelope:** responses are unwrapped from loop-task's
   `{ ok, data }` / `{ ok, error: { message } }` shape.
 - **Auth:** none (the daemon is a local/trusted service).
