@@ -82,7 +82,8 @@
     "sort": "Sort",
     "connectInstance": "Connect instance",
     "newProject": "New project",
-    "inbox": "Inbox"
+    "inbox": "Inbox",
+    "projectHasFailure": "A loop in this project has failed"
   },
   "vmWizard": {
     "stepPickTarget": "Pick target",

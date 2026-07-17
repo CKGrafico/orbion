@@ -671,6 +671,25 @@ input {
   flex-shrink: 0;
 }
 
+.tree-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tree-dot-pip {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 1px solid var(--bg-sidebar);
+  pointer-events: none;
+}
+
 .tree-label {
   flex: 1;
   min-width: 0;

@@ -67,6 +67,18 @@ function LoopStatusDot({ status, lastExitCode }: LoopStatusDotProps): React.Reac
   return <span className="tree-dot" style={{ background: color }} />;
 }
 
+/** Check whether a project-instance node has any failed loops on a reachable instance. */
+function projectHasFailedLoop(
+  loops: LoopMeta[],
+  envId: string,
+  health: Record<string, EnvironmentHealth>,
+): boolean {
+  const h = health[envId] ?? "unknown";
+  // Unreachable instances (offline, blocked, unknown) must NOT trigger the pip
+  if (h !== "ok" && h !== "connecting" && h !== "backoff") return false;
+  return loops.some((loop) => loopStatusToFleetItem(loop.status, loop.lastExitCode) === "failed");
+}
+
 /** A flattened project-instance node for the 2-level tree */
 interface ProjectInstanceNode {
   key: string;          // composite key: `${envId}::${projectId}`
@@ -304,7 +316,12 @@ export function Sidebar(props: {
                     hasChildren={hasChildren}
                     onClick={(e) => { e.stopPropagation(); toggleProject(node.key); }}
                   />
-                  <span className="tree-dot" style={{ background: node.projectColor }} />
+                  <span className="tree-dot-wrap">
+                    <span className="tree-dot" style={{ background: node.projectColor }} />
+                    {projectHasFailedLoop(node.loops, node.envId, health) ? (
+                      <span className="tree-dot-pip" title={intl.formatMessage({ id: "sidebar.projectHasFailure" })} />
+                    ) : null}
+                  </span>
                   <span className="tree-label">{node.projectName}</span>
                   {hasMultipleEnvs ? (
                     <span className="tree-instance-badge">{node.envName}</span>
