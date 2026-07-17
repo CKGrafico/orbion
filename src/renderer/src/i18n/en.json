@@ -541,5 +541,10 @@
     "loopsFailing": "{count} loops failing",
     "unreachable": "1 unreachable",
     "unreachablePlural": "{count} unreachable"
+  },
+  "coldOpen": {
+    "headline": "Welcome to Orbion",
+    "copy": "Orbion talks to loop-task daemons running on your machines. Adding one machine is the only setup you need — then you can start managing loops and tasks right away.",
+    "addFirstMachine": "Add your first machine"
   }
 }

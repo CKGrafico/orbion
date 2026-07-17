@@ -28,6 +28,7 @@ export function useEnvironments(): {
   environments: Environment[];
   selectedId: string | null;
   mainVm: Environment | null;
+  loaded: boolean;
   select: (id: string | null) => void;
   add: (name: string, baseUrl: string, kind?: EndpointKind) => Promise<Environment>;
   remove: (id: string) => void;
@@ -165,6 +166,7 @@ export function useEnvironments(): {
     environments,
     selectedId,
     mainVm,
+    loaded,
     select,
     add,
     remove,

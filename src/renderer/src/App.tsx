@@ -7,6 +7,7 @@ import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
 import { loopStatusToFleetItem } from "./fleet-mapping";
 import { useEnvironments } from "./store";
 import { OrbionMark } from "./components/OrbionMark";
+import { ColdOpen } from "./components/ColdOpen";
 import { fetchLoops, fetchProjects, fetchSettings, isMock } from "./api";
 import type { DaemonSettings } from "./api";
 import { useUnreadTracker } from "./use-unread-tracker";
@@ -66,7 +67,7 @@ function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHeal
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, mainVm, select, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
+  const { environments, selectedId, mainVm, loaded, select, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
@@ -727,75 +728,91 @@ export function App(): React.ReactNode {
     );
   };
 
+  // Cold-open: when no environments are configured and the store has loaded,
+  // show only the centered welcome card — no sidebar, no loop UI, no chat.
+  const isColdOpen = loaded && environments.length === 0;
+
   return (
     <div className="app">
       <div className="titlebar">
-        <button
-          className="icon-btn"
-          title={sidebarOpen ? intl.formatMessage({ id: "app.hideSidebar" }) : intl.formatMessage({ id: "app.showSidebar" })}
-          onClick={() => setSidebarOpen((v) => !v)}
-        >
-          <PanelLeft size={15} />
-        </button>
+        {!isColdOpen ? (
+          <button
+            className="icon-btn"
+            title={sidebarOpen ? intl.formatMessage({ id: "app.hideSidebar" }) : intl.formatMessage({ id: "app.showSidebar" })}
+            onClick={() => setSidebarOpen((v) => !v)}
+          >
+            <PanelLeft size={15} />
+          </button>
+        ) : null}
         <span className="titlebar-brand">
           <OrbionMark size={16} />
           {intl.formatMessage({ id: "app.brand" })}
         </span>
         <span className="titlebar-tag">{isMock ? intl.formatMessage({ id: "app.mock" }) : intl.formatMessage({ id: "app.preview" })}</span>
         <span style={{ flex: 1 }} />
-        <button
-          className="icon-btn"
-          title={globalMuted ? intl.formatMessage({ id: "app.unmuteNotifications" }) : intl.formatMessage({ id: "app.muteNotifications" })}
-          onClick={handleToggleGlobalMute}
-          style={{ opacity: globalMuted ? 1 : 0.5, color: globalMuted ? "var(--danger)" : "var(--text-secondary)" }}
-        >
-          {globalMuted ? <BellOff size={14} /> : <Bell size={14} />}
-        </button>
+        {!isColdOpen ? (
+          <button
+            className="icon-btn"
+            title={globalMuted ? intl.formatMessage({ id: "app.unmuteNotifications" }) : intl.formatMessage({ id: "app.muteNotifications" })}
+            onClick={handleToggleGlobalMute}
+            style={{ opacity: globalMuted ? 1 : 0.5, color: globalMuted ? "var(--danger)" : "var(--text-secondary)" }}
+          >
+            {globalMuted ? <BellOff size={14} /> : <Bell size={14} />}
+          </button>
+        ) : null}
       </div>
 
       <div className="body">
-        {sidebarOpen ? (
-          <aside className="panel sidebar-panel">
-            <Sidebar
-              environments={environments}
-              selectedId={selectedId}
-              health={health}
-              connectionStatus={connectionStatus}
-              perEnvLoops={perEnvLoops}
-              perEnvProjects={perEnvProjects}
-              view={view}
-              onSelect={handleSelect}
-              onNavigate={handleNavigate}
-              onAddVm={() => setVmWizardOpen(true)}
-              inboxItemCount={inboxItemCount}
-              onNavigateToLoop={(envId, loopId) => {
-                select(envId);
-                setView({ kind: "loop", loopId });
-              }}
-              onNavigateToProject={(envId, projectId) => {
-                select(envId);
-                setView({ kind: "project", projectId });
-              }}
-              onNavigateToInbox={() => {
-                setView({ kind: "inbox" });
-              }}
-            />
-          </aside>
-        ) : null}
-
-        <div className="panel main-panel">
-          {view.kind !== "inbox" ? renderInstanceHeader() : null}
-          {view.kind !== "inbox" ? renderDetailHeader() : null}
-
-          <div className={`content${view.kind === "inbox" ? " content-full" : ""}`}>
-            {renderContent()}
+        {isColdOpen ? (
+          <div className="panel main-panel">
+            <ColdOpen onAddVm={() => setVmWizardOpen(true)} />
           </div>
+        ) : (
+          <>
+            {sidebarOpen ? (
+              <aside className="panel sidebar-panel">
+                <Sidebar
+                  environments={environments}
+                  selectedId={selectedId}
+                  health={health}
+                  connectionStatus={connectionStatus}
+                  perEnvLoops={perEnvLoops}
+                  perEnvProjects={perEnvProjects}
+                  view={view}
+                  onSelect={handleSelect}
+                  onNavigate={handleNavigate}
+                  onAddVm={() => setVmWizardOpen(true)}
+                  inboxItemCount={inboxItemCount}
+                  onNavigateToLoop={(envId, loopId) => {
+                    select(envId);
+                    setView({ kind: "loop", loopId });
+                  }}
+                  onNavigateToProject={(envId, projectId) => {
+                    select(envId);
+                    setView({ kind: "project", projectId });
+                  }}
+                  onNavigateToInbox={() => {
+                    setView({ kind: "inbox" });
+                  }}
+                />
+              </aside>
+            ) : null}
 
-          {/* InfraChatPanel shows only on instance/project/loop views */}
-          {view.kind !== "inbox" && selected && mainVm ? (
-            <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
-          ) : null}
-        </div>
+            <div className="panel main-panel">
+              {view.kind !== "inbox" ? renderInstanceHeader() : null}
+              {view.kind !== "inbox" ? renderDetailHeader() : null}
+
+              <div className={`content${view.kind === "inbox" ? " content-full" : ""}`}>
+                {renderContent()}
+              </div>
+
+              {/* InfraChatPanel shows only on instance/project/loop views */}
+              {view.kind !== "inbox" && selected && mainVm ? (
+                <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
 
       {vmWizardOpen ? (

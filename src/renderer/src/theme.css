@@ -1608,6 +1608,43 @@ input {
   font-family: var(--font-mono);
 }
 
+/* ── Cold-open empty state ────────────────────────────────────── */
+
+.cold-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  gap: 16px;
+  text-align: center;
+  padding: 40px;
+}
+
+.cold-open-headline {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cold-open-copy {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  max-width: 400px;
+  line-height: 1.6;
+}
+
+.cold-open-btn {
+  margin-top: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 24px;
+}
+
 /* ── Tailscale peer discovery ──────────────────────────────────── */
 
 .tailscale-peers {
