@@ -20,14 +20,24 @@ interface InfraChatPanelProps {
   mainVmName: string;
 }
 
+/** Escape markdown special characters and strip HTML-like tags from untrusted strings
+ *  before interpolation into markdown content, preventing XSS via daemon-controlled data. */
+function escapeMd(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[*_~`#[\]|\\]/g, (ch) => `\\${ch}`);
+}
+
 function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
   if (!Array.isArray(data)) return intl.formatMessage({ id: "infra.noData" });
   const lines: string[] = [`## ${intl.formatMessage({ id: "infra.fleetStatusHeader" })}\n`];
   for (const machine of data as MachineStatusEntry[]) {
     const icon = machine.health === "connected" ? "🟢" : machine.health === "offline" ? "🔴" : "🟡";
-    lines.push(`**${machine.name}** ${icon} \`${machine.health}\``);
+    lines.push(`**${escapeMd(machine.name)}** ${icon} \`${escapeMd(machine.health)}\``);
     for (const ep of machine.endpoints) {
-      lines.push(`  - ${ep.kind}: \`${ep.url}\``);
+      lines.push(`  - ${escapeMd(ep.kind)}: \`${escapeMd(ep.url)}\``);
     }
     lines.push("");
   }
@@ -41,7 +51,7 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
   }
 
   const labelFilter = result.issues.length > 0 && result.issues[0].labels.length > 0
-    ? result.issues[0].labels[0]
+    ? escapeMd(result.issues[0].labels[0])
     : undefined;
 
   const lines: string[] = [
@@ -54,9 +64,9 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
 
   for (const issue of result.issues) {
     const labelChips = issue.labels.length > 0
-      ? " " + issue.labels.map((l) => `\`${l}\``).join(" ")
+      ? " " + issue.labels.map((l) => `\`${escapeMd(l)}\``).join(" ")
       : "";
-    lines.push(`- [#${issue.number}](issue://${issue.number}) ${issue.title}${labelChips}`);
+    lines.push(`- [#${issue.number}](issue://${issue.number}) ${escapeMd(issue.title)}${labelChips}`);
   }
 
   if (result.truncated) {

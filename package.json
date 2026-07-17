@@ -25,7 +25,8 @@
     "react-dom": "^19.2.0",
     "react-intl": "^10.1.16",
     "react-markdown": "^10.1.0",
-    "rehype-highlight": "^7.0.2"
+    "rehype-highlight": "^7.0.2",
+    "rehype-sanitize": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

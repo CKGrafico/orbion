@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
+import rehypeSanitize from "rehype-sanitize";
 import type { ToolCall } from "./types";
 
 const KIND_ICONS: Record<string, string> = {
@@ -103,7 +104,7 @@ export function MarkdownContent({
 
   return (
     <div className="markdown-content">
-      <Markdown rehypePlugins={[rehypeHighlight]} components={components as never}>
+      <Markdown rehypePlugins={[rehypeHighlight, rehypeSanitize]} components={components as never}>
         {content}
       </Markdown>
     </div>

@@ -322,6 +322,9 @@ keys, writes them into electron-store, and clears the keys. The renderer's
 | TypeScript 5.8 (strict) | Language | Type-safe IPC contract across process boundaries |
 | Plain CSS + custom properties | Styling | Design tokens in `theme.css`; no CSS framework |
 | Server-Sent Events (SSE) | Log streaming | Push-based live log following |
+| rehype-sanitize 6 | HTML sanitization | Strips dangerous HTML (script, iframe, event handlers) from all markdown rendered via react-markdown; defense-in-depth against XSS in the Electron renderer |
+| react-markdown 10 | Chat markdown rendering | Renders assistant messages with code highlighting + HTML sanitization |
+| highlight.js 11 | Code syntax highlighting | Used via rehype-highlight in MarkdownContent |
 | Electron safeStorage | Encryption-at-rest | OS-native encryption wrapper; encrypts session tokens and OpenCode passwords; rejects storage when unavailable |
 | pnpm | Package manager | Dependency management (Node >= 20) |
 
@@ -359,6 +362,13 @@ keys, writes them into electron-store, and clears the keys. The renderer's
   environments are sent to the renderer via IPC.
 - **URL validation:** the main process rejects any base URL that is not
   `http:`/`https:` before making a request.
+- **Markdown sanitization:** all markdown rendered via `MarkdownContent.tsx`
+  passes through `rehype-sanitize`, which strips `<script>`, `<iframe>`,
+  event handlers (`onerror`, `onclick`, etc.), and `javascript:` URLs.
+  Untrusted strings interpolated into markdown (machine names, URLs,
+  issue titles, labels from daemon/API responses) are escaped via
+  `escapeMd()` before interpolation, preventing injection of markdown
+  formatting or HTML tags.
 - **External links:** `setWindowOpenHandler` denies in-app navigation and opens
   links in the system browser.
 - **Trust boundary:** renderer ⇄ preload ⇄ main. Only the main process performs
