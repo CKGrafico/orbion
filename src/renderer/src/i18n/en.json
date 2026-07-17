@@ -217,6 +217,7 @@
     "mainRequestTimedOut": "Request timed out",
     "mainInvalidPairingResponse": "Invalid pairing response from daemon",
     "mainInvalidEnvUrl": "Invalid environment URL: {url}",
+    "mainBaseUrlNotRegistered": "Base URL not registered as an environment: {url}",
     "mainNoMainVm": "No main VM configured",
     "mainNoEndpoint": "Main VM has no active endpoint",
     "mainRepoUrlRequired": "repoUrl is required",
