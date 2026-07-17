@@ -2,5 +2,8 @@ packages:
   - docs
 
 allowBuilds:
+  '@parcel/watcher': set this to true or false
+  '@swc/core': set this to true or false
   electron: false
   esbuild: false
+  sharp: set this to true or false

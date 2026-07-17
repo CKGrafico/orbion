@@ -99,7 +99,21 @@ export interface ConfigBridge {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue";
+
+export interface CreateIssueParams {
+  title: string;
+  body: string;
+  labels?: string[];
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+}
+
+export interface CreateIssueResult {
+  platform: "github" | "ado";
+  url: string;
+  number?: number;
+}
 
 export interface MachineStatusEntry {
   id: string;

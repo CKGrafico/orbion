@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import { execFile } from "node:child_process";
 import type {
   ApiRequestArgs,
   ApiResponse,
@@ -11,6 +12,8 @@ import type {
   OpenCodeEndpoint,
   InfraActionArgs,
   InfraActionResult,
+  CreateIssueParams,
+  CreateIssueResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -147,6 +150,42 @@ function isAllowedBaseUrl(baseUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+interface CliCheckResult {
+  cli: "gh" | "az";
+  authenticated: boolean;
+  error?: string;
+}
+
+function checkPlatformCli(): Promise<CliCheckResult | null> {
+  return new Promise((resolve) => {
+    execFile("gh", ["auth", "status"], (err, _stdout, stderr) => {
+      if (!err) {
+        resolve({ cli: "gh", authenticated: true });
+        return;
+      }
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        // gh not found, try az
+        execFile("az", ["account", "show"], (azErr) => {
+          if (!azErr) {
+            resolve({ cli: "az", authenticated: true });
+            return;
+          }
+          const azCode = (azErr as NodeJS.ErrnoException).code;
+          if (azCode === "ENOENT") {
+            resolve(null);
+            return;
+          }
+          resolve({ cli: "az", authenticated: false, error: stderr || azErr.message });
+        });
+        return;
+      }
+      // gh found but not authenticated
+      resolve({ cli: "gh", authenticated: false, error: stderr || err.message });
+    });
+  });
 }
 
 function joinUrl(baseUrl: string, apiPath: string): string {
@@ -664,6 +703,81 @@ app.whenReady().then(() => {
           return { ok: false, error: cloneResult.error ?? msg("vmWizard.mainCloneFailed") };
         }
         return { ok: true, data: { vm: targetEnv.name, repoUrl, result: cloneResult.data } };
+      }
+      case "create-issue": {
+        const params = args.params as CreateIssueParams | undefined;
+        if (!params?.title) {
+          return { ok: false, error: msg("issues.titleRequired") };
+        }
+
+        const cliCheck = await checkPlatformCli();
+        if (!cliCheck) {
+          return { ok: false, error: msg("issues.noPlatformCli") };
+        }
+        if (!cliCheck.authenticated) {
+          if (cliCheck.cli === "gh") {
+            return { ok: false, error: msg("issues.ghNotAuth") };
+          }
+          return { ok: false, error: msg("issues.azNotAuth") };
+        }
+
+        const title = params.title;
+        const body = params.body ?? "";
+        const labels = params.labels ?? [];
+        const repo = params.repo;
+
+        if (cliCheck.cli === "gh") {
+          const ghArgs: string[] = ["issue", "create", "--title", title, "--body", body];
+          for (const label of labels) {
+            ghArgs.push("--label", label);
+          }
+          if (repo) {
+            ghArgs.push("--repo", repo);
+          }
+          return new Promise<InfraActionResult>((resolve) => {
+            execFile("gh", ghArgs, (err, stdout, stderr) => {
+              if (err) {
+                resolve({ ok: false, error: msg("issues.createFailed", { detail: stderr || err.message }) });
+                return;
+              }
+              const url = stdout.trim();
+              const numberMatch = url.match(/\/issues\/(\d+)$/);
+              const result: CreateIssueResult = {
+                platform: "github",
+                url,
+                number: numberMatch ? parseInt(numberMatch[1], 10) : undefined,
+              };
+              resolve({ ok: true, data: result });
+            });
+          });
+        }
+
+        // az boards work-item create
+        const azArgs: string[] = [
+          "boards", "work-item", "create",
+          "--title", title,
+          "--description", body,
+          "--type", "Issue",
+        ];
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("az", azArgs, (err, stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: msg("issues.createFailed", { detail: stderr || err.message }) });
+              return;
+            }
+            try {
+              const parsed = JSON.parse(stdout) as { id?: number; url?: string };
+              const result: CreateIssueResult = {
+                platform: "ado",
+                url: parsed.url ?? "",
+                number: parsed.id,
+              };
+              resolve({ ok: true, data: result });
+            } catch {
+              resolve({ ok: false, error: msg("issues.createFailed", { detail: "Unexpected output from az CLI" }) });
+            }
+          });
+        });
       }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };

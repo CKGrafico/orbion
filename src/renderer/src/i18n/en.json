@@ -309,16 +309,28 @@
   },
   "infra": {
     "title": "Infrastructure",
-    "description": "Ask about your fleet: machine status, clone repos, manage services.",
+    "description": "Ask about your fleet: machine status, clone repos, create issues, manage services.",
     "userInitials": "U",
     "botInitials": "INF",
     "noData": "No machine data available.",
     "unreachable": "Unable to reach the infrastructure runtime. Check that the main VM is connected.",
-    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM",
+    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item",
     "fleetStatusHeader": "Fleet Status",
     "cloneInitiated": "## Clone initiated\n\n{data}",
     "errorMessage": "**Error:** {detail}",
     "unknownError": "Unknown error"
+  },
+  "issues": {
+    "draftTitle": "Draft issue",
+    "fileQuestion": "File this issue?",
+    "optionFile": "File issue",
+    "optionCancel": "Cancel",
+    "created": "Issue created: [{url}]({url})",
+    "createFailed": "**Failed to create issue:** {detail}",
+    "noPlatformCli": "No platform CLI found. Install `gh` (GitHub CLI) or `az` (Azure CLI) to create issues from chat.",
+    "ghNotAuth": "GitHub CLI is not authenticated. Run `gh auth login` in a terminal first.",
+    "azNotAuth": "Azure CLI is not authenticated. Run `az login` in a terminal first.",
+    "titleRequired": "Issue title is required. Start with a short title on the first line."
   },
   "pickMainVm": {
     "title": "Pick a new main VM",

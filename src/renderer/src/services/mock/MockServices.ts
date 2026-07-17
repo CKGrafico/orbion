@@ -211,7 +211,19 @@ export class MockVmWizardService implements IVmWizardService {
 
 @injectable()
 export class MockInfraService implements IInfraService {
-  async executeAction(): Promise<InfraActionResult> { return { ok: false, error: "mock" }; }
+  async executeAction(args: InfraActionArgs): Promise<InfraActionResult> {
+    if (args.action === "create-issue") {
+      return {
+        ok: true,
+        data: {
+          platform: "github" as const,
+          url: `https://github.com/mock-org/mock-repo/issues/42`,
+          number: 42,
+        },
+      };
+    }
+    return { ok: false, error: "mock" };
+  }
   async getStatus(): Promise<{ mainVmId: string | null; connected: boolean }> { return { mainVmId: null, connected: false }; }
 }
 
