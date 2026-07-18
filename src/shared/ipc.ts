@@ -328,6 +328,7 @@ export type VmWizardStep =
   | "forwarding"
   | "pairing"
   | "consent"
+  | "loop-task-consent"
   | "done"
   | "error";
 
@@ -355,6 +356,7 @@ export interface VmWizardProbeResult {
   authOk: boolean;
   nodeFound: boolean;
   nodeVersion: string | null;
+  loopTaskFound: boolean;
   daemonRunning: boolean;
   daemonPort: number | null;
   opencodeRunning: boolean;
