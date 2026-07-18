@@ -7,4 +7,4 @@
 - [x] 3.1 Render dedicated install-loop-task, retry, and cancel actions with actual failure output in the add-machine wizard <!-- agent: frontend-engineer.build, depends_on: [1.1, 2.2], touches: [src/renderer/src/components/AddVmWizard.tsx] -->
 - [x] 3.2 Add localized copy for loop-task detection, install/start consent, retry, and diagnostic output <!-- agent: frontend-engineer.fast, depends_on: [3.1], touches: [src/renderer/src/i18n/en.json] -->
 - [x] 4.1 Add focused Vitest coverage for command detection, Node 20 enforcement, install/start success, diagnostic failure output, retry readiness, and local-path exclusion <!-- agent: frontend-engineer.build, depends_on: [1.2, 2.2, 3.1], touches: [tests/ssh-loop-task-onboarding.test.ts, tests/vm-wizard-runtime.test.ts] -->
-- [ ] 5.1 Run the focused tests, full Vitest suite, typecheck, and production build; fix regressions <!-- agent: frontend-engineer.fast, depends_on: [4.1, 3.2], touches: [] -->
+- [x] 5.1 Run the focused tests, full Vitest suite, typecheck, and production build; fix regressions <!-- agent: frontend-engineer.fast, depends_on: [4.1, 3.2], touches: [] -->
