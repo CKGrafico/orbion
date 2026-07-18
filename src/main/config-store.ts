@@ -1,7 +1,8 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem } from "../shared/ipc.js";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
+import { getCredential, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 
 interface LegacyInstance {
@@ -66,12 +67,14 @@ const store = new Store<ConfigSchema>({
 // Write serialization — prevents read-modify-write races under concurrent IPC
 // ---------------------------------------------------------------------------
 let writeChain: Promise<void> = Promise.resolve();
+const pendingLegacyTokenMaintenance = new Set<string>();
 
 function serialize<T>(fn: () => T): Promise<T> {
   const next = writeChain.then(() => fn());
-  writeChain = next.catch((err) => {
-    console.error("[config-store] serialized write failed:", err);
-  });
+  writeChain = next.then(
+    () => undefined,
+    (err) => { console.error("[config-store] serialized write failed:", err); },
+  );
   return next;
 }
 
@@ -144,6 +147,7 @@ function ensureMigrated(): void {
       return {
         id: inst.id,
         name: inst.name,
+        agentRuntime: "opencode",
         endpoints: [endpoint],
         activeEndpointId: inst.id,
       };
@@ -165,14 +169,16 @@ function ensureMigrated(): void {
 
 export function getEnvironments(): EnvironmentWithFingerprint[] {
   ensureMigrated();
-  return store.get("environments", []);
+  return store.get("environments", []).map((env) => ({
+    ...env,
+    agentRuntime: env.agentRuntime ?? "opencode",
+  }));
 }
 
 /** Strip wasEncrypted from internal endpoints before sending to renderer. */
 function sanitizeEndpoint(ep: InternalOpenCodeEndpoint | null | undefined): OpenCodeEndpoint | null | undefined {
   if (!ep) return ep;
-  const { wasEncrypted: _, ...rest } = ep;
-  return rest;
+  return { url: ep.url, password: null };
 }
 
 /** Get environments with wasEncrypted stripped from OpenCodeEndpoint fields (for IPC/renderer). */
@@ -180,15 +186,19 @@ export function getEnvironmentsForRenderer(): Environment[] {
   const envs = getEnvironments();
   return envs.map((env) => ({
     ...env,
+    credentialRefs: env.credentialRefs
+      ? {
+          ...(env.credentialRefs.sessionToken ? { sessionToken: env.credentialRefs.sessionToken } : {}),
+          ...(env.credentialRefs.sshKeyPassphrase ? { sshKeyPassphrase: env.credentialRefs.sshKeyPassphrase } : {}),
+        }
+      : undefined,
     opencode: sanitizeEndpoint(env.opencode),
     infraOpenCode: sanitizeEndpoint(env.infraOpenCode),
   }));
 }
 
 export function findEnvironmentByFingerprint(fingerprintId: string): EnvironmentWithFingerprint | undefined {
-  ensureMigrated();
-  const envs = store.get("environments", []);
-  return envs.find((e) => e.fingerprintId === fingerprintId);
+  return getEnvironments().find((env) => env.fingerprintId === fingerprintId);
 }
 
 export function getSelectedEnvironmentId(): string | null {
@@ -197,19 +207,31 @@ export function getSelectedEnvironmentId(): string | null {
 }
 
 export function getMainVmId(): string | null {
-  ensureMigrated();
-  const envs = store.get("environments", []);
-  const mainVm = envs.find((e) => e.role === "main-vm");
+  const mainVm = getEnvironments().find((env) => env.role === "main-vm");
   return mainVm?.id ?? null;
 }
 
 export function getMainVm(): EnvironmentWithFingerprint | null {
-  ensureMigrated();
-  const envs = store.get("environments", []);
-  return envs.find((e) => e.role === "main-vm") ?? null;
+  return getEnvironments().find((env) => env.role === "main-vm") ?? null;
 }
 
 export function getSessionToken(environmentId: string): SessionToken | null {
+  const env = getEnvironments().find((candidate) => candidate.id === environmentId);
+  const reference = env?.credentialRefs?.sessionToken;
+  if (reference) {
+    const serializedToken = getCredential(reference);
+    if (!serializedToken) return null;
+    const token = parseSessionToken(serializedToken);
+    if (!token) return null;
+    if (token.expiresAt !== null && Date.now() > token.expiresAt) {
+      void removeSessionToken(environmentId);
+      void _setEnvironmentAuthState(environmentId, "blocked");
+      return null;
+    }
+    queueLegacySessionTokenMaintenance(environmentId);
+    return token;
+  }
+
   const tokens = store.get("sessionTokens", {});
   const entry = tokens[environmentId];
   if (!entry) return null;
@@ -225,7 +247,83 @@ export function getSessionToken(environmentId: string): SessionToken | null {
     void _setEnvironmentAuthState(environmentId, "blocked");
     return null;
   }
+  queueLegacySessionTokenMaintenance(environmentId, token);
   return token;
+}
+
+export function getSshKeyPassphrase(environmentId: string): string | null {
+  const env = getEnvironments().find((candidate) => candidate.id === environmentId);
+  const reference = env?.credentialRefs?.sshKeyPassphrase;
+  return reference ? getCredential(reference) : null;
+}
+
+function parseSessionToken(value: string): SessionToken | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    if (!("accessToken" in parsed) || typeof parsed.accessToken !== "string") return null;
+    if (!("scope" in parsed) || !isSessionScope(parsed.scope)) return null;
+    if (!("expiresAt" in parsed) || (parsed.expiresAt !== null && typeof parsed.expiresAt !== "number")) return null;
+    return {
+      accessToken: parsed.accessToken,
+      scope: parsed.scope,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isSessionScope(value: unknown): value is SessionScope {
+  return value === "read-only" || value === "operate" || value === "admin";
+}
+
+function queueLegacySessionTokenMaintenance(environmentId: string, token?: SessionToken): void {
+  if (pendingLegacyTokenMaintenance.has(environmentId)) return;
+  pendingLegacyTokenMaintenance.add(environmentId);
+  void serialize(() => {
+    if (token) {
+      migrateLegacySessionToken(environmentId, token);
+    } else {
+      cleanupLegacySessionToken(environmentId);
+    }
+  }).then(
+    () => { pendingLegacyTokenMaintenance.delete(environmentId); },
+    () => { pendingLegacyTokenMaintenance.delete(environmentId); },
+  );
+}
+
+function migrateLegacySessionToken(environmentId: string, token: SessionToken): void {
+  const envs = store.get("environments", []);
+  const env = envs.find((candidate) => candidate.id === environmentId);
+  if (!env || env.credentialRefs?.sessionToken) return;
+
+  let reference: string | null;
+  try {
+    reference = storeCredential(JSON.stringify(token));
+  } catch (error) {
+    console.error("[config-store] legacy session token vault migration failed:", error);
+    return;
+  }
+  if (!reference) return;
+
+  env.credentialRefs = { ...env.credentialRefs, sessionToken: reference };
+  try {
+    store.set("environments", envs);
+  } catch (error) {
+    removeCredential(reference);
+    console.error("[config-store] legacy session token reference attachment failed:", error);
+    return;
+  }
+  cleanupLegacySessionToken(environmentId);
+}
+
+function cleanupLegacySessionToken(environmentId: string): void {
+  try {
+    mutateSessionTokens((tokens) => { delete tokens[environmentId]; });
+  } catch (error) {
+    console.error("[config-store] legacy session token cleanup failed:", error);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +334,13 @@ function _setEnvironmentFingerprintId(environmentId: string, fingerprintId: stri
   mutateEnvironment(environmentId, (env) => { env.fingerprintId = fingerprintId; });
 }
 
-function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Environment {
+function _addEnvironment(
+  name: string,
+  url: string,
+  kind: EndpointKind = "direct",
+  sshTarget?: string,
+  agentRuntime: AgentRuntime = "opencode",
+): Environment {
   ensureMigrated();
   const endpointId = crypto.randomUUID().slice(0, 8);
   const endpoint: AccessEndpoint = {
@@ -250,6 +354,7 @@ function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct
   const env: Environment = {
     id: crypto.randomUUID().slice(0, 8),
     name: name.trim(),
+    agentRuntime,
     endpoints: [endpoint],
     activeEndpointId: endpointId,
   };
@@ -258,6 +363,13 @@ function _addEnvironment(name: string, url: string, kind: EndpointKind = "direct
 }
 
 function _removeEnvironment(id: string): void {
+  const env = store.get("environments", []).find((candidate) => candidate.id === id);
+  if (env?.credentialRefs) {
+    for (const reference of Object.values(env.credentialRefs)) {
+      if (reference) removeCredential(reference);
+    }
+  }
+  mutateSessionTokens((tokens) => { delete tokens[id]; });
   mutateEnvironments((envs) => {
     const idx = envs.findIndex((e) => e.id === id);
     if (idx !== -1) envs.splice(idx, 1);
@@ -322,6 +434,7 @@ function _migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | 
         return {
           id: inst.id,
           name: inst.name,
+          agentRuntime: "opencode",
           endpoints: [endpoint],
           activeEndpointId: inst.id,
         };
@@ -351,21 +464,74 @@ function _setEnvironmentAuthState(environmentId: string, authState: EnvironmentA
 }
 
 function _storeSessionToken(environmentId: string, token: SessionToken): boolean {
-  const encrypted = encryptValue(token.accessToken);
-  if (!encrypted) return false;
-  mutateSessionTokens((tokens) => {
-    tokens[environmentId] = {
-      encryptedAccessToken: encrypted,
-      scope: token.scope,
-      expiresAt: token.expiresAt,
-    };
-  });
+  const reference = storeCredential(JSON.stringify(token));
+  if (!reference) return false;
+  const previousReference = store.get("environments", [])
+    .find((candidate) => candidate.id === environmentId)
+    ?.credentialRefs?.sessionToken;
+  let found: EnvironmentWithFingerprint | null;
+  try {
+    found = mutateEnvironment(environmentId, (env) => {
+      env.credentialRefs = { ...env.credentialRefs, sessionToken: reference };
+    });
+  } catch (error) {
+    removeCredential(reference);
+    throw error;
+  }
+  if (!found) {
+    removeCredential(reference);
+    return false;
+  }
+  if (previousReference) removeCredential(previousReference);
+  mutateSessionTokens((tokens) => { delete tokens[environmentId]; });
   _setEnvironmentAuthState(environmentId, "paired");
   return true;
 }
 
 function _removeSessionToken(environmentId: string): void {
+  const env = store.get("environments", []).find((candidate) => candidate.id === environmentId);
+  const reference = env?.credentialRefs?.sessionToken;
+  if (reference) removeCredential(reference);
+  mutateEnvironment(environmentId, (candidate) => {
+    if (!candidate.credentialRefs) return;
+    const { sessionToken: _, ...remainingRefs } = candidate.credentialRefs;
+    candidate.credentialRefs = Object.keys(remainingRefs).length > 0 ? remainingRefs : undefined;
+  });
   mutateSessionTokens((tokens) => { delete tokens[environmentId]; });
+}
+
+function _storeSshKeyPassphrase(environmentId: string, passphrase: string): boolean {
+  const reference = storeCredential(passphrase);
+  if (!reference) return false;
+  const previousReference = store.get("environments", [])
+    .find((candidate) => candidate.id === environmentId)
+    ?.credentialRefs?.sshKeyPassphrase;
+  let found: EnvironmentWithFingerprint | null;
+  try {
+    found = mutateEnvironment(environmentId, (env) => {
+      env.credentialRefs = { ...env.credentialRefs, sshKeyPassphrase: reference };
+    });
+  } catch (error) {
+    removeCredential(reference);
+    throw error;
+  }
+  if (!found) {
+    removeCredential(reference);
+    return false;
+  }
+  if (previousReference) removeCredential(previousReference);
+  return true;
+}
+
+function _removeSshKeyPassphrase(environmentId: string): void {
+  const env = store.get("environments", []).find((candidate) => candidate.id === environmentId);
+  const reference = env?.credentialRefs?.sshKeyPassphrase;
+  if (reference) removeCredential(reference);
+  mutateEnvironment(environmentId, (candidate) => {
+    if (!candidate.credentialRefs) return;
+    const { sshKeyPassphrase: _, ...remainingRefs } = candidate.credentialRefs;
+    candidate.credentialRefs = Object.keys(remainingRefs).length > 0 ? remainingRefs : undefined;
+  });
 }
 
 /**
@@ -388,7 +554,7 @@ function _setEndpointWithEncryption(
     if (!encrypted) {
       return { ok: false, reason: "encryption-unavailable" };
     }
-    const found = mutateEnvironment(environmentId, (env) => {
+    mutateEnvironment(environmentId, (env) => {
       env[field] = { ...endpoint, password: encrypted, wasEncrypted: true };
     });
     return { ok: true };
@@ -438,8 +604,14 @@ export function setEnvironmentFingerprintId(environmentId: string, fingerprintId
   return serialize(() => _setEnvironmentFingerprintId(environmentId, fingerprintId));
 }
 
-export function addEnvironment(name: string, url: string, kind: EndpointKind = "direct", sshTarget?: string): Promise<Environment> {
-  return serialize(() => _addEnvironment(name, url, kind, sshTarget));
+export function addEnvironment(
+  name: string,
+  url: string,
+  kind: EndpointKind = "direct",
+  sshTarget?: string,
+  agentRuntime: AgentRuntime = "opencode",
+): Promise<Environment> {
+  return serialize(() => _addEnvironment(name, url, kind, sshTarget, agentRuntime));
 }
 
 export function removeEnvironment(id: string): Promise<void> {
@@ -480,6 +652,14 @@ export function storeSessionToken(environmentId: string, token: SessionToken): P
 
 export function removeSessionToken(environmentId: string): Promise<void> {
   return serialize(() => _removeSessionToken(environmentId));
+}
+
+export function storeSshKeyPassphrase(environmentId: string, passphrase: string): Promise<boolean> {
+  return serialize(() => _storeSshKeyPassphrase(environmentId, passphrase));
+}
+
+export function removeSshKeyPassphrase(environmentId: string): Promise<void> {
+  return serialize(() => _removeSshKeyPassphrase(environmentId));
 }
 
 export function setOpenCodeEndpoint(environmentId: string, endpoint: OpenCodeEndpoint | null): Promise<SetOpenCodeEndpointResult> {
