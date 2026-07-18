@@ -12,6 +12,8 @@ import {
 
 const DEFAULT_DAEMON_PORT = 8845;
 const DEFAULT_OPENCODE_PORT = 13284;
+const MAX_DIAGNOSTIC_LINES_PER_SOURCE = 120;
+const MAX_DIAGNOSTIC_CHARS_PER_SOURCE = 12_000;
 
 // ─── Shell-safe helpers ──────────────────────────────────────────────
 
@@ -310,6 +312,65 @@ if [ -f "$LAUNCH_DIR/daemon.log" ]; then
 fi
 `;
 
+const TAIL_LAUNCH_FAILURE_LOGS_SCRIPT = `
+LAUNCH_DIR="$HOME/.orbion/ssh-launch/__HASH__"
+for log_file in \
+  "$LAUNCH_DIR/install.log" \
+  "$LAUNCH_DIR"/install-*.log \
+  "$LAUNCH_DIR/daemon.log" \
+  "$LAUNCH_DIR/opencode.log"; do
+  if [ -s "$log_file" ]; then
+    printf '\n[%s]\n' "\${log_file##*/}"
+    tail -120 "$log_file" 2>/dev/null || true
+  fi
+done
+`;
+
+function trimDiagnosticOutput(output: string): string {
+  const normalized = output.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) return "";
+
+  const recentLines = normalized.split("\n").slice(-MAX_DIAGNOSTIC_LINES_PER_SOURCE).join("\n");
+  return recentLines.slice(-MAX_DIAGNOSTIC_CHARS_PER_SOURCE).trim();
+}
+
+function buildLaunchFailureLogTail(
+  launchStdout: string,
+  launchStderr: string,
+  remoteLogsStdout: string,
+  remoteLogsStderr: string,
+): string | null {
+  const sources = [
+    ["stdout", launchStdout],
+    ["stderr", launchStderr],
+    ["remote logs", remoteLogsStdout],
+    ["remote log stderr", remoteLogsStderr],
+  ] as const;
+  const seenLines = new Set<string>();
+  const sections: string[] = [];
+
+  for (const [label, rawOutput] of sources) {
+    const output = trimDiagnosticOutput(rawOutput);
+    if (!output) continue;
+
+    const lines = output.split("\n");
+    const uniqueLines = lines.filter((line) => {
+      const key = line.trim();
+      return !key || !seenLines.has(key);
+    });
+    const uniqueOutput = uniqueLines.join("\n").trim();
+    if (!uniqueOutput) continue;
+
+    sections.push(`[${label}]\n${uniqueOutput}`);
+    for (const line of lines) {
+      const key = line.trim();
+      if (key) seenLines.add(key);
+    }
+  }
+
+  return sections.length > 0 ? sections.join("\n\n") : null;
+}
+
 // ─── Marker parsing ─────────────────────────────────────────────
 
 /** Pre-computed marker maps for fast stdout line parsing */
@@ -421,9 +482,14 @@ export async function launchOnVm(
   const launchResult = await sshExec(host, script);
 
   if (launchResult.code !== 0) {
-    const tailScript = TAIL_LOG_SCRIPT.replace(/__HASH__/g, hash);
+    const tailScript = TAIL_LAUNCH_FAILURE_LOGS_SCRIPT.replace(/__HASH__/g, hash);
     const tailResult = await sshExec(host, tailScript);
-    result.logTail = tailResult.stdout.trim() || null;
+    result.logTail = buildLaunchFailureLogTail(
+      launchResult.stdout,
+      launchResult.stderr,
+      tailResult.stdout,
+      tailResult.stderr,
+    );
     result.errorDetail = msg("vmWizard.mainLaunchScriptFailed", { code: launchResult.code });
 
     for (const line of launchResult.stdout.split("\n")) {
