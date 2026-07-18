@@ -17,6 +17,7 @@ const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   forwarding: "vmWizard.stepForwarding",
   pairing: "vmWizard.stepPairing",
   consent: "vmWizard.stepConsent",
+  "loop-task-consent": "vmWizard.stepLoopTaskConsent",
   done: "vmWizard.stepDone",
   error: "vmWizard.stepError",
 };
@@ -30,8 +31,9 @@ const STEP_ORDER: VmWizardStep[] = [
   "pick-reach-method",
   "pick-target",
   "probing",
-  "pick-services",
   "consent",
+  "loop-task-consent",
+  "pick-services",
   "installing",
   "pairing",
   "done",
@@ -155,7 +157,9 @@ export function AddVmWizard(props: {
   const currentStep = progress?.step ?? "idle";
   const isDone = currentStep === "done";
   const isError = currentStep === "error";
-  const isConsent = currentStep === "consent";
+  const isNodeConsent = currentStep === "consent";
+  const isLoopTaskConsent = currentStep === "loop-task-consent";
+  const isConsentStep = isNodeConsent || isLoopTaskConsent;
   const isPickServices = currentStep === "pick-services";
   const isInstalling = currentStep === "installing";
   const [setAsMain, setSetAsMain] = useState(true);
@@ -462,10 +466,18 @@ export function AddVmWizard(props: {
                 {progress.probe.opencodeRunning ? intl.formatMessage({ id: "vmWizard.opencodeOnPort" }, { port: progress.probe.opencodePort ?? "?" }) : intl.formatMessage({ id: "vmWizard.opencodeNotRunning" })}
               </div>
             ) : null}
-            {progress.launch?.logTail ? (
-              <pre style={{ marginTop: 8, fontSize: 11, color: "var(--danger)", background: "var(--bg-log)", padding: 8, borderRadius: 6, maxHeight: 100, overflow: "auto" }}>
-                {progress.launch.logTail}
-              </pre>
+            {isError && progress.launch?.logTail ? (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>
+                  {intl.formatMessage({ id: "vmWizard.diagnosticOutput" })}
+                </div>
+                <pre
+                  aria-label={intl.formatMessage({ id: "vmWizard.diagnosticOutput" })}
+                  style={{ margin: 0, fontSize: 11, color: "var(--danger)", background: "var(--bg-log)", padding: 8, borderRadius: 6, maxHeight: 160, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                >
+                  {progress.launch.logTail}
+                </pre>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -599,7 +611,7 @@ export function AddVmWizard(props: {
           </div>
         ) : null}
 
-        {isConsent && progress?.consentPrompt ? (
+        {isNodeConsent && progress?.consentPrompt ? (
           <div style={{
             marginTop: 12,
             padding: 12,
@@ -625,6 +637,40 @@ export function AddVmWizard(props: {
                 onClick={() => vmWizardService.respondConsent("skip")}
               >
                 {intl.formatMessage({ id: "vmWizard.skip" })}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {isLoopTaskConsent && progress?.consentPrompt ? (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: "var(--bg-log)",
+            borderRadius: 8,
+            border: "1px solid var(--bg-active)",
+          }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
+              <ShieldCheck size={16} />
+              <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {translateMessage(intl, progress.consentPrompt)}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn primary"
+                onClick={() => vmWizardService.respondConsent("install")}
+              >
+                {intl.formatMessage({ id: "vmWizard.installAndStartLoopTask" })}
+              </button>
+              <button
+                className="btn"
+                onClick={() => {
+                  vmWizardService.respondConsent("skip");
+                  onCancel();
+                }}
+              >
+                {intl.formatMessage({ id: "vmWizard.cancel" })}
               </button>
             </div>
           </div>
@@ -660,17 +706,28 @@ export function AddVmWizard(props: {
         ) : null}
 
         <div className="modal-actions">
-          <button className="btn" onClick={() => doneResult ? handleDoneFinal() : handleCancel()}>
-            {running ? intl.formatMessage({ id: "vmWizard.cancel" }) : intl.formatMessage({ id: "vmWizard.close" })}
-          </button>
-          {isPickServices ? (
+          {isError ? (
+            <>
+              <button className="btn" onClick={handleCancel}>
+                {intl.formatMessage({ id: "vmWizard.cancel" })}
+              </button>
+              <button className="btn primary" onClick={() => void startWizard()}>
+                {intl.formatMessage({ id: "vmWizard.retry" })}
+              </button>
+            </>
+          ) : !isConsentStep ? (
+            <button className="btn" onClick={() => doneResult ? handleDoneFinal() : handleCancel()}>
+              {running ? intl.formatMessage({ id: "vmWizard.cancel" }) : intl.formatMessage({ id: "vmWizard.close" })}
+            </button>
+          ) : null}
+          {!isError && isPickServices ? (
             <button
               className="btn primary"
               onClick={() => vmWizardService.respondServiceSelection(serviceSelection)}
             >
               {intl.formatMessage({ id: "vmWizard.confirmServices" })}
             </button>
-          ) : !isDone ? (
+          ) : !isError && !isDone && !isConsentStep ? (
             <button
               className="btn primary"
               onClick={() => void startWizard()}

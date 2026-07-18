@@ -9,7 +9,7 @@ import {
   MISE_INSTALL,
 } from "./verified-install.js";
 
-const NODE_VERSION_FLOOR = "18.0.0";
+const NODE_VERSION_FLOOR = "20.0.0";
 
 function sshExec(host: SshHost, command: string, timeout = 30_000): Promise<{ stdout: string; stderr: string; code: number }> {
   const args = buildSshArgs(host, command);
@@ -56,6 +56,14 @@ fi
 
 node_version="\$("\${node_path}" --version 2>/dev/null || echo 'unknown')"
 echo "NODE_FOUND|\${node_path}|\${node_version}"
+`;
+
+const LOOP_TASK_PROBE_SCRIPT = `
+if command -v loop-task >/dev/null 2>&1; then
+  echo "LOOP_TASK_FOUND"
+else
+  echo "LOOP_TASK_NOT_FOUND"
+fi
 `;
 
 const DAEMON_PROBE_SCRIPT = `
@@ -126,6 +134,7 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
     authOk: false,
     nodeFound: false,
     nodeVersion: null,
+    loopTaskFound: false,
     daemonRunning: false,
     daemonPort: null,
     opencodeRunning: false,
@@ -163,15 +172,22 @@ export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {
     }
   }
 
+  const loopTaskResult = await sshExec(host, LOOP_TASK_PROBE_SCRIPT);
+  result.loopTaskFound = loopTaskResult.stdout
+    .split("\n")
+    .some((line) => line.trim() === "LOOP_TASK_FOUND");
+
   const daemonResult = await sshExec(host, DAEMON_PROBE_SCRIPT);
 
   for (const line of daemonResult.stdout.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.startsWith("DAEMON_RUNNING|")) {
       const port = parseInt(trimmed.split("|")[1] ?? "", 10);
+      result.loopTaskFound = true;
       result.daemonRunning = true;
       result.daemonPort = isNaN(port) ? null : port;
     } else if (trimmed === "DAEMON_RUNNING_UNKNOWN_PORT") {
+      result.loopTaskFound = true;
       result.daemonRunning = true;
       result.daemonPort = null;
     } else if (trimmed.startsWith("OPENCODE_RUNNING|")) {

@@ -96,9 +96,10 @@ async function askConsent(
   prompt: I18nMessage,
   probe: VmWizardProbeResult,
   reachMethod: ReachMethod = "ssh",
+  step: "consent" | "loop-task-consent" = "consent",
 ): Promise<"install" | "skip"> {
   emitProgress({
-    step: "consent",
+    step,
     message: prompt,
     reachMethod,
     probe,
@@ -331,6 +332,55 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
     probe.nodeVersion = reprobe.nodeVersion;
     probe.errorDetail = null;
     emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe: reprobe });
+  }
+
+  if (probe.loopTaskFound === false) {
+    const decision = await askConsent(
+      msg("vmWizard.mainConsentLoopTaskNotFound"),
+      probe,
+      "ssh",
+      "loop-task-consent",
+    );
+
+    if (decision === "skip") {
+      emitProgress({
+        step: "error",
+        message: msg("vmWizard.mainLoopTaskInstallCancelled"),
+        reachMethod: "ssh",
+        probe,
+      });
+      throw new Error("vmWizard.mainLoopTaskInstallCancelled");
+    }
+
+    emitProgress({
+      step: "installing",
+      message: msg("vmWizard.mainInstallingLoopTask"),
+      reachMethod: "ssh",
+      probe,
+    });
+
+    const loopTaskLaunch = await launchOnVm(host, {
+      daemonRunning: probe.daemonRunning,
+      daemonPort: probe.daemonPort,
+      opencodeRunning: probe.opencodeRunning,
+      opencodePort: probe.opencodePort,
+      installTools: {},
+    });
+
+    if (!loopTaskLaunch.started) {
+      emitProgress({
+        step: "error",
+        message: loopTaskLaunch.errorDetail ?? msg("vmWizard.mainFailedToStartServices"),
+        reachMethod: "ssh",
+        probe,
+        launch: loopTaskLaunch,
+      });
+      throw new Error("vmWizard.mainFailedToStartServices");
+    }
+
+    probe.loopTaskFound = true;
+    probe.daemonRunning = true;
+    probe.daemonPort = loopTaskLaunch.daemonPort;
   }
 
   // Step 2: Pick services

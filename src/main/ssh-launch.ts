@@ -12,6 +12,8 @@ import {
 
 const DEFAULT_DAEMON_PORT = 8845;
 const DEFAULT_OPENCODE_PORT = 13284;
+const MAX_DIAGNOSTIC_LINES_PER_SOURCE = 120;
+const MAX_DIAGNOSTIC_CHARS_PER_SOURCE = 12_000;
 
 // ─── Shell-safe helpers ──────────────────────────────────────────────
 
@@ -278,6 +280,48 @@ if [ -z "$DAEMON_SKIP" ]; then
   nohup loop-task serve --host 127.0.0.1 --port "\${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.log" 2>&1 &
   DAEMON_PID=$!
   echo "$DAEMON_PID" > "$LAUNCH_DIR/daemon.pid"
+
+  daemon_ready() {
+    if command -v curl >/dev/null 2>&1; then
+      curl -sS -o /dev/null --connect-timeout 1 --max-time 1 "http://127.0.0.1:\${DAEMON_PORT}/api/projects" 2>/dev/null
+      return $?
+    fi
+
+    if command -v ss >/dev/null 2>&1; then
+      ss -tln 2>/dev/null | grep -Eq "127\\.0\\.0\\.1:\${DAEMON_PORT}[[:space:]]"
+    elif command -v lsof >/dev/null 2>&1; then
+      lsof -nP -iTCP:"\${DAEMON_PORT}" -sTCP:LISTEN 2>/dev/null | grep -q "127.0.0.1:\${DAEMON_PORT}"
+    elif command -v netstat >/dev/null 2>&1; then
+      netstat -an 2>/dev/null | grep -Eq "127\\.0\\.0\\.1[.:]\${DAEMON_PORT}[[:space:]].*LISTEN"
+    elif command -v nc >/dev/null 2>&1; then
+      nc -z 127.0.0.1 "\${DAEMON_PORT}" >/dev/null 2>&1
+    else
+      return 1
+    fi
+  }
+
+  DAEMON_READY=""
+  STARTUP_ATTEMPT=0
+  while [ "$STARTUP_ATTEMPT" -lt 20 ]; do
+    if ! kill -0 "$DAEMON_PID" 2>/dev/null; then
+      break
+    fi
+    if daemon_ready && kill -0 "$DAEMON_PID" 2>/dev/null; then
+      DAEMON_READY=1
+      break
+    fi
+    STARTUP_ATTEMPT=$((STARTUP_ATTEMPT + 1))
+    sleep 1
+  done
+
+  if [ -z "$DAEMON_READY" ]; then
+    echo "DAEMON_START_FAILED"
+    cat "$LAUNCH_DIR/daemon.log" 2>/dev/null || true
+    kill "$DAEMON_PID" 2>/dev/null || true
+    rm -f "$LAUNCH_DIR/daemon.pid" "$LAUNCH_DIR/daemon.info"
+    exit 1
+  fi
+
   echo "port=\${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.info"
   echo "DAEMON_STARTED|\${DAEMON_PORT}|\${DAEMON_PID}"
 fi
@@ -309,6 +353,65 @@ if [ -f "$LAUNCH_DIR/daemon.log" ]; then
   tail -20 "$LAUNCH_DIR/daemon.log" 2>/dev/null || true
 fi
 `;
+
+const TAIL_LAUNCH_FAILURE_LOGS_SCRIPT = `
+LAUNCH_DIR="$HOME/.orbion/ssh-launch/__HASH__"
+for log_file in \
+  "$LAUNCH_DIR/install.log" \
+  "$LAUNCH_DIR"/install-*.log \
+  "$LAUNCH_DIR/daemon.log" \
+  "$LAUNCH_DIR/opencode.log"; do
+  if [ -s "$log_file" ]; then
+    printf '\n[%s]\n' "\${log_file##*/}"
+    tail -120 "$log_file" 2>/dev/null || true
+  fi
+done
+`;
+
+function trimDiagnosticOutput(output: string): string {
+  const normalized = output.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) return "";
+
+  const recentLines = normalized.split("\n").slice(-MAX_DIAGNOSTIC_LINES_PER_SOURCE).join("\n");
+  return recentLines.slice(-MAX_DIAGNOSTIC_CHARS_PER_SOURCE).trim();
+}
+
+function buildLaunchFailureLogTail(
+  launchStdout: string,
+  launchStderr: string,
+  remoteLogsStdout: string,
+  remoteLogsStderr: string,
+): string | null {
+  const sources = [
+    ["stdout", launchStdout],
+    ["stderr", launchStderr],
+    ["remote logs", remoteLogsStdout],
+    ["remote log stderr", remoteLogsStderr],
+  ] as const;
+  const seenLines = new Set<string>();
+  const sections: string[] = [];
+
+  for (const [label, rawOutput] of sources) {
+    const output = trimDiagnosticOutput(rawOutput);
+    if (!output) continue;
+
+    const lines = output.split("\n");
+    const uniqueLines = lines.filter((line) => {
+      const key = line.trim();
+      return !key || !seenLines.has(key);
+    });
+    const uniqueOutput = uniqueLines.join("\n").trim();
+    if (!uniqueOutput) continue;
+
+    sections.push(`[${label}]\n${uniqueOutput}`);
+    for (const line of lines) {
+      const key = line.trim();
+      if (key) seenLines.add(key);
+    }
+  }
+
+  return sections.length > 0 ? sections.join("\n\n") : null;
+}
 
 // ─── Marker parsing ─────────────────────────────────────────────
 
@@ -421,9 +524,14 @@ export async function launchOnVm(
   const launchResult = await sshExec(host, script);
 
   if (launchResult.code !== 0) {
-    const tailScript = TAIL_LOG_SCRIPT.replace(/__HASH__/g, hash);
+    const tailScript = TAIL_LAUNCH_FAILURE_LOGS_SCRIPT.replace(/__HASH__/g, hash);
     const tailResult = await sshExec(host, tailScript);
-    result.logTail = tailResult.stdout.trim() || null;
+    result.logTail = buildLaunchFailureLogTail(
+      launchResult.stdout,
+      launchResult.stderr,
+      tailResult.stdout,
+      tailResult.stderr,
+    );
     result.errorDetail = msg("vmWizard.mainLaunchScriptFailed", { code: launchResult.code });
 
     for (const line of launchResult.stdout.split("\n")) {
@@ -432,6 +540,9 @@ export async function launchOnVm(
         result.errorDetail = msg("vmWizard.mainNodeNotFoundOnVm");
       } else if (trimmed === "INSTALL_FAILED_LOOP_TASK") {
         result.errorDetail = msg("vmWizard.mainInstallLoopTaskFailed");
+        result.loopTaskStatus = "failed";
+      } else if (trimmed === "DAEMON_START_FAILED") {
+        result.errorDetail = msg("vmWizard.mainFailedToStartServices");
         result.loopTaskStatus = "failed";
       } else if (trimmed.startsWith("DAEMON_PORT_BUSY|")) {
         result.errorDetail = msg("vmWizard.mainDaemonPortBusy", { port: daemonPort });
