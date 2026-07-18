@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { AgentRuntime, ReachMethod, SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../shared/ipc";
-import { TOOL_DEFINITIONS, type ToolDefinition } from "../../shared/tool-definitions";
+import type { AgentRuntime, ReachMethod, SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../../shared/ipc";
+import { TOOL_DEFINITIONS, type ToolDefinition } from "../../../shared/tool-definitions";
 import { ShieldCheck, X, Check, Loader, SkipForward, Lock, Globe, Terminal } from "lucide-react";
 import { translateMessage } from "../i18n";
 import type { IVmWizardService, IConfigService } from "../services/interfaces";
