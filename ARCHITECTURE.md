@@ -41,7 +41,7 @@ orbion/
 │   │   ├── connection-supervisor.ts  # Periodic health probes + SSE reconnect
 │   │   ├── opencode-client.ts  # OpenCode server status + version checks
 │   │   ├── platform-classifier.ts  # Git remote URL → platform classification
-│   │   └── ssh-probe.ts        # SSH-based VM probing + Node/mise installation
+│   │   └── ssh-probe.ts        # SSH VM, Node 20+, loop-task, and daemon probing
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
 │   ├── shared/
@@ -159,6 +159,13 @@ There is no separate server; the **Electron main process is the backend**
   and opaque references to any wizard-owned credentials. The dedicated
   `credential-vault.ts` store holds only `safeStorage`-encrypted credential
   payloads. Removing an environment removes every credential it references.
+- **SSH onboarding** (`vm-wizard.ts`, `ssh-probe.ts`, `ssh-launch.ts`) — after
+  SSH authentication, probes Node.js, the `loop-task` command, and daemon state.
+  Node.js 20 or newer is required. A missing loop-task command produces an
+  explicit install-and-start checkpoint. The pinned global npm install and
+  daemon launch run over SSH, bind the daemon to `127.0.0.1`, and use a bounded
+  readiness check before the environment is saved. Local/direct instances are
+  validated only through their supplied API URL and remain user-managed.
 - **Window management** — single-instance lock, custom hidden titlebar with a
   Windows overlay, `ready-to-show` gating, and external links routed to the
   system browser via `setWindowOpenHandler`.
@@ -229,6 +236,13 @@ No application CLI. Automation is limited to `package.json` npm scripts
 5s. Success updates the loop list and marks the instance `ok`; failure marks it
 `offline`. Non-selected instances are health-checked every 20s in the
 background.
+
+**SSH machine onboarding:** after SSH reachability succeeds, the main process
+checks Node.js 20+, detects the `loop-task` command, and inspects daemon state.
+If loop-task is missing, the renderer presents one install-and-start action.
+The main process installs the pinned package, starts the daemon on loopback, and
+waits for API or listening-port readiness. On failure, bounded stdout, stderr,
+and remote install/daemon logs are returned to the wizard for retry or cancel.
 
 **Log follow (pushed):** `LogViewer` first fetches an initial tail
 (`GET /api/loops/:id/logs?tail=200`), then opens an SSE subscription. `api.ts`
