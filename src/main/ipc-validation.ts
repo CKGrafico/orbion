@@ -9,6 +9,7 @@
  */
 
 import { ipcMain } from "electron";
+import { isAllowedApiOperation, isAllowedStreamPath } from "../shared/daemon-allowlist.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -138,6 +139,13 @@ const validators: Record<string, Validator> = {
       issues.push("timeoutMs must be a finite number");
     if (a.timeoutMs !== undefined && isNumber(a.timeoutMs) && a.timeoutMs <= 0)
       issues.push("timeoutMs must be positive");
+    // Allowlist enforcement: reject method+path combinations not explicitly permitted.
+    // A compromised renderer can send any IPC payload; this check is the trust boundary.
+    const method = (a.method ?? "GET") as string;
+    const path = a.path as string | undefined;
+    if (path !== undefined && isAllowedPath(path) && !isAllowedApiOperation(method, path)) {
+      issues.push(`operation ${method} ${path} is not allowlisted for renderer daemon requests`);
+    }
     return issues;
   },
 
@@ -151,6 +159,10 @@ const validators: Record<string, Validator> = {
     if (!isNonEmptyString(a.subId)) issues.push("subId must be a non-empty string");
     if (!isValidHttpUrl(a.baseUrl)) issues.push("baseUrl must be a valid http/https URL");
     if (!isAllowedPath(a.path)) issues.push("path must start with /api/ and not contain path traversal or encoded sequences");
+    // Stream allowlist enforcement: reject stream paths not explicitly permitted.
+    if (isAllowedPath(a.path as string) && !isAllowedStreamPath(a.path as string)) {
+      issues.push(`stream path ${a.path as string} is not allowlisted for renderer stream subscriptions`);
+    }
     return issues;
   },
 
