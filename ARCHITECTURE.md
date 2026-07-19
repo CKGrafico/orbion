@@ -74,7 +74,7 @@ orbion/
 │               ├── AddInstanceModal.tsx  # Register a new instance
 │               ├── LoopsView.tsx         # Loop list for the selected instance
 │               ├── LoopDetail.tsx        # Single-loop metadata + logs
-│               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row, log tail with copy)
+│               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row, log tail, action buttons: pause/resume/stop/trigger with confirmation)
 │               ├── LogViewer.tsx         # Tail + live SSE log follow
 │               ├── TasksView.tsx         # Task definitions list
 │               └── ProjectsView.tsx      # Projects list
@@ -136,7 +136,10 @@ flowchart LR
   LoopCard receives an optional `instance` prop (the full `Environment` object);
   when provided and the instance is reachable, the card fetches and displays a
   compact log tail (last 10 lines via `GET /api/loops/:id/logs?tail=10`) with
-  error-line highlighting and a copy affordance.
+  error-line highlighting and a copy affordance. The card also renders contextual
+  action buttons (Pause, Resume, Stop, Run Now) that call the daemon's mutation
+  endpoints directly via `apiRequest`; destructive actions show an inline
+  confirmation overlay before executing.
 - **Inputs:** data from `api.ts`; persisted instances from `store.ts` via IPC.
 - **Outputs:** IPC calls via `window.api`.
 
@@ -207,7 +210,7 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 actions (`run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`)
 via its `executeInboxAction` method, which calls the same loop-task API
 endpoints as the loop card (`POST /api/loops/:id/trigger`,
-`POST /api/loops/:id/pause`, `POST /api/loops/:id/resume`). The `infra:executeAction` handler supports
+`POST /api/loops/:id/pause`, `POST /api/loops/:id/resume`, `POST /api/loops/:id/stop`). The `infra:executeAction` handler supports
 actions: `machine-status`, `clone-repo`, `create-issue`,
 `detect-platform`, `list-issues`, `add-label`, `edit-issue`.
 
