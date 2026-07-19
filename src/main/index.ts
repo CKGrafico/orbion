@@ -130,6 +130,8 @@ import {
   callMcpTool,
   removeMcpSession,
 } from "./mcp-client.js";
+import { sendPromptToAgent, interruptAgent } from "./agent-client.js";
+import type { AgentSendPromptArgs } from "../shared/ipc.js";
 
 const streams = new Map<string, AbortController>();
 
@@ -1553,7 +1555,7 @@ app.whenReady().then(() => {
   });
 
   safeHandle("transcript:updateMessage", async (_event, ...rawArgs) => {
-    const [messageId, updates] = validateIpc<[string, Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>>]>("transcript:updateMessage", rawArgs);
+    const [messageId, updates] = validateIpc<[string, Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>  ]>("transcript:updateMessage", rawArgs);
     await transcriptUpdateMessage(messageId, updates);
   });
 
@@ -1581,7 +1583,18 @@ app.whenReady().then(() => {
 
   safeHandle("mcp:callTool", async (_event, ...rawArgs): Promise<McpToolCallResult> => {
     const [environmentId, toolName, args] = validateIpc<[string, string, Record<string, unknown>]>("mcp:callTool", rawArgs);
-    return callMcpTool(environmentId, toolName, args);
+     return callMcpTool(environmentId, toolName, args);
+  });
+
+  // ── Agent streaming (OpenCode runtime) ─────────────────────────────
+  safeHandle("agent:sendPrompt", async (_event, ...rawArgs) => {
+    const [args] = validateIpc<[AgentSendPromptArgs]>("agent:sendPrompt", rawArgs);
+    return sendPromptToAgent(args);
+  });
+
+  safeHandle("agent:interrupt", async (_event, ...rawArgs) => {
+    const [environmentId, sessionId] = validateIpc<[string, string | undefined]>("agent:interrupt", rawArgs);
+    return interruptAgent(environmentId, sessionId);
   });
 
   // Prune old breaches on startup

@@ -41,6 +41,7 @@ orbion/
 │   │   ├── connection-supervisor.ts  # Periodic health probes + SSE reconnect
 │   │   ├── reachability-tracker.ts   # Instance reachability as its own health layer (connected/reconnecting/unreachable)
 │   │   ├── opencode-client.ts  # OpenCode server status + version checks
+│   │   ├── agent-client.ts     # Agent streaming: OpenCode promptAsync + SSE events + interrupt
 │   │   ├── platform-classifier.ts  # Git remote URL → platform classification
 │   │   ├── transcript-store.ts # Per-session chat transcript file storage
 │   │   ├── sse-parser.ts     # Spec-compliant SSE stream parser (eventsource-parser)
@@ -190,7 +191,7 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
 `budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
 `inbox:queryFleet`, `inbox:resolveItem`, `inbox:getResolvedItems`,
-`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`. The inbox service also performs inline
+`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The inbox service also performs inline
 actions (`run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`)
 via its `executeInboxAction` method, which calls the same loop-task API
 endpoints as the loop card (`POST /api/loops/:id/trigger`,
@@ -214,8 +215,10 @@ actions: `machine-status`, `clone-repo`, `create-issue`,
   `InboxItem` (with `availableActions` and `projectId` fields),
   `ResolvedInboxItem`, `InboxItemResolutionReason`, `InboxQueryResult`,
   `BudgetWatch`, `BudgetBreach`, `ConditionWatch`, `WatchCondition`,
-  `WatchTarget`, `WatchConditionKind`, `OutageEscalation`.
-  Imported by all three layers so the boundary stays type-safe.
+  `WatchTarget`, `WatchConditionKind`, `OutageEscalation`,
+  `AgentSendPromptArgs`, `AgentSendPromptResult`, `AgentStreamEvent`,
+  `AgentBridge`.
+   Imported by all three layers so the boundary stays type-safe.
 - **`src/renderer/src/types.ts`** — domain types (`LoopMeta`, `RunRecord`,
   `Project`, `TaskDefinition`, `Instance`, `LoopStatus`, `InstanceHealth`)
   mirrored from the loop-task daemon.
@@ -258,6 +261,16 @@ and remote install/daemon logs are returned to the wizard for retry or cancel.
 keeps one global `stream:event` listener that dispatches to per-subscription
 callbacks keyed by `subId`; lines are appended (capped at 2000) with autoscroll
 while "following".
+
+**Agent streaming (pushed):** When the user sends a prompt in a chat session,
+the renderer calls `agent:sendPrompt` which proxies to the OpenCode runtime's
+`session/prompt` endpoint in the main process. The main process then subscribes
+to the agent's SSE event stream (`v2/session/events`) and forwards parsed events
+to the renderer as `agent:streamEvent` messages. The `SessionChatView` component
+renders text deltas incrementally and shows a Stop button during streaming.
+Pressing Stop triggers `agent:interrupt`, which aborts the SSE stream locally
+and sends an interrupt signal to the OpenCode runtime; partial output is kept
+in the transcript.
 
 ```mermaid
 sequenceDiagram
@@ -565,4 +578,4 @@ and screenshots without a daemon. This is a notable gap (see §15).
 - **Mock mode** — renderer running without `window.api` (plain browser), backed
   by `mock.ts`.
 
-<!-- Last updated: 2026-07-19T18:15:00Z -->
+<!-- Last updated: 2026-07-19T20:00:00Z -->

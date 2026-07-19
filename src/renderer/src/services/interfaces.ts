@@ -42,6 +42,9 @@ import type {
   BootstrapSeedImportResult,
   RestoreAvailability,
   PullRestoreResult,
+  AgentSendPromptArgs,
+  AgentSendPromptResult,
+  AgentStreamEvent,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -202,4 +205,13 @@ export interface IMcpService {
   callTool(environmentId: string, toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult>;
   /** Subscribe to MCP connection status changes. */
   onStatusChange(cb: (status: McpConnectionStatus) => void): () => void;
+}
+
+export interface IAgentService {
+  /** Send a prompt to the agent and begin streaming events. */
+  sendPrompt(args: AgentSendPromptArgs): Promise<AgentSendPromptResult>;
+  /** Interrupt/abort an in-flight agent generation. Partial output is kept. */
+  interrupt(environmentId: string, sessionId?: string): Promise<void>;
+  /** Subscribe to agent streaming events. */
+  onStreamEvent(cb: (event: AgentStreamEvent) => void): () => void;
 }

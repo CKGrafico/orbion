@@ -1,0 +1,13 @@
+- [ ] 1.1 Add AgentStreamEvent, AgentStreamArgs, and AgentBridge types to src/shared/ipc.ts <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/shared/ipc.ts] -->
+- [ ] 1.2 Create src/main/agent-client.ts: OpenCode v2 streaming adapter (promptAsync + SSE events + interrupt) <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/main/agent-client.ts] -->
+- [ ] 1.3 Register agent:sendPrompt, agent:interrupt, agent:streamEvent IPC handlers in src/main/index.ts <!-- agent: frontend-engineer.build, depends_on: [1.2], touches: [src/main/index.ts] -->
+- [ ] 2.1 Wire agent bridge in src/preload/index.ts <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/preload/index.ts] -->
+- [ ] 2.2 Add IAgentService to src/renderer/src/services/interfaces.ts <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/renderer/src/services/interfaces.ts] -->
+- [ ] 2.3 Create src/renderer/src/services/impl/AgentService.ts (real impl) <!-- agent: frontend-engineer.build, depends_on: [2.2], touches: [src/renderer/src/services/impl/AgentService.ts] -->
+- [ ] 2.4 Add MockAgentService to src/renderer/src/services/mock/MockServices.ts <!-- agent: frontend-engineer.build, depends_on: [2.2], touches: [src/renderer/src/services/mock/MockServices.ts] -->
+- [ ] 2.5 Register IAgentService in src/renderer/src/services/container.ts <!-- agent: frontend-engineer.fast, depends_on: [2.3, 2.4], touches: [src/renderer/src/services/container.ts] -->
+- [ ] 3.1 Create src/renderer/src/components/SessionChatView.tsx (streaming chat with stop control) <!-- agent: frontend-engineer.build, depends_on: [2.2], touches: [src/renderer/src/components/SessionChatView.tsx] -->
+- [ ] 3.2 Wire SessionChatView into App.tsx, replacing the session placeholder <!-- agent: frontend-engineer.fast, depends_on: [3.1], touches: [src/renderer/src/App.tsx] -->
+- [ ] 3.3 Add streaming cursor keyframe animation to src/renderer/src/theme.css <!-- agent: frontend-engineer.fast, depends_on: [], touches: [src/renderer/src/theme.css] -->
+- [ ] 4.1 Add i18n keys for agent streaming UI <!-- agent: frontend-engineer.fast, depends_on: [3.1], touches: [src/renderer/src/i18n/**] -->
+- [ ] 5.1 Run pnpm typecheck and fix any errors <!-- agent: frontend-engineer.fast, depends_on: [1.3, 2.5, 3.2, 3.3, 4.1], touches: [] -->

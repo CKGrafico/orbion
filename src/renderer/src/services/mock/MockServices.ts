@@ -41,6 +41,9 @@ import type {
   BootstrapSeedImportResult,
   RestoreAvailability,
   PullRestoreResult,
+  AgentSendPromptArgs,
+  AgentSendPromptResult,
+  AgentStreamEvent,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -61,6 +64,7 @@ import type {
   IReachabilityService,
   ITranscriptService,
   IMcpService,
+  IAgentService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -997,5 +1001,80 @@ export class MockMcpService implements IMcpService {
     return () => {
       this.listeners = this.listeners.filter((l) => l !== cb);
     };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mock Agent Service (browser-only dev — simulates streaming)
+// ---------------------------------------------------------------------------
+
+const MOCK_AGENT_RESPONSE = `I can help you with that. Here's what I found:
+
+The **ETL** project has 3 active loops:
+- \`daily-sync\` runs every 30 minutes and is currently **running**
+- \`hourly-report\` runs every hour and is **waiting** for its next run
+- \`weekly-cleanup\` runs weekly and is **paused**
+
+Would you like me to check any of these in more detail, or would you like to perform an action on them?`;
+
+@injectable()
+export class MockAgentService implements IAgentService {
+  private streamListeners: ((event: AgentStreamEvent) => void)[] = [];
+  private activeTimers: ReturnType<typeof setInterval>[] = [];
+
+  async sendPrompt(args: AgentSendPromptArgs): Promise<AgentSendPromptResult> {
+    // Simulate streaming the mock response character by character
+    const text = MOCK_AGENT_RESPONSE;
+    let idx = 0;
+
+    const timer = setInterval(() => {
+      const chunkSize = Math.floor(Math.random() * 4) + 2;
+      const chunk = text.slice(idx, idx + chunkSize);
+      idx += chunkSize;
+
+      if (chunk) {
+        this.emitStreamEvent({
+          kind: "text-delta",
+          chatSessionId: args.chatSessionId,
+          turnId: args.turnId,
+          text: chunk,
+        });
+      }
+
+      if (idx >= text.length) {
+        clearInterval(timer);
+        this.activeTimers = this.activeTimers.filter((t) => t !== timer);
+        this.emitStreamEvent({
+          kind: "turn-finished",
+          chatSessionId: args.chatSessionId,
+          turnId: args.turnId,
+        });
+      }
+    }, 25);
+
+    this.activeTimers.push(timer);
+
+    return { ok: true, sessionId: `mock-session-${Date.now()}` };
+  }
+
+  async interrupt(): Promise<void> {
+    // Stop all active streaming timers
+    for (const timer of this.activeTimers) {
+      clearInterval(timer);
+    }
+    this.activeTimers = [];
+  }
+
+  onStreamEvent(cb: (event: AgentStreamEvent) => void): () => void {
+    this.streamListeners.push(cb);
+    return () => {
+      this.streamListeners = this.streamListeners.filter((l) => l !== cb);
+    };
+  }
+
+  private emitStreamEvent(event: AgentStreamEvent): void {
+    for (const listener of this.streamListeners) {
+      listener(event);
+    }
   }
 }

@@ -38,6 +38,9 @@ import type {
   BootstrapSeedImportResult,
   RestoreAvailability,
   PullRestoreResult,
+  AgentSendPromptArgs,
+  AgentSendPromptResult,
+  AgentStreamEvent,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -356,6 +359,25 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.on("mcp:status", listener);
       return () => {
         ipcRenderer.removeListener("mcp:status", listener);
+      };
+    },
+  },
+
+  agent: {
+    sendPrompt: (args: AgentSendPromptArgs) =>
+      ipcRenderer.invoke("agent:sendPrompt", args) as Promise<AgentSendPromptResult>,
+    interrupt: (environmentId: string, sessionId?: string) =>
+      ipcRenderer.invoke("agent:interrupt", environmentId, sessionId) as Promise<void>,
+    onStreamEvent: (cb: (event: AgentStreamEvent) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        streamEvent: AgentStreamEvent,
+      ): void => {
+        cb(streamEvent);
+      };
+      ipcRenderer.on("agent:streamEvent", listener);
+      return () => {
+        ipcRenderer.removeListener("agent:streamEvent", listener);
       };
     },
   },
