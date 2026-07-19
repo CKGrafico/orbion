@@ -53,11 +53,13 @@ vi.mock("electron-store", () => {
 import { getCredential, storeCredential } from "../src/main/credential-vault.js";
 import {
   addEnvironment,
+  findSecretFieldInJson,
   getEnvironments,
   getEnvironmentsForRenderer,
   getSessionToken,
   getSshKeyPassphrase,
   removeEnvironment,
+  SECRET_FIELD_NAMES,
   storeSessionToken,
   storeSshKeyPassphrase,
 } from "../src/main/config-store.js";
@@ -181,5 +183,127 @@ describe("environment credential ownership", () => {
     expect(getCredential(String(sessionReference))).toBeNull();
     expect(getCredential(String(passphraseReference))).toBeNull();
     expect(record(storeValues("config").get("sessionTokens"))[environment.id]).toBeUndefined();
+  });
+});
+
+describe("sync-safe serialization (references-not-secrets)", () => {
+  beforeEach(() => {
+    electronMocks.encryptionAvailable = true;
+    for (const values of electronMocks.stores.values()) values.clear();
+  });
+
+  it("no known-secret field appears in serialized output", async () => {
+    const accessToken = "s3cret-daemon-token-162";
+    const passphrase = "s3cret-ssh-passphrase-162";
+    const ocPassword = "s3cret-oc-password-162";
+
+    const environment = await addEnvironment("FullEnv", "http://localhost:8845", "direct", undefined, "claude");
+
+    await storeSessionToken(environment.id, {
+      accessToken,
+      scope: "operate",
+      expiresAt: null,
+    });
+    await storeSshKeyPassphrase(environment.id, passphrase);
+
+    // Set OpenCode endpoint with a password (will be encrypted internally)
+    storeValues("config").set("environments", getEnvironments().map((env) => {
+      if (env.id === environment.id) {
+        return {
+          ...env,
+          opencode: { url: "http://localhost:8846", password: ocPassword, wasEncrypted: true },
+        };
+      }
+      return env;
+    }));
+
+    // Inject a legacy EncryptedSessionToken to ensure it is not leaked
+    storeValues("config").set("sessionTokens", {
+      [environment.id]: {
+        encryptedAccessToken: "legacy-ciphertext-value",
+        scope: "operate",
+        expiresAt: null,
+      },
+    });
+
+    const serialized = JSON.stringify(getEnvironmentsForRenderer());
+
+    // Structural assertion: none of the known secret field names appear as keys
+    const leaked = findSecretFieldInJson(serialized);
+    expect(leaked).toBeNull();
+
+    // Content assertions: actual secret values must not appear
+    expect(serialized).not.toContain(accessToken);
+    expect(serialized).not.toContain(passphrase);
+    expect(serialized).not.toContain(ocPassword);
+    expect(serialized).not.toContain("legacy-ciphertext-value");
+  });
+
+  it("credentialRefs contains only opaque reference UUIDs, never values or ciphertext", async () => {
+    const environment = await addEnvironment("RefOnly", "http://localhost:8845");
+    await storeSessionToken(environment.id, {
+      accessToken: "token-value-xyz",
+      scope: "admin",
+      expiresAt: null,
+    });
+    await storeSshKeyPassphrase(environment.id, "passphrase-value-xyz");
+
+    const exposed = getEnvironmentsForRenderer().find((e) => e.id === environment.id);
+    const refs = exposed?.credentialRefs;
+    expect(refs).toBeDefined();
+
+    // Reference keys are UUID strings (opaque)
+    expect(refs!.sessionToken).toEqual(expect.any(String));
+    expect(refs!.sshKeyPassphrase).toEqual(expect.any(String));
+
+    // The serialized refs must not contain any value/ciphertext fields
+    const refsJson = JSON.stringify(refs);
+    expect(findSecretFieldInJson(refsJson)).toBeNull();
+  });
+
+  it("OpenCode endpoint serializes url but never password or wasEncrypted", async () => {
+    const environment = await addEnvironment("OCEndpoint", "http://localhost:8845");
+
+    // Directly inject internal data with password and wasEncrypted
+    storeValues("config").set("environments", getEnvironments().map((env) => {
+      if (env.id === environment.id) {
+        return {
+          ...env,
+          opencode: { url: "http://localhost:8846", password: "encrypted-ciphertext", wasEncrypted: true },
+          infraOpenCode: { url: "http://infra:8846", password: "infra-encrypted", wasEncrypted: true },
+        };
+      }
+      return env;
+    }));
+
+    const exposed = getEnvironmentsForRenderer().find((e) => e.id === environment.id);
+    expect(exposed?.opencode).toBeDefined();
+    expect(exposed?.opencode?.url).toBe("http://localhost:8846");
+    expect((exposed?.opencode as Record<string, unknown>)?.password).toBeUndefined();
+    expect((exposed?.opencode as Record<string, unknown>)?.wasEncrypted).toBeUndefined();
+
+    expect(exposed?.infraOpenCode).toBeDefined();
+    expect(exposed?.infraOpenCode?.url).toBe("http://infra:8846");
+    expect((exposed?.infraOpenCode as Record<string, unknown>)?.password).toBeUndefined();
+    expect((exposed?.infraOpenCode as Record<string, unknown>)?.wasEncrypted).toBeUndefined();
+  });
+
+  it("env with only public fields serializes without secrets", async () => {
+    await addEnvironment("Plain", "http://localhost:8845");
+
+    const serialized = JSON.stringify(getEnvironmentsForRenderer());
+    expect(findSecretFieldInJson(serialized)).toBeNull();
+  });
+
+  it("SECRET_FIELD_NAMES covers all fields that must never appear in sync", () => {
+    // This test documents the canonical list of secret field names.
+    // If a new secret field is added to the codebase, it MUST be added here too.
+    expect(SECRET_FIELD_NAMES).toEqual([
+      "password",
+      "wasEncrypted",
+      "encryptedAccessToken",
+      "encryptedValue",
+      "accessToken",
+    ]);
   });
 });
