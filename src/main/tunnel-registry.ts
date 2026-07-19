@@ -390,7 +390,6 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
 
     entry.reconnect.retryTimer = null;
 
-    // Try to reopen the tunnel
     const envId = entry.environmentId;
     const endpointId = entry.endpointId;
 
@@ -403,17 +402,33 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
 
       if (!endpoint) {
         // Environment or endpoint was removed while we were waiting
-        entry.reconnect = null;
+        const fresh = registry.get(key);
+        if (fresh) {
+          if (fresh.reconnect?.retryTimer) {
+            clearTimeout(fresh.reconnect.retryTimer);
+          }
+          fresh.reconnect = null;
+        }
         return;
       }
 
       const result = await openTunnelForEndpoint(envId, endpoint);
 
+      // After openTunnelForEndpoint returns, the captured `entry` may be stale:
+      // openTunnelForEndpoint deletes the old entry and creates a new one in the
+      // registry when the tunnel process was dead. Look up the fresh entry instead.
+      const freshEntry = registry.get(key);
+
       if (result !== null) {
-        // Success! Reset reconnect state
-        entry.reconnect = null;
+        // Success! Reset reconnect state on the FRESH registry entry
+        if (freshEntry) {
+          if (freshEntry.reconnect?.retryTimer) {
+            clearTimeout(freshEntry.reconnect.retryTimer);
+          }
+          freshEntry.reconnect = null;
+        }
         console.info(
-          `[tunnel-registry] Tunnel reconnected: ${entry.tunnelId} → 127.0.0.1:${result}`,
+          `[tunnel-registry] Tunnel reconnected: ${freshEntry?.tunnelId ?? entry.tunnelId} → 127.0.0.1:${result}`,
         );
 
         // Notify listeners that reconnect is complete
@@ -421,40 +436,46 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
           reconnectCallback(envId, endpointId, false);
         }
       } else {
-        // Failed again, schedule next retry
-        const failureCount = (entry.reconnect?.failureCount ?? 0) + 1;
+        // Failed again, schedule next retry on the fresh entry
+        const currentFailureCount = (freshEntry?.reconnect?.failureCount ?? (entry.reconnect?.failureCount ?? 0)) + 1;
         const backoffMs = Math.min(
-          INITIAL_BACKOFF_MS * Math.pow(2, failureCount - 1),
+          INITIAL_BACKOFF_MS * Math.pow(2, currentFailureCount - 1),
           MAX_BACKOFF_MS,
         );
 
-        entry.reconnect = {
-          failureCount,
-          backoffMs,
-          retryTimer: null,
-        };
+        if (freshEntry) {
+          freshEntry.reconnect = {
+            failureCount: currentFailureCount,
+            backoffMs,
+            retryTimer: null,
+          };
+        }
 
+        const logTunnelId = freshEntry?.tunnelId ?? entry.tunnelId;
         console.warn(
-          `[tunnel-registry] Tunnel reconnect failed for ${entry.tunnelId}. Next retry in ${backoffMs}ms (attempt ${failureCount}).`,
+          `[tunnel-registry] Tunnel reconnect failed for ${logTunnelId}. Next retry in ${backoffMs}ms (attempt ${currentFailureCount}).`,
         );
 
-        scheduleTunnelReconnect(key, entry);
+        scheduleTunnelReconnect(key, freshEntry ?? entry);
       }
     } catch {
       // If import or anything fails, keep retrying
-      const failureCount = (entry.reconnect?.failureCount ?? 0) + 1;
+      const freshEntry = registry.get(key);
+      const currentFailureCount = (freshEntry?.reconnect?.failureCount ?? (entry.reconnect?.failureCount ?? 0)) + 1;
       const backoffMs = Math.min(
-        INITIAL_BACKOFF_MS * Math.pow(2, failureCount - 1),
+        INITIAL_BACKOFF_MS * Math.pow(2, currentFailureCount - 1),
         MAX_BACKOFF_MS,
       );
 
-      entry.reconnect = {
-        failureCount,
-        backoffMs,
-        retryTimer: null,
-      };
+      if (freshEntry) {
+        freshEntry.reconnect = {
+          failureCount: currentFailureCount,
+          backoffMs,
+          retryTimer: null,
+        };
+      }
 
-      scheduleTunnelReconnect(key, entry);
+      scheduleTunnelReconnect(key, freshEntry ?? entry);
     }
   }, delay);
 }
