@@ -13,6 +13,8 @@ const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   "pick-target": "vmWizard.stepPickTarget",
   probing: "vmWizard.stepProbing",
   "pick-services": "vmWizard.stepPickServices",
+  "runtime-provision": "vmWizard.stepRuntimeProvision",
+  "runtime-consent": "vmWizard.stepRuntimeConsent",
   installing: "vmWizard.stepInstalling",
   forwarding: "vmWizard.stepForwarding",
   pairing: "vmWizard.stepPairing",
@@ -34,6 +36,8 @@ const STEP_ORDER: VmWizardStep[] = [
   "consent",
   "loop-task-consent",
   "pick-services",
+  "runtime-provision",
+  "runtime-consent",
   "installing",
   "pairing",
   "done",
@@ -159,7 +163,8 @@ export function AddVmWizard(props: {
   const isError = currentStep === "error";
   const isNodeConsent = currentStep === "consent";
   const isLoopTaskConsent = currentStep === "loop-task-consent";
-  const isConsentStep = isNodeConsent || isLoopTaskConsent;
+  const isRuntimeConsent = currentStep === "runtime-consent";
+  const isConsentStep = isNodeConsent || isLoopTaskConsent || isRuntimeConsent;
   const isPickServices = currentStep === "pick-services";
   const isInstalling = currentStep === "installing";
   const [setAsMain, setSetAsMain] = useState(true);
@@ -671,6 +676,37 @@ export function AddVmWizard(props: {
                 }}
               >
                 {intl.formatMessage({ id: "vmWizard.cancel" })}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {isRuntimeConsent && progress?.consentPrompt ? (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: "var(--bg-log)",
+            borderRadius: 8,
+            border: "1px solid var(--bg-active)",
+          }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
+              <ShieldCheck size={16} />
+              <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {translateMessage(intl, progress.consentPrompt)}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn primary"
+                onClick={() => vmWizardService.respondRuntimeConsent("install")}
+              >
+                {intl.formatMessage({ id: "vmWizard.installRuntime" })}
+              </button>
+              <button
+                className="btn"
+                onClick={() => vmWizardService.respondRuntimeConsent("skip")}
+              >
+                {intl.formatMessage({ id: "vmWizard.skip" })}
               </button>
             </div>
           </div>

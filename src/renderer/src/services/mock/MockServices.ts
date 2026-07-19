@@ -279,6 +279,7 @@ export class MockVmWizardService implements IVmWizardService {
   cancelWizard(): void {}
   respondConsent(): void {}
   respondServiceSelection(): void {}
+  respondRuntimeConsent(): void {}
 }
 
 @injectable()

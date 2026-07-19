@@ -26,4 +26,7 @@ export class VmWizardService implements IVmWizardService {
   respondServiceSelection(selection: VmWizardServiceSelection): void {
     return this.api.respondServiceSelection(selection);
   }
+  respondRuntimeConsent(decision: "install" | "skip"): void {
+    return this.api.respondRuntimeConsent(decision);
+  }
 }

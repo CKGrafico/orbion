@@ -77,6 +77,7 @@ export interface IVmWizardService {
   cancelWizard(): void;
   respondConsent(decision: "install" | "skip"): void;
   respondServiceSelection(selection: VmWizardServiceSelection): void;
+  respondRuntimeConsent(decision: "install" | "skip"): void;
 }
 
 export interface IInfraService {

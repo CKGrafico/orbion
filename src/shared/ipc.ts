@@ -70,6 +70,8 @@ export type EnvironmentRole = "coding" | "main-vm";
 
 export type AgentRuntime = "opencode" | "claude";
 
+export type RuntimeState = "available" | "unavailable" | "unknown";
+
 export interface EnvironmentCredentialRefs {
   sessionToken?: string;
   sshKeyPassphrase?: string;
@@ -80,6 +82,7 @@ export interface Environment {
   name: string;
   role?: EnvironmentRole;
   agentRuntime: AgentRuntime;
+  runtimeState?: RuntimeState;
   credentialRefs?: EnvironmentCredentialRefs;
   endpoints: AccessEndpoint[];
   activeEndpointId: string | null;
@@ -324,6 +327,8 @@ export type VmWizardStep =
   | "pick-target"
   | "probing"
   | "pick-services"
+  | "runtime-provision"
+  | "runtime-consent"
   | "installing"
   | "forwarding"
   | "pairing"
@@ -415,6 +420,7 @@ export interface VmWizardBridge {
   cancelWizard: () => void;
   respondConsent: (decision: "install" | "skip") => void;
   respondServiceSelection: (selection: VmWizardServiceSelection) => void;
+  respondRuntimeConsent: (decision: "install" | "skip") => void;
 }
 
 // ── Conversational inbox ────────────────────────────────────────────

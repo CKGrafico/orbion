@@ -1,17 +1,19 @@
-import type { AgentRuntime, SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage, ReachMethod, SessionToken, VmWizardStartOptions } from "../shared/ipc.js";
+import type { AgentRuntime, SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage, ReachMethod, SessionToken, VmWizardStartOptions, RuntimeState } from "../shared/ipc.js";
 import { TOOL_DEFINITIONS } from "../shared/tool-definitions.js";
 import { listSshHosts, parseTarget } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
-import { getEnvironments, addEnvironment, removeEnvironment, exchangePairingCode, storeSessionToken, storeSshKeyPassphrase, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded } from "./config-store.js";
+import { getEnvironments, addEnvironment, removeEnvironment, exchangePairingCode, storeSessionToken, storeSshKeyPassphrase, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded, setEnvironmentRuntimeState } from "./config-store.js";
 import { getMainWindow } from "./main-window.js";
 import { msg } from "./i18n.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { trimTrailingSlash } from "../shared/utils.js";
+import { createRuntimeAdapter, runtimeDetectMessage, runtimeConsentMessage } from "./runtime-adapter.js";
 
 let wizardCancelled = false;
 let consentResolver: ((decision: "install" | "skip") => void) | null = null;
 let serviceSelectionResolver: ((selection: VmWizardServiceSelection) => void) | null = null;
+let runtimeConsentResolver: ((decision: "install" | "skip") => void) | null = null;
 
 export function cancelWizard(): void {
   wizardCancelled = true;
@@ -25,6 +27,7 @@ export function resetWizardState(): void {
   wizardCancelled = false;
   consentResolver = null;
   serviceSelectionResolver = null;
+  runtimeConsentResolver = null;
 }
 
 export function respondConsent(decision: "install" | "skip"): void {
@@ -38,6 +41,13 @@ export function respondServiceSelection(selection: VmWizardServiceSelection): vo
   if (serviceSelectionResolver) {
     serviceSelectionResolver(selection);
     serviceSelectionResolver = null;
+  }
+}
+
+export function respondRuntimeConsent(decision: "install" | "skip"): void {
+  if (runtimeConsentResolver) {
+    runtimeConsentResolver(decision);
+    runtimeConsentResolver = null;
   }
 }
 
@@ -391,6 +401,52 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
 
   const serviceSelection = await askServiceSelection(probe, agentRuntime);
 
+  // Step 2.5: Runtime provisioning — check and offer to install the chosen runtime
+  let runtimeState: RuntimeState = "unknown";
+
+  if (wizardCancelled) {
+    emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
+    throw new Error("vmWizard.mainCancelled");
+  }
+
+  {
+    const runtimeAdapter = createRuntimeAdapter(agentRuntime);
+    emitProgress({ step: "runtime-provision", message: runtimeDetectMessage(agentRuntime, { available: false }), reachMethod: "ssh", probe });
+
+    const detected = runtimeAdapter.detect(probe);
+
+    if (detected.available) {
+      runtimeState = "available";
+      emitProgress({ step: "runtime-provision", message: runtimeDetectMessage(agentRuntime, detected), reachMethod: "ssh", probe });
+    } else {
+      // Offer to install the runtime
+      emitProgress({
+        step: "runtime-consent",
+        message: runtimeConsentMessage(agentRuntime),
+        reachMethod: "ssh",
+        probe,
+        consentPrompt: runtimeConsentMessage(agentRuntime),
+      });
+
+      const runtimeDecision = await new Promise<"install" | "skip">((resolve) => {
+        runtimeConsentResolver = resolve;
+      });
+
+      if (wizardCancelled) {
+        emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
+        throw new Error("vmWizard.mainCancelled");
+      }
+
+      if (runtimeDecision === "skip") {
+        runtimeState = "unavailable";
+      } else {
+        // Ensure the chosen runtime is included in the install tools
+        const selectedRuntimeToolId = runtimeToolId(agentRuntime);
+        serviceSelection.installTools[selectedRuntimeToolId] = true;
+      }
+    }
+  }
+
   // Step 3: Install / Start
   if (wizardCancelled) {
     emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
@@ -422,6 +478,15 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
 
   const daemonPort = launch.daemonPort ?? 8845;
   const opencodePort = launch.opencodePort;
+
+  // Update runtime state based on launch result
+  const selectedRuntimeToolId = runtimeToolId(agentRuntime);
+  const runtimeStatus = launch.toolStatuses[selectedRuntimeToolId];
+  if (runtimeState !== "available" && (runtimeStatus === "installed" || runtimeStatus === "started" || runtimeStatus === "already-running")) {
+    runtimeState = "available";
+  } else if (runtimeState !== "available" && runtimeStatus === "failed") {
+    runtimeState = "unavailable";
+  }
 
   // Direct URL — daemon is reachable on the VM's IP. No tunnel.
   const daemonUrl = `http://${host.hostName}:${daemonPort}`;
@@ -462,6 +527,7 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
   // Step 4: Save environment (direct URL, daemon is reachable on the VM's IP)
   const env = await addEnvironment(envName, daemonUrl, "ssh", host.label, agentRuntime);
   await persistWizardCredentials(env.id, sshKeyPassphrase, pair.paired ? pendingToken : null, "ssh");
+  await setEnvironmentRuntimeState(env.id, runtimeState);
   await autoPromoteFirstEnvIfNeeded();
 
   if (opencodePort) {
@@ -544,9 +610,33 @@ async function runLocalWizard(
     throw new Error("vmWizard.mainAlreadyExists");
   }
 
+  // Runtime provisioning — check availability for local/direct environments
+  let runtimeState: RuntimeState = "unknown";
+
+  emitProgress({ step: "runtime-provision", message: runtimeDetectMessage(agentRuntime, { available: false }), reachMethod: "local" });
+
+  if (agentRuntime === "opencode") {
+    // For OpenCode on local environments, check if the OpenCode server responds.
+    // We try the default OpenCode port (13284) on the same host as the daemon.
+    try {
+      const daemonHost = url.replace(/^https?:\/\//, "").replace(/:\d+.*$/, "");
+      const ocResult = await fetchAndUnwrap<{ ok: boolean }>(
+        `http://${daemonHost}:13284/api/health`,
+        { timeoutMs: 5_000 },
+      );
+      runtimeState = ocResult.ok ? "available" : "unavailable";
+    } catch {
+      runtimeState = "unavailable";
+    }
+  }
+  // For Claude Code on local environments, we cannot verify without SSH, so it stays "unknown".
+
+  emitProgress({ step: "runtime-provision", message: runtimeDetectMessage(agentRuntime, { available: runtimeState === "available" }), reachMethod: "local" });
+
   // Save environment — local/direct, no SSH target
   const env = await addEnvironment(name, url, "direct", undefined, agentRuntime);
   await persistWizardCredentials(env.id, sshKeyPassphrase, null, "local");
+  await setEnvironmentRuntimeState(env.id, runtimeState);
   await autoPromoteFirstEnvIfNeeded();
 
   emitProgress({

@@ -327,6 +327,13 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
+  "vmWizard:respondRuntimeConsent": (args) => {
+    const issues: string[] = [];
+    if (!isEnum(args[0], CONSENT_DECISIONS))
+      issues.push("decision must be 'install' or 'skip'");
+    return issues;
+  },
+
   // ── OpenCode ────────────────────────────────────────────
   "opencode:getStatus": (args) => {
     const issues: string[] = [];

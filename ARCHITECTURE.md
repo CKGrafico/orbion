@@ -159,10 +159,15 @@ There is no separate server; the **Electron main process is the backend**
   and opaque references to any wizard-owned credentials. The dedicated
   `credential-vault.ts` store holds only `safeStorage`-encrypted credential
   payloads. Removing an environment removes every credential it references.
-- **SSH onboarding** (`vm-wizard.ts`, `ssh-probe.ts`, `ssh-launch.ts`) — after
+- **SSH onboarding** (`vm-wizard.ts`, `ssh-probe.ts`, `ssh-launch.ts`, `runtime-adapter.ts`) — after
   SSH authentication, probes Node.js, the `loop-task` command, and daemon state.
   Node.js 20 or newer is required. A missing loop-task command produces an
-  explicit install-and-start checkpoint. The pinned global npm install and
+  explicit install-and-start checkpoint. After service selection, the wizard
+  checks the chosen agent runtime's availability via `runtime-adapter.ts`, which
+  isolates OpenCode and Claude Code detection/install logic behind a small
+  adapter interface. If the runtime is missing, a consent step offers to install
+  it. The result (available/unavailable/unknown) is stored as `runtimeState` on
+  the `Environment`. The pinned global npm install and
   daemon launch run over SSH, bind the daemon to `127.0.0.1`, and use a bounded
   readiness check before the environment is saved. Local/direct instances are
   validated only through their supplied API URL and remain user-managed.

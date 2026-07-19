@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem } from "../shared/ipc.js";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { getCredential, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
@@ -463,6 +463,10 @@ function _setEnvironmentAuthState(environmentId: string, authState: EnvironmentA
   mutateEnvironment(environmentId, (env) => { env.authState = authState; });
 }
 
+function _setEnvironmentRuntimeState(environmentId: string, runtimeState: RuntimeState): void {
+  mutateEnvironment(environmentId, (env) => { env.runtimeState = runtimeState; });
+}
+
 function _storeSessionToken(environmentId: string, token: SessionToken): boolean {
   const reference = storeCredential(JSON.stringify(token));
   if (!reference) return false;
@@ -644,6 +648,10 @@ export function updateEndpointHealth(environmentId: string, endpointId: string, 
 
 export function setEnvironmentAuthState(environmentId: string, authState: EnvironmentAuthState): Promise<void> {
   return serialize(() => _setEnvironmentAuthState(environmentId, authState));
+}
+
+export function setEnvironmentRuntimeState(environmentId: string, runtimeState: RuntimeState): Promise<void> {
+  return serialize(() => _setEnvironmentRuntimeState(environmentId, runtimeState));
 }
 
 export function storeSessionToken(environmentId: string, token: SessionToken): Promise<boolean> {

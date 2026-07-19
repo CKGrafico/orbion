@@ -90,6 +90,8 @@
     "stepPickTarget": "Pick target",
     "stepProbing": "Probing VM",
     "stepPickServices": "Pick services",
+    "stepRuntimeProvision": "Checking runtime",
+    "stepRuntimeConsent": "Install runtime",
     "stepInstalling": "Installing services",
     "stepForwarding": "Opening tunnel",
     "stepPairing": "Pairing",
@@ -175,6 +177,7 @@
     "opencodeOnPort": "OpenCode on :{port}",
     "installViaMise": "Install via mise",
     "installAndStartLoopTask": "Install and start loop-task",
+    "installRuntime": "Install runtime",
     "skip": "Skip",
     "cancel": "Cancel",
     "close": "Close",
@@ -254,7 +257,11 @@
     "mainTargetVmNotFound": "Target VM not found",
     "mainTargetVmNoEndpoint": "Target VM has no active endpoint",
     "mainCloneFailed": "Clone failed",
-    "mainUnknownAction": "Unknown infra action: {action}"
+    "mainUnknownAction": "Unknown infra action: {action}",
+    "mainRuntimeDetected": "{runtime} is available on the VM.",
+    "mainRuntimeNotDetected": "{runtime} was not detected on the VM.",
+    "mainRuntimeConsentPrompt": "{runtime} was not found on the VM. Install it?",
+    "mainRuntimeInstallFailed": "Failed to install {runtime} on the VM. Check the remote log for details."
   },
   "tasks": {
     "noTasks": "No tasks",
