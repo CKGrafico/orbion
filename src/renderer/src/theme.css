@@ -360,6 +360,122 @@ input {
   white-space: nowrap;
 }
 
+/* ── Instance Selector ─────────────────────────────────────────── */
+
+.instance-selector-wrapper {
+  position: relative;
+  margin: 2px;
+}
+
+.instance-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--bg-segment);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.instance-selector-trigger:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.instance-selector-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.instance-selector-arrow {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.instance-selector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 300px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  padding: 4px 0;
+}
+
+.instance-selector-dropdown-header {
+  padding: 6px 12px 4px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.instance-selector-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  border: none;
+  background: none;
+  transition: background 0.1s;
+}
+
+.instance-selector-option:hover {
+  background: var(--bg-hover);
+}
+
+.instance-selector-option.selected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.instance-selector-option.unreachable {
+  opacity: 0.5;
+}
+
+.instance-selector-option-name {
+  font-weight: 500;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.instance-selector-option-path {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instance-selector-option-loops {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
 /* ── Sidebar ────────────────────────────────────────────────────── */
 
 .sidebar {

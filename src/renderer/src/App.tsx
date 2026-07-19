@@ -36,6 +36,7 @@ import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
 import { SessionChatView } from "./components/SessionChatView";
 import { ModelSelector, getReasoningEffortsForModel } from "./components/ModelSelector";
 import { ReasoningEffortSelector } from "./components/ReasoningEffortSelector";
+import { InstanceSelector } from "./components/InstanceSelector";
 import type { IAgentService } from "./services/interfaces";
 
 type View =
@@ -748,6 +749,36 @@ export function App(): React.ReactNode {
     void configService.getChatSessions().then((s) => setSessions(s));
   }, [sessions, configService]);
 
+  /** Handle instance switch in a chat session: persist the change and add a transcript note. */
+  const handleInstanceSwitch = useCallback((sessionId: string, newEnvironmentId: string, newWorkingDirectory: string | undefined): void => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session || session.environmentId === newEnvironmentId) return;
+
+    const newEnv = environments.find((e) => e.id === newEnvironmentId);
+    const instanceName = newEnv?.name ?? newEnvironmentId;
+
+    const updates: Partial<Pick<ChatSession, "environmentId" | "workingDirectory">> = {
+      environmentId: newEnvironmentId,
+    };
+    if (newWorkingDirectory) {
+      updates.workingDirectory = newWorkingDirectory;
+    }
+
+    // Persist the instance change
+    void configService.updateChatSession(sessionId, updates);
+    // Add a transcript note about the switch
+    void transcriptService.appendMessage({
+      id: `instance-switch-${Date.now()}`,
+      sessionId,
+      role: "assistant",
+      content: intl.formatMessage({ id: "instanceSelector.switchedInstance" }, { instance: instanceName }),
+      startedAt: Date.now(),
+      finishedAt: Date.now(),
+    });
+    // Refresh sessions in local state
+    void configService.getChatSessions().then((s) => setSessions(s));
+  }, [sessions, environments, configService, transcriptService, intl]);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -926,6 +957,17 @@ export function App(): React.ReactNode {
                 {session.workingDirectory}
               </span>
             ) : null}
+            <InstanceSelector
+              projectName={session.projectName}
+              environments={environments}
+              perEnvProjects={perEnvProjects}
+              perEnvLoops={perEnvLoops}
+              health={health}
+              reachability={reachability}
+              currentEnvironmentId={session.environmentId}
+              mainVmId={mainVm?.id ?? null}
+              onChange={(envId, workDir) => handleInstanceSwitch(session.id, envId, workDir)}
+            />
             <AgentRuntimeSwitcher
               value={session.activeRuntime}
               instanceDefault={instanceDefault}
