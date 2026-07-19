@@ -58,7 +58,7 @@ export interface IConfigService {
   getChatSessions(): Promise<ChatSession[]>;
   addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession>;
   removeChatSession(sessionId: string): Promise<void>;
-  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>): Promise<void>;
+  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory">>): Promise<void>;
   getExpandedProjects(): Promise<string[]>;
   setExpandedProjects(expandedKeys: string[]): Promise<void>;
 }

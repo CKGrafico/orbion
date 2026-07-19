@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -27,7 +27,7 @@ import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, InboxBuildParams } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, InboxBuildParams } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 
@@ -76,6 +76,7 @@ export function App(): React.ReactNode {
   const [outageService] = useInject<IOutageService>(cid.IOutageService);
   const [reachabilityService] = useInject<IReachabilityService>(cid.IReachabilityService);
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -95,6 +96,13 @@ export function App(): React.ReactNode {
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
   /** The currently viewed chat session id (drives active-session highlighting in sidebar) */
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  /** All chat sessions — loaded from config store for header rendering */
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+
+  // Load sessions on mount and when activeSessionId changes
+  useEffect(() => {
+    void configService.getChatSessions().then((s) => setSessions(s));
+  }, [configService, activeSessionId]);
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -718,6 +726,26 @@ export function App(): React.ReactNode {
     }
 
     if (view.kind === "session") {
+      // Find the active session to render its scoped header
+      const session = sessions.find((s) => s.id === activeSessionId);
+      if (session) {
+        // Look up the project color from perEnvProjects using the session's home scope
+        const envProjects = perEnvProjects[session.environmentId] ?? [];
+        const project = envProjects.find((p) => p.name === session.projectName);
+        const projectColor = project?.color ?? "var(--text-muted)";
+        return (
+          <div className="main-header">
+            <span className="dot" style={{ background: projectColor }} />
+            <span className="main-title">{session.projectName}</span>
+            {session.workingDirectory ? (
+              <span className="chip mono session-directory" title={session.workingDirectory}>
+                {session.workingDirectory}
+              </span>
+            ) : null}
+            <span style={{ flex: 1 }} />
+          </div>
+        );
+      }
       return (
         <div className="main-header">
           <span className="main-title">{intl.formatMessage({ id: "session.viewTitle" })}</span>
@@ -907,6 +935,34 @@ export function App(): React.ReactNode {
                   }}
                   onNavigateToSession={handleNavigateToSession}
                   activeSessionId={activeSessionId}
+                  onOpenProjectChat={useCallback((projectName: string, environmentId: string, workingDirectory: string) => {
+                    // Find or create a session for this project on this instance
+                    const existing = sessions.find(
+                      (s) => s.projectName === projectName && s.environmentId === environmentId,
+                    );
+                    if (existing) {
+                      setActiveSessionId(existing.id);
+                      setView({ kind: "session", sessionId: existing.id });
+                      // Touch lastActiveAt
+                      void configService.updateChatSession(existing.id, {
+                        lastActiveAt: new Date().toISOString(),
+                      });
+                    } else {
+                      void configService
+                        .addChatSession({
+                          title: `Project: ${projectName}`,
+                          projectName,
+                          environmentId,
+                          workingDirectory,
+                          lastActiveAt: new Date().toISOString(),
+                        })
+                        .then((newSession) => {
+                          setActiveSessionId(newSession.id);
+                          setView({ kind: "session", sessionId: newSession.id });
+                          select(environmentId);
+                        });
+                    }
+                  }, [sessions, configService, select])}
                 />
               </aside>
             ) : null}
