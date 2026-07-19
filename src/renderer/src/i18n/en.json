@@ -95,6 +95,7 @@
     "stepPickReachMethod": "Choose reach method",
     "stepPickTarget": "Pick target",
     "stepProbing": "Probing VM",
+    "stepHostKeyVerify": "Verify host key",
     "stepPickServices": "Pick services",
     "stepRuntimeProvision": "Checking runtime",
     "stepRuntimeConsent": "Install runtime",
@@ -267,7 +268,12 @@
     "mainRuntimeDetected": "{runtime} is available on the VM.",
     "mainRuntimeNotDetected": "{runtime} was not detected on the VM.",
     "mainRuntimeConsentPrompt": "{runtime} was not found on the VM. Install it?",
-    "mainRuntimeInstallFailed": "Failed to install {runtime} on the VM. Check the remote log for details."
+    "mainRuntimeInstallFailed": "Failed to install {runtime} on the VM. Check the remote log for details.",
+    "hostKeyVerifyDescription": "The SSH server presented this host key fingerprint. Verify it matches the expected fingerprint for this host before connecting. If you are unsure, contact the host administrator.",
+    "trustHost": "Trust this host",
+    "mainHostKeyFetching": "Fetching host key for {label}…",
+    "mainHostKeyConfirm": "Confirm host key for {label}",
+    "mainHostKeyRejected": "Host key verification rejected. The wizard cannot proceed without trusting the host key."
   },
   "tasks": {
     "noTasks": "No tasks",

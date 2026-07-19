@@ -187,6 +187,8 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("vmWizard:respondServiceSelection", selection) as Promise<void>,
     respondRuntimeConsent: (decision: "install" | "skip") =>
       ipcRenderer.invoke("vmWizard:respondRuntimeConsent", decision) as Promise<void>,
+    respondHostKey: (accepted: boolean) =>
+      ipcRenderer.invoke("vmWizard:respondHostKey", accepted) as Promise<void>,
   },
 
   infra: {

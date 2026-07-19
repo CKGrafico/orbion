@@ -29,4 +29,7 @@ export class VmWizardService implements IVmWizardService {
   respondRuntimeConsent(decision: "install" | "skip"): void {
     return this.api.respondRuntimeConsent(decision);
   }
+  respondHostKey(accepted: boolean): void {
+    return this.api.respondHostKey(accepted);
+  }
 }

@@ -12,6 +12,7 @@ const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   "pick-reach-method": "vmWizard.stepPickReachMethod",
   "pick-target": "vmWizard.stepPickTarget",
   probing: "vmWizard.stepProbing",
+  "host-key-verify": "vmWizard.stepHostKeyVerify",
   "pick-services": "vmWizard.stepPickServices",
   "runtime-provision": "vmWizard.stepRuntimeProvision",
   "runtime-consent": "vmWizard.stepRuntimeConsent",
@@ -32,6 +33,7 @@ function stepLabel(intl: IntlShape, step: VmWizardStep): string {
 const STEP_ORDER: VmWizardStep[] = [
   "pick-reach-method",
   "pick-target",
+  "host-key-verify",
   "probing",
   "consent",
   "loop-task-consent",
@@ -165,6 +167,7 @@ export function AddVmWizard(props: {
   const isLoopTaskConsent = currentStep === "loop-task-consent";
   const isRuntimeConsent = currentStep === "runtime-consent";
   const isConsentStep = isNodeConsent || isLoopTaskConsent || isRuntimeConsent;
+  const isHostKeyVerify = currentStep === "host-key-verify";
   const isPickServices = currentStep === "pick-services";
   const isInstalling = currentStep === "installing";
   const [setAsMain, setSetAsMain] = useState(true);
@@ -712,6 +715,51 @@ export function AddVmWizard(props: {
           </div>
         ) : null}
 
+        {isHostKeyVerify && progress?.hostKeyFingerprint ? (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: "var(--bg-log)",
+            borderRadius: 8,
+            border: "1px solid var(--border-subtle)",
+          }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
+              <ShieldCheck size={16} style={{ color: "var(--accent)" }} />
+              <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {intl.formatMessage({ id: "vmWizard.hostKeyVerifyDescription" })}
+              </span>
+            </div>
+            <div style={{
+              padding: "8px 10px",
+              background: "var(--bg-input)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 6,
+              marginBottom: 10,
+              fontFamily: "monospace",
+              fontSize: 12,
+              color: "var(--text-primary)",
+              wordBreak: "break-all",
+              lineHeight: 1.5,
+            }}>
+              {progress.hostKeyFingerprint}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn primary"
+                onClick={() => vmWizardService.respondHostKey(true)}
+              >
+                {intl.formatMessage({ id: "vmWizard.trustHost" })}
+              </button>
+              <button
+                className="btn"
+                onClick={() => vmWizardService.respondHostKey(false)}
+              >
+                {intl.formatMessage({ id: "vmWizard.cancel" })}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {isDone && doneResult ? (
           <div style={{ marginTop: 12, padding: 12, background: "var(--bg-log)", borderRadius: 8, border: "1px solid var(--bg-active)" }}>
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: isFirstEnv ? "default" : "pointer", opacity: isFirstEnv ? 0.7 : 1 }}>
@@ -751,7 +799,7 @@ export function AddVmWizard(props: {
                 {intl.formatMessage({ id: "vmWizard.retry" })}
               </button>
             </>
-          ) : !isConsentStep ? (
+          ) : !isConsentStep && !isHostKeyVerify ? (
             <button className="btn" onClick={() => doneResult ? handleDoneFinal() : handleCancel()}>
               {running ? intl.formatMessage({ id: "vmWizard.cancel" }) : intl.formatMessage({ id: "vmWizard.close" })}
             </button>

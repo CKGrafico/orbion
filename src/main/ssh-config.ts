@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { execFile, execFileSync } from "node:child_process";
 import type { SshHost } from "../shared/ipc.js";
 
 interface RawHost {
@@ -178,7 +179,7 @@ export function buildSshArgs(host: SshHost, command: string): string[] {
     args.push("-p", String(host.port));
   }
 
-  args.push("-o", "StrictHostKeyChecking=accept-new");
+  args.push("-o", "StrictHostKeyChecking=yes");
   args.push("-o", "ConnectTimeout=10");
   args.push("-o", "BatchMode=yes");
 
@@ -186,4 +187,110 @@ export function buildSshArgs(host: SshHost, command: string): string[] {
   args.push(command);
 
   return args;
+}
+
+// ─── Known hosts management ──────────────────────────────────────────
+// Host key verification replaces the insecure StrictHostKeyChecking=accept-new
+// with explicit user confirmation on first connection, followed by
+// standard known_hosts verification on all subsequent connections.
+
+/** Return the path to the user's ~/.ssh/known_hosts file. */
+export function knownHostsPath(): string {
+  return path.join(os.homedir(), ".ssh", "known_hosts");
+}
+
+/**
+ * Check if a host already has an entry in ~/.ssh/known_hosts.
+ * Uses `ssh-keygen -F` for reliable matching (handles hashed known_hosts).
+ */
+export function isHostInKnownHosts(hostName: string, port: number): boolean {
+  const searchKey = port === 22 ? hostName : `[${hostName}]:${port}`;
+
+  if (!HOSTNAME_RE.test(hostName)) return false;
+
+  try {
+    const result = execFileSync("ssh-keygen", ["-F", searchKey, "-f", knownHostsPath()], {
+      timeout: 5_000,
+      encoding: "utf8",
+    });
+    return result.includes(searchKey);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Append a verified host key line to ~/.ssh/known_hosts.
+ * Creates the ~/.ssh/ directory (mode 0700) and known_hosts file if absent.
+ */
+export function appendToKnownHosts(keyLine: string): void {
+  const sshDir = path.join(os.homedir(), ".ssh");
+  const khPath = knownHostsPath();
+
+  if (!fs.existsSync(sshDir)) {
+    fs.mkdirSync(sshDir, { recursive: true, mode: 0o700 });
+  }
+
+  // Ensure the line ends with a newline
+  const line = keyLine.endsWith("\n") ? keyLine : `${keyLine}\n`;
+
+  fs.appendFileSync(khPath, line, { encoding: "utf8", mode: 0o644 });
+}
+
+/** Result of fetching a host key via ssh-keyscan. */
+export interface HostKeyResult {
+  /** Raw keyscan output lines (e.g. "[host]:port ssh-ed25519 AAAA...") */
+  rawLines: string;
+  /** Human-readable fingerprint (e.g. "SHA256:abc123..."), null if unavailable */
+  fingerprint: string | null;
+}
+
+/**
+ * Fetch the host key for a host:port using ssh-keyscan.
+ * This is safe: ssh-keyscan does not authenticate or open an SSH session.
+ * Returns null if the host is unreachable or keyscan fails.
+ */
+export async function fetchHostKey(hostName: string, port: number): Promise<HostKeyResult | null> {
+  if (!HOSTNAME_RE.test(hostName)) return null;
+
+  const keyscanArgs: string[] = ["-T", "10"];
+  if (port !== 22) {
+    keyscanArgs.push("-p", String(port));
+  }
+  keyscanArgs.push(hostName);
+
+  const rawLines = await new Promise<string>((resolve) => {
+    execFile("ssh-keyscan", keyscanArgs, { timeout: 15_000 }, (err, stdout) => {
+      if (err || !stdout?.trim()) {
+        resolve("");
+        return;
+      }
+      resolve(stdout.trim());
+    });
+  });
+
+  if (!rawLines) return null;
+
+  // Derive the human-readable fingerprint via ssh-keygen -lf -
+  let fingerprint: string | null = null;
+  try {
+    fingerprint = await new Promise<string | null>((resolve) => {
+      const proc = execFile("ssh-keygen", ["-lf", "-"], { timeout: 5_000 }, (err, stdout) => {
+        if (err || !stdout?.trim()) {
+          resolve(null);
+          return;
+        }
+        // ssh-keygen may output multiple lines for multiple key types;
+        // return the first one (typically the strongest)
+        const first = stdout.trim().split("\n")[0]?.trim() ?? null;
+        resolve(first);
+      });
+      // Feed the keyscan output as stdin to ssh-keygen
+      proc.stdin?.end(rawLines);
+    });
+  } catch {
+    fingerprint = null;
+  }
+
+  return { rawLines, fingerprint };
 }

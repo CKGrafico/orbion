@@ -75,7 +75,7 @@ export function openTunnel(
 
   args.push("-N");
   args.push("-L", `${localPort}:127.0.0.1:${remotePort}`);
-  args.push("-o", "StrictHostKeyChecking=accept-new");
+  args.push("-o", "StrictHostKeyChecking=yes");
   args.push("-o", "ConnectTimeout=10");
   args.push("-o", "ServerAliveInterval=15");
   args.push("-o", "ServerAliveCountMax=3");
