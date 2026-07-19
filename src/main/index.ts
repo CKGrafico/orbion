@@ -103,6 +103,7 @@ import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
+import { checkPlatformCli, resolvePlatformCli } from "./platform-cli.js";
 import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
@@ -290,42 +291,6 @@ function isAllowedBaseUrl(baseUrl: string): boolean {
   } catch {
     return false;
   }
-}
-
-interface CliCheckResult {
-  cli: "gh" | "az";
-  authenticated: boolean;
-  error?: string;
-}
-
-function checkPlatformCli(): Promise<CliCheckResult | null> {
-  return new Promise((resolve) => {
-    execFile("gh", ["auth", "status"], (err, _stdout, stderr) => {
-      if (!err) {
-        resolve({ cli: "gh", authenticated: true });
-        return;
-      }
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === "ENOENT") {
-        // gh not found, try az
-        execFile("az", ["account", "show"], (azErr) => {
-          if (!azErr) {
-            resolve({ cli: "az", authenticated: true });
-            return;
-          }
-          const azCode = (azErr as NodeJS.ErrnoException).code;
-          if (azCode === "ENOENT") {
-            resolve(null);
-            return;
-          }
-          resolve({ cli: "az", authenticated: false, error: stderr || azErr.message });
-        });
-        return;
-      }
-      // gh found but not authenticated
-      resolve({ cli: "gh", authenticated: false, error: stderr || err.message });
-    });
-  });
 }
 
 function platformCacheKey(environmentId: string, projectId: string): string {
@@ -1061,46 +1026,11 @@ app.whenReady().then(() => {
           preferredCli = "az";
         }
 
-        const cliCheck = await checkPlatformCli();
-        if (!cliCheck && !preferredCli) {
-          return { ok: false, error: msg("issues.noPlatformCli") };
+        const cliResolved = await resolvePlatformCli(preferredCli, "issues");
+        if ("error" in cliResolved) {
+          return { ok: false, error: cliResolved.error };
         }
-
-        // Determine which CLI to use: prefer cached platform, fall back to heuristic
-        let useCli: "gh" | "az";
-
-        if (preferredCli) {
-          // Use the preferred CLI if it's available and authenticated
-          if (preferredCli === "gh" && cliCheck?.cli === "gh" && cliCheck.authenticated) {
-            useCli = "gh";
-          } else if (preferredCli === "az" && cliCheck?.cli === "az" && cliCheck.authenticated) {
-            useCli = "az";
-          } else if (cliCheck && cliCheck.authenticated) {
-            // Preferred CLI not available/authenticated, fall back to whatever works
-            useCli = cliCheck.cli;
-          } else {
-            // No authenticated CLI at all
-            if (!cliCheck) {
-              return { ok: false, error: msg("issues.noPlatformCli") };
-            }
-            if (cliCheck.cli === "gh") {
-              return { ok: false, error: msg("issues.ghNotAuth") };
-            }
-            return { ok: false, error: msg("issues.azNotAuth") };
-          }
-        } else {
-          // No cached platform — use existing heuristic
-          if (!cliCheck) {
-            return { ok: false, error: msg("issues.noPlatformCli") };
-          }
-          if (!cliCheck.authenticated) {
-            if (cliCheck.cli === "gh") {
-              return { ok: false, error: msg("issues.ghNotAuth") };
-            }
-            return { ok: false, error: msg("issues.azNotAuth") };
-          }
-          useCli = cliCheck.cli;
-        }
+        const useCli = cliResolved.cli;
 
         const title = params.title;
         const body = params.body ?? "";
@@ -1169,10 +1099,14 @@ app.whenReady().then(() => {
           return { ok: false, error: msg("labels.issueNumberAndLabelsRequired") };
         }
 
-        const cliCheck = await checkPlatformCli();
-        if (!cliCheck || cliCheck.cli !== "gh" || !cliCheck.authenticated) {
+        const cliResolved = await resolvePlatformCli(null, "labels");
+        if ("error" in cliResolved) {
+          return { ok: false, error: cliResolved.error };
+        }
+        if (cliResolved.cli !== "gh") {
           return { ok: false, error: msg("labels.ghRequiredForLabels") };
         }
+        const useCli = cliResolved.cli;
 
         const labelArgs: string[] = [
           "issue", "edit", String(params.issueNumber),
@@ -1216,40 +1150,11 @@ app.whenReady().then(() => {
           preferredCli = "az";
         }
 
-        const cliCheck = await checkPlatformCli();
-        if (!cliCheck && !preferredCli) {
-          return { ok: false, error: msg("editIssue.noPlatformCli") };
+        const cliResolved = await resolvePlatformCli(preferredCli, "editIssue");
+        if ("error" in cliResolved) {
+          return { ok: false, error: cliResolved.error };
         }
-
-        let useCli: "gh" | "az";
-        if (preferredCli) {
-          if (preferredCli === "gh" && cliCheck?.cli === "gh" && cliCheck.authenticated) {
-            useCli = "gh";
-          } else if (preferredCli === "az" && cliCheck?.cli === "az" && cliCheck.authenticated) {
-            useCli = "az";
-          } else if (cliCheck && cliCheck.authenticated) {
-            useCli = cliCheck.cli;
-          } else {
-            if (!cliCheck) {
-              return { ok: false, error: msg("editIssue.noPlatformCli") };
-            }
-            if (cliCheck.cli === "gh") {
-              return { ok: false, error: msg("editIssue.ghNotAuth") };
-            }
-            return { ok: false, error: msg("editIssue.azNotAuth") };
-          }
-        } else {
-          if (!cliCheck) {
-            return { ok: false, error: msg("editIssue.noPlatformCli") };
-          }
-          if (!cliCheck.authenticated) {
-            if (cliCheck.cli === "gh") {
-              return { ok: false, error: msg("editIssue.ghNotAuth") };
-            }
-            return { ok: false, error: msg("editIssue.azNotAuth") };
-          }
-          useCli = cliCheck.cli;
-        }
+        const useCli = cliResolved.cli;
 
         // Azure DevOps: label operations are not supported via az boards CLI
         if (useCli === "az" && (params.addLabels?.length || params.removeLabels?.length)) {
