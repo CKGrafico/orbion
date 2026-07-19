@@ -16,9 +16,9 @@ type View =
   | { kind: "project"; projectId: string }
   | { kind: "loop"; loopId: string };
 
-/** Composite key for a Project(instance) pair — unique across environments */
-function projectInstanceKey(projectId: string, envId: string): string {
-  return `${envId}::${projectId}`;
+/** Key for a merged project node — deduped by project name */
+function mergedProjectKey(projectName: string): string {
+  return `merged:${projectName}`;
 }
 
 function healthTooltip(intl: IntlShape, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
@@ -85,15 +85,22 @@ function projectHasFailedLoop(
   return loops.some((loop) => loopStatusToFleetItem(loop.status, loop.lastExitCode, r) === "failed");
 }
 
-/** A flattened project-instance node for the 2-level tree */
-interface ProjectInstanceNode {
-  key: string;          // composite key: `${envId}::${projectId}`
-  projectId: string;
-  projectName: string;
-  projectColor: string;
+/** One instance's contribution to a merged project */
+interface ProjectInstanceSlice {
   envId: string;
   envName: string;
+  projectId: string;
   loops: LoopMeta[];
+}
+
+/** A merged project node — one entry per project NAME across all instances */
+interface MergedProjectNode {
+  key: string;             // `merged:${projectName}`
+  projectName: string;
+  projectColor: string;
+  instances: ProjectInstanceSlice[];
+  /** All loops from every instance, concatenated */
+  allLoops: LoopMeta[];
 }
 
 export function Sidebar(props: {
@@ -131,15 +138,20 @@ export function Sidebar(props: {
   // Text search filter
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Track which project-instance nodes are expanded
+  // Track which project nodes are expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
-  // Whether there's more than one environment (controls instance badge visibility)
-  const hasMultipleEnvs = environments.length > 1;
+  // Build merged project node list — one entry per project NAME across all instances.
+  // Same-name projects on different instances merge into a single sidebar row.
+  const projectNodes = useMemo<MergedProjectNode[]>(() => {
+    // Phase 1: collect per-instance project data
+    const envProjectData: Array<{
+      envId: string;
+      envName: string;
+      project: Project;
+      loops: LoopMeta[];
+    }> = [];
 
-  // Build flattened Project(instance) node list
-  const projectNodes = useMemo<ProjectInstanceNode[]>(() => {
-    const nodes: ProjectInstanceNode[] = [];
     for (const env of environments) {
       const envProjects = perEnvProjects[env.id] ?? [];
       const envLoops = perEnvLoops[env.id] ?? [];
@@ -155,15 +167,7 @@ export function Sidebar(props: {
 
       for (const project of envProjects) {
         const projectLoops = loopsByProject.get(project.id) ?? [];
-        nodes.push({
-          key: projectInstanceKey(project.id, env.id),
-          projectId: project.id,
-          projectName: project.name,
-          projectColor: project.color,
-          envId: env.id,
-          envName: env.name,
-          loops: projectLoops,
-        });
+        envProjectData.push({ envId: env.id, envName: env.name, project, loops: projectLoops });
       }
 
       // Also include "default" (unassigned) loops as a virtual project under each env
@@ -171,22 +175,46 @@ export function Sidebar(props: {
         (l) => !l.projectId || !envProjects.some((p) => p.id === l.projectId)
       );
       if (unassignedLoops.length > 0) {
-        // Check if a "default" project exists; if not, create a virtual one
         const hasDefaultProject = envProjects.some((p) => p.id === "default");
         if (!hasDefaultProject) {
-          nodes.push({
-            key: projectInstanceKey("default", env.id),
-            projectId: "default",
-            projectName: "Default",
-            projectColor: PILL_COLORS["idle"],
+          envProjectData.push({
             envId: env.id,
             envName: env.name,
+            project: { id: "default", name: "Default", color: PILL_COLORS["idle"], createdAt: new Date().toISOString() },
             loops: unassignedLoops,
           });
         }
       }
     }
-    return nodes;
+
+    // Phase 2: merge by project name
+    const byName = new Map<string, MergedProjectNode>();
+    for (const entry of envProjectData) {
+      const name = entry.project.name;
+      let node = byName.get(name);
+      if (!node) {
+        node = {
+          key: mergedProjectKey(name),
+          projectName: name,
+          projectColor: entry.project.color,
+          instances: [],
+          allLoops: [],
+        };
+        byName.set(name, node);
+      }
+      // If the same project name appears on multiple instances, prefer the
+      // color from the first instance that has it (all instances should have
+      // the same color for the same-named project, but use first-wins if not).
+      node.instances.push({
+        envId: entry.envId,
+        envName: entry.envName,
+        projectId: entry.project.id,
+        loops: entry.loops,
+      });
+      node.allLoops = [...node.allLoops, ...entry.loops];
+    }
+
+    return [...byName.values()];
   }, [environments, perEnvProjects, perEnvLoops]);
 
   // Filter by search query
@@ -196,8 +224,8 @@ export function Sidebar(props: {
     return projectNodes.filter((node) => {
       // Match project name, instance name, or any loop description
       if (node.projectName.toLowerCase().includes(q)) return true;
-      if (node.envName.toLowerCase().includes(q)) return true;
-      if (node.loops.some((l) => (l.description || l.id).toLowerCase().includes(q))) return true;
+      if (node.instances.some((inst) => inst.envName.toLowerCase().includes(q))) return true;
+      if (node.allLoops.some((l) => (l.description || l.id).toLowerCase().includes(q))) return true;
       return false;
     });
   }, [projectNodes, searchQuery]);
@@ -211,13 +239,22 @@ export function Sidebar(props: {
     });
   }, []);
 
-  // Determine which environment is "selected" for a given project node
-  // When clicking a project or loop, we select the environment it belongs to
-  const isProjectSelected = (node: ProjectInstanceNode): boolean => {
-    if (node.envId !== selectedId) return false;
-    if (view.kind === "project" && view.projectId === node.projectId) return true;
-    // Also selected if any child loop is the active loop view
-    if (view.kind === "loop" && node.loops.some((l) => l.id === view.loopId)) return true;
+  // Determine which environment is "selected" for a given merged project node.
+  // A merged project is selected if the current view is a project with a matching
+  // name, or if any child loop on the selected instance is active.
+  const isProjectSelected = (node: MergedProjectNode): boolean => {
+    if (view.kind === "project") {
+      // Check if any instance in this merged node has the selected project
+      return node.instances.some(
+        (inst) => inst.envId === selectedId && inst.projectId === view.projectId,
+      );
+    }
+    if (view.kind === "loop") {
+      // Also selected if any child loop belongs to the selected instance
+      return node.allLoops.some(
+        (l) => l.id === view.loopId && node.instances.some((inst) => inst.envId === selectedId && inst.loops.some((il) => il.id === l.id)),
+      );
+    }
     return false;
   };
 
@@ -292,7 +329,7 @@ export function Sidebar(props: {
         </button>
       </div>
 
-      {/* 2-level tree: Project(instance) > Loop */}
+      {/* 2-level tree: Merged project > Loop */}
       <div className="sidebar-list">
         {filteredNodes.length === 0 ? (
           <div className="sidebar-empty">
@@ -304,10 +341,20 @@ export function Sidebar(props: {
           filteredNodes.map((node) => {
             const projectExpanded = expandedProjects.has(node.key);
             const projectSelected = isProjectSelected(node);
-            const hasChildren = node.loops.length > 0;
+            const hasChildren = node.allLoops.length > 0;
+            const instanceCount = node.instances.length;
 
-            const h = health[node.envId] ?? "unknown";
-            const cs = connectionStatus?.[node.envId];
+            // Pick the primary instance for this merged project:
+            // prefer the currently selected env if it has this project,
+            // otherwise fall back to the first instance.
+            const primaryInstance = node.instances.find((inst) => inst.envId === selectedId) ?? node.instances[0];
+            const h = health[primaryInstance.envId] ?? "unknown";
+            const cs = connectionStatus?.[primaryInstance.envId];
+
+            // Check for failed loops across ALL instances in this merged project
+            const hasFailedLoop = node.instances.some((inst) =>
+              projectHasFailedLoop(inst.loops, inst.envId, health, reachability),
+            );
 
             return (
               <div key={node.key}>
@@ -315,8 +362,8 @@ export function Sidebar(props: {
                 <div
                   className={`tree-node tree-node-depth-0${projectSelected ? " selected" : ""}`}
                   onClick={() => {
-                    onSelect(node.envId);
-                    onNavigate({ kind: "project", projectId: node.projectId });
+                    onSelect(primaryInstance.envId);
+                    onNavigate({ kind: "project", projectId: primaryInstance.projectId });
                   }}
                   title={healthTooltip(intl, h, cs)}
                 >
@@ -327,55 +374,106 @@ export function Sidebar(props: {
                   />
                   <span className="tree-dot-wrap">
                     <span className="tree-dot" style={{ background: node.projectColor }} />
-                    {projectHasFailedLoop(node.loops, node.envId, health, reachability) ? (
+                    {hasFailedLoop ? (
                       <span className="tree-dot-pip" title={intl.formatMessage({ id: "sidebar.projectHasFailure" })} />
                     ) : null}
                   </span>
                   <span className="tree-label">{node.projectName}</span>
-                  {hasMultipleEnvs ? (
-                    <span className="tree-instance-badge">{node.envName}</span>
+                  {instanceCount > 1 ? (
+                    <span className="tree-instance-badge" title={intl.formatMessage({ id: "sidebar.instanceCount" }, { count: instanceCount })}>
+                      {instanceCount}
+                    </span>
                   ) : null}
                   <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }}>
-                    {node.loops.length}
+                    {node.allLoops.length}
                   </span>
                 </div>
 
-                {/* Loop children (level 1) */}
+                {/* Loop children (level 1) — grouped by instance when multiple */}
                 {projectExpanded ? (
                   <div className="tree-children">
-                    {node.loops.map((loop) => {
-                      const loopSelected = isLoopSelected(loop.id);
-                      const loopTitle = loop.description?.trim() || loop.id;
-                      const envReachability = reachability?.[node.envId];
-                      const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, envReachability);
-                      const loopColor = PILL_COLORS[fleetItem];
-                      const loopLabel = getPillLabel(fleetItem);
+                    {instanceCount > 1 ? (
+                      // Multi-instance: show instance group headers + loops
+                      node.instances.map((inst) => {
+                        if (inst.loops.length === 0) return null;
+                        const instReachability = reachability?.[inst.envId];
+                        return (
+                          <div key={`inst-${inst.envId}`}>
+                            <div className="tree-node tree-node-depth-1 tree-instance-group">
+                              <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
+                              <span className="tree-instance-label">{inst.envName}</span>
+                            </div>
+                            {inst.loops.map((loop) => {
+                              const loopSelected = isLoopSelected(loop.id);
+                              const loopTitle = loop.description?.trim() || loop.id;
+                              const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, instReachability);
+                              const loopColor = PILL_COLORS[fleetItem];
+                              const loopLabel = getPillLabel(fleetItem);
 
-                      return (
-                        <div
-                          key={loop.id}
-                          className={`tree-node tree-node-depth-1${loopSelected ? " selected" : ""}`}
-                          onClick={() => {
-                            onSelect(node.envId);
-                            onNavigate({ kind: "loop", loopId: loop.id });
-                          }}
-                        >
-                          <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
-                          <LoopStatusDot status={loop.status} lastExitCode={loop.lastExitCode} reachability={envReachability} />
-                          <span className="tree-label">{loopTitle}</span>
-                          <span
-                            className="tree-loop-status"
-                            style={{ color: loopColor }}
-                            title={loopLabel}
+                              return (
+                                <div
+                                  key={loop.id}
+                                  className={`tree-node tree-node-depth-2${loopSelected ? " selected" : ""}`}
+                                  onClick={() => {
+                                    onSelect(inst.envId);
+                                    onNavigate({ kind: "loop", loopId: loop.id });
+                                  }}
+                                >
+                                  <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
+                                  <LoopStatusDot status={loop.status} lastExitCode={loop.lastExitCode} reachability={instReachability} />
+                                  <span className="tree-label">{loopTitle}</span>
+                                  <span
+                                    className="tree-loop-status"
+                                    style={{ color: loopColor }}
+                                    title={loopLabel}
+                                  >
+                                    {loopLabel}
+                                  </span>
+                                  <span className="tree-loop-runcount">
+                                    {loop.runCount > 0 ? `${loop.runCount}r` : ""}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      // Single instance: show loops directly (same as before)
+                      node.allLoops.map((loop) => {
+                        const loopSelected = isLoopSelected(loop.id);
+                        const loopTitle = loop.description?.trim() || loop.id;
+                        const envReachability = reachability?.[primaryInstance.envId];
+                        const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, envReachability);
+                        const loopColor = PILL_COLORS[fleetItem];
+                        const loopLabel = getPillLabel(fleetItem);
+
+                        return (
+                          <div
+                            key={loop.id}
+                            className={`tree-node tree-node-depth-1${loopSelected ? " selected" : ""}`}
+                            onClick={() => {
+                              onSelect(primaryInstance.envId);
+                              onNavigate({ kind: "loop", loopId: loop.id });
+                            }}
                           >
-                            {loopLabel}
-                          </span>
-                          <span className="tree-loop-runcount">
-                            {loop.runCount > 0 ? `${loop.runCount}r` : ""}
-                          </span>
-                        </div>
-                      );
-                    })}
+                            <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
+                            <LoopStatusDot status={loop.status} lastExitCode={loop.lastExitCode} reachability={envReachability} />
+                            <span className="tree-label">{loopTitle}</span>
+                            <span
+                              className="tree-loop-status"
+                              style={{ color: loopColor }}
+                              title={loopLabel}
+                            >
+                              {loopLabel}
+                            </span>
+                            <span className="tree-loop-runcount">
+                              {loop.runCount > 0 ? `${loop.runCount}r` : ""}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 ) : null}
               </div>
