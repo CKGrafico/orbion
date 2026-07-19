@@ -861,6 +861,7 @@ export function App(): React.ReactNode {
                   perEnvProjects={perEnvProjects}
                   view={view}
                   reachability={reachability}
+                  mainVmId={mainVm?.id ?? null}
                   onSelect={handleSelect}
                   onNavigate={handleNavigate}
                   onAddVm={() => setVmWizardOpen(true)}

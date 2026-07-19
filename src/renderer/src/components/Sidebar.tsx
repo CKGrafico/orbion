@@ -113,6 +113,8 @@ export function Sidebar(props: {
   view: View;
   /** Per-environment reachability state (its own health layer, separate from loop status). */
   reachability?: Record<string, ReachabilityState>;
+  /** ID of the main-VM environment — used to prefer its project color when instances disagree. */
+  mainVmId?: string | null;
   onSelect: (id: string) => void;
   onNavigate: (view: View) => void;
   onAddVm?: () => void;
@@ -131,7 +133,7 @@ export function Sidebar(props: {
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
-    reachability,
+    reachability, mainVmId,
   } = props;
   const intl = useIntl();
 
@@ -189,22 +191,30 @@ export function Sidebar(props: {
 
     // Phase 2: merge by project name
     const byName = new Map<string, MergedProjectNode>();
+    // Track the color from the main-VM instance per project name so we can
+    // prefer it deterministically when instances disagree.
+    const mainVmColor = new Map<string, string>();
+    for (const entry of envProjectData) {
+      const name = entry.project.name;
+      if (entry.envId === mainVmId && !mainVmColor.has(name)) {
+        mainVmColor.set(name, entry.project.color);
+      }
+    }
     for (const entry of envProjectData) {
       const name = entry.project.name;
       let node = byName.get(name);
       if (!node) {
+        // Prefer the main-VM's color; fall back to the first instance's color.
+        const color = mainVmColor.get(name) ?? entry.project.color;
         node = {
           key: mergedProjectKey(name),
           projectName: name,
-          projectColor: entry.project.color,
+          projectColor: color,
           instances: [],
           allLoops: [],
         };
         byName.set(name, node);
       }
-      // If the same project name appears on multiple instances, prefer the
-      // color from the first instance that has it (all instances should have
-      // the same color for the same-named project, but use first-wins if not).
       node.instances.push({
         envId: entry.envId,
         envName: entry.envName,
@@ -215,7 +225,7 @@ export function Sidebar(props: {
     }
 
     return [...byName.values()];
-  }, [environments, perEnvProjects, perEnvLoops]);
+  }, [environments, perEnvProjects, perEnvLoops, mainVmId]);
 
   // Filter by search query
   const filteredNodes = useMemo(() => {
@@ -384,7 +394,7 @@ export function Sidebar(props: {
                       {instanceCount}
                     </span>
                   ) : null}
-                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }}>
+                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.loopCount" }, { count: node.allLoops.length })}>
                     {node.allLoops.length}
                   </span>
                 </div>
