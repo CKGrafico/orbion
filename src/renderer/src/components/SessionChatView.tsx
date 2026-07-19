@@ -4,8 +4,10 @@ import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
 import type { IAgentService, ITranscriptService } from "../services/interfaces";
+import type { LoopMeta } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
+import { LoopSummaryBar } from "./LoopSummaryBar";
 import { WifiOff } from "lucide-react";
 
 const MarkdownContent = lazy(() =>
@@ -24,9 +26,11 @@ interface SessionChatViewProps {
   reasoningEffort?: ReasoningEffort;
   environments: Array<{ id: string; name: string }>;
   reachability?: ReachabilityState;
+  /** Loops scoped to the session's home project x instance, for the summary bar. */
+  loops: LoopMeta[];
 }
 
-export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -274,6 +278,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           )}
         </div>
       ) : null}
+      <LoopSummaryBar loops={loops} reachability={reachability} />
       <div className="session-chat-scroll" ref={scrollRef}>
         {rows.length === 0 ? (
           <div className="session-chat-empty">
