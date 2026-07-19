@@ -753,6 +753,10 @@
     "statusStopped": "stopped",
     "statusFailed": "failed",
     "statusFinished": "finished",
-    "statusUnknown": "unknown"
+    "statusUnknown": "unknown",
+    "outputLabel": "OUTPUT",
+    "copy": "Copy",
+    "copied": "Copied",
+    "logUnavailable": "unavailable"
   }
 }

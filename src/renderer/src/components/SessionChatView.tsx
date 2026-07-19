@@ -4,7 +4,7 @@ import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
 import type { IAgentService, ITranscriptService } from "../services/interfaces";
-import type { LoopMeta } from "../types";
+import type { LoopMeta, Environment } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar } from "./LoopSummaryBar";
@@ -31,9 +31,11 @@ interface SessionChatViewProps {
   loops: LoopMeta[];
   /** All per-environment loops, for resolving loop-card rows. */
   perEnvLoops: Record<string, LoopMeta[]>;
+  /** The full environment instance, for log tail in loop cards. */
+  instance?: Environment;
 }
 
-export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, instance }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -371,7 +373,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 if (!loop) return null;
                 return (
                   <div key={row.id} className="transcript-loop-card">
-                    <LoopCard loop={loop} reachability={reachability} />
+                    <LoopCard loop={loop} reachability={reachability} instance={instance} />
                   </div>
                 );
               }

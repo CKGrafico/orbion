@@ -1357,6 +1357,70 @@ input {
   flex-shrink: 0;
 }
 
+/* ── Log tail inside loop card (compact monospace output) ────────── */
+
+.loop-card-log-tail {
+  margin-top: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.loop-card-log-tail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 8px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.loop-card-log-tail-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.loop-card-log-tail-copy {
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: transparent;
+  border: none;
+  font-family: var(--font-ui);
+}
+
+.loop-card-log-tail-copy:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.loop-card-log-tail-content {
+  background: #0b111b;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.loop-card-log-tail-line {
+  padding: 0;
+}
+
+.loop-card-log-tail-line--error {
+  color: var(--danger);
+  font-weight: 500;
+}
+
 /* ── Transcript loop-card row (padding inside the chat stream) ──── */
 
 .transcript-loop-card {
