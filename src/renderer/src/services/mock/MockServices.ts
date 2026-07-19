@@ -37,6 +37,8 @@ import type {
   TranscriptMessage,
   McpConnectionStatus,
   McpToolCallResult,
+  BootstrapSeedExportResult,
+  BootstrapSeedImportResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -268,6 +270,31 @@ export class MockConfigService implements IConfigService {
   }
   async setExpandedProjects(expandedKeys: string[]): Promise<void> {
     try { localStorage.setItem("orbion.expanded.mock", JSON.stringify(expandedKeys)); } catch { /* empty */ }
+  }
+  async exportBootstrapSeed(): Promise<BootstrapSeedExportResult> {
+    const mainVm = mockEnvironments.find((e) => e.role === "main-vm");
+    if (!mainVm) {
+      return { ok: false, error: { key: "bootstrapSeed.noMainVm" } };
+    }
+    const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
+    if (!activeEndpoint) {
+      return { ok: false, error: { key: "bootstrapSeed.noEndpoint" } };
+    }
+    const kind = activeEndpoint.kind === "ssh" ? "ssh" as const : "direct" as const;
+    const target = kind === "ssh" && activeEndpoint.sshTarget
+      ? activeEndpoint.sshTarget
+      : activeEndpoint.url;
+    const { encodeBootstrapSeed } = await import("../../../../shared/utils");
+    const seed = encodeBootstrapSeed({ kind, target, name: mainVm.name });
+    return { ok: true, seed };
+  }
+  async importBootstrapSeed(seedString: string): Promise<BootstrapSeedImportResult> {
+    const { decodeBootstrapSeed } = await import("../../../../shared/utils");
+    const seed = decodeBootstrapSeed(seedString);
+    if (!seed) {
+      return { ok: false, error: { key: "bootstrapSeed.invalidSeed" } };
+    }
+    return { ok: true, seed };
   }
 }
 
