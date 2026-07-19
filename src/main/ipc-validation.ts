@@ -560,6 +560,39 @@ const validators: Record<string, Validator> = {
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     return issues;
   },
+
+  // ── MCP ─────────────────────────────────────────────────────
+  "mcp:getStatus": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+
+  "mcp:connect": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+
+  "mcp:disconnect": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+
+  "mcp:callTool": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    if (!isString(args[1])) {
+      issues.push("toolName must be a string");
+    } else if (args[1].length === 0 || args[1].length > 256) {
+      issues.push("toolName must be 1-256 characters");
+    } else if (/[\x00-\x1f\x60\x24\x5c\x3b\x22\x27\x26\x7c\x3c\x3e\x28\x29\x7b\x7d]/.test(args[1])) {
+      issues.push("toolName contains disallowed characters");
+    }
+    if (!isObject(args[2])) issues.push("args must be an object");
+    return issues;
+  },
 };
 
 // ── Structured IPC error result ───────────────────────────────────────
