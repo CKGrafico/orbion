@@ -900,6 +900,42 @@ app.whenReady().then(() => {
     await setExpandedProjects(expandedKeys);
   });
 
+  // ── CLI input sanitization (issue #191) ──────────────────────────────
+  /** Label: alphanumeric, underscore, dot, colon, slash, hyphen only. No commas, spaces, or `--` prefix. */
+  const LABEL_RE = /^[a-zA-Z0-9_.:/-]+$/;
+  /** Repo: `owner/repo` where each part is alphanumeric, underscore, dot, or hyphen. */
+  const REPO_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+  /** Control characters (newlines, null bytes, tabs, etc.) – reject in title/body. */
+  const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
+
+  function validateLabels(labels: string[]): void {
+    for (const label of labels) {
+      if (!LABEL_RE.test(label)) {
+        throw new Error(`Invalid label: "${label}". Labels may only contain letters, digits, _, ., :, /, -`);
+      }
+      if (label.startsWith("--")) {
+        throw new Error(`Invalid label: "${label}". Labels must not start with "--"`);
+      }
+    }
+  }
+
+  function validateRepo(repo: string | undefined): void {
+    if (!repo) return;
+    if (!REPO_RE.test(repo)) {
+      throw new Error(`Invalid repo format: "${repo}". Expected "owner/repo"`);
+    }
+  }
+
+  function sanitizeText(value: string): string {
+    return value.replace(CONTROL_CHAR_RE, " ").trim();
+  }
+
+  function validateCliInputs(opts: { title?: string; body?: string; labels?: string[]; repo?: string | undefined }): void {
+    if (opts.labels?.length) validateLabels(opts.labels);
+    validateRepo(opts.repo);
+  }
+  // ── end CLI input sanitization ──────────────────────────────────────
+
   safeHandle("infra:executeAction", async (_event, ...rawArgs): Promise<InfraActionResult> => {
     const [args] = validateIpc<[InfraActionArgs]>("infra:executeAction", rawArgs);
     const mainVmEnv = getMainVm();
@@ -1032,10 +1068,16 @@ app.whenReady().then(() => {
         }
         const useCli = cliResolved.cli;
 
-        const title = params.title;
-        const body = params.body ?? "";
+        const title = sanitizeText(params.title);
+        const body = sanitizeText(params.body ?? "");
         const labels = params.labels ?? [];
         const repo = params.repo;
+
+        try {
+          validateCliInputs({ title, body, labels, repo });
+        } catch (validationErr) {
+          return { ok: false, error: (validationErr as Error).message };
+        }
 
         if (useCli === "gh") {
           const ghArgs: string[] = ["issue", "create", "--title", title, "--body", body];
@@ -1106,7 +1148,12 @@ app.whenReady().then(() => {
         if (cliResolved.cli !== "gh") {
           return { ok: false, error: msg("labels.ghRequiredForLabels") };
         }
-        const useCli = cliResolved.cli;
+
+        try {
+          validateCliInputs({ labels: params.labels, repo: params.repo });
+        } catch (validationErr) {
+          return { ok: false, error: (validationErr as Error).message };
+        }
 
         const labelArgs: string[] = [
           "issue", "edit", String(params.issueNumber),
@@ -1161,13 +1208,27 @@ app.whenReady().then(() => {
           return { ok: false, error: msg("editIssue.adoLabelsNotSupported") };
         }
 
+        const sanitizedTitle = params.title ? sanitizeText(params.title) : undefined;
+        const sanitizedBody = params.body ? sanitizeText(params.body) : undefined;
+
+        try {
+          validateCliInputs({
+            title: sanitizedTitle,
+            body: sanitizedBody,
+            labels: [...(params.addLabels ?? []), ...(params.removeLabels ?? [])],
+            repo: params.repo,
+          });
+        } catch (validationErr) {
+          return { ok: false, error: (validationErr as Error).message };
+        }
+
         if (useCli === "gh") {
           const ghArgs: string[] = ["issue", "edit", String(params.issueNumber)];
-          if (params.title) {
-            ghArgs.push("--title", params.title);
+          if (sanitizedTitle) {
+            ghArgs.push("--title", sanitizedTitle);
           }
-          if (params.body) {
-            ghArgs.push("--body", params.body);
+          if (sanitizedBody) {
+            ghArgs.push("--body", sanitizedBody);
           }
           if (params.addLabels?.length) {
             ghArgs.push("--add-label", params.addLabels.join(","));
@@ -1180,8 +1241,8 @@ app.whenReady().then(() => {
           }
 
           const changes: EditIssueResult["changes"] = {};
-          if (params.title) changes.title = true;
-          if (params.body) changes.body = true;
+          if (sanitizedTitle) changes.title = true;
+          if (sanitizedBody) changes.body = true;
           if (params.addLabels?.length) changes.labelsAdded = params.addLabels;
           if (params.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
 
@@ -1206,16 +1267,16 @@ app.whenReady().then(() => {
           "boards", "work-item", "update",
           "--id", String(params.issueNumber),
         ];
-        if (params.title) {
-          azArgs.push("--title", params.title);
+        if (sanitizedTitle) {
+          azArgs.push("--title", sanitizedTitle);
         }
-        if (params.body) {
-          azArgs.push("--description", params.body);
+        if (sanitizedBody) {
+          azArgs.push("--description", sanitizedBody);
         }
 
         const changes: EditIssueResult["changes"] = {};
-        if (params.title) changes.title = true;
-        if (params.body) changes.body = true;
+        if (sanitizedTitle) changes.title = true;
+        if (sanitizedBody) changes.body = true;
 
         return new Promise<InfraActionResult>((resolve) => {
           execFile("az", azArgs, (err, stdout, stderr) => {
