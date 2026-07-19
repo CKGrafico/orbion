@@ -14,12 +14,15 @@ interface LoopSummaryBarProps {
 const HEALTHY_STATUSES: Set<LoopStatus> = new Set(["running", "waiting"]);
 
 /** Exception statuses that get individual colored segments. */
-const EXCEPTION_STATUSES: LoopStatus[] = ["failed", "paused", "finished"];
+const EXCEPTION_STATUSES: LoopStatus[] = ["failed", "paused", "stopped", "finished"];
 
-/** Color CSS variable for each exception status. Failures use the alert/danger color. */
+/** Color CSS variable for each exception status.
+ *  Failed uses the alert/danger color; stopped gets warm amber distinct from failed;
+ *  paused gets yellow (schedule kept); finished gets green (success). */
 const EXCEPTION_COLORS: Record<string, string> = {
   failed: "var(--danger)",
   paused: "var(--status-paused)",
+  stopped: "var(--status-stopped)",
   finished: "var(--status-finished)",
 };
 
@@ -34,7 +37,6 @@ export function LoopSummaryBar({ loops, reachability }: LoopSummaryBarProps): Re
       waiting: 0,
       paused: 0,
       stopped: 0,
-      idle: 0,
       failed: 0,
       finished: 0,
     };

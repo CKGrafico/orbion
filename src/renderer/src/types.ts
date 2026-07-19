@@ -2,7 +2,7 @@ import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAu
 
 export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult };
 
-export type LoopStatus = "running" | "waiting" | "paused" | "idle" | "stopped" | "failed" | "finished";
+export type LoopStatus = "running" | "waiting" | "paused" | "stopped" | "failed" | "finished";
 
 export interface RunRecord {
   runNumber: number;

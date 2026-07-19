@@ -2,11 +2,17 @@ import type { LoopStatus, RunRecord } from "./types";
 import { standaloneIntl } from "./i18n";
 
 // Status palette matches the loop-task TUI theme so both products read the same.
+// All 6 loop-task states are represented with distinct colors:
+//   running  = lime-green (active work)
+//   waiting  = blue (idle between runs)
+//   paused   = amber (schedule kept, can resume)
+//   stopped  = warm-amber (schedule cleared, must re-create)
+//   failed   = red (non-zero exit)
+//   finished = green (hit max-runs, success)
 export const STATUS_COLORS: Record<LoopStatus, string> = {
   running: "var(--status-running)",
   waiting: "var(--status-waiting)",
   paused: "var(--status-paused)",
-  idle: "var(--status-idle)",
   stopped: "var(--status-stopped)",
   failed: "var(--status-failed)",
   finished: "var(--status-finished)",

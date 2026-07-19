@@ -331,7 +331,6 @@
     "statusRunning": "running",
     "statusWaiting": "waiting",
     "statusPaused": "paused",
-    "statusIdle": "idle",
     "statusStopped": "stopped",
     "activityToday": "Runs today",
     "activityAvgDuration": "Avg duration",
@@ -509,6 +508,8 @@
     "working": "working",
     "done": "done",
     "failed": "failed",
+    "paused": "paused",
+    "stopped": "stopped",
     "idle": "idle",
     "unknown": "unknown"
   },
@@ -734,6 +735,7 @@
     "healthyCount": "{count} running",
     "failedCount": "{count} failed",
     "pausedCount": "{count} paused",
+    "stoppedCount": "{count} stopped",
     "finishedCount": "{count} finished",
     "nextRun": "next: {loop} in {countdown}"
   },
@@ -748,7 +750,6 @@
     "statusRunning": "running",
     "statusWaiting": "waiting",
     "statusPaused": "paused",
-    "statusIdle": "idle",
     "statusStopped": "stopped",
     "statusFailed": "failed",
     "statusFinished": "finished",

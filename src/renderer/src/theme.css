@@ -30,10 +30,9 @@
   --status-running: #9fef00;
   --status-waiting: #5cb2ff;
   --status-paused: #ffcc5c;
-  --status-idle: #a4b1cd;
-  --status-stopped: #ff8484;
+  --status-stopped: #e8a24e;
   --status-failed: #ff8484;
-  --status-finished: #a4b1cd;
+  --status-finished: #a9d95c;
   --status-unknown: #64718c;
   --health-ok: #a9d95c;
   --health-offline: #ff8484;

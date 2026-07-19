@@ -6,6 +6,8 @@ export type FleetItemStatus =
   | "working"
   | "completed"
   | "failed"
+  | "paused"
+  | "stopped"
   | "idle"
   | "unknown";
 
@@ -13,6 +15,8 @@ export const PRIORITY_ORDER: FleetItemStatus[] = [
   "pending-approval",
   "awaiting-input",
   "failed",
+  "stopped",
+  "paused",
   "working",
   "completed",
   "idle",
@@ -29,6 +33,8 @@ const PILL_LABEL_KEYS: Record<FleetItemStatus, string> = {
   working: "fleet.working",
   completed: "fleet.done",
   failed: "fleet.failed",
+  paused: "fleet.paused",
+  stopped: "fleet.stopped",
   idle: "fleet.idle",
   unknown: "fleet.unknown",
 };
@@ -41,6 +47,8 @@ export const PILL_COLORS: Record<FleetItemStatus, string> = {
   "pending-approval": "var(--pill-approval)",
   "awaiting-input": "var(--pill-input)",
   failed: "var(--pill-failed)",
+  stopped: "var(--status-stopped)",
+  paused: "var(--status-paused)",
   working: "var(--pill-working)",
   completed: "var(--pill-done)",
   idle: "var(--pill-idle)",
@@ -72,6 +80,7 @@ export function isNotifiableStatus(status: FleetItemStatus): boolean {
   return (
     status === "pending-approval" ||
     status === "awaiting-input" ||
-    status === "failed"
+    status === "failed" ||
+    status === "stopped"
   );
 }
