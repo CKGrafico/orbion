@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -27,9 +27,10 @@ import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, InboxBuildParams } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, InboxBuildParams } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
+import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
 
 type View =
   | { kind: "inbox" }
@@ -77,6 +78,7 @@ export function App(): React.ReactNode {
   const [reachabilityService] = useInject<IReachabilityService>(cid.IReachabilityService);
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
+  const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -573,6 +575,30 @@ export function App(): React.ReactNode {
     setView({ kind: "session", sessionId });
   }, []);
 
+  /** Handle runtime switch in a chat session: persist the change and add a transcript note. */
+  const handleRuntimeSwitch = useCallback((sessionId: string, newRuntime: AgentRuntime): void => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session || session.activeRuntime === newRuntime) return;
+
+    const runtimeLabel = newRuntime === "opencode"
+      ? intl.formatMessage({ id: "agentSwitcher.opencode" })
+      : intl.formatMessage({ id: "agentSwitcher.claude" });
+
+    // Persist the runtime change
+    void configService.updateChatSession(sessionId, { activeRuntime: newRuntime });
+    // Add a transcript note about the switch
+    void transcriptService.appendMessage({
+      id: `runtime-switch-${Date.now()}`,
+      sessionId,
+      role: "assistant",
+      content: intl.formatMessage({ id: "agentSwitcher.switchedRuntime" }, { runtime: runtimeLabel }),
+      startedAt: Date.now(),
+      finishedAt: Date.now(),
+    });
+    // Refresh sessions in local state
+    void configService.getChatSessions().then((s) => setSessions(s));
+  }, [sessions, configService, transcriptService, intl]);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -733,6 +759,11 @@ export function App(): React.ReactNode {
         const envProjects = perEnvProjects[session.environmentId] ?? [];
         const project = envProjects.find((p) => p.name === session.projectName);
         const projectColor = project?.color ?? "var(--text-muted)";
+        // Resolve the environment for the session's home instance
+        const sessionEnv = environments.find((e) => e.id === session.environmentId);
+        const instanceDefault = sessionEnv?.agentRuntime ?? "opencode";
+        const sessionReachability = reachability[session.environmentId];
+        const sessionRuntimeState = sessionEnv?.runtimeState;
         return (
           <div className="main-header">
             <span className="dot" style={{ background: projectColor }} />
@@ -742,6 +773,13 @@ export function App(): React.ReactNode {
                 {session.workingDirectory}
               </span>
             ) : null}
+            <AgentRuntimeSwitcher
+              value={session.activeRuntime}
+              instanceDefault={instanceDefault}
+              reachability={sessionReachability}
+              runtimeState={sessionRuntimeState}
+              onChange={(runtime) => handleRuntimeSwitch(session.id, runtime)}
+            />
             <span style={{ flex: 1 }} />
           </div>
         );
@@ -948,12 +986,16 @@ export function App(): React.ReactNode {
                         lastActiveAt: new Date().toISOString(),
                       });
                     } else {
+                      // Derive the default runtime from the environment
+                      const env = environments.find((e) => e.id === environmentId);
+                      const defaultRuntime = env?.agentRuntime ?? "opencode";
                       void configService
                         .addChatSession({
                           title: `Project: ${projectName}`,
                           projectName,
                           environmentId,
                           workingDirectory,
+                          activeRuntime: defaultRuntime,
                           lastActiveAt: new Date().toISOString(),
                         })
                         .then((newSession) => {
@@ -962,7 +1004,7 @@ export function App(): React.ReactNode {
                           select(environmentId);
                         });
                     }
-                  }, [sessions, configService, select])}
+                  }, [sessions, configService, select, environments])}
                 />
               </aside>
             ) : null}

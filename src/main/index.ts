@@ -922,7 +922,7 @@ app.whenReady().then(() => {
   });
 
   safeHandle("config:updateChatSession", async (_event, ...rawArgs) => {
-    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory">>]>("config:updateChatSession", rawArgs);
+    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>]>("config:updateChatSession", rawArgs);
     await updateChatSession(sessionId, updates);
   });
 

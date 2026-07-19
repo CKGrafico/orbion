@@ -394,6 +394,7 @@ const validators: Record<string, Validator> = {
     if (!isNonEmptyString(s.environmentId)) issues.push("environmentId must be a non-empty string");
     if (typeof s.workingDirectory !== "string") issues.push("workingDirectory must be a string");
     if (!isNonEmptyString(s.lastActiveAt)) issues.push("lastActiveAt must be a non-empty string");
+    if (!isEnum(s.activeRuntime, AGENT_RUNTIMES)) issues.push("activeRuntime must be one of opencode, claude");
     return issues;
   },
 

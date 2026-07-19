@@ -956,7 +956,7 @@ export function removeChatSession(sessionId: string): void {
   });
 }
 
-export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory">>): void {
+export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>): void {
   void serialize(() => {
     const sessions = store.get("chatSessions", []);
     const idx = sessions.findIndex((s) => s.id === sessionId);

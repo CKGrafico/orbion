@@ -106,11 +106,11 @@ const MOCK_TASKS: TaskDefinition[] = [
 ];
 
 const MOCK_CHAT_SESSIONS: ChatSession[] = [
-  { id: "session-1", title: "Build pipeline setup", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
-  { id: "session-2", title: "Fix flaky tests", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
-  { id: "session-3", title: "ETL data migration", projectName: "ETL", environmentId: "mock-env-1", workingDirectory: "/home/user/etl-pipeline", lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
-  { id: "session-4", title: "Agent code review", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
-  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
+  { id: "session-1", title: "Build pipeline setup", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
+  { id: "session-2", title: "Fix flaky tests", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
+  { id: "session-3", title: "ETL data migration", projectName: "ETL", environmentId: "mock-env-1", workingDirectory: "/home/user/etl-pipeline", activeRuntime: "opencode", lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
+  { id: "session-4", title: "Agent code review", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
+  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
 ];
 
 function mockRequest<T>(path: string): Promise<ApiResponse<T>> {
@@ -251,7 +251,7 @@ export class MockConfigService implements IConfigService {
     const filtered = sessions.filter((s) => s.id !== sessionId);
     try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(filtered)); } catch { /* empty */ }
   }
-  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory">>): Promise<void> {
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>): Promise<void> {
     const sessions = await this.getChatSessions();
     const idx = sessions.findIndex((s) => s.id === sessionId);
     if (idx >= 0) {

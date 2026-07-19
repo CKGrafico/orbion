@@ -631,5 +631,12 @@
     "statusError": "MCP error",
     "toolsAvailable": "{count} tools available",
     "reconnectAction": "Reconnect MCP"
+  },
+  "agentSwitcher": {
+    "label": "Agent runtime",
+    "opencode": "OpenCode",
+    "claude": "Claude",
+    "switchedRuntime": "Switched runtime to {runtime}. Next message will use {runtime}.",
+    "unavailableReason": "{runtime} is not available on this instance: {reason}"
   }
 }
