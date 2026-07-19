@@ -806,6 +806,8 @@ export interface TranscriptMessage {
   finishedAt?: number;
   /** ISO timestamp when this message was first persisted. */
   createdAt: string;
+  /** The environment (instance) that produced this message. Undefined for legacy messages. */
+  environmentId?: string;
 }
 
 export interface TranscriptBridge {

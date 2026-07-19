@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { TranscriptMessage, ToolCallRecord } from "../../../shared/ipc";
 import type { ITranscriptService } from "../services/interfaces";
-import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow } from "./types";
+import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow } from "./types";
 
 const TOOL_CALLS_THRESHOLD = 3;
 
@@ -57,6 +57,7 @@ function chatMessageToTranscriptMessage(
     startedAt: msg.startedAt,
     finishedAt: typeof msg.finishedAt === "number" ? msg.finishedAt : undefined,
     createdAt: new Date().toISOString(),
+    environmentId: msg.environmentId,
   };
 }
 
@@ -68,19 +69,52 @@ function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
     toolCalls: tm.toolCalls?.map(recordToToolCall),
     startedAt: tm.startedAt,
     finishedAt: tm.finishedAt != null ? tm.finishedAt : (tm.content ? true : undefined),
+    environmentId: tm.environmentId,
   };
+}
+
+/**
+ * Check whether a transcript message is a system-generated handoff note
+ * (e.g., instance switch, runtime switch, model switch).
+ */
+function isSystemNoteMessage(msg: TranscriptMessage): boolean {
+  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-");
+}
+
+/**
+ * Extract instance handoff data from an instance-switch transcript message.
+ * The content format is "Switched from X to Y" or the legacy "Switched instance to X".
+ */
+function parseInstanceHandoff(msg: TranscriptMessage): { fromInstance: string; toInstance: string } | null {
+  if (!msg.id.startsWith("instance-switch-")) return null;
+  // Try the new format: content has "from X to Y"
+  const fromToMatch = msg.content.match(/from\s+(.+?)\s+to\s+(.+)/);
+  if (fromToMatch) {
+    return { fromInstance: fromToMatch[1].trim(), toInstance: fromToMatch[2].trim() };
+  }
+  // Legacy format: "Switched instance to X" – we don't have fromInstance
+  const toMatch = msg.content.match(/to\s+(.+)/);
+  if (toMatch) {
+    return { fromInstance: "", toInstance: toMatch[1].trim() };
+  }
+  return { fromInstance: "", toInstance: msg.content };
 }
 
 /**
  * Group transcript messages into turns by pairing user and assistant messages.
  * Messages are assumed to arrive in order: user, assistant, user, assistant, ...
  * Tool messages (if any) are merged into the preceding assistant message.
+ * System handoff notes (instance-switch-*, etc.) are skipped — they are rendered
+ * as InstanceHandoffRow, not as chat turns.
  */
 function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
   const turns: ChatTurn[] = [];
   let currentUser: ChatMessage | null = null;
 
   for (const msg of messages) {
+    // Skip system notes — they are rendered as InstanceHandoffRow, not turns
+    if (isSystemNoteMessage(msg)) continue;
+
     const chatMsg = transcriptMessageToChatMessage(msg);
 
     if (msg.role === "user") {
@@ -148,11 +182,33 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
 // Row building
 // ---------------------------------------------------------------------------
 
-function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
+function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = []): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
 
+  // Build handoff rows from system note messages
+  const handoffRows: Array<{ row: InstanceHandoffRow; timestamp: number }> = [];
+  for (const msg of handoffMessages) {
+    const handoff = parseInstanceHandoff(msg);
+    if (handoff) {
+      handoffRows.push({
+        row: {
+          id: msg.id,
+          kind: "instance-handoff",
+          turnId: msg.id,
+          fromInstance: handoff.fromInstance,
+          toInstance: handoff.toInstance,
+        },
+        timestamp: msg.startedAt,
+      });
+    }
+  }
+
+  // Build turn-based rows with timestamps for interleaving
+  const turnRows: Array<{ rows: TranscriptRow[]; timestamp: number }> = [];
   for (const turn of turns) {
-    rows.push({
+    const turnRowsList: TranscriptRow[] = [];
+
+    turnRowsList.push({
       id: `user-${turn.id}`,
       kind: "user-message",
       turnId: turn.id,
@@ -160,7 +216,7 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
     });
 
     if (turn.approval && !turn.approval.resolved) {
-      rows.push({
+      turnRowsList.push({
         id: `approval-${turn.id}`,
         kind: "approval-request",
         turnId: turn.id,
@@ -169,7 +225,7 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
     }
 
     if (turn.question && !turn.question.resolved) {
-      rows.push({
+      turnRowsList.push({
         id: `question-${turn.id}`,
         kind: "question-request",
         turnId: turn.id,
@@ -184,7 +240,7 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
       const durationSec = lastTool?.finishedAt
         ? Math.round((lastTool.finishedAt - turn.assistantMessage.startedAt) / 1000)
         : 0;
-      rows.push({
+      turnRowsList.push({
         id: `fold-${turn.id}`,
         kind: "turn-fold",
         turnId: turn.id,
@@ -196,7 +252,7 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
       const hasExpander = visibleTools.length > TOOL_CALLS_THRESHOLD;
 
       if (hasExpander) {
-        rows.push({
+        turnRowsList.push({
           id: `expander-${turn.id}`,
           kind: "tool-calls-expander",
           turnId: turn.id,
@@ -207,7 +263,7 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
       const startIdx = hasExpander ? visibleTools.length - TOOL_CALLS_THRESHOLD : 0;
       for (let i = startIdx; i < visibleTools.length; i++) {
         const tc = visibleTools[i];
-        rows.push({
+        turnRowsList.push({
           id: `tool-${turn.id}-${tc.id}`,
           kind: "tool-call",
           turnId: turn.id,
@@ -219,13 +275,32 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
 
     const messageStreaming = isStreaming(turn.assistantMessage.finishedAt);
     if (turn.assistantMessage.content || messageStreaming) {
-      rows.push({
+      turnRowsList.push({
         id: `assistant-${turn.id}`,
         kind: "assistant-message",
         turnId: turn.id,
         content: turn.assistantMessage.content,
         streaming: messageStreaming,
+        environmentId: turn.assistantMessage.environmentId,
       });
+    }
+
+    turnRows.push({ rows: turnRowsList, timestamp: turn.userMessage.startedAt });
+  }
+
+  // Merge turn groups and handoff dividers by timestamp
+  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number };
+  const merged: MergeItem[] = [
+    ...turnRows.map((t) => ({ kind: "turn" as const, rows: t.rows, timestamp: t.timestamp })),
+    ...handoffRows.map((h) => ({ kind: "handoff" as const, row: h.row, timestamp: h.timestamp })),
+  ];
+  merged.sort((a, b) => a.timestamp - b.timestamp);
+
+  for (const item of merged) {
+    if (item.kind === "handoff") {
+      rows.push(item.row);
+    } else {
+      rows.push(...item.rows);
     }
   }
 
@@ -238,6 +313,7 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
 
 export function useTranscript(sessionId: string | null) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [handoffMessages, setHandoffMessages] = useState<TranscriptMessage[]>([]);
   const [rows, setRows] = useState<TranscriptRow[]>([]);
   const expandedToolsRef = useRef<Set<string>>(new Set());
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -245,6 +321,7 @@ export function useTranscript(sessionId: string | null) {
   const loadedSessionRef = useRef<string | null>(null);
   const persistTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const PERSIST_DEBOUNCE_MS = 300;
+  const turnsRef = useRef<ChatTurn[]>([]);
 
   // ── Debounced persistence ──────────────────────────────────────────
 
@@ -303,8 +380,10 @@ export function useTranscript(sessionId: string | null) {
     transcriptService.getMessages(sessionId).then((messages) => {
       if (cancelled) return;
       const hydratedTurns = messagesToChatTurns(messages);
+      const handoffs = messages.filter(isSystemNoteMessage);
       setTurns(hydratedTurns);
-      setRows(buildRowsFromTurns(hydratedTurns));
+      setHandoffMessages(handoffs);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs));
       loadedSessionRef.current = sessionId;
       loadingRef.current = false;
     }).catch(() => {
@@ -319,11 +398,20 @@ export function useTranscript(sessionId: string | null) {
 
   // ── Row rebuild helpers ────────────────────────────────────────────
 
+  // Keep turnsRef in sync for use in effects
+  turnsRef.current = turns;
+
   const rebuildRows = useCallback((newTurns: ChatTurn[]): TranscriptRow[] => {
-    const newRows = buildRowsFromTurns(newTurns);
+    const newRows = buildRowsFromTurns(newTurns, handoffMessages);
     setRows(newRows);
     return newRows;
-  }, []);
+  }, [handoffMessages]);
+
+  // Rebuild rows when handoffMessages changes (e.g., when a new handoff is added)
+  useEffect(() => {
+    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages);
+    setRows(newRows);
+  }, [handoffMessages]);
 
   const setTurnsAndRebuild = useCallback(
     (updater: (prev: ChatTurn[]) => ChatTurn[]) => {
@@ -559,6 +647,31 @@ export function useTranscript(sessionId: string | null) {
     [rebuildRows],
   );
 
+  const addHandoffMessage = useCallback(
+    (message: TranscriptMessage) => {
+      if (!isSystemNoteMessage(message)) return;
+      setHandoffMessages((prev) => [...prev, message]);
+    },
+    [],
+  );
+
+  /** Force a reload of the transcript from the persistence layer. */
+  const reloadTranscript = useCallback(() => {
+    if (!sessionId) return;
+    loadedSessionRef.current = null;
+    loadingRef.current = false;
+    transcriptService.getMessages(sessionId).then((messages) => {
+      const hydratedTurns = messagesToChatTurns(messages);
+      const handoffs = messages.filter(isSystemNoteMessage);
+      setTurns(hydratedTurns);
+      setHandoffMessages(handoffs);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs));
+      loadedSessionRef.current = sessionId;
+    }).catch(() => {
+      // Ignore errors
+    });
+  }, [sessionId, transcriptService]);
+
   return {
     turns,
     rows,
@@ -574,5 +687,7 @@ export function useTranscript(sessionId: string | null) {
     resolveApproval,
     answerQuestion,
     setTurnAccessMode,
+    addHandoffMessage,
+    reloadTranscript,
   };
 }

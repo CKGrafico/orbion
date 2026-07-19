@@ -333,8 +333,15 @@ loop-task daemons. Local persistence uses these mechanisms:
   transcript files stored as individual JSON arrays under
   `userData/transcripts/<sessionId>.json`. Each file holds an array of
   `TranscriptMessage` objects (user messages, assistant messages, tool calls).
-  Transcripts are instance-independent: they are keyed by `ChatSession.id`, not
-  by any `environmentId`, so they survive instance removal or unreachability.
+  Messages carry an optional `environmentId` field indicating which instance
+  produced them; legacy messages without this field are attributed implicitly
+  from the session. Transcripts are instance-independent: they are keyed by
+  `ChatSession.id`, not by any `environmentId`, so they survive instance removal
+  or unreachability. When the user switches the instance selector mid-session,
+  an interrupt is sent to the old instance's agent, a handoff divider row is
+  persisted (with `instance-switch-*` message IDs), and the MCP connection is
+  refreshed on the new instance. The handoff divider appears as a distinct
+  visual row (not a chat bubble) between messages from different instances.
   Writes are serialized per-session through a `serializeSession()` queue to
   prevent read-modify-write races. A debounce timer (200ms) batches rapid
   streaming content updates to reduce disk I/O. When a `ChatSession` is removed,

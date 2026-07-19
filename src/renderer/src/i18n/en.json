@@ -714,7 +714,13 @@
     "header": "Instances with {project}",
     "noInstance": "No instance",
     "loopCount": "{count, plural, one {1 loop} other {# loops}}",
-    "switchedInstance": "Switched instance to {instance}. Agent now runs on {instance}.",
+    "switchedInstance": "Switched from {fromInstance} to {toInstance}",
     "unreachable": "unreachable"
+  },
+  "instanceHandoff": {
+    "label": "Switched from {fromInstance} to {toInstance}"
+  },
+  "instanceAttribution": {
+    "label": "on {instance}"
   }
 }

@@ -29,7 +29,7 @@ import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, InboxBuildParams } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
@@ -87,6 +87,7 @@ export function App(): React.ReactNode {
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
+  const [mcpService] = useInject<IMcpService>(cid.IMcpService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [wizardSeed, setWizardSeed] = useState<BootstrapSeed | null>(null);
@@ -749,35 +750,52 @@ export function App(): React.ReactNode {
     void configService.getChatSessions().then((s) => setSessions(s));
   }, [sessions, configService]);
 
-  /** Handle instance switch in a chat session: persist the change and add a transcript note. */
+  /** Handle instance switch in a chat session: interrupt, persist, add handoff divider, reconnect MCP. */
   const handleInstanceSwitch = useCallback((sessionId: string, newEnvironmentId: string, newWorkingDirectory: string | undefined): void => {
     const session = sessions.find((s) => s.id === sessionId);
     if (!session || session.environmentId === newEnvironmentId) return;
 
+    const oldEnv = environments.find((e) => e.id === session.environmentId);
     const newEnv = environments.find((e) => e.id === newEnvironmentId);
-    const instanceName = newEnv?.name ?? newEnvironmentId;
+    const oldInstanceName = oldEnv?.name ?? session.environmentId;
+    const newInstanceName = newEnv?.name ?? newEnvironmentId;
 
+    // Step 1: Interrupt any in-flight generation on the old instance
+    void agentService.interrupt(session.environmentId).catch(() => {
+      // Interrupt may fail if the old instance is unreachable; proceed anyway
+    });
+
+    // Step 2: Persist the instance change
     const updates: Partial<Pick<ChatSession, "environmentId" | "workingDirectory">> = {
       environmentId: newEnvironmentId,
     };
     if (newWorkingDirectory) {
       updates.workingDirectory = newWorkingDirectory;
     }
-
-    // Persist the instance change
     void configService.updateChatSession(sessionId, updates);
-    // Add a transcript note about the switch
+
+    // Step 3: Add a handoff divider message with from/to instance names
     void transcriptService.appendMessage({
       id: `instance-switch-${Date.now()}`,
       sessionId,
       role: "assistant",
-      content: intl.formatMessage({ id: "instanceSelector.switchedInstance" }, { instance: instanceName }),
+      content: intl.formatMessage(
+        { id: "instanceSelector.switchedInstance" },
+        { fromInstance: oldInstanceName, toInstance: newInstanceName },
+      ),
       startedAt: Date.now(),
       finishedAt: Date.now(),
+      environmentId: newEnvironmentId,
     });
-    // Refresh sessions in local state
+
+    // Step 4: Refresh MCP tools on the new instance
+    void mcpService.connect(newEnvironmentId).catch(() => {
+      // MCP connect failure is surfaced via the MCP status chip; proceed
+    });
+
+    // Step 5: Refresh sessions in local state
     void configService.getChatSessions().then((s) => setSessions(s));
-  }, [sessions, environments, configService, transcriptService, intl]);
+  }, [sessions, environments, configService, transcriptService, agentService, mcpService, intl]);
 
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
@@ -889,6 +907,7 @@ export function App(): React.ReactNode {
             activeRuntime={session?.activeRuntime ?? "opencode"}
             model={session?.activeModel}
             reasoningEffort={session?.reasoningEffort}
+            environments={environments.map((e) => ({ id: e.id, name: e.name }))}
           />
         );
       }

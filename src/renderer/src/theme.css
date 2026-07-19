@@ -2398,6 +2398,42 @@ input {
   30% { transform: translateY(-4px); opacity: 1; }
 }
 
+/* ── Instance handoff divider ────────────────────────────────────── */
+
+.transcript-instance-handoff {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px;
+  margin: 4px 0;
+}
+
+.transcript-handoff-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.transcript-handoff-text {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Instance attribution label ──────────────────────────────────── */
+
+.transcript-instance-attribution {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
 /* ── Code blocks ──────────────────────────────────────────────────── */
 
 .code-block {

@@ -18,6 +18,8 @@ export interface ChatMessage {
   startedAt: number;
   /** Timestamp when the message finished streaming, or true if finished. Undefined if still streaming. */
   finishedAt?: number | boolean;
+  /** The environment (instance) that produced this message. */
+  environmentId?: string;
 }
 
 export type AccessMode = "supervised" | "full";
@@ -69,7 +71,8 @@ export type RowKind =
   | "tool-calls-expander"
   | "turn-fold"
   | "approval-request"
-  | "question-request";
+  | "question-request"
+  | "instance-handoff";
 
 export interface BaseRow {
   id: string;
@@ -86,6 +89,8 @@ export interface AssistantMessageRow extends BaseRow {
   kind: "assistant-message";
   content: string;
   streaming: boolean;
+  /** The instance that produced this message, used for "on <instance>" attribution. */
+  environmentId?: string;
 }
 
 export interface ToolCallRow extends BaseRow {
@@ -115,6 +120,14 @@ export interface QuestionRow extends BaseRow {
   question: QuestionRequest;
 }
 
+export interface InstanceHandoffRow extends BaseRow {
+  kind: "instance-handoff";
+  /** The instance name the session was running on before the switch. */
+  fromInstance: string;
+  /** The instance name the session is now running on. */
+  toInstance: string;
+}
+
 export type TranscriptRow =
   | UserMessageRow
   | AssistantMessageRow
@@ -122,4 +135,5 @@ export type TranscriptRow =
   | ToolCallsExpanderRow
   | TurnFoldRow
   | ApprovalRow
-  | QuestionRow;
+  | QuestionRow
+  | InstanceHandoffRow;

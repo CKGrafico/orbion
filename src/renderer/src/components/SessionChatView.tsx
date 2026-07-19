@@ -20,9 +20,10 @@ interface SessionChatViewProps {
   activeRuntime: string;
   model?: string;
   reasoningEffort?: ReasoningEffort;
+  environments: Array<{ id: string; name: string }>;
 }
 
-export function SessionChatView({ sessionId, environmentId, activeRuntime, model, reasoningEffort }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, activeRuntime, model, reasoningEffort, environments }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -36,6 +37,7 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
     appendAssistantContent,
     finishTurn,
     interruptTurn,
+    reloadTranscript,
   } = useTranscript(sessionId);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("full");
@@ -43,6 +45,25 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [opencodeSessionId, setOpenCodeSessionId] = useState<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const initialEnvRef = useRef<string | null>(null);
+
+  // ── Clear active turn and reload transcript on instance switch ───
+  // When the environmentId changes (instance switch), any in-flight
+  // streaming from the old instance should be abandoned and the transcript
+  // should be reloaded to pick up the handoff divider message.
+  // Skip on initial mount (no switch has occurred yet).
+  useEffect(() => {
+    if (initialEnvRef.current === null) {
+      initialEnvRef.current = environmentId;
+      return;
+    }
+    if (initialEnvRef.current === environmentId) return;
+    initialEnvRef.current = environmentId;
+    setActiveTurnId(null);
+    if (sessionId) {
+      reloadTranscript();
+    }
+  }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-scroll on new content ──────────────────────────────────────
 
@@ -149,6 +170,7 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
           role: "user",
           content: text,
           startedAt: timestamp,
+          environmentId,
         },
         assistantMessage: {
           id: assistantMsgId,
@@ -157,6 +179,7 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
           toolCalls: [],
           startedAt: timestamp + 1,
           finishedAt: undefined,
+          environmentId,
         },
         finished: false,
         collapsed: false,
@@ -255,7 +278,10 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
                     </div>
                   </div>
                 );
-              case "assistant-message":
+              case "assistant-message": {
+                const envName = row.environmentId
+                  ? environments.find((e) => e.id === row.environmentId)?.name
+                  : undefined;
                 return (
                   <div key={row.id} className="transcript-assistant-msg">
                     <div className="transcript-avatar session-assistant-avatar">{activeRuntime === "claude" ? "CC" : "OC"}</div>
@@ -263,9 +289,15 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
                       <Suspense fallback={null}>
                         <MarkdownContent content={row.content} streaming={row.streaming} />
                       </Suspense>
+                      {envName ? (
+                        <span className="transcript-instance-attribution">
+                          {intl.formatMessage({ id: "instanceAttribution.label" }, { instance: envName })}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 );
+              }
               case "tool-call":
                 return (
                   <ToolCallInlineBlock
@@ -297,6 +329,19 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime, model
               case "question-request":
                 // Agent approvals/questions are handled by the OpenCode runtime.
                 return null;
+              case "instance-handoff":
+                return (
+                  <div key={row.id} className="transcript-instance-handoff">
+                    <span className="transcript-handoff-line" />
+                    <span className="transcript-handoff-text">
+                      {intl.formatMessage(
+                        { id: "instanceHandoff.label" },
+                        { fromInstance: row.fromInstance, toInstance: row.toInstance },
+                      )}
+                    </span>
+                    <span className="transcript-handoff-line" />
+                  </div>
+                );
               default:
                 return null;
             }
