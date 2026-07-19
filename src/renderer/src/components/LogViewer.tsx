@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import type { Environment } from "../types";
-import { fetchLogs, subscribeLogs } from "../api";
+import { fetchLogs } from "../api";
 import { useLogRows } from "./useLogRows";
+import { useLiveLog } from "./useLiveLog";
+import type { StreamState } from "./useLiveLog";
 import { RunCard } from "./RunCard";
 import { RunSelector } from "./RunSelector";
 import type { RunRecord } from "../types";
@@ -22,6 +24,13 @@ export function LogViewer(props: {
   const paneRef = useRef<HTMLDivElement | null>(null);
   const followRef = useRef(follow);
   followRef.current = follow;
+
+  const { streamState, reconnect, stop } = useLiveLog(
+    instance,
+    loopId,
+    (line) => appendLines([line]),
+    (parsed) => appendEvent(parsed),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -43,23 +52,10 @@ export function LogViewer(props: {
       if (!cancelled) setInitialRows("");
     });
 
-    const unsubscribe = subscribeLogs(
-      instance,
-      loopId,
-      (line) => {
-        if (!cancelled) appendLines([line]);
-      },
-      undefined,
-      (parsed) => {
-        if (!cancelled) appendEvent(parsed);
-      },
-    );
-
     return () => {
       cancelled = true;
-      unsubscribe();
     };
-  }, [instance.id, instance.activeEndpointId, loopId, appendLines, appendEvent, setInitialRows, reset]);
+  }, [instance.id, instance.activeEndpointId, loopId, setInitialRows, reset]);
 
   useEffect(() => {
     if (followRef.current && paneRef.current) {
@@ -109,9 +105,13 @@ export function LogViewer(props: {
       <div className="card-header">
         <span className="overline">{intl.formatMessage({ id: "logs.title" })}</span>
         <span className="spacer" />
-        <button className={`toggle${follow ? " on" : ""}`} onClick={() => setFollow((f) => !f)}>
-          {follow ? `● ${intl.formatMessage({ id: "logs.following" })}` : intl.formatMessage({ id: "logs.follow" })}
-        </button>
+        <StreamStateIndicator
+          streamState={streamState}
+          follow={follow}
+          onToggleFollow={() => setFollow((f) => !f)}
+          onReconnect={reconnect}
+          onStop={stop}
+        />
         <button className="toggle" onClick={() => void copyAll()}>
           {copied ? `${intl.formatMessage({ id: "logs.copied" })} ✓` : intl.formatMessage({ id: "logs.copy" })}
         </button>
@@ -133,5 +133,49 @@ export function LogViewer(props: {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Combined stream state / follow toggle button.
+ *
+ * - Connected + following:  ● Following   (green dot)
+ * - Connected + not following: Follow       (click to resume)
+ * - Reconnecting:           ⟳ Reconnecting (auto-retrying)
+ * - Stopped:                ✕ Disconnected (click to reconnect)
+ */
+function StreamStateIndicator(props: {
+  streamState: StreamState;
+  follow: boolean;
+  onToggleFollow: () => void;
+  onReconnect: () => void;
+  onStop: () => void;
+}): React.ReactNode {
+  const { streamState, follow, onToggleFollow, onReconnect, onStop } = props;
+  const intl = useIntl();
+
+  if (streamState === "reconnecting") {
+    return (
+      <button className="toggle reconnecting" onClick={onStop}>
+        {`\u21BB ${intl.formatMessage({ id: "logs.reconnecting" })}`}
+      </button>
+    );
+  }
+
+  if (streamState === "stopped") {
+    return (
+      <button className="toggle stopped" onClick={onReconnect}>
+        {`\u2717 ${intl.formatMessage({ id: "logs.disconnected" })}`}
+      </button>
+    );
+  }
+
+  // streamState === "connected"
+  return (
+    <button className={`toggle${follow ? " on" : ""}`} onClick={onToggleFollow}>
+      {follow
+        ? `\u25CF ${intl.formatMessage({ id: "logs.following" })}`
+        : intl.formatMessage({ id: "logs.follow" })}
+    </button>
   );
 }

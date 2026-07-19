@@ -350,7 +350,9 @@
     "follow": "Follow",
     "copied": "Copied",
     "copy": "Copy",
-    "noOutput": "No log output yet."
+    "noOutput": "No log output yet.",
+    "reconnecting": "Reconnecting",
+    "disconnected": "Disconnected"
   },
   "runSelector": {
     "title": "Runs",
