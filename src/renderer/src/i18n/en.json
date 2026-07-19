@@ -601,7 +601,12 @@
   "coldOpen": {
     "headline": "Welcome to Orbion",
     "copy": "Orbion talks to loop-task daemons running on your machines. Adding one machine is the only setup you need — then you can start managing loops and tasks right away.",
-    "addFirstMachine": "Add your first machine"
+    "addFirstMachine": "Add your first machine",
+    "importSeed": "Import seed",
+    "importSeedTitle": "Import bootstrap seed",
+    "importSeedPlaceholder": "Paste your orbion:// seed here…",
+    "importSeedInvalid": "Invalid seed format. Seeds start with orbion://",
+    "importSeedConfirm": "Start setup"
   },
   "runtimeHealth": {
     "ok": "Runtime",
@@ -649,5 +654,12 @@
     "claude": "Claude",
     "switchedRuntime": "Switched runtime to {runtime}. Next message will use {runtime}.",
     "unavailableReason": "{runtime} is not available on this instance: {reason}"
+  },
+  "bootstrapSeed": {
+    "exportLabel": "Export seed",
+    "exportCopied": "Seed copied to clipboard",
+    "noMainVm": "No main VM configured. Set a main VM first.",
+    "noEndpoint": "Main VM has no endpoint configured.",
+    "invalidSeed": "Invalid seed format. Seeds start with orbion://"
   }
 }
