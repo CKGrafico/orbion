@@ -31,9 +31,6 @@ const DEFAULT_MCP_PORT = 8846;
 /** Timeout for MCP HTTP requests (tool discovery + tool calls). */
 const MCP_TIMEOUT_MS = 15_000;
 
-/** JSON-RPC request ID counter per session. */
-let nextId = 1;
-
 interface McpSession {
   environmentId: string;
   baseUrl: string;
@@ -41,6 +38,8 @@ interface McpSession {
   tools: McpToolInfo[];
   lastError: string | I18nMessage | null;
   connectedAt: number | null;
+  /** Per-session monotonic counter for JSON-RPC request IDs, avoiding cross-session collisions. */
+  nextRpcId: number;
 }
 
 // ── In-memory sessions ────────────────────────────────────────────────────
@@ -124,11 +123,11 @@ interface JsonRpcResponse {
 }
 
 async function rpcRequest(
-  baseUrl: string,
+  session: McpSession,
   method: string,
   params?: unknown,
 ): Promise<JsonRpcResponse> {
-  const id = nextId++;
+  const id = session.nextRpcId++;
   const body = {
     jsonrpc: "2.0",
     id,
@@ -140,7 +139,7 @@ async function rpcRequest(
   const timeout = setTimeout(() => controller.abort(), MCP_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${baseUrl}/mcp`, {
+    const res = await fetch(`${session.baseUrl}/mcp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -215,14 +214,17 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
       tools: [],
       lastError: null,
       connectedAt: null,
+      nextRpcId: 1,
     };
     sessions.set(environmentId, session);
     broadcastStatus(session);
   }
 
   try {
+    const session = getSession(environmentId)!;
+
     // 1. Initialize handshake
-    const initResult = await rpcRequest(baseUrl, "initialize", {
+    const initResult = await rpcRequest(session, "initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: {
@@ -240,7 +242,7 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
     }
 
     // 2. Discover available tools
-    const toolsResult = await rpcRequest(baseUrl, "tools/list", {});
+    const toolsResult = await rpcRequest(session, "tools/list", {});
 
     if (toolsResult.error) {
       updateSession(environmentId, {
@@ -342,7 +344,7 @@ export async function callMcpTool(
   }
 
   try {
-    const result = await rpcRequest(session.baseUrl, "tools/call", {
+    const result = await rpcRequest(session, "tools/call", {
       name: toolName,
       arguments: args,
     });
