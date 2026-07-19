@@ -7,11 +7,20 @@ const MAX_ROWS = 2000;
 /**
  * Hook that converts flat log lines and structured events into
  * segmented RunSegments containing structured LogRow arrays.
+ *
+ * Lifecycle:
+ * - While the initial tail request is pending (`tailPendingRef === true`),
+ *   live rows are rendered immediately but also tracked in `liveRowsBeforeTailRef`.
+ * - When `setInitialRows` resolves, it merges tail rows (historical) with
+ *   any live rows that arrived earlier, deduplicating by text content.
+ * - After the tail resolves, `appendLines`/`appendEvent` append normally.
  */
 export function useLogRows() {
   const [segments, setSegments] = useState<RunSegment[]>([]);
   const rowsRef = useRef<LogRow[]>([]);
   let rowIdCounter = useRef(0);
+  const tailPendingRef = useRef(true);
+  const liveRowsBeforeTailRef = useRef<LogRow[]>([]);
 
   const nextId = useCallback(() => {
     rowIdCounter.current += 1;
@@ -97,6 +106,11 @@ export function useLogRows() {
       rowsRef.current = rowsRef.current.slice(rowsRef.current.length - MAX_ROWS);
     }
 
+    // Track live rows that arrive before the initial tail resolves
+    if (tailPendingRef.current) {
+      liveRowsBeforeTailRef.current = [...liveRowsBeforeTailRef.current, ...newRows];
+    }
+
     setSegments(rebuildSegments(rowsRef.current));
   }, [nextId, rebuildSegments]);
 
@@ -132,31 +146,53 @@ export function useLogRows() {
     if (!newRow) return;
 
     rowsRef.current = [...rowsRef.current, newRow];
+
+    // Track live rows that arrive before the initial tail resolves
+    if (tailPendingRef.current) {
+      liveRowsBeforeTailRef.current = [...liveRowsBeforeTailRef.current, newRow];
+    }
+
     setSegments(rebuildSegments(rowsRef.current));
   }, [nextId, rebuildSegments]);
 
+  /**
+   * Produce a stable text key for deduplication purposes.
+   * Only plain-text rows are deduplicated by content; structured rows
+   * (run-header, exit, tool-call, markdown) are kept by kind + key fields.
+   */
+  const rowDedupeKey = useCallback((row: LogRow): string => {
+    switch (row.kind) {
+      case "plain-text": return `pt:${row.text}`;
+      case "run-header": return `rh:${row.runNumber}`;
+      case "exit": return `ex:${row.exitCode}`;
+      case "tool-call": return `tc:${row.toolKind}:${row.title}:${row.status}`;
+      case "markdown": return `md:${row.content.slice(0, 80)}`;
+      default: return row.id;
+    }
+  }, []);
+
   const setInitialRows = useCallback((text: string) => {
     const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
-    rowIdCounter.current = 0;
-    const newRows: LogRow[] = [];
+    // Do NOT reset rowIdCounter — live rows already use IDs above 0
+    const tailRows: LogRow[] = [];
 
     for (const line of lines) {
       const classified = classifyLogLine(line);
       if (classified.kind === "run-header") {
-        newRows.push({
+        tailRows.push({
           id: nextId(),
           kind: "run-header",
           runNumber: classified.runNumber ?? 0,
           timestamp: null,
         });
       } else if (classified.kind === "exit") {
-        newRows.push({
+        tailRows.push({
           id: nextId(),
           kind: "exit",
           exitCode: classified.exitCode ?? 0,
         });
       } else {
-        newRows.push({
+        tailRows.push({
           id: nextId(),
           kind: "plain-text",
           text: line,
@@ -164,7 +200,21 @@ export function useLogRows() {
       }
     }
 
-    rowsRef.current = newRows;
+    // Build a set of tail-line dedupe keys so we can skip live rows that
+    // duplicate content already present in the historical tail.
+    const tailKeys = new Set(tailRows.map(rowDedupeKey));
+    const liveRows = liveRowsBeforeTailRef.current.filter(
+      (row) => !tailKeys.has(rowDedupeKey(row)),
+    );
+
+    // Tail rows are historical (older), live rows are newer → concatenate
+    const merged = [...tailRows, ...liveRows];
+    rowsRef.current = merged;
+
+    // Mark tail as resolved so future live rows are no longer tracked
+    tailPendingRef.current = false;
+    liveRowsBeforeTailRef.current = [];
+
     // Reset segments for fresh rebuild
     setSegments((prev) => {
       const expandedRuns = new Set<number>();
@@ -175,7 +225,7 @@ export function useLogRows() {
       let currentRows: LogRow[] = [];
       let currentRun = 0;
 
-      for (const row of newRows) {
+      for (const row of merged) {
         if (row.kind === "run-header") {
           if (currentRows.length > 0 || currentRun > 0) {
             segs.push({
@@ -199,17 +249,17 @@ export function useLogRows() {
         });
       }
 
-      if (segs.length === 0 && newRows.length > 0) {
+      if (segs.length === 0 && merged.length > 0) {
         segs.push({
           runNumber: 0,
-          rows: newRows,
+          rows: merged,
           expanded: true,
         });
       }
 
       return segs;
     });
-  }, [nextId]);
+  }, [nextId, rowDedupeKey]);
 
   const toggleSegment = useCallback((runNumber: number) => {
     setSegments((prev) =>
@@ -222,6 +272,8 @@ export function useLogRows() {
   const reset = useCallback(() => {
     rowsRef.current = [];
     rowIdCounter.current = 0;
+    tailPendingRef.current = true;
+    liveRowsBeforeTailRef.current = [];
     setSegments([]);
   }, []);
 

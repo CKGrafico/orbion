@@ -29,10 +29,19 @@ export function LogViewer(props: {
 
     void fetchLogs(instance, loopId, INITIAL_TAIL).then((res) => {
       if (cancelled) return;
+      // Always call setInitialRows to mark the tail phase as resolved,
+      // even when the response is empty — this ensures live rows
+      // received while the request was pending are preserved via merge.
       if (res.ok && typeof res.data === "string" && res.data.length > 0) {
         setInitialRows(res.data);
+      } else {
+        setInitialRows("");
       }
-    }).catch(() => { /* network error, will retry on next poll */ });
+    }).catch(() => {
+      // Network error — still resolve the tail phase so live rows
+      // are no longer tracked in the pre-tail buffer.
+      if (!cancelled) setInitialRows("");
+    });
 
     const unsubscribe = subscribeLogs(
       instance,
