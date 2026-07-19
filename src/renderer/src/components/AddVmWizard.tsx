@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { AgentRuntime, ReachMethod, SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep } from "../../../shared/ipc";
+import type { AgentRuntime, ReachMethod, SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep, BootstrapSeed } from "../../../shared/ipc";
 import { TOOL_DEFINITIONS, type ToolDefinition } from "../../../shared/tool-definitions";
 import { ShieldCheck, X, Check, Loader, SkipForward, Lock, Globe, Terminal } from "lucide-react";
 import { translateMessage } from "../i18n";
@@ -53,18 +53,20 @@ function stepIndex(step: VmWizardStep): number {
 export function AddVmWizard(props: {
   onDone: (environmentId: string, environmentName: string, daemonUrl: string) => void;
   onCancel: () => void;
+  /** Optional pre-filled values from an imported bootstrap seed. */
+  initialSeed?: BootstrapSeed | null;
 }): React.ReactNode {
-  const { onDone, onCancel } = props;
+  const { onDone, onCancel, initialSeed } = props;
   const intl = useIntl();
   const [vmWizardService] = useInject<IVmWizardService>(cid.IVmWizardService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
 
-  const [target, setTarget] = useState("");
-  const [envName, setEnvName] = useState("");
-  const [reachMethod, setReachMethod] = useState<ReachMethod>("ssh");
+  const [target, setTarget] = useState(initialSeed?.kind === "ssh" ? initialSeed.target : "");
+  const [envName, setEnvName] = useState(initialSeed?.name ?? "");
+  const [reachMethod, setReachMethod] = useState<ReachMethod>(initialSeed?.kind === "ssh" ? "ssh" : initialSeed?.kind === "direct" ? "local" : "ssh");
   const [agentRuntime, setAgentRuntime] = useState<AgentRuntime>("opencode");
   const [sshKeyPassphrase, setSshKeyPassphrase] = useState("");
-  const [localUrl, setLocalUrl] = useState("");
+  const [localUrl, setLocalUrl] = useState(initialSeed?.kind === "direct" ? initialSeed.target : "");
   const [hosts, setHosts] = useState<SshHost[]>([]);
   const [hostsLoaded, setHostsLoaded] = useState(false);
   const [progress, setProgress] = useState<VmWizardProgress | null>(null);

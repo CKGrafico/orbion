@@ -8,6 +8,8 @@ import type {
   OpenCodeEndpoint,
   SetOpenCodeEndpointResult,
   ChatSession,
+  BootstrapSeedExportResult,
+  BootstrapSeedImportResult,
 } from "../../../../shared/ipc";
 import type { IConfigService } from "../interfaces";
 
@@ -82,5 +84,11 @@ export class ConfigService implements IConfigService {
   }
   async setExpandedProjects(expandedKeys: string[]): Promise<void> {
     return this.api.setExpandedProjects(expandedKeys);
+  }
+  async exportBootstrapSeed(): Promise<BootstrapSeedExportResult> {
+    return this.api.exportBootstrapSeed();
+  }
+  async importBootstrapSeed(seedString: string): Promise<BootstrapSeedImportResult> {
+    return this.api.importBootstrapSeed(seedString);
   }
 }

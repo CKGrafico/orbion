@@ -38,6 +38,8 @@ import type {
   TranscriptMessage,
   McpConnectionStatus,
   McpToolCallResult,
+  BootstrapSeedExportResult,
+  BootstrapSeedImportResult,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -64,6 +66,8 @@ export interface IConfigService {
   updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>): Promise<void>;
   getExpandedProjects(): Promise<string[]>;
   setExpandedProjects(expandedKeys: string[]): Promise<void>;
+  exportBootstrapSeed(): Promise<BootstrapSeedExportResult>;
+  importBootstrapSeed(seedString: string): Promise<BootstrapSeedImportResult>;
 }
 
 export interface IConnectionService {

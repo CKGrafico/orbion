@@ -1787,6 +1787,60 @@ input {
   padding: 9px 24px;
 }
 
+.cold-open-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.cold-open-seed-dialog {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 28px;
+  background: var(--surface-elevated);
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  max-width: 420px;
+  width: 100%;
+}
+
+.cold-open-seed-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cold-open-seed-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  outline: none;
+}
+
+.cold-open-seed-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.cold-open-seed-error {
+  margin: 0;
+  color: var(--text-danger, #e55);
+  font-size: 12px;
+}
+
+.cold-open-seed-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* ── Tailscale peer discovery ──────────────────────────────────── */
 
 .tailscale-peers {

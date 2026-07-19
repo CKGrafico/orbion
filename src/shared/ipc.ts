@@ -91,6 +91,28 @@ export interface Environment {
   infraOpenCode?: OpenCodeEndpoint | null;
 }
 
+// ── Bootstrap seed (portable config-home reach info) ──────────────────
+
+/** Parsed bootstrap seed: non-secret reach info for the config-home VM. */
+export interface BootstrapSeed {
+  /** Reach method: "ssh" or "direct". Maps to ReachMethod in the wizard. */
+  kind: "ssh" | "direct";
+  /** For SSH: "user@host:port". For direct: the URL. */
+  target: string;
+  /** Environment name (from the VM's config). */
+  name: string;
+}
+
+/** Result of exporting a bootstrap seed from the main-VM. */
+export type BootstrapSeedExportResult =
+  | { ok: true; seed: string }
+  | { ok: false; error: string | I18nMessage };
+
+/** Result of importing (parsing) a bootstrap seed string. */
+export type BootstrapSeedImportResult =
+  | { ok: true; seed: BootstrapSeed }
+  | { ok: false; error: string | I18nMessage };
+
 export interface ConfigBridge {
   getEnvironments: () => Promise<Environment[]>;
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
@@ -115,6 +137,8 @@ export interface ConfigBridge {
   updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>) => Promise<void>;
   getExpandedProjects: () => Promise<string[]>;
   setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
+  exportBootstrapSeed: () => Promise<BootstrapSeedExportResult>;
+  importBootstrapSeed: (seedString: string) => Promise<BootstrapSeedImportResult>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────

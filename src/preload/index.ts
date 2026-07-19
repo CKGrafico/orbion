@@ -34,6 +34,8 @@ import type {
   TranscriptMessage,
   McpConnectionStatus,
   McpToolCallResult,
+  BootstrapSeedExportResult,
+  BootstrapSeedImportResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -99,6 +101,10 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:getExpandedProjects") as Promise<string[]>,
     setExpandedProjects: (expandedKeys: string[]) =>
       ipcRenderer.invoke("config:setExpandedProjects", expandedKeys) as Promise<void>,
+    exportBootstrapSeed: () =>
+      ipcRenderer.invoke("config:exportBootstrapSeed") as Promise<BootstrapSeedExportResult>,
+    importBootstrapSeed: (seedString: string) =>
+      ipcRenderer.invoke("config:importBootstrapSeed", seedString) as Promise<BootstrapSeedImportResult>,
   },
 
   connection: {

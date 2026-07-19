@@ -444,6 +444,14 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
+  "config:exportBootstrapSeed": () => [],
+
+  "config:importBootstrapSeed": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("seedString must be a non-empty string");
+    return issues;
+  },
+
   // ── Infra ───────────────────────────────────────────────
   "infra:executeAction": (args) => {
     const issues: string[] = [];

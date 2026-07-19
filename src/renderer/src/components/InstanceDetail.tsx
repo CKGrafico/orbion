@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
+import { cid, useInject } from "inversify-hooks";
 import type { Environment, LoopMeta, Project } from "../types";
 import type { ReachabilityState } from "../../../shared/ipc";
 import { fetchProjects } from "../api";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { PILL_COLORS, getPillLabel } from "../fleet-status";
 import { runsToday, avgDuration, formatDurationShort } from "../format";
-import { Folder } from "lucide-react";
+import { Folder, Copy } from "lucide-react";
+import type { IConfigService } from "../services/interfaces";
 
 function LoopActivitySummary({ loop }: { loop: LoopMeta }): React.ReactNode {
   const intl = useIntl();
@@ -42,8 +44,23 @@ export function InstanceDetail(props: {
 }): React.ReactNode {
   const { instance, loops, connectionPhase, reachability, onOpenLoop, onOpenProject } = props;
   const intl = useIntl();
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [seedCopied, setSeedCopied] = useState(false);
+
+  const handleExportSeed = async (): Promise<void> => {
+    const result = await configService.exportBootstrapSeed();
+    if (result.ok) {
+      try {
+        await navigator.clipboard.writeText(result.seed);
+        setSeedCopied(true);
+        setTimeout(() => setSeedCopied(false), 2000);
+      } catch {
+        // clipboard API may not be available in all contexts
+      }
+    }
+  };
 
   useEffect(() => {
     if (connectionPhase && connectionPhase !== "connected") return;
@@ -94,6 +111,25 @@ export function InstanceDetail(props: {
 
   return (
     <div className="content-inner">
+      {/* Export seed action for main-VM */}
+      {instance.role === "main-vm" ? (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card-header">
+            <span className="overline">{intl.formatMessage({ id: "bootstrapSeed.exportLabel" })}</span>
+            <span className="spacer" />
+            <button
+              className="btn"
+              style={{ fontSize: 12, padding: "4px 12px" }}
+              onClick={() => void handleExportSeed()}
+            >
+              <Copy size={12} style={{ marginRight: 4 }} />
+              {seedCopied
+                ? intl.formatMessage({ id: "bootstrapSeed.exportCopied" })
+                : intl.formatMessage({ id: "bootstrapSeed.exportLabel" })}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {/* Loops grouped by project */}
       {projects.map((project) => {
         const projectLoops = loopsByProject.get(project.id) ?? [];
