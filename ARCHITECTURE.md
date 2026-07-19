@@ -74,7 +74,7 @@ orbion/
 │               ├── AddInstanceModal.tsx  # Register a new instance
 │               ├── LoopsView.tsx         # Loop list for the selected instance
 │               ├── LoopDetail.tsx        # Single-loop metadata + logs
-│               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row)
+│               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row, log tail with copy)
 │               ├── LogViewer.tsx         # Tail + live SSE log follow
 │               ├── TasksView.tsx         # Task definitions list
 │               └── ProjectsView.tsx      # Projects list
@@ -133,6 +133,10 @@ flowchart LR
   simple `view` discriminated union (`list` | `loop`) plus a `section` enum in
   `App.tsx` — there is no URL router. The chat transcript rows include a `loop-card`
   kind that renders a live `<LoopCard>` component bound to the polled loop data.
+  LoopCard receives an optional `instance` prop (the full `Environment` object);
+  when provided and the instance is reachable, the card fetches and displays a
+  compact log tail (last 10 lines via `GET /api/loops/:id/logs?tail=10`) with
+  error-line highlighting and a copy affordance.
 - **Inputs:** data from `api.ts`; persisted instances from `store.ts` via IPC.
 - **Outputs:** IPC calls via `window.api`.
 
