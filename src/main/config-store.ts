@@ -1,9 +1,12 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult } from "../shared/ipc.js";
+import { execFile } from "node:child_process";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult } from "../shared/ipc.js";
 import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
 import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
+import { parseTarget, buildSshArgs } from "./ssh-config.js";
+import { msg } from "./i18n.js";
 
 interface LegacyInstance {
   id: string;
@@ -1181,4 +1184,252 @@ export function importBootstrapSeed(seedString: string): BootstrapSeedImportResu
     return { ok: false, error: { key: "bootstrapSeed.invalidSeed" } };
   }
   return { ok: true, seed };
+}
+
+// ---------------------------------------------------------------------------
+// Pull-canonical restore from config-home ────────────────────────────────
+// ---------------------------------------------------------------------------
+
+const REMOTE_CONFIG_PATH = "~/.orbion/config.json";
+
+/**
+ * Execute an SSH command on the main-VM and return stdout.
+ * Returns null if the main-VM cannot be reached or has no SSH endpoint.
+ */
+function sshOnMainVm(command: string): Promise<string | null> {
+  const mainVm = getMainVm();
+  if (!mainVm) return Promise.resolve(null);
+
+  const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
+  if (!activeEndpoint) return Promise.resolve(null);
+
+  // Only SSH endpoints can run remote commands
+  // For direct/local endpoints, the "VM" is the local machine, so we can't
+  // cat a remote config file. Direct mode is not the config-home scenario.
+  if (activeEndpoint.kind !== "ssh" || !activeEndpoint.sshTarget) {
+    return Promise.resolve(null);
+  }
+
+  const sshHost = parseTarget(activeEndpoint.sshTarget);
+  if (!sshHost) return Promise.resolve(null);
+
+  const args = buildSshArgs(sshHost, command);
+
+  return new Promise((resolve) => {
+    execFile("ssh", args, { timeout: 15_000 }, (err, stdout) => {
+      if (err) {
+        resolve(null);
+        return;
+      }
+      resolve(stdout ?? "");
+    });
+  });
+}
+
+/**
+ * Check whether the config-home VM has a config file available for restore.
+ * Reads `~/.orbion/config.json` over SSH and counts environments.
+ */
+export async function checkRestoreAvailable(): Promise<RestoreAvailability> {
+  const mainVm = getMainVm();
+  if (!mainVm) {
+    return { available: false, reason: { key: "restore.noMainVm" } };
+  }
+
+  const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
+  if (!activeEndpoint) {
+    return { available: false, reason: { key: "restore.noEndpoint" } };
+  }
+
+  if (activeEndpoint.kind !== "ssh" || !activeEndpoint.sshTarget) {
+    return { available: false, reason: { key: "restore.notSshEndpoint" } };
+  }
+
+  // SSH to the main-VM and check if the config file exists and is readable
+  const output = await sshOnMainVm(`cat ${REMOTE_CONFIG_PATH} 2>/dev/null`);
+  if (output === null) {
+    return { available: false, reason: { key: "restore.sshFailed" } };
+  }
+
+  if (output.trim().length === 0) {
+    return { available: false, reason: { key: "restore.noConfigFile" } };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(output);
+    if (typeof parsed !== "object" || parsed === null) {
+      return { available: false, reason: { key: "restore.invalidConfig" } };
+    }
+
+    const envs = (parsed as Record<string, unknown>)["environments"];
+    if (!Array.isArray(envs)) {
+      return { available: false, reason: { key: "restore.noEnvironments" } };
+    }
+
+    const names: string[] = [];
+    for (const env of envs) {
+      if (typeof env === "object" && env !== null && "name" in env) {
+        const name = (env as Record<string, unknown>)["name"];
+        if (typeof name === "string") names.push(name);
+      }
+    }
+
+    if (names.length === 0) {
+      return { available: false, reason: { key: "restore.emptyEnvironments" } };
+    }
+
+    return { available: true, environmentCount: names.length, environmentNames: names };
+  } catch {
+    return { available: false, reason: { key: "restore.invalidConfig" } };
+  }
+}
+
+/**
+ * Validate and sanitize a single environment parsed from the remote config.
+ * Uses the same allowlist logic as `sanitizeEnvironmentForSync` to ensure
+ * only safe fields are imported. Assigns new IDs so there is no collision
+ * with existing local environments.
+ */
+function sanitizeRemoteEnvironment(raw: unknown): Environment | null {
+  if (typeof raw !== "object" || raw === null) return null;
+
+  const obj = raw as Record<string, unknown>;
+
+  // Required fields
+  if (typeof obj["name"] !== "string" || !obj["name"].trim()) return null;
+  if (!Array.isArray(obj["endpoints"])) return null;
+
+  const endpoints: AccessEndpoint[] = [];
+  for (const rawEp of obj["endpoints"] as unknown[]) {
+    if (typeof rawEp !== "object" || rawEp === null) continue;
+    const ep = rawEp as Record<string, unknown>;
+
+    if (typeof ep["url"] !== "string") continue;
+    if (typeof ep["kind"] !== "string" || !["direct", "ssh", "tailscale"].includes(ep["kind"] as string)) continue;
+
+    const endpoint: AccessEndpoint = {
+      id: crypto.randomUUID().slice(0, 8),
+      kind: ep["kind"] as EndpointKind,
+      url: trimTrailingSlash(ep["url"].trim()),
+      sshTarget: typeof ep["sshTarget"] === "string" ? ep["sshTarget"] : null,
+      lastError: null,
+      failureCount: 0,
+    };
+    endpoints.push(endpoint);
+  }
+
+  if (endpoints.length === 0) return null;
+
+  const agentRuntime = obj["agentRuntime"] === "claude" ? "claude" as const : "opencode" as const;
+  const runtimeState = typeof obj["runtimeState"] === "string"
+    && ["available", "unavailable", "unknown"].includes(obj["runtimeState"] as string)
+    ? obj["runtimeState"] as RuntimeState
+    : undefined;
+
+  const env: Environment = {
+    id: crypto.randomUUID().slice(0, 8),
+    name: (obj["name"] as string).trim(),
+    agentRuntime,
+    runtimeState,
+    credentialRefs: undefined, // Never import credential references: they point to the remote keychain
+    endpoints,
+    activeEndpointId: endpoints[0].id,
+    authState: "unauthenticated", // Restored environments need fresh auth
+  };
+
+  // Optional role: only preserve "main-vm" to maintain the designation.
+  // We never import "main-vm" because this machine already has one.
+  if (typeof obj["role"] === "string" && obj["role"] === "coding") {
+    env.role = "coding";
+  }
+
+  // Optional OpenCode endpoint (URL only, no password)
+  if (typeof obj["opencode"] === "object" && obj["opencode"] !== null) {
+    const oc = obj["opencode"] as Record<string, unknown>;
+    if (typeof oc["url"] === "string") {
+      env.opencode = { url: oc["url"], password: null };
+    }
+  }
+
+  return env;
+}
+
+/**
+ * Pull-canonical restore from the config-home VM.
+ * Reads the remote config file, replaces all local environments with
+ * those from the VM (pull-only, no merge), and returns the restored list.
+ */
+export async function pullRestore(): Promise<PullRestoreResult> {
+  const mainVm = getMainVm();
+  if (!mainVm) {
+    return { ok: false, error: { key: "restore.noMainVm" } };
+  }
+
+  const output = await sshOnMainVm(`cat ${REMOTE_CONFIG_PATH} 2>/dev/null`);
+  if (output === null || output.trim().length === 0) {
+    return { ok: false, error: { key: "restore.sshFailed" } };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    return { ok: false, error: { key: "restore.invalidConfig" } };
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    return { ok: false, error: { key: "restore.invalidConfig" } };
+  }
+
+  const rawEnvs = (parsed as Record<string, unknown>)["environments"];
+  if (!Array.isArray(rawEnvs)) {
+    return { ok: false, error: { key: "restore.noEnvironments" } };
+  }
+
+  // Sanitize and parse each environment from the remote config
+  const restored: Environment[] = [];
+  for (const rawEnv of rawEnvs) {
+    const env = sanitizeRemoteEnvironment(rawEnv);
+    if (env) restored.push(env);
+  }
+
+  if (restored.length === 0) {
+    return { ok: false, error: { key: "restore.emptyEnvironments" } };
+  }
+
+  // Pull-only replacement: remove all existing local environments and
+  // replace with the canonical set from the VM.
+  await serialize(() => {
+    // Remove credentials for all existing environments
+    for (const env of store.get("environments", [])) {
+      if (env.credentialRefs) {
+        for (const reference of Object.values(env.credentialRefs)) {
+          if (reference) removeCredential(reference);
+        }
+      }
+    }
+
+    // Replace environments wholesale with the restored set
+    const restoredWithFingerprint: EnvironmentWithFingerprint[] = restored.map((env) => ({
+      ...env,
+      authState: "unauthenticated" as EnvironmentAuthState,
+    }));
+    store.set("environments", restoredWithFingerprint);
+
+    // Clear legacy session tokens
+    store.set("sessionTokens", {});
+
+    // Select the first restored environment
+    if (restoredWithFingerprint.length > 0) {
+      store.set("selectedEnvironmentId", restoredWithFingerprint[0].id);
+    }
+
+    // Auto-promote the first environment to main-vm if none has the role
+    _autoPromoteFirstEnvIfNeeded();
+  });
+
+  // Prune orphaned credentials after clearing old environments
+  pruneOrphanCredentials(collectActiveCredentialReferences());
+
+  return { ok: true, restored };
 }

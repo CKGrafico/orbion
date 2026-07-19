@@ -39,6 +39,8 @@ import type {
   McpToolCallResult,
   BootstrapSeedExportResult,
   BootstrapSeedImportResult,
+  RestoreAvailability,
+  PullRestoreResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -295,6 +297,39 @@ export class MockConfigService implements IConfigService {
       return { ok: false, error: { key: "bootstrapSeed.invalidSeed" } };
     }
     return { ok: true, seed };
+  }
+  async checkRestoreAvailable(): Promise<RestoreAvailability> {
+    // Mock: simulate a config-home with 2 environments available for restore
+    return {
+      available: true,
+      environmentCount: 2,
+      environmentNames: ["Production Server", "Staging VM"],
+    };
+  }
+  async pullRestore(): Promise<PullRestoreResult> {
+    // Mock: simulate restoring environments by adding mock entries
+    const restored: Environment[] = [
+      {
+        id: "restored-1",
+        name: "Production Server",
+        agentRuntime: "opencode",
+        endpoints: [{ id: "rep-1", kind: "ssh" as EndpointKind, url: "http://localhost:8845", sshTarget: null, lastError: null, failureCount: 0 }],
+        activeEndpointId: "rep-1",
+        authState: "unauthenticated",
+      },
+      {
+        id: "restored-2",
+        name: "Staging VM",
+        agentRuntime: "claude",
+        endpoints: [{ id: "rep-2", kind: "direct" as EndpointKind, url: "http://localhost:8846", lastError: null, failureCount: 0 }],
+        activeEndpointId: "rep-2",
+        authState: "unauthenticated",
+      },
+    ];
+    mockEnvironments = restored;
+    mockSelectedId = restored[0]?.id ?? null;
+    saveMockEnvironments();
+    return { ok: true, restored };
   }
 }
 

@@ -113,6 +113,18 @@ export type BootstrapSeedImportResult =
   | { ok: true; seed: BootstrapSeed }
   | { ok: false; error: string | I18nMessage };
 
+// ── Pull-canonical restore from config-home ───────────────────────────
+
+/** Whether a config-home VM has a config file available for restore. */
+export type RestoreAvailability =
+  | { available: true; environmentCount: number; environmentNames: string[] }
+  | { available: false; reason: string | I18nMessage };
+
+/** Result of a pull-canonical restore from the config-home VM. */
+export type PullRestoreResult =
+  | { ok: true; restored: Environment[] }
+  | { ok: false; error: string | I18nMessage };
+
 export interface ConfigBridge {
   getEnvironments: () => Promise<Environment[]>;
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
@@ -139,6 +151,8 @@ export interface ConfigBridge {
   setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
   exportBootstrapSeed: () => Promise<BootstrapSeedExportResult>;
   importBootstrapSeed: (seedString: string) => Promise<BootstrapSeedImportResult>;
+  checkRestoreAvailable: () => Promise<RestoreAvailability>;
+  pullRestore: () => Promise<PullRestoreResult>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────

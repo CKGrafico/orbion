@@ -661,5 +661,18 @@
     "noMainVm": "No main VM configured. Set a main VM first.",
     "noEndpoint": "Main VM has no endpoint configured.",
     "invalidSeed": "Invalid seed format. Seeds start with orbion://"
+  },
+  "restore": {
+    "availableTitle": "Config restore available",
+    "availableCopy": "Your config-home VM has {count, plural, one {1 environment} other {# environments}} available to restore: {names}. This will replace your local setup (pull-only, no merge). Environments that need credentials will prompt you once.",
+    "restoreAction": "Restore from config-home",
+    "skipAction": "Skip restore",
+    "restoringTitle": "Restoring config…",
+    "restoreSuccess": "Restored {count, plural, one {1 environment} other {# environments}} from your config-home.",
+    "restoreFailed": "Restore failed: {error}",
+    "noConfigFile": "No config file found on the config-home VM.",
+    "notSsh": "Config restore is only available when the main VM uses SSH.",
+    "credentialPrompt": "Re-authorize {name}",
+    "credentialNeeded": "This environment needs credentials to connect. You will be prompted once (into the keychain)."
   }
 }

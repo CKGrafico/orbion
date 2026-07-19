@@ -40,6 +40,8 @@ import type {
   McpToolCallResult,
   BootstrapSeedExportResult,
   BootstrapSeedImportResult,
+  RestoreAvailability,
+  PullRestoreResult,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -68,6 +70,8 @@ export interface IConfigService {
   setExpandedProjects(expandedKeys: string[]): Promise<void>;
   exportBootstrapSeed(): Promise<BootstrapSeedExportResult>;
   importBootstrapSeed(seedString: string): Promise<BootstrapSeedImportResult>;
+  checkRestoreAvailable(): Promise<RestoreAvailability>;
+  pullRestore(): Promise<PullRestoreResult>;
 }
 
 export interface IConnectionService {
