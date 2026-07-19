@@ -8,6 +8,8 @@ export const STATUS_COLORS: Record<LoopStatus, string> = {
   paused: "var(--status-paused)",
   idle: "var(--status-idle)",
   stopped: "var(--status-stopped)",
+  failed: "var(--status-failed)",
+  finished: "var(--status-finished)",
 };
 
 export function timeAgo(isoDate: string | null): string {

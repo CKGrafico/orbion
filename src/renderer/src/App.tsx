@@ -959,6 +959,15 @@ export function App(): React.ReactNode {
         const session = sessions.find((s) => s.id === view.sessionId);
         const sessionEnvId = session?.environmentId ?? selected?.id ?? "";
         const sessionEnv = environments.find((e) => e.id === sessionEnvId);
+        // Scope loops to the session's project x instance
+        const projectName = session?.projectName;
+        const envProjects = perEnvProjects[sessionEnvId] ?? [];
+        const sessionProject = projectName
+          ? envProjects.find((p) => p.name === projectName)
+          : undefined;
+        const sessionLoops = sessionProject
+          ? (perEnvLoops[sessionEnvId] ?? []).filter((l) => (l.projectId ?? "default") === sessionProject.id)
+          : perEnvLoops[sessionEnvId] ?? [];
         return (
           <SessionChatView
             sessionId={view.sessionId}
@@ -969,6 +978,7 @@ export function App(): React.ReactNode {
             reasoningEffort={session?.reasoningEffort}
             environments={environments.map((e) => ({ id: e.id, name: e.name }))}
             reachability={reachability[sessionEnvId]}
+            loops={sessionLoops}
           />
         );
       }

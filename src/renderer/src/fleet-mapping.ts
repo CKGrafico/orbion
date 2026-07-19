@@ -38,6 +38,10 @@ export function loopStatusToFleetItem(
       return "idle";
     case "stopped":
       return "failed";
+    case "failed":
+      return "failed";
+    case "finished":
+      return "completed";
     default:
       return "idle";
   }

@@ -727,5 +727,14 @@
   "unreachableBanner": {
     "unreachable": "{instance} unreachable — reconnecting…",
     "reconnecting": "{instance} reconnecting…"
+  },
+  "loopSummary": {
+    "emptyState": "No loops yet — ask to create one",
+    "unknownState": "{count} loops — status unknown",
+    "healthyCount": "{count} running",
+    "failedCount": "{count} failed",
+    "pausedCount": "{count} paused",
+    "finishedCount": "{count} finished",
+    "nextRun": "next: {loop} in {countdown}"
   }
 }

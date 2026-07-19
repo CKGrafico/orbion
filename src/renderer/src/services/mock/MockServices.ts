@@ -101,6 +101,9 @@ const MOCK_LOOPS: LoopMeta[] = [
   mockLoop({ id: "loop-3", status: "stopped", command: "docker compose up", intervalHuman: "1h", runCount: 12, lastExitCode: 1, lastRunAt: iso(-7200000), runHistory: [
     { runNumber: 12, startedAt: iso(-7200000), exitCode: 1, duration: 5400, logSize: 2048, status: "completed", logOffset: 0 },
   ] }),
+  mockLoop({ id: "loop-3b", status: "paused", command: "k6 run load-test.js", description: "Load test", intervalHuman: "1h", runCount: 8, lastExitCode: 0, lastRunAt: iso(-5400000), projectId: "etl", runHistory: [
+    { runNumber: 8, startedAt: iso(-5400000), exitCode: 0, duration: 3000, logSize: 800, status: "completed", logOffset: 0 },
+  ] }),
   mockLoop({ id: "loop-4", status: "running", command: "opencode agent run", description: "AI code review agent", intervalHuman: "15m", runCount: 67, lastExitCode: 0, lastRunAt: iso(-180000), nextRunAt: iso(720000), pid: 23456, projectId: "agents", runHistory: [
     { runNumber: 67, startedAt: iso(-180000), exitCode: 0, duration: 8500, logSize: 2048, status: "completed", logOffset: 0 },
     { runNumber: 66, startedAt: iso(-1080000), exitCode: 0, duration: 9200, logSize: 1920, status: "completed", logOffset: 0 },
@@ -109,6 +112,12 @@ const MOCK_LOOPS: LoopMeta[] = [
   mockLoop({ id: "loop-5", status: "waiting", command: "claude-code --auto-approve", description: "Claude automated fixes", intervalHuman: "30m", runCount: 23, lastExitCode: 0, lastRunAt: iso(-600000), nextRunAt: iso(1200000), projectId: "agents", runHistory: [
     { runNumber: 23, startedAt: iso(-600000), exitCode: 0, duration: 12000, logSize: 2560, status: "completed", logOffset: 0 },
     { runNumber: 22, startedAt: iso(-2400000), exitCode: 0, duration: 11500, logSize: 2400, status: "completed", logOffset: 0 },
+  ] }),
+  mockLoop({ id: "loop-6", status: "failed", command: "python etl_pipeline.py", description: "ETL nightly run", intervalHuman: "1d", runCount: 45, lastExitCode: 1, lastRunAt: iso(-3600000), projectId: "etl", runHistory: [
+    { runNumber: 45, startedAt: iso(-3600000), exitCode: 1, duration: 15000, logSize: 3200, status: "completed", logOffset: 0 },
+  ] }),
+  mockLoop({ id: "loop-7", status: "finished", command: "node seed-data.js", description: "Database seed", intervalHuman: "1w", maxRuns: 3, runCount: 3, lastExitCode: 0, lastRunAt: iso(-86400000), projectId: "etl", runHistory: [
+    { runNumber: 3, startedAt: iso(-86400000), exitCode: 0, duration: 5000, logSize: 1024, status: "completed", logOffset: 0 },
   ] }),
 ];
 
