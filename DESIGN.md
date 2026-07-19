@@ -43,8 +43,9 @@ themes:
       status_running: "#9fef00"
       status_waiting: "#5cb2ff"
       status_paused: "#ffcc5c"
-      status_idle: "#a4b1cd"
-      status_stopped: "#ff8484"
+      status_stopped: "#e8a24e"
+      status_failed: "#ff8484"
+      status_finished: "#a9d95c"
 
       selection: "rgba(217, 119, 87, 0.35)"
 
@@ -154,7 +155,7 @@ three-step ramp (`text_primary` / `text_secondary` / `text_muted`) for clear
 hierarchy against the dark surfaces. Status is expressed through a fixed palette
 deliberately matched to the loop-task TUI, so the desktop app and the terminal
 read as the same product: **running** = lime, **waiting** = blue, **paused** =
-amber, **idle** = muted gray, **stopped** = red.
+amber, **stopped** = warm amber, **failed** = red, **finished** = green.
 
 ## Typography
 
