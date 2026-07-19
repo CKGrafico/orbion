@@ -34,6 +34,7 @@ import type {
   OutageEscalation,
   ReachabilityStatus,
   ChatSession,
+  TranscriptMessage,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -52,6 +53,7 @@ import type {
   InboxBuildParams,
   IOutageService,
   IReachabilityService,
+  ITranscriptService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -791,5 +793,79 @@ export class MockReachabilityService implements IReachabilityService {
     return () => {
       this.listeners = this.listeners.filter((l) => l !== cb);
     };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mock Transcript Service (localStorage-backed for browser-only dev)
+// ---------------------------------------------------------------------------
+
+const TRANSCRIPT_KEY_PREFIX = "orbion.transcript.";
+
+@injectable()
+export class MockTranscriptService implements ITranscriptService {
+  private getKey(sessionId: string): string {
+    return `${TRANSCRIPT_KEY_PREFIX}${sessionId}`;
+  }
+
+  async getMessages(sessionId: string): Promise<TranscriptMessage[]> {
+    try {
+      const raw = localStorage.getItem(this.getKey(sessionId));
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed as TranscriptMessage[];
+    } catch {
+      return [];
+    }
+  }
+
+  async appendMessage(message: Omit<TranscriptMessage, "createdAt">): Promise<TranscriptMessage> {
+    const messages = await this.getMessages(message.sessionId);
+    const withTimestamp: TranscriptMessage = {
+      ...message,
+      createdAt: new Date().toISOString(),
+    };
+    messages.push(withTimestamp);
+    localStorage.setItem(this.getKey(message.sessionId), JSON.stringify(messages));
+    return withTimestamp;
+  }
+
+  async appendMessages(batch: Array<Omit<TranscriptMessage, "createdAt">>): Promise<TranscriptMessage[]> {
+    if (batch.length === 0) return [];
+    const sessionId = batch[0].sessionId;
+    const messages = await this.getMessages(sessionId);
+    const withTimestamps: TranscriptMessage[] = batch.map((msg) => ({
+      ...msg,
+      createdAt: new Date().toISOString(),
+    }));
+    messages.push(...withTimestamps);
+    localStorage.setItem(this.getKey(sessionId), JSON.stringify(messages));
+    return withTimestamps;
+  }
+
+  async updateMessage(messageId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>): Promise<void> {
+    // Find the session containing this message
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(TRANSCRIPT_KEY_PREFIX)) continue;
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const messages: TranscriptMessage[] = JSON.parse(raw);
+        const idx = messages.findIndex((m) => m.id === messageId);
+        if (idx !== -1) {
+          messages[idx] = { ...messages[idx], ...updates };
+          localStorage.setItem(key, JSON.stringify(messages));
+          return;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    localStorage.removeItem(this.getKey(sessionId));
   }
 }

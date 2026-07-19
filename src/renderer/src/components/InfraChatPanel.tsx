@@ -94,7 +94,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
     resolveApproval,
     answerQuestion,
     setTurnAccessMode,
-  } = useTranscript();
+  } = useTranscript(null);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("supervised");
   const [drafts, setDrafts] = useState<Record<string, string>>({});

@@ -448,6 +448,62 @@ const validators: Record<string, Validator> = {
   },
 
   "reachability:getAll": () => [],
+
+  // ── Transcript ─────────────────────────────────────────────
+  "transcript:getMessages": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
+    return issues;
+  },
+
+  "transcript:appendMessage": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) {
+      issues.push("message must be an object");
+      return issues;
+    }
+    const m = args[0] as Record<string, unknown>;
+    if (!isNonEmptyString(m.id)) issues.push("message.id must be a non-empty string");
+    if (!isNonEmptyString(m.sessionId)) issues.push("message.sessionId must be a non-empty string");
+    if (!isEnum(m.role, ["user", "assistant", "tool"])) issues.push("message.role must be user, assistant, or tool");
+    if (!isString(m.content)) issues.push("message.content must be a string");
+    if (!isNumber(m.startedAt)) issues.push("message.startedAt must be a number");
+    return issues;
+  },
+
+  "transcript:appendMessages": (args) => {
+    const issues: string[] = [];
+    if (!Array.isArray(args[0])) {
+      issues.push("messages must be an array");
+      return issues;
+    }
+    for (let i = 0; i < (args[0] as unknown[]).length; i++) {
+      const m = (args[0] as Record<string, unknown>[])[i];
+      if (!isObject(m)) {
+        issues.push(`messages[${i}] must be an object`);
+        continue;
+      }
+      if (!isNonEmptyString(m.id)) issues.push(`messages[${i}].id must be a non-empty string`);
+      if (!isNonEmptyString(m.sessionId)) issues.push(`messages[${i}].sessionId must be a non-empty string`);
+      if (!isEnum(m.role, ["user", "assistant", "tool"])) issues.push(`messages[${i}].role must be user, assistant, or tool`);
+      if (!isString(m.content)) issues.push(`messages[${i}].content must be a string`);
+      if (issues.length > 5) break;
+    }
+    return issues;
+  },
+
+  "transcript:updateMessage": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("messageId must be a non-empty string");
+    if (!isObject(args[1])) issues.push("updates must be an object");
+    return issues;
+  },
+
+  "transcript:deleteSession": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
+    return issues;
+  },
 };
 
 // ── Structured IPC error result ───────────────────────────────────────

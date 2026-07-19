@@ -673,6 +673,46 @@ export interface ChatSession {
   createdAt: string;
 }
 
+// ── Transcript persistence (local, instance-independent) ────────────
+
+/** A persisted tool-call record within a transcript message. */
+export interface ToolCallRecord {
+  id: string;
+  kind: string;
+  title: string;
+  status: "running" | "completed" | "error";
+  output?: string;
+  startedAt: number;
+  finishedAt?: number;
+}
+
+/** A single persisted message in a chat transcript. */
+export interface TranscriptMessage {
+  id: string;
+  /** The ChatSession this message belongs to. */
+  sessionId: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  toolCalls?: ToolCallRecord[];
+  startedAt: number;
+  finishedAt?: number;
+  /** ISO timestamp when this message was first persisted. */
+  createdAt: string;
+}
+
+export interface TranscriptBridge {
+  /** Get all messages for a session, ordered by createdAt. */
+  getMessages: (sessionId: string) => Promise<TranscriptMessage[]>;
+  /** Append a single message to a session. */
+  appendMessage: (message: Omit<TranscriptMessage, "createdAt">) => Promise<TranscriptMessage>;
+  /** Append multiple messages atomically (for initial replay). */
+  appendMessages: (messages: Array<Omit<TranscriptMessage, "createdAt">>) => Promise<TranscriptMessage[]>;
+  /** Update a specific message (for streaming content or status changes). */
+  updateMessage: (messageId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>) => Promise<void>;
+  /** Delete all messages for a session. */
+  deleteSession: (sessionId: string) => Promise<void>;
+}
+
 // ── Native OS notifications ─────────────────────────────────────────
 
 export type DeepLinkTarget =
@@ -732,4 +772,5 @@ export interface LoopTaskBridge {
   notification: NotificationBridge;
   outage: OutageBridge;
   reachability: ReachabilityBridge;
+  transcript: TranscriptBridge;
 }

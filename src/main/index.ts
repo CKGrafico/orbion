@@ -31,6 +31,7 @@ import type {
   ResolvedInboxItem,
   VmWizardStartOptions,
   ReachabilityStatus,
+  TranscriptMessage,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -81,6 +82,14 @@ import {
   getExpandedProjects,
   setExpandedProjects,
 } from "./config-store.js";
+import {
+  getMessages as transcriptGetMessages,
+  appendMessage as transcriptAppendMessage,
+  appendMessages as transcriptAppendMessages,
+  updateMessage as transcriptUpdateMessage,
+  updateMessageInSession as transcriptUpdateMessageInSession,
+  deleteSession as transcriptDeleteSession,
+} from "./transcript-store.js";
 import {
   ConnectionSupervisor,
   EndpointHealthTracker,
@@ -893,6 +902,7 @@ app.whenReady().then(() => {
   safeHandle("config:removeChatSession", async (_event, ...rawArgs) => {
     const [sessionId] = validateIpc<[string]>("config:removeChatSession", rawArgs);
     await removeChatSession(sessionId);
+    await transcriptDeleteSession(sessionId);
   });
 
   safeHandle("config:updateChatSession", async (_event, ...rawArgs) => {
@@ -1509,6 +1519,33 @@ app.whenReady().then(() => {
   safeHandle("reachability:getAll", (): ReachabilityStatus[] => {
     validateIpc("reachability:getAll", []);
     return reachabilityTracker.getAll();
+  });
+
+  // ── Transcript IPC handlers ──────────────────────────────────────────
+
+  safeHandle("transcript:getMessages", async (_event, ...rawArgs) => {
+    const [sessionId] = validateIpc<[string]>("transcript:getMessages", rawArgs);
+    return transcriptGetMessages(sessionId);
+  });
+
+  safeHandle("transcript:appendMessage", async (_event, ...rawArgs) => {
+    const [message] = validateIpc<[Omit<TranscriptMessage, "createdAt">]>("transcript:appendMessage", rawArgs);
+    return transcriptAppendMessage(message);
+  });
+
+  safeHandle("transcript:appendMessages", async (_event, ...rawArgs) => {
+    const [messages] = validateIpc<[Array<Omit<TranscriptMessage, "createdAt">>]>("transcript:appendMessages", rawArgs);
+    return transcriptAppendMessages(messages);
+  });
+
+  safeHandle("transcript:updateMessage", async (_event, ...rawArgs) => {
+    const [messageId, updates] = validateIpc<[string, Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>>]>("transcript:updateMessage", rawArgs);
+    await transcriptUpdateMessage(messageId, updates);
+  });
+
+  safeHandle("transcript:deleteSession", async (_event, ...rawArgs) => {
+    const [sessionId] = validateIpc<[string]>("transcript:deleteSession", rawArgs);
+    await transcriptDeleteSession(sessionId);
   });
 
   // Prune old breaches on startup
