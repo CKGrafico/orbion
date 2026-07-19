@@ -209,26 +209,149 @@ export function getEnvironments(): EnvironmentWithFingerprint[] {
   }));
 }
 
-/** Strip wasEncrypted from internal endpoints before sending to renderer. */
-function sanitizeEndpoint(ep: InternalOpenCodeEndpoint | null | undefined): OpenCodeEndpoint | null | undefined {
-  if (!ep) return ep;
-  return { url: ep.url, password: null };
+// ---------------------------------------------------------------------------
+// Sync-safe serialization — structurally excludes secret fields
+// ---------------------------------------------------------------------------
+
+/**
+ * Field names that are known secrets or internal security metadata.
+ * If any of these appear in serialized output, the serialization layer
+ * is broken. The test suite asserts against this list.
+ *
+ * - password: plaintext or encrypted password on OpenCode endpoints
+ * - wasEncrypted: internal encryption metadata on InternalOpenCodeEndpoint
+ * - encryptedAccessToken: ciphertext in legacy EncryptedSessionToken
+ * - encryptedValue: ciphertext in credential-vault CredentialRecord
+ * - accessToken: plaintext session token value
+ */
+export const SECRET_FIELD_NAMES: readonly string[] = [
+  "password",
+  "wasEncrypted",
+  "encryptedAccessToken",
+  "encryptedValue",
+  "accessToken",
+] as const;
+
+/**
+ * Fields safe to include in a synced/serialized environment.
+ * Uses an explicit allowlist so that adding a new field to
+ * EnvironmentWithFingerprint requires a deliberate decision here.
+ * If a field is not listed, it is silently dropped by sanitizeEnvironmentForSync.
+ */
+const SAFE_ENVIRONMENT_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "name",
+  "role",
+  "agentRuntime",
+  "runtimeState",
+  "credentialRefs",
+  "endpoints",
+  "activeEndpointId",
+  "authState",
+  "opencode",
+  "infraOpenCode",
+  "fingerprintId",
+]);
+
+/**
+ * Fields safe to include on an AccessEndpoint in synced output.
+ */
+const SAFE_ENDPOINT_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "kind",
+  "url",
+  "sshTarget",
+  "lastError",
+  "failureCount",
+]);
+
+/**
+ * Fields safe to include on a credentialRefs object in synced output.
+ * Only opaque reference identifiers — never credential values or ciphertext.
+ */
+const SAFE_CREDENTIAL_REF_KEYS: ReadonlySet<string> = new Set([
+  "sessionToken",
+  "sshKeyPassphrase",
+]);
+
+/**
+ * Fields safe to include on an OpenCode-style endpoint in synced output.
+ * The `password` field is NEVER included — only the `url` is synced.
+ */
+const SAFE_OPENCODE_ENDPOINT_KEYS: ReadonlySet<string> = new Set([
+  "url",
+]);
+
+/**
+ * Structurally sanitize a single environment for sync/serialization.
+ * Uses allowlists at every nesting level so that secret fields cannot
+ * accidentally leak into serialized output, even if new fields are
+ * added to the internal types later.
+ */
+function sanitizeEnvironmentForSync(env: EnvironmentWithFingerprint): Environment {
+  const result: Record<string, unknown> = {};
+
+  for (const key of Object.keys(env)) {
+    if (!SAFE_ENVIRONMENT_KEYS.has(key)) continue;
+
+    if (key === "credentialRefs" && env.credentialRefs) {
+      const refs: Record<string, unknown> = {};
+      for (const refKey of Object.keys(env.credentialRefs)) {
+        if (SAFE_CREDENTIAL_REF_KEYS.has(refKey)) {
+          const value = (env.credentialRefs as Record<string, unknown>)[refKey];
+          if (value != null) refs[refKey] = value;
+        }
+      }
+      result.credentialRefs = Object.keys(refs).length > 0 ? refs : undefined;
+    } else if (key === "endpoints") {
+      result.endpoints = env.endpoints.map((ep) => {
+        const safeEp: Record<string, unknown> = {};
+        for (const epKey of Object.keys(ep)) {
+          if (SAFE_ENDPOINT_KEYS.has(epKey)) {
+            safeEp[epKey] = (ep as Record<string, unknown>)[epKey];
+          }
+        }
+        return safeEp;
+      });
+    } else if (key === "opencode" || key === "infraOpenCode") {
+      const endpoint = env[key] as InternalOpenCodeEndpoint | null | undefined;
+      if (endpoint) {
+        const safeE: Record<string, unknown> = {};
+        for (const eKey of Object.keys(endpoint)) {
+          if (SAFE_OPENCODE_ENDPOINT_KEYS.has(eKey)) {
+            safeE[eKey] = (endpoint as Record<string, unknown>)[eKey];
+          }
+        }
+        result[key] = safeE;
+      } else {
+        result[key] = endpoint;
+      }
+    } else {
+      (result as Record<string, unknown>)[key] = (env as Record<string, unknown>)[key];
+    }
+  }
+
+  return result as unknown as Environment;
 }
 
-/** Get environments with wasEncrypted stripped from OpenCodeEndpoint fields (for IPC/renderer). */
+/**
+ * Check whether a serialized JSON string contains any known secret field names.
+ * Returns the first secret field name found, or null if the output is clean.
+ */
+export function findSecretFieldInJson(serialized: string): string | null {
+  for (const field of SECRET_FIELD_NAMES) {
+    // Match the field name as a JSON key: `"fieldName"`
+    const pattern = `"${field}"`;
+    if (serialized.includes(pattern)) {
+      return field;
+    }
+  }
+  return null;
+}
+
+/** Get environments structurally sanitized for IPC/renderer/sync. */
 export function getEnvironmentsForRenderer(): Environment[] {
-  const envs = getEnvironments();
-  return envs.map((env) => ({
-    ...env,
-    credentialRefs: env.credentialRefs
-      ? {
-          ...(env.credentialRefs.sessionToken ? { sessionToken: env.credentialRefs.sessionToken } : {}),
-          ...(env.credentialRefs.sshKeyPassphrase ? { sshKeyPassphrase: env.credentialRefs.sshKeyPassphrase } : {}),
-        }
-      : undefined,
-    opencode: sanitizeEndpoint(env.opencode),
-    infraOpenCode: sanitizeEndpoint(env.infraOpenCode),
-  }));
+  return getEnvironments().map(sanitizeEnvironmentForSync);
 }
 
 export function findEnvironmentByFingerprint(fingerprintId: string): EnvironmentWithFingerprint | undefined {
