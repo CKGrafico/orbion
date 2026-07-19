@@ -2,13 +2,23 @@ import { execFile } from "node:child_process";
 import type { TailscalePeer, TailscalePeersResponse } from "../shared/ipc.js";
 
 let cliAvailable: boolean | null = null;
+let cliAvailableCheckedAt = 0;
+const CLI_CHECK_TTL_MS = 60_000; // Re-check every 60 seconds
+
+function invalidateTailscaleCliCache(): void {
+  cliAvailable = null;
+  cliAvailableCheckedAt = 0;
+}
 
 async function detectTailscaleCLI(): Promise<boolean> {
-  if (cliAvailable !== null) return cliAvailable;
+  if (cliAvailable !== null && Date.now() - cliAvailableCheckedAt < CLI_CHECK_TTL_MS) {
+    return cliAvailable;
+  }
   const cmd = process.platform === "win32" ? "where" : "which";
   return new Promise((resolve) => {
     execFile(cmd, ["tailscale"], (err) => {
       cliAvailable = !err;
+      cliAvailableCheckedAt = Date.now();
       resolve(cliAvailable);
     });
   });
@@ -69,6 +79,11 @@ async function fetchPeers(): Promise<TailscalePeersResponse> {
   return new Promise((resolve) => {
     execFile("tailscale", ["status", "--json"], { timeout: 10_000 }, (err, stdout) => {
       if (err) {
+        // If tailscale binary not found (ENOENT), invalidate CLI cache so the
+        // next call re-checks availability instead of remaining stale.
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          invalidateTailscaleCliCache();
+        }
         const result: TailscalePeersResponse = {
           available: true,
           peers: [],
@@ -87,4 +102,4 @@ async function fetchPeers(): Promise<TailscalePeersResponse> {
   });
 }
 
-export { detectTailscaleCLI, fetchPeers };
+export { detectTailscaleCLI, fetchPeers, invalidateTailscaleCliCache };
