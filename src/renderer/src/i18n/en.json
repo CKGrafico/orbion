@@ -757,6 +757,8 @@
     "outputLabel": "OUTPUT",
     "copy": "Copy",
     "copied": "Copied",
-    "logUnavailable": "unavailable"
+    "logUnavailable": "unavailable",
+    "live": "LIVE",
+    "disconnected": "disconnected"
   }
 }

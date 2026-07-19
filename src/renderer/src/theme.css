@@ -1410,6 +1410,7 @@ input {
   word-break: break-all;
   max-height: 120px;
   overflow-y: auto;
+  scroll-behavior: smooth;
 }
 
 .loop-card-log-tail-line {
@@ -1419,6 +1420,34 @@ input {
 .loop-card-log-tail-line--error {
   color: var(--danger);
   font-weight: 500;
+}
+
+/* ── Live streaming indicator in loop card log header ─────────────── */
+
+.loop-card-log-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-running, #34d399);
+  margin-left: 6px;
+  vertical-align: middle;
+  animation: loop-card-live-pulse 1.5s ease-in-out infinite;
+}
+
+.loop-card-log-live-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--status-running, #34d399);
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+@keyframes loop-card-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* ── Transcript loop-card row (padding inside the chat stream) ──── */
