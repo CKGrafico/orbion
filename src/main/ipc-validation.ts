@@ -601,6 +601,29 @@ const validators: Record<string, Validator> = {
     if (!isObject(args[2])) issues.push("args must be an object");
     return issues;
   },
+
+  // ── Agent streaming ──────────────────────────────────────────
+  "agent:sendPrompt": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) {
+      issues.push("args must be an object");
+      return issues;
+    }
+    const a = args[0] as Record<string, unknown>;
+    if (!isNonEmptyString(a.environmentId)) issues.push("environmentId must be a non-empty string");
+    if (!isNonEmptyString(a.prompt)) issues.push("prompt must be a non-empty string");
+    if (a.sessionId !== undefined && !isString(a.sessionId)) issues.push("sessionId must be a string if provided");
+    if (!isNonEmptyString(a.chatSessionId)) issues.push("chatSessionId must be a non-empty string");
+    if (!isNonEmptyString(a.turnId)) issues.push("turnId must be a non-empty string");
+    return issues;
+  },
+
+  "agent:interrupt": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    if (args[1] !== undefined && !isString(args[1])) issues.push("sessionId must be a string if provided");
+    return issues;
+  },
 };
 
 // ── Structured IPC error result ───────────────────────────────────────

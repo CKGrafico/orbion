@@ -837,6 +837,46 @@ export interface McpBridge {
   onStatusChange: (cb: (status: McpConnectionStatus) => void) => () => void;
 }
 
+// ── Agent streaming (OpenCode runtime) ────────────────────────────────
+
+/** Arguments for sending a prompt to the agent runtime. */
+export interface AgentSendPromptArgs {
+  environmentId: string;
+  prompt: string;
+  /** OpenCode session ID (if resuming an existing session). */
+  sessionId?: string;
+  /** The Orbion chat session ID for correlating stream events. */
+  chatSessionId: string;
+  /** The Orbion turn ID for correlating stream events. */
+  turnId: string;
+}
+
+/** A single streaming event from the agent runtime. */
+export type AgentStreamEvent =
+  | { kind: "text-delta"; chatSessionId: string; turnId: string; text: string }
+  | { kind: "tool-call-start"; chatSessionId: string; turnId: string; toolCallId: string; toolName: string; title: string }
+  | { kind: "tool-call-output"; chatSessionId: string; turnId: string; toolCallId: string; output: string; status: "completed" | "error" }
+  | { kind: "turn-finished"; chatSessionId: string; turnId: string }
+  | { kind: "turn-error"; chatSessionId: string; turnId: string; error: string }
+  | { kind: "turn-interrupted"; chatSessionId: string; turnId: string };
+
+/** Result of sending a prompt to the agent. */
+export interface AgentSendPromptResult {
+  ok: boolean;
+  /** The OpenCode session ID that processed the prompt. */
+  sessionId?: string;
+  error?: string | I18nMessage;
+}
+
+export interface AgentBridge {
+  /** Send a prompt to the agent and begin streaming events. */
+  sendPrompt: (args: AgentSendPromptArgs) => Promise<AgentSendPromptResult>;
+  /** Interrupt/abort an in-flight agent generation. Partial output is kept. */
+  interrupt: (environmentId: string, sessionId?: string) => Promise<void>;
+  /** Subscribe to agent streaming events. */
+  onStreamEvent: (cb: (event: AgentStreamEvent) => void) => () => void;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -873,4 +913,5 @@ export interface LoopTaskBridge {
   reachability: ReachabilityBridge;
   transcript: TranscriptBridge;
   mcp: McpBridge;
+  agent: AgentBridge;
 }

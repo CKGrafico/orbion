@@ -674,5 +674,17 @@
     "notSsh": "Config restore is only available when the main VM uses SSH.",
     "credentialPrompt": "Re-authorize {name}",
     "credentialNeeded": "This environment needs credentials to connect. You will be prompted once (into the keychain)."
+  },
+  "agent": {
+    "noEndpoint": "No OpenCode endpoint configured for this environment. Add one in the VM settings.",
+    "promptFailed": "Failed to send prompt (HTTP {status}): {detail}",
+    "promptTimedOut": "The agent request timed out. Try again or interrupt the generation.",
+    "promptError": "Agent error: {detail}"
+  },
+  "session": {
+    "emptyDescription": "Start a conversation with the agent. Ask about loops, tasks, or anything related to your project.",
+    "userInitials": "You",
+    "viewTitle": "Chat Session",
+    "viewDescription": "Start a conversation with the agent by typing below."
   }
 }

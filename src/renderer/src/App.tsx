@@ -32,6 +32,7 @@ import type { IConnectionService, IOpenCodeService, IOutageService, IInboxServic
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
+import { SessionChatView } from "./components/SessionChatView";
 
 type View =
   | { kind: "inbox" }
@@ -738,14 +739,13 @@ export function App(): React.ReactNode {
           />
         );
       case "session": {
-        // Session view: show the chat panel for the selected session
+        const session = sessions.find((s) => s.id === view.sessionId);
         return (
-          <div className="content-inner">
-            <div className="session-chat-placeholder">
-              <h3>{intl.formatMessage({ id: "session.viewTitle" })}</h3>
-              <p>{intl.formatMessage({ id: "session.viewDescription" })}</p>
-            </div>
-          </div>
+          <SessionChatView
+            sessionId={view.sessionId}
+            environmentId={session?.environmentId ?? selected?.id ?? ""}
+            activeRuntime={session?.activeRuntime ?? "opencode"}
+          />
         );
       }
     }
