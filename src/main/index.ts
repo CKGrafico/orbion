@@ -84,6 +84,8 @@ import {
   updateChatSession,
   getExpandedProjects,
   setExpandedProjects,
+  exportBootstrapSeed,
+  importBootstrapSeed,
 } from "./config-store.js";
 import {
   getMessages as transcriptGetMessages,
@@ -889,6 +891,16 @@ app.whenReady().then(() => {
   safeHandle("config:setExpandedProjects", async (_event, ...rawArgs) => {
     const [expandedKeys] = validateIpc<[string[]]>("config:setExpandedProjects", rawArgs);
     await setExpandedProjects(expandedKeys);
+  });
+
+  safeHandle("config:exportBootstrapSeed", () => {
+    validateIpc("config:exportBootstrapSeed", []);
+    return exportBootstrapSeed();
+  });
+
+  safeHandle("config:importBootstrapSeed", (_event, ...rawArgs) => {
+    const [seedString] = validateIpc<[string]>("config:importBootstrapSeed", rawArgs);
+    return importBootstrapSeed(seedString);
   });
 
   // ── CLI input sanitization (issue #191) ──────────────────────────────

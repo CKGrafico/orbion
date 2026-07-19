@@ -1,7 +1,7 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession } from "../shared/ipc.js";
-import { trimTrailingSlash } from "../shared/utils.js";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult } from "../shared/ipc.js";
+import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
 import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 
@@ -1134,4 +1134,51 @@ export function setExpandedProjects(expandedKeys: string[]): void {
   void serialize(() => {
     store.set("expandedProjects", expandedKeys);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap seed — portable config-home reach info (no secrets)
+// ---------------------------------------------------------------------------
+
+/**
+ * Export a bootstrap seed for the main-VM environment.
+ * The seed is a compact URI string containing only non-secret reach info
+ * (host, port, method, name). Returns an error if no main-VM is set.
+ */
+export function exportBootstrapSeed(): BootstrapSeedExportResult {
+  const mainVm = getMainVm();
+  if (!mainVm) {
+    return { ok: false, error: { key: "bootstrapSeed.noMainVm" } };
+  }
+
+  const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
+  if (!activeEndpoint) {
+    return { ok: false, error: { key: "bootstrapSeed.noEndpoint" } };
+  }
+
+  const kind = activeEndpoint.kind === "ssh" ? "ssh" as const : "direct" as const;
+  const target = kind === "ssh" && activeEndpoint.sshTarget
+    ? activeEndpoint.sshTarget
+    : activeEndpoint.url;
+
+  const seedString = encodeBootstrapSeed({
+    kind,
+    target,
+    name: mainVm.name,
+  });
+
+  return { ok: true, seed: seedString };
+}
+
+/**
+ * Import (parse) a bootstrap seed string.
+ * Returns the parsed seed data or an error if the string is invalid.
+ * Does NOT create an environment; the caller (wizard) handles that.
+ */
+export function importBootstrapSeed(seedString: string): BootstrapSeedImportResult {
+  const seed = decodeBootstrapSeed(seedString);
+  if (!seed) {
+    return { ok: false, error: { key: "bootstrapSeed.invalidSeed" } };
+  }
+  return { ok: true, seed };
 }
