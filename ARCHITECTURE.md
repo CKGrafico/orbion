@@ -42,6 +42,7 @@ orbion/
 │   │   ├── reachability-tracker.ts   # Instance reachability as its own health layer (connected/reconnecting/unreachable)
 │   │   ├── opencode-client.ts  # OpenCode server status + version checks
 │   │   ├── platform-classifier.ts  # Git remote URL → platform classification
+│   │   ├── transcript-store.ts # Per-session chat transcript file storage
 │   │   └── ssh-probe.ts        # SSH VM, Node 20+, loop-task, and daemon probing
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
@@ -187,7 +188,7 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
 `budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
 `inbox:queryFleet`, `inbox:resolveItem`, `inbox:getResolvedItems`,
-`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`. The inbox service also performs inline
+`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`. The inbox service also performs inline
 actions (`run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`)
 via its `executeInboxAction` method, which calls the same loop-task API
 endpoints as the loop card (`POST /api/loops/:id/trigger`,
@@ -284,8 +285,8 @@ sequenceDiagram
 
 ## 5. Data Stores
 
-The app has **no database or backend store of its own**; all authoritative data
-lives in the loop-task daemons. Local persistence uses two mechanisms:
+The app has **no formal database**; all authoritative domain data lives in the
+loop-task daemons. Local persistence uses these mechanisms:
 
 - **electron-store** (main process, `config-store.ts`): a typed JSON store in
   Electron's `userData` directory holding registered environments
@@ -307,6 +308,16 @@ lives in the loop-task daemons. Local persistence uses two mechanisms:
   these values or their ciphertext.
 - **window-bounds.json** (main, in Electron `userData`): window
   size/position/maximized state.
+- **Transcript store** (main process, `transcript-store.ts`): per-session chat
+  transcript files stored as individual JSON arrays under
+  `userData/transcripts/<sessionId>.json`. Each file holds an array of
+  `TranscriptMessage` objects (user messages, assistant messages, tool calls).
+  Transcripts are instance-independent: they are keyed by `ChatSession.id`, not
+  by any `environmentId`, so they survive instance removal or unreachability.
+  Writes are serialized per-session through a `serializeSession()` queue to
+  prevent read-modify-write races. A debounce timer (200ms) batches rapid
+  streaming content updates to reduce disk I/O. When a `ChatSession` is removed,
+  the corresponding transcript file is also deleted.
 
 A **safeStorage wrapper** (`config-store.ts`: `encryptValue`/`decryptValue`) and
 the dedicated credential vault use OS-native encryption (DPAPI on Windows,
@@ -544,4 +555,4 @@ and screenshots without a daemon. This is a notable gap (see §15).
 - **Mock mode** — renderer running without `window.api` (plain browser), backed
   by `mock.ts`.
 
-<!-- Last updated: 2026-07-18T18:15:00Z -->
+<!-- Last updated: 2026-07-19T18:15:00Z -->
