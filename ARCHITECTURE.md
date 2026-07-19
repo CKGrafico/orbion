@@ -74,6 +74,7 @@ orbion/
 │               ├── AddInstanceModal.tsx  # Register a new instance
 │               ├── LoopsView.tsx         # Loop list for the selected instance
 │               ├── LoopDetail.tsx        # Single-loop metadata + logs
+│               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row)
 │               ├── LogViewer.tsx         # Tail + live SSE log follow
 │               ├── TasksView.tsx         # Task definitions list
 │               └── ProjectsView.tsx      # Projects list
@@ -130,7 +131,8 @@ flowchart LR
   plain CSS with custom-property design tokens. No router, no state library.
 - **State model:** local component state + a `useInstances` hook. "Routing" is a
   simple `view` discriminated union (`list` | `loop`) plus a `section` enum in
-  `App.tsx` — there is no URL router.
+  `App.tsx` — there is no URL router. The chat transcript rows include a `loop-card`
+  kind that renders a live `<LoopCard>` component bound to the polled loop data.
 - **Inputs:** data from `api.ts`; persisted instances from `store.ts` via IPC.
 - **Outputs:** IPC calls via `window.api`.
 
