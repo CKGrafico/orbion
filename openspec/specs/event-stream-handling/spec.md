@@ -1,10 +1,11 @@
 # event-stream-handling Specification
 
 ## Purpose
-TBD - created by archiving change loop-detail-run-selector-log-rendering. Update Purpose after archive.
+Defines how SSE (Server-Sent Events) streams from loop-task daemons are parsed in the main process and dispatched to the renderer via the `stream:event` IPC channel.
+
 ## Requirements
 ### Requirement: Event stream kind is handled in stream subscriber
-The stream handler in `api.ts` SHALL process `StreamEventPayload` instances where `kind === "event"` instead of silently ignoring them. When an event payload is received, the handler SHALL attempt to parse the `text` field as JSON and route the parsed structure to the appropriate log row type. If JSON parsing fails, the text SHALL be treated as a plain-text line.
+The stream handler in the main process SHALL use a spec-compliant SSE parser to process incoming `text/event-stream` responses. When an SSE event is parsed, the handler SHALL dispatch `StreamEventPayload` messages to the renderer with the correct `kind` and `text`. Multi-line `data:` fields SHALL be concatenated with `\n` before dispatch as a single `data` kind message. The `event:` field SHALL be dispatched as a separate `event` kind message. Lines starting with `id:`, `retry:`, or `:` SHALL be processed by the parser but SHALL NOT trigger any dispatch to the renderer.
 
 #### Scenario: Structured event received and parsed
 - **WHEN** a `StreamEventPayload` with `kind: "event"` is received and `text` contains valid JSON
@@ -21,6 +22,18 @@ The stream handler in `api.ts` SHALL process `StreamEventPayload` instances wher
 #### Scenario: Event with markdown content creates markdown row
 - **WHEN** a parsed event contains a `content` field with markdown text
 - **THEN** a `markdown` LogRow is created
+
+#### Scenario: Multi-line data fields are concatenated
+- **WHEN** the SSE stream delivers an event with multiple `data:` lines
+- **THEN** the data values are concatenated with `\n` and dispatched as a single `data` kind `StreamEventPayload`
+
+#### Scenario: Chunk boundary does not break event parsing
+- **WHEN** the `\n\n` boundary is split across two chunk reads
+- **THEN** the parser correctly detects the event boundary and dispatches the event
+
+#### Scenario: id and retry fields do not pollute data
+- **WHEN** the SSE stream delivers `id:` or `retry:` lines
+- **THEN** no `StreamEventPayload` is dispatched for those lines, and subsequent data events are not corrupted
 
 ### Requirement: Subscribe logs callback accepts structured events
 The `subscribeLogs` function signature SHALL support an optional `onEvent` callback that receives parsed structured events. The existing `onLine` callback SHALL continue to receive plain text lines for backward compatibility. When no `onEvent` callback is provided, structured events SHALL be converted to plain text lines via JSON.stringify.

@@ -43,6 +43,7 @@ orbion/
 │   │   ├── opencode-client.ts  # OpenCode server status + version checks
 │   │   ├── platform-classifier.ts  # Git remote URL → platform classification
 │   │   ├── transcript-store.ts # Per-session chat transcript file storage
+│   │   ├── sse-parser.ts     # Spec-compliant SSE stream parser (eventsource-parser)
 │   │   └── ssh-probe.ts        # SSH VM, Node 20+, loop-task, and daemon probing
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
@@ -141,10 +142,11 @@ There is no separate server; the **Electron main process is the backend**
   (`AbortController`), then unwraps the loop-task `{ ok, data }` /
   `{ ok, error: { message } }` envelope into the app's `ApiResponse` shape.
   Validates that the base URL is `http:`/`https:` before fetching.
-- **`handleStreamSubscribe`** — a minimal hand-rolled SSE client: streams the
-  response body, splits on `\n\n`, and forwards `data:` / `event:` lines to the
-  renderer as `stream:event` messages. Subscriptions are tracked in a
-  `Map<subId, AbortController>` for clean teardown.
+- **`handleStreamSubscribe`** — an SSE client powered by `sse-parser.ts`: streams the
+  response body through a spec-compliant `eventsource-parser`, correctly concatenating
+  multi-line `data:` fields and handling chunk-boundary splits, and forwards parsed
+  `data:` / `event:` events to the renderer as `stream:event` messages. Subscriptions
+  are tracked in a `Map<subId, AbortController>` for clean teardown.
 - **Tunnel auto-reconnect** (`tunnel-registry.ts` + `ssh-tunnel.ts`) — when
   an SSH tunnel process exits unexpectedly (network blip, keepalive timeout),
   the registry automatically retries reopening it with exponential backoff
