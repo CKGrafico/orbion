@@ -11,6 +11,14 @@ import type { FleetItemStatus } from "./fleet-status";
  * When the instance is reconnecting, its loops are "unknown" as well,
  * since we can't confirm their actual state.
  *
+ * All 6 loop-task states are preserved as distinct FleetItemStatus values:
+ *   running  → working    (active task)
+ *   waiting  → idle       (idle between runs)
+ *   paused   → paused     (schedule kept, can resume)
+ *   stopped  → stopped    (schedule cleared, must re-create)
+ *   failed   → failed     (non-zero exit code)
+ *   finished → completed  (hit max-runs, success)
+ *
  * "unknown" is distinct from any loop-level status: it is not in the
  * priority order and does not inflate failure tallies.
  */
@@ -26,18 +34,15 @@ export function loopStatusToFleetItem(
     return "unknown";
   }
 
-  if (lastExitCode !== null && lastExitCode !== 0) return "failed";
   switch (status) {
     case "running":
       return "working";
     case "waiting":
       return "idle";
     case "paused":
-      return "idle";
-    case "idle":
-      return "idle";
+      return "paused";
     case "stopped":
-      return "failed";
+      return "stopped";
     case "failed":
       return "failed";
     case "finished":
