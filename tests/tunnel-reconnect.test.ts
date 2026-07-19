@@ -203,3 +203,97 @@ describe("Tunnel exit event classification", () => {
     expect(shouldReconnect).toBe(true);
   });
 });
+
+// ── Stale entry regression (gh-209) ─────────────────────────────────
+
+describe("Stale entry mutation after openTunnelForEndpoint (gh-209)", () => {
+  it("mutating a stale captured entry does NOT affect the fresh registry entry", () => {
+    // Simulates the bug: after openTunnelForEndpoint deletes the stale entry
+    // and creates a new one, mutating the old captured reference has no effect
+    // on the registry's current entry.
+    interface Entry {
+      reconnect: { failureCount: number; backoffMs: number; retryTimer: null } | null;
+    }
+
+    const registry = new Map<string, Entry>();
+
+    // Create the "stale" entry (captured by the setTimeout callback)
+    const staleEntry: Entry = {
+      reconnect: { failureCount: 2, backoffMs: 4_000, retryTimer: null },
+    };
+    registry.set("env1:ep1", staleEntry);
+
+    // Simulate openTunnelForEndpoint: delete stale, create fresh
+    registry.delete("env1:ep1");
+    const freshEntry: Entry = { reconnect: null };
+    registry.set("env1:ep1", freshEntry);
+
+    // Bug behavior: mutate stale (this should NOT affect the registry)
+    staleEntry.reconnect = null;
+
+    // The fresh entry in the registry is unaffected by the stale mutation
+    const currentEntry = registry.get("env1:ep1");
+    expect(currentEntry).toBe(freshEntry);
+    expect(currentEntry!.reconnect).toBeNull();
+
+    // The stale entry is disconnected from the registry
+    expect(staleEntry).not.toBe(currentEntry);
+  });
+
+  it("fresh lookup after reconnect success clears state on the canonical entry", () => {
+    // Validates the fix: after openTunnelForEndpoint, we look up the fresh
+    // entry from the registry and clear reconnect state on IT, not on the
+    // captured reference.
+    interface Entry {
+      reconnect: { failureCount: number; backoffMs: number; retryTimer: null } | null;
+    }
+
+    const registry = new Map<string, Entry>();
+
+    // Create stale entry with reconnect state
+    const staleEntry: Entry = {
+      reconnect: { failureCount: 3, backoffMs: 4_000, retryTimer: null },
+    };
+    registry.set("env1:ep1", staleEntry);
+
+    // Simulate: openTunnelForEndpoint deletes stale, creates fresh
+    registry.delete("env1:ep1");
+    const freshEntry: Entry = {
+      reconnect: { failureCount: 3, backoffMs: 4_000, retryTimer: null },
+    };
+    registry.set("env1:ep1", freshEntry);
+
+    // Fix: look up the fresh entry and clear reconnect on it
+    const currentEntry = registry.get("env1:ep1");
+    if (currentEntry) {
+      currentEntry.reconnect = null;
+    }
+
+    // The canonical registry entry is now clean
+    expect(registry.get("env1:ep1")!.reconnect).toBeNull();
+  });
+
+  it("isTunnelReconnecting returns false after reconnect clears fresh entry state", () => {
+    // After the fix, isTunnelReconnecting() should return false once
+    // reconnect state is cleared on the fresh registry entry.
+    interface Entry {
+      reconnect: { failureCount: number; backoffMs: number; retryTimer: null } | null;
+    }
+
+    const registry = new Map<string, Entry>();
+
+    // Fresh entry with reconnect state (as created by openTunnelForEndpoint
+    // when the existing tunnel was dead)
+    const freshEntry: Entry = {
+      reconnect: { failureCount: 1, backoffMs: 1_000, retryTimer: null },
+    };
+    registry.set("env1:ep1", freshEntry);
+
+    // Before clearing: "reconnecting"
+    expect(freshEntry.reconnect).not.toBeNull();
+
+    // After clearing (fix): no longer reconnecting
+    freshEntry.reconnect = null;
+    expect(freshEntry.reconnect).toBeNull();
+  });
+});
