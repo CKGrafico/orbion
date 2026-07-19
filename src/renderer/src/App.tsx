@@ -499,63 +499,120 @@ export function App(): React.ReactNode {
     });
   }, []);
 
-  // Fetch loops for the selected environment (polling every 5s)
+  // Stable keys for per-environment polling effect dependencies
+  const envEndpointsKey = useMemo(
+    () => environments.map((e) => `${e.id}:${e.activeEndpointId ?? ""}`).join(","),
+    [environments],
+  );
+  const envPhasesKey = useMemo(
+    () => environments.map((e) => connectionStatus[e.id]?.phase ?? "unknown").join(","),
+    [environments, connectionStatus],
+  );
+
+  // ── Per-instance loop polling (every ~5s) ──────────────────────────────
+  // Poll loops from every connected instance's API. Polling pauses for
+  // unreachable instances (skipped on each tick) and resumes automatically
+  // on recovery. All data flows through perEnvLoops, which the bar, cards,
+  // and rollups all read.
   useEffect(() => {
-    if (!selected) {
+    if (environments.length === 0) {
       setLoops([]);
       return;
     }
 
-    const connStatus = connectionStatus[selected.id];
-    if (connStatus && connStatus.phase !== "connected") {
-      setLoops([]);
+    // Build the connected-env snapshot for this tick
+    const connectedEnvs = environments.filter(
+      (env) => connectionStatus[env.id]?.phase === "connected",
+    );
+
+    if (connectedEnvs.length === 0) {
+      if (selected) setLoops([]);
       return;
     }
 
     let cancelled = false;
 
-    const load = async (): Promise<void> => {
-      const res = await fetchLoops(selected);
-      if (cancelled) return;
-      if (res.ok && Array.isArray(res.data)) {
-        setLoops(res.data);
-        setPerEnvLoops((prev) => ({ ...prev, [selected.id]: res.data as LoopMeta[] }));
-        setLastUpdated(Date.now());
+    const pollAll = async (): Promise<void> => {
+      for (const env of connectedEnvs) {
+        if (cancelled) return;
+        const res = await fetchLoops(env);
+        if (cancelled) return;
+        if (res.ok && Array.isArray(res.data)) {
+          const loopData = res.data as LoopMeta[];
+          setPerEnvLoops((prev) => ({ ...prev, [env.id]: loopData }));
+          // Update the selected-env fast path
+          if (env.id === selectedId) {
+            setLoops(loopData);
+            setLastUpdated(Date.now());
+          }
+        }
       }
     };
 
-    void load();
-    const timer = setInterval(() => void load(), 5000);
+    void pollAll();
+    const timer = setInterval(() => void pollAll(), 5000);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selected?.id, selected?.activeEndpointId, connectionStatus[selected?.id ?? ""]?.phase]);
+  }, [
+    envEndpointsKey,
+    selectedId,
+    envPhasesKey,
+  ]);
 
-  // Fetch projects for the selected environment (polling every 10s)
+  // When the selected environment has no data yet (e.g. it was unreachable and
+  // just became connected), derive loops from perEnvLoops so the UI updates
+  // immediately without waiting for the next poll tick.
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedId) {
+      setLoops([]);
+      return;
+    }
+    const envLoops = perEnvLoops[selectedId];
+    if (envLoops) {
+      setLoops(envLoops);
+      setLastUpdated(Date.now());
+    } else {
+      const connStatus = connectionStatus[selectedId];
+      if (!connStatus || connStatus.phase !== "connected") {
+        setLoops([]);
+      }
+    }
+  }, [selectedId, selectedId ? perEnvLoops[selectedId]?.length : undefined, selectedId ? connectionStatus[selectedId]?.phase : undefined]);
 
-    const connStatus = connectionStatus[selected.id];
-    if (connStatus && connStatus.phase !== "connected") return;
+  // ── Per-instance project polling (every ~10s) ─────────────────────────
+  useEffect(() => {
+    if (environments.length === 0) return;
+
+    const connectedEnvs = environments.filter(
+      (env) => connectionStatus[env.id]?.phase === "connected",
+    );
+    if (connectedEnvs.length === 0) return;
 
     let cancelled = false;
 
-    const load = async (): Promise<void> => {
-      const res = await fetchProjects(selected);
-      if (cancelled) return;
-      if (res.ok && Array.isArray(res.data)) {
-        setPerEnvProjects((prev) => ({ ...prev, [selected.id]: res.data as Project[] }));
+    const pollAll = async (): Promise<void> => {
+      for (const env of connectedEnvs) {
+        if (cancelled) return;
+        const res = await fetchProjects(env);
+        if (cancelled) return;
+        if (res.ok && Array.isArray(res.data)) {
+          setPerEnvProjects((prev) => ({ ...prev, [env.id]: res.data as Project[] }));
+        }
       }
     };
 
-    void load();
-    const timer = setInterval(() => void load(), 10000);
+    void pollAll();
+    const timer = setInterval(() => void pollAll(), 10000);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [selected?.id, selected?.activeEndpointId, connectionStatus[selected?.id ?? ""]?.phase]);
+  }, [
+    envEndpointsKey,
+    envPhasesKey,
+  ]);
 
   useEffect(() => {
     if (!selected) { setDaemonSettings(null); return; }
