@@ -135,13 +135,15 @@ export function Sidebar(props: {
   onNavigateToSession?: (sessionId: string) => void;
   /** The currently active session id, if any. */
   activeSessionId?: string | null;
+  /** Open or create a chat session for a project on a specific instance. */
+  onOpenProjectChat?: (projectName: string, environmentId: string, workingDirectory: string) => void;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
-    reachability, mainVmId, onNavigateToSession, activeSessionId,
+    reachability, mainVmId, onNavigateToSession, activeSessionId, onOpenProjectChat,
   } = props;
   const intl = useIntl();
   const [configService] = useInject<IConfigService>(cid.IConfigService);
@@ -456,6 +458,19 @@ export function Sidebar(props: {
                   <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.sessionCount" }, { count: projSessions.length })}>
                     {projSessions.length}
                   </span>
+                  <button
+                    className="tree-action-btn"
+                    title={intl.formatMessage({ id: "sidebar.openProjectChat" })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Derive workingDirectory from first loop's cwd in this project on the primary instance
+                      const projectLoops = primaryInstance.loops;
+                      const cwd = projectLoops.length > 0 ? projectLoops[0].cwd : `~/${node.projectName}`;
+                      onOpenProjectChat?.(node.projectName, primaryInstance.envId, cwd);
+                    }}
+                  >
+                    <MessageSquare size={12} />
+                  </button>
                 </div>
 
                 {/* Session & loop children — rendered when expanded */}

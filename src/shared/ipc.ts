@@ -112,7 +112,7 @@ export interface ConfigBridge {
   getChatSessions: () => Promise<ChatSession[]>;
   addChatSession: (session: Omit<ChatSession, "id" | "createdAt">) => Promise<ChatSession>;
   removeChatSession: (sessionId: string) => Promise<void>;
-  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>) => Promise<void>;
+  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory">>) => Promise<void>;
   getExpandedProjects: () => Promise<string[]>;
   setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
 }
@@ -663,6 +663,10 @@ export interface ChatSession {
   title: string;
   /** Project this session is filed under (project name, matching sidebar merge key). */
   projectName: string;
+  /** The environment (instance) this session is homed to. */
+  environmentId: string;
+  /** The project's working directory on the home instance (derived from loops' cwd at creation). */
+  workingDirectory: string;
   /** ISO timestamp of last activity in this session. */
   lastActiveAt: string;
   /** ISO timestamp when the session was created. */

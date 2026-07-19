@@ -391,6 +391,8 @@ const validators: Record<string, Validator> = {
     const s = args[0] as Record<string, unknown>;
     if (!isNonEmptyString(s.title)) issues.push("title must be a non-empty string");
     if (!isNonEmptyString(s.projectName)) issues.push("projectName must be a non-empty string");
+    if (!isNonEmptyString(s.environmentId)) issues.push("environmentId must be a non-empty string");
+    if (typeof s.workingDirectory !== "string") issues.push("workingDirectory must be a string");
     if (!isNonEmptyString(s.lastActiveAt)) issues.push("lastActiveAt must be a non-empty string");
     return issues;
   },

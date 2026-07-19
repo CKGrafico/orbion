@@ -88,7 +88,8 @@
     "loopCount": "{count} loops",
     "loopUnknown": "unknown",
     "sessionCount": "{count} sessions",
-    "sessionActive": "active"
+    "sessionActive": "active",
+    "openProjectChat": "Open in chat"
   },
   "vmWizard": {
     "stepPickReachMethod": "Choose reach method",
@@ -607,6 +608,7 @@
   },
   "session": {
     "viewTitle": "Chat session",
-    "viewDescription": "Chat with the AI agent about this project's tasks and loops."
+    "viewDescription": "Chat with the AI agent about this project's tasks and loops.",
+    "directoryLabel": "Working directory"
   }
 }
