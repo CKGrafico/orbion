@@ -44,6 +44,8 @@ import type {
   AgentSendPromptArgs,
   AgentSendPromptResult,
   AgentStreamEvent,
+  ConfigStamp,
+  StampCheckedWriteResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -138,6 +140,11 @@ function mockSubscribeLogs(_loopId: string, onLine: (line: string) => void): () 
 
 let mockEnvironments: Environment[] = [];
 let mockSelectedId: string | null = null;
+let mockStamp: ConfigStamp = { timestamp: Date.now(), revision: 0 };
+
+function mockBumpStamp(): void {
+  mockStamp = { timestamp: Date.now(), revision: mockStamp.revision + 1 };
+}
 
 function loadMockEnvironments(): Environment[] {
   try {
@@ -184,12 +191,14 @@ export class MockConfigService implements IConfigService {
     };
     mockEnvironments = [...mockEnvironments, env];
     mockSelectedId = env.id;
+    mockBumpStamp();
     saveMockEnvironments();
     return env;
   }
   async removeEnvironment(id: string): Promise<void> {
     mockEnvironments = mockEnvironments.filter((e) => e.id !== id);
     if (mockSelectedId === id) mockSelectedId = null;
+    mockBumpStamp();
     saveMockEnvironments();
   }
   async addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null> {
@@ -332,8 +341,27 @@ export class MockConfigService implements IConfigService {
     ];
     mockEnvironments = restored;
     mockSelectedId = restored[0]?.id ?? null;
+    mockBumpStamp();
     saveMockEnvironments();
     return { ok: true, restored };
+  }
+  async getConfigStamp(): Promise<ConfigStamp> {
+    return mockStamp;
+  }
+  async stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigStamp): Promise<StampCheckedWriteResult> {
+    if (mockStamp.revision !== knownStamp.revision || mockStamp.timestamp !== knownStamp.timestamp) {
+      return { ok: false, stale: { stale: true, currentStamp: mockStamp, knownStamp } };
+    }
+    mockEnvironments.forEach((e) => { e.role = e.id === environmentId ? "main-vm" as const : undefined; });
+    mockBumpStamp();
+    saveMockEnvironments();
+    return { ok: true, stamp: mockStamp };
+  }
+  async forceSetMainVm(environmentId: string): Promise<ConfigStamp> {
+    mockEnvironments.forEach((e) => { e.role = e.id === environmentId ? "main-vm" as const : undefined; });
+    mockBumpStamp();
+    saveMockEnvironments();
+    return mockStamp;
   }
 }
 

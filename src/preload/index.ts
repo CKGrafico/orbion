@@ -41,6 +41,8 @@ import type {
   AgentSendPromptArgs,
   AgentSendPromptResult,
   AgentStreamEvent,
+  ConfigStamp,
+  StampCheckedWriteResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -114,6 +116,12 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:checkRestoreAvailable") as Promise<RestoreAvailability>,
     pullRestore: () =>
       ipcRenderer.invoke("config:pullRestore") as Promise<PullRestoreResult>,
+    getConfigStamp: () =>
+      ipcRenderer.invoke("config:getConfigStamp") as Promise<ConfigStamp>,
+    stampCheckedSetMainVm: (environmentId: string, knownStamp: ConfigStamp) =>
+      ipcRenderer.invoke("config:stampCheckedSetMainVm", environmentId, knownStamp) as Promise<StampCheckedWriteResult>,
+    forceSetMainVm: (environmentId: string) =>
+      ipcRenderer.invoke("config:forceSetMainVm", environmentId) as Promise<ConfigStamp>,
   },
 
   connection: {

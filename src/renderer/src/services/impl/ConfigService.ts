@@ -12,6 +12,8 @@ import type {
   BootstrapSeedImportResult,
   RestoreAvailability,
   PullRestoreResult,
+  ConfigStamp,
+  StampCheckedWriteResult,
 } from "../../../../shared/ipc";
 import type { IConfigService } from "../interfaces";
 
@@ -98,5 +100,14 @@ export class ConfigService implements IConfigService {
   }
   async pullRestore(): Promise<PullRestoreResult> {
     return this.api.pullRestore();
+  }
+  async getConfigStamp(): Promise<ConfigStamp> {
+    return this.api.getConfigStamp();
+  }
+  async stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigStamp): Promise<StampCheckedWriteResult> {
+    return this.api.stampCheckedSetMainVm(environmentId, knownStamp);
+  }
+  async forceSetMainVm(environmentId: string): Promise<ConfigStamp> {
+    return this.api.forceSetMainVm(environmentId);
   }
 }

@@ -1,7 +1,7 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
 import { execFile } from "node:child_process";
-import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult } from "../shared/ipc.js";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult, ConfigStamp, StaleConfigResult, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
 import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
@@ -49,6 +49,7 @@ interface ConfigSchema {
   projectPickupLabels: Record<string, string[]>;
   chatSessions: ChatSession[];
   expandedProjects: string[];
+  configStamp: ConfigStamp;
 }
 
 const store = new Store<ConfigSchema>({
@@ -66,6 +67,7 @@ const store = new Store<ConfigSchema>({
     projectPickupLabels: {},
     chatSessions: [],
     expandedProjects: [],
+    configStamp: { timestamp: Date.now(), revision: 0 },
   },
 });
 
@@ -95,6 +97,7 @@ function serialize<T>(fn: () => T): Promise<T> {
  *
  * Guarantees `store.set("environments", envs)` is always called after the callback,
  * eliminating the risk of a forgotten write.
+ * Bumps the config stamp on every write.
  */
 function mutateEnvironment(
   id: string,
@@ -105,6 +108,7 @@ function mutateEnvironment(
   if (!env) return null;
   fn(env);
   store.set("environments", envs);
+  bumpStamp();
   return env;
 }
 
@@ -112,6 +116,7 @@ function mutateEnvironment(
  * Read-mutate-write helper for the full environments array.
  * Encapsulates: read → apply callback → write back.
  * Use when the mutation spans multiple environments or adds/removes entries.
+ * Bumps the config stamp on every write.
  */
 function mutateEnvironments(
   fn: (envs: EnvironmentWithFingerprint[]) => void,
@@ -119,11 +124,13 @@ function mutateEnvironments(
   const envs = store.get("environments", []);
   fn(envs);
   store.set("environments", envs);
+  bumpStamp();
 }
 
 /**
  * Read-mutate-write helper for the session tokens record.
  * Encapsulates: read → apply callback → write back.
+ * Bumps the config stamp on every write.
  */
 function mutateSessionTokens(
   fn: (tokens: Record<string, EncryptedSessionToken>) => void,
@@ -131,6 +138,7 @@ function mutateSessionTokens(
   const tokens = store.get("sessionTokens", {});
   fn(tokens);
   store.set("sessionTokens", tokens);
+  bumpStamp();
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +495,61 @@ function cleanupLegacySessionToken(environmentId: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Versioned config stamp — bumped on every mutating write
+// ---------------------------------------------------------------------------
+
+function currentStamp(): ConfigStamp {
+  return store.get("configStamp", { timestamp: Date.now(), revision: 0 });
+}
+
+function bumpStamp(): void {
+  const prev = currentStamp();
+  store.set("configStamp", { timestamp: Date.now(), revision: prev.revision + 1 });
+}
+
+/** Get the current config stamp (read-only, synchronous). */
+export function getConfigStamp(): ConfigStamp {
+  return currentStamp();
+}
+
+/**
+ * Stamp-checked set-main-VM: writes only if the file's current stamp
+ * matches `knownStamp`. Returns a `StaleConfigResult` on conflict.
+ */
+function _stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigStamp): StampCheckedWriteResult {
+  const onDisk = currentStamp();
+  if (onDisk.revision !== knownStamp.revision || onDisk.timestamp !== knownStamp.timestamp) {
+    const staleResult: StaleConfigResult = {
+      stale: true,
+      currentStamp: onDisk,
+      knownStamp,
+    };
+    return { ok: false, stale: staleResult };
+  }
+  _setMainVm(environmentId);
+  bumpStamp();
+  return { ok: true, stamp: currentStamp() };
+}
+
+/**
+ * Force-set the main-VM designate regardless of staleness.
+ * Last-write-wins with explicit user consent.
+ */
+function _forceSetMainVm(environmentId: string): ConfigStamp {
+  _setMainVm(environmentId);
+  bumpStamp();
+  return currentStamp();
+}
+
+export function stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigStamp): Promise<StampCheckedWriteResult> {
+  return serialize(() => _stampCheckedSetMainVm(environmentId, knownStamp));
+}
+
+export function forceSetMainVm(environmentId: string): Promise<ConfigStamp> {
+  return serialize(() => _forceSetMainVm(environmentId));
+}
+
+// ---------------------------------------------------------------------------
 // Mutation internals (unserialized — called from within serialize() only)
 // ---------------------------------------------------------------------------
 
@@ -537,6 +600,7 @@ function _removeEnvironment(id: string): void {
   const selectedId = store.get("selectedEnvironmentId");
   if (selectedId === id) {
     store.set("selectedEnvironmentId", null);
+    bumpStamp();
   }
   // Prune any orphaned credentials left behind after environment removal.
   pruneOrphanCredentials(collectActiveCredentialReferences());
@@ -576,6 +640,7 @@ function _setActiveEndpoint(environmentId: string, endpointId: string): void {
 
 function _setSelectedEnvironmentId(id: string | null): void {
   store.set("selectedEnvironmentId", id);
+  bumpStamp();
 }
 
 function _migrateFromLocalStorage(rawInstances: string, rawSelectedId: string | null): boolean {
@@ -865,12 +930,14 @@ function _addBudgetWatch(watch: Omit<BudgetWatch, "id" | "createdAt">): BudgetWa
   const watches = store.get("budgetWatches", []);
   watches.push(newWatch);
   store.set("budgetWatches", watches);
+  bumpStamp();
   return newWatch;
 }
 
 function _removeBudgetWatch(watchId: string): void {
   const watches = store.get("budgetWatches", []);
   store.set("budgetWatches", watches.filter((w) => w.id !== watchId));
+  bumpStamp();
 }
 
 function _updateBudgetWatch(watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>): void {
@@ -879,6 +946,7 @@ function _updateBudgetWatch(watchId: string, updates: Partial<Pick<BudgetWatch, 
   if (idx !== -1) {
     watches[idx] = { ...watches[idx], ...updates };
     store.set("budgetWatches", watches);
+    bumpStamp();
   }
 }
 
@@ -910,6 +978,7 @@ function _addBudgetBreach(breach: Omit<BudgetBreach, "id">): BudgetBreach {
   const breaches = store.get("budgetBreaches", []);
   breaches.push(newBreach);
   store.set("budgetBreaches", breaches);
+  bumpStamp();
   return newBreach;
 }
 
@@ -919,6 +988,7 @@ function _dismissBudgetBreach(breachId: string): void {
   if (idx !== -1) {
     breaches[idx] = { ...breaches[idx], dismissed: true };
     store.set("budgetBreaches", breaches);
+    bumpStamp();
   }
 }
 
@@ -930,6 +1000,7 @@ function _pruneOldBreaches(): void {
   );
   if (pruned.length !== breaches.length) {
     store.set("budgetBreaches", pruned);
+    bumpStamp();
   }
 }
 
@@ -957,6 +1028,7 @@ function _dismissInboxItem(itemId: string): void {
   const ids = new Set(_getInboxDismissedIds());
   ids.add(itemId);
   store.set("inboxDismissedIds", [...ids]);
+  bumpStamp();
 }
 
 function _isInboxItemDismissed(itemId: string): boolean {
@@ -991,6 +1063,7 @@ function _addResolvedItem(resolved: ResolvedInboxItem): void {
   if (items.some((ri) => ri.item.id === resolved.item.id)) return;
   items.push(resolved);
   store.set("inboxResolvedItems", items);
+  bumpStamp();
 }
 
 function _pruneResolvedItems(): void {
@@ -999,6 +1072,7 @@ function _pruneResolvedItems(): void {
     (ri) => new Date(ri.resolvedAt).getTime() >= cutoff
   );
   store.set("inboxResolvedItems", items);
+  bumpStamp();
 }
 
 export function addResolvedItem(resolved: ResolvedInboxItem): Promise<void> {
@@ -1027,6 +1101,7 @@ function _setProjectPickupLabels(projectId: string, labels: string[]): void {
   const all = store.get("projectPickupLabels", {});
   all[projectId] = labels;
   store.set("projectPickupLabels", all);
+  bumpStamp();
 }
 
 export function setProjectPickupLabels(projectId: string, labels: string[]): Promise<void> {
@@ -1103,6 +1178,7 @@ export async function addChatSession(session: Omit<ChatSession, "id" | "createdA
     };
     sessions.push(newSession);
     store.set("chatSessions", sessions);
+    bumpStamp();
     return newSession;
   });
 }
@@ -1111,6 +1187,7 @@ export function removeChatSession(sessionId: string): Promise<void> {
   return serialize(() => {
     const sessions = store.get("chatSessions", []);
     store.set("chatSessions", sessions.filter((s) => s.id !== sessionId));
+    bumpStamp();
   });
 }
 
@@ -1121,6 +1198,7 @@ export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatS
     if (idx >= 0) {
       sessions[idx] = { ...sessions[idx], ...updates };
       store.set("chatSessions", sessions);
+      bumpStamp();
     }
   });
 }
@@ -1136,6 +1214,7 @@ export function getExpandedProjects(): string[] {
 export function setExpandedProjects(expandedKeys: string[]): Promise<void> {
   return serialize(() => {
     store.set("expandedProjects", expandedKeys);
+    bumpStamp();
   });
 }
 
@@ -1426,6 +1505,9 @@ export async function pullRestore(): Promise<PullRestoreResult> {
 
     // Auto-promote the first environment to main-vm if none has the role
     _autoPromoteFirstEnvIfNeeded();
+
+    // Bump the stamp after the wholesale replace
+    bumpStamp();
   });
 
   // Prune orphaned credentials after clearing old environments

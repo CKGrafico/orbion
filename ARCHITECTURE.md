@@ -164,6 +164,12 @@ There is no separate server; the **Electron main process is the backend**
   and opaque references to any wizard-owned credentials. The dedicated
   `credential-vault.ts` store holds only `safeStorage`-encrypted credential
   payloads. Removing an environment removes every credential it references.
+  Every mutating write bumps a **version stamp** (`configStamp`:
+  `{ timestamp, revision }`), enabling stale-overwrite detection: before
+  writing, callers compare their last-known stamp against the file's current
+  stamp; if stale (config changed on another machine), a warning dialog
+  offers pull-remote or overwrite-anyway. Last-write-wins remains the model;
+  this is a guardrail, not a merge system.
 - **SSH onboarding** (`vm-wizard.ts`, `ssh-probe.ts`, `ssh-launch.ts`, `runtime-adapter.ts`) — after
   SSH authentication, probes Node.js, the `loop-task` command, and daemon state.
   Node.js 20 or newer is required. A missing loop-task command produces an
@@ -191,7 +197,7 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
 `budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
 `inbox:queryFleet`, `inbox:resolveItem`, `inbox:getResolvedItems`,
-`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The inbox service also performs inline
+`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`, `config:getConfigStamp`, `config:stampCheckedSetMainVm`, `config:forceSetMainVm`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The `config:getConfigStamp`, `config:stampCheckedSetMainVm`, and `config:forceSetMainVm` handlers implement versioned config writes with stale-overwrite detection: the stamp-checked variant compares the caller's last-known stamp against the on-disk stamp and returns a conflict result on mismatch, while the force variant writes regardless of staleness (last-write-wins with explicit consent). The inbox service also performs inline
 actions (`run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`)
 via its `executeInboxAction` method, which calls the same loop-task API
 endpoints as the loop card (`POST /api/loops/:id/trigger`,

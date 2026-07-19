@@ -4212,3 +4212,24 @@ input {
   from { opacity: 0.5; }
   to { opacity: 1; }
 }
+
+/* ── Stale config warning ──────────────────────────────────────────── */
+
+.stale-config-modal .modal-body {
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0 0 18px 0;
+  font-size: 13px;
+}
+
+.stale-config-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0 0 12px 0;
+}
+
+.stale-config-progress {
+  color: var(--text-muted);
+  font-size: 13px;
+  animation: pulse-opacity 1.2s ease-in-out infinite alternate;
+}

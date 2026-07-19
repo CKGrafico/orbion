@@ -125,6 +125,31 @@ export type PullRestoreResult =
   | { ok: true; restored: Environment[] }
   | { ok: false; error: string | I18nMessage };
 
+// ── Versioned config writes with stale-overwrite warning ──────────────
+
+/** A version stamp attached to every config write. */
+export interface ConfigStamp {
+  /** Wall-clock timestamp (Date.now()) of the last write. */
+  timestamp: number;
+  /** Monotonically increasing revision counter. */
+  revision: number;
+}
+
+/** Result of a stamp-checked write that detected a conflict. */
+export interface StaleConfigResult {
+  /** True when the file's current stamp is newer than the caller's last-known stamp. */
+  stale: true;
+  /** The stamp on disk (newer than what the caller held). */
+  currentStamp: ConfigStamp;
+  /** The stamp the caller held at the time of the write attempt. */
+  knownStamp: ConfigStamp;
+}
+
+/** Result of a stamp-checked write: either a clean write or a stale conflict. */
+export type StampCheckedWriteResult =
+  | { ok: true; stamp: ConfigStamp }
+  | { ok: false; stale: StaleConfigResult };
+
 export interface ConfigBridge {
   getEnvironments: () => Promise<Environment[]>;
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
@@ -153,6 +178,13 @@ export interface ConfigBridge {
   importBootstrapSeed: (seedString: string) => Promise<BootstrapSeedImportResult>;
   checkRestoreAvailable: () => Promise<RestoreAvailability>;
   pullRestore: () => Promise<PullRestoreResult>;
+  /** Get the current config stamp (timestamp + monotonic revision). */
+  getConfigStamp: () => Promise<ConfigStamp>;
+  /** Stamp-checked write: update the main-VM designate only if the config is
+   *  not stale relative to `knownStamp`. Returns `StaleConfigResult` on conflict. */
+  stampCheckedSetMainVm: (environmentId: string, knownStamp: ConfigStamp) => Promise<StampCheckedWriteResult>;
+  /** Force-write the main-VM designate regardless of staleness (last-write-wins with explicit consent). */
+  forceSetMainVm: (environmentId: string) => Promise<ConfigStamp>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────

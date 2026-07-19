@@ -35,7 +35,7 @@ import type {
   McpConnectionStatus,
   McpToolCallResult,
 } from "../shared/ipc.js";
-import type { Environment, SessionScope, NotificationSendArgs } from "../shared/ipc.js";
+import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -88,6 +88,9 @@ import {
   importBootstrapSeed,
   checkRestoreAvailable,
   pullRestore,
+  getConfigStamp,
+  stampCheckedSetMainVm,
+  forceSetMainVm,
 } from "./config-store.js";
 import {
   getMessages as transcriptGetMessages,
@@ -932,6 +935,21 @@ app.whenReady().then(() => {
     }
 
     return result;
+  });
+
+  safeHandle("config:getConfigStamp", (): ConfigStamp => {
+    validateIpc("config:getConfigStamp", []);
+    return getConfigStamp();
+  });
+
+  safeHandle("config:stampCheckedSetMainVm", async (_event, ...rawArgs): Promise<StampCheckedWriteResult> => {
+    const [environmentId, knownStamp] = validateIpc<[string, ConfigStamp]>("config:stampCheckedSetMainVm", rawArgs);
+    return stampCheckedSetMainVm(environmentId, knownStamp);
+  });
+
+  safeHandle("config:forceSetMainVm", async (_event, ...rawArgs): Promise<ConfigStamp> => {
+    const [environmentId] = validateIpc<[string]>("config:forceSetMainVm", rawArgs);
+    return forceSetMainVm(environmentId);
   });
 
   // ── CLI input sanitization (issue #191) ──────────────────────────────

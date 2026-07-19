@@ -23,6 +23,7 @@ import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
 import { RestoreOffer } from "./components/RestoreOffer";
+import { StaleConfigWarning } from "./components/StaleConfigWarning";
 import { InboxView } from "./features/inbox/InboxView";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
@@ -72,7 +73,7 @@ function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHeal
 }
 
 export function App(): React.ReactNode {
-  const { environments, selectedId, mainVm, loaded, select, remove, setActiveEndpoint, setMainVm, reload } = useEnvironments();
+  const { environments, selectedId, mainVm, loaded, select, remove, setActiveEndpoint, setMainVm, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
@@ -103,6 +104,10 @@ export function App(): React.ReactNode {
   const [restoreAvailability, setRestoreAvailability] = useState<RestoreAvailability | null>(null);
   /** Whether the restore offer is showing */
   const [restoreOfferOpen, setRestoreOfferOpen] = useState(false);
+  /** Stale config warning: holds the StaleConfigResult when a stamp-checked write detects conflict */
+  const [staleConfigResult, setStaleConfigResult] = useState<import("../../../shared/ipc").StaleConfigResult | null>(null);
+  /** The environment ID pending a set-main-VM when a stale conflict occurred */
+  const [staleConfigEnvId, setStaleConfigEnvId] = useState<string | null>(null);
   /** The currently viewed chat session id (drives active-session highlighting in sidebar) */
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   /** All chat sessions — loaded from config store for header rendering */
@@ -608,6 +613,45 @@ export function App(): React.ReactNode {
     setRestoreAvailability(null);
   }, []);
 
+  /** Stamp-checked set-main-VM: writes only if config is not stale. Shows stale warning on conflict. */
+  const handleStampCheckedSetMainVm = useCallback(async (environmentId: string): Promise<void> => {
+    const result = await stampCheckedSetMainVm(environmentId);
+    if (!result.ok && result.stale) {
+      setStaleConfigResult(result.stale);
+      setStaleConfigEnvId(environmentId);
+    }
+  }, [stampCheckedSetMainVm]);
+
+  /** Pull-remote from the config-home VM as stale resolution. */
+  const handleStalePullRemote = useCallback(async (): Promise<import("../../../shared/ipc").PullRestoreResult> => {
+    const result = await configService.pullRestore();
+    if (result.ok) {
+      await reload();
+      // After pull-restore, apply the originally intended set-main-VM
+      if (staleConfigEnvId) {
+        void forceSetMainVm(staleConfigEnvId);
+      }
+      setStaleConfigResult(null);
+      setStaleConfigEnvId(null);
+    }
+    return result;
+  }, [configService, reload, forceSetMainVm, staleConfigEnvId]);
+
+  /** Force-write the set-main-VM despite staleness (last-write-wins with explicit consent). */
+  const handleStaleOverwriteAnyway = useCallback(async (): Promise<void> => {
+    if (staleConfigEnvId) {
+      await forceSetMainVm(staleConfigEnvId);
+    }
+    setStaleConfigResult(null);
+    setStaleConfigEnvId(null);
+  }, [forceSetMainVm, staleConfigEnvId]);
+
+  /** Dismiss the stale config warning without taking action. */
+  const handleStaleCancel = useCallback((): void => {
+    setStaleConfigResult(null);
+    setStaleConfigEnvId(null);
+  }, []);
+
   const handleNavigateToSession = useCallback((sessionId: string): void => {
     setActiveSessionId(sessionId);
     setView({ kind: "session", sessionId });
@@ -923,7 +967,7 @@ export function App(): React.ReactNode {
           <button
             className="icon-btn"
             title={intl.formatMessage({ id: "app.markAsMainTooltip" })}
-            onClick={() => { setMainVm(selected.id); }}
+            onClick={() => { void handleStampCheckedSetMainVm(selected.id); }}
             style={{ opacity: 0.6 }}
           >
             <Star size={14} />
@@ -1090,7 +1134,7 @@ export function App(): React.ReactNode {
         <PickMainVmModal
           candidates={environments.filter((e) => e.role !== "main-vm")}
           onPick={(id) => {
-            setMainVm(id);
+            void handleStampCheckedSetMainVm(id);
             setPickMainVmOpen(false);
           }}
           onSkip={() => setPickMainVmOpen(false)}
@@ -1102,6 +1146,15 @@ export function App(): React.ReactNode {
           availability={restoreAvailability}
           onRestore={handlePullRestore}
           onSkip={handleSkipRestore}
+        />
+      ) : null}
+
+      {staleConfigResult ? (
+        <StaleConfigWarning
+          staleResult={staleConfigResult}
+          onPullRemote={handleStalePullRemote}
+          onOverwriteAnyway={handleStaleOverwriteAnyway}
+          onCancel={handleStaleCancel}
         />
       ) : null}
 

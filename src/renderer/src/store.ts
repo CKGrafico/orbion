@@ -38,6 +38,10 @@ export function useEnvironments(): {
   removeSessionToken: (environmentId: string) => void;
   setOpenCodeEndpoint: (environmentId: string, url: string, password: string | null) => void;
   setMainVm: (environmentId: string) => void;
+  /** Stamp-checked set-main-VM: returns a StaleConfigResult if config was modified elsewhere. */
+  stampCheckedSetMainVm: (environmentId: string) => Promise<import("../../../shared/ipc").StampCheckedWriteResult>;
+  /** Force-write the main-VM designate regardless of staleness. */
+  forceSetMainVm: (environmentId: string) => Promise<void>;
   reload: () => Promise<void>;
 } {
   const [configService] = useInject<IConfigService>(cid.IConfigService);
@@ -153,6 +157,26 @@ export function useEnvironments(): {
     [configService],
   );
 
+  const stampCheckedSetMainVmFn = useCallback(
+    async (environmentId: string): Promise<import("../../../shared/ipc").StampCheckedWriteResult> => {
+      const stamp = await configService.getConfigStamp();
+      const result = await configService.stampCheckedSetMainVm(environmentId, stamp);
+      if (result.ok) {
+        setEnvironments(await configService.getEnvironments());
+      }
+      return result;
+    },
+    [configService],
+  );
+
+  const forceSetMainVmFn = useCallback(
+    async (environmentId: string): Promise<void> => {
+      await configService.forceSetMainVm(environmentId);
+      setEnvironments(await configService.getEnvironments());
+    },
+    [configService],
+  );
+
   const reloadFn = useCallback(async () => {
     const [envs, sid] = await Promise.all([
       configService.getEnvironments(),
@@ -176,6 +200,8 @@ export function useEnvironments(): {
     removeSessionToken: removeSessionTokenFn,
     setOpenCodeEndpoint: setOpenCodeEndpointFn,
     setMainVm: setMainVmFn,
+    stampCheckedSetMainVm: stampCheckedSetMainVmFn,
+    forceSetMainVm: forceSetMainVmFn,
     reload: reloadFn,
   };
 

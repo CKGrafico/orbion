@@ -675,6 +675,16 @@
     "credentialPrompt": "Re-authorize {name}",
     "credentialNeeded": "This environment needs credentials to connect. You will be prompted once (into the keychain)."
   },
+  "staleConfig": {
+    "title": "Config changed on another machine",
+    "description": "The config was updated on another machine since you last saw it. What would you like to do?",
+    "pullRemote": "Pull from config-home",
+    "overwriteAnyway": "Overwrite anyway",
+    "cancelling": "Cancelling…",
+    "pulling": "Pulling config…",
+    "pullFailed": "Pull failed: {error}",
+    "overwriteSucceeded": "Config overwritten."
+  },
   "agent": {
     "noEndpoint": "No OpenCode endpoint configured for this environment. Add one in the VM settings.",
     "promptFailed": "Failed to send prompt (HTTP {status}): {detail}",

@@ -45,6 +45,8 @@ import type {
   AgentSendPromptArgs,
   AgentSendPromptResult,
   AgentStreamEvent,
+  ConfigStamp,
+  StampCheckedWriteResult,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -75,6 +77,13 @@ export interface IConfigService {
   importBootstrapSeed(seedString: string): Promise<BootstrapSeedImportResult>;
   checkRestoreAvailable(): Promise<RestoreAvailability>;
   pullRestore(): Promise<PullRestoreResult>;
+  /** Get the current config stamp (timestamp + monotonic revision). */
+  getConfigStamp(): Promise<ConfigStamp>;
+  /** Stamp-checked write: update the main-VM designate only if the config is
+   *  not stale relative to `knownStamp`. Returns `StaleConfigResult` on conflict. */
+  stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigStamp): Promise<StampCheckedWriteResult>;
+  /** Force-write the main-VM designate regardless of staleness (last-write-wins with explicit consent). */
+  forceSetMainVm(environmentId: string): Promise<ConfigStamp>;
 }
 
 export interface IConnectionService {

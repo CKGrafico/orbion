@@ -1,0 +1,12 @@
+- [x] 1.1 Add ConfigStamp, StaleConfigResult, StampCheckedWriteResult types to shared/ipc.ts
+- [x] 1.2 Add configStamp to ConfigSchema and bumpStamp() to all mutations in config-store.ts
+- [x] 1.3 Add getConfigStamp(), stampCheckedSetMainVm(), forceSetMainVm() to config-store.ts
+- [x] 2.1 Add IPC handlers for config:getConfigStamp, config:stampCheckedSetMainVm, config:forceSetMainVm in main/index.ts
+- [x] 2.2 Add preload bridge entries for the new config methods
+- [x] 3.1 Add IConfigService interface methods and real ConfigService implementation
+- [x] 3.2 Add mock ConfigService implementation with stamp tracking
+- [x] 4.1 Add stampCheckedSetMainVm, forceSetMainVm to useEnvironments store hook
+- [x] 4.2 Implement StaleConfigWarning component with pull-remote / overwrite-anyway / skip
+- [x] 4.3 Add staleConfig i18n keys and theme.css styles
+- [x] 4.4 Wire StaleConfigWarning into App.tsx for the mark-as-main flow
+- [x] 5.1 Verify typecheck passes (no new errors introduced)
