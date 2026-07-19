@@ -10,6 +10,9 @@ import type { FleetItemStatus } from "./fleet-status";
  * NOT "failed". A dropped tunnel never reads as your work failing.
  * When the instance is reconnecting, its loops are "unknown" as well,
  * since we can't confirm their actual state.
+ *
+ * "unknown" is distinct from any loop-level status: it is not in the
+ * priority order and does not inflate failure tallies.
  */
 export function loopStatusToFleetItem(
   status: LoopStatus,
@@ -20,16 +23,7 @@ export function loopStatusToFleetItem(
   // distinct from any loop-level status. "unknown" is not in the priority
   // order and doesn't pollute failure tallies.
   if (reachability === "unreachable" || reachability === "reconnecting") {
-    // We still return the loop-level mapping but consumers should check
-    // reachability first to render loops as "unknown" (greyed) rather
-    // than "failed". The FleetItemStatus type doesn't have an "unknown"
-    // variant because the existing types drive color/pill logic — the
-    // reachability gate is handled at the component level.
-    //
-    // We return "idle" here so unreachable loops don't inflate failure
-    // counts. The Sidebar/FleetHealthFooter will override rendering
-    // when reachability says otherwise.
-    return "idle";
+    return "unknown";
   }
 
   if (lastExitCode !== null && lastExitCode !== 0) return "failed";

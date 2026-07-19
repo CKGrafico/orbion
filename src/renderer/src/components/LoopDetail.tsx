@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import type { BudgetWatch } from "../../../shared/ipc";
+import type { ReachabilityState } from "../../../shared/ipc";
 import type { Environment, LoopMeta } from "../types";
 import { fetchLoop } from "../api";
 import { STATUS_COLORS, commandLine, timeAgo, timeUntil, runsToday, avgDuration, lastRunDuration, formatDurationShort } from "../format";
 import { LogViewer } from "./LogViewer";
 import { BudgetWatchPanel } from "./BudgetWatchPanel";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, WifiOff } from "lucide-react";
 import { cid, useInject } from "inversify-hooks";
 import type { IBudgetService } from "../services/interfaces";
 
@@ -14,9 +15,11 @@ export function LoopDetail(props: {
   instance: Environment;
   loopId: string;
   initial: LoopMeta | null;
+  /** Per-environment reachability state (its own health layer, separate from loop status). */
+  reachability?: ReachabilityState;
   onBack: () => void;
 }): React.ReactNode {
-  const { instance, loopId, initial, onBack } = props;
+  const { instance, loopId, initial, reachability, onBack } = props;
   const intl = useIntl();
   const [loop, setLoop] = useState<LoopMeta | null>(initial);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
@@ -55,6 +58,7 @@ export function LoopDetail(props: {
   const title =
     loop?.description?.trim() || (loop ? commandLine(loop.command, loop.commandArgs) : loopId);
   const failed = loop && loop.lastExitCode !== null && loop.lastExitCode !== 0;
+  const isUnreachable = reachability === "unreachable" || reachability === "reconnecting";
 
   return (
     <div className="content-inner">
@@ -66,9 +70,9 @@ export function LoopDetail(props: {
         {loop ? (
           <span
             className="chip"
-            style={{ color: STATUS_COLORS[loop.status] ?? "var(--text-secondary)" }}
+            style={{ color: isUnreachable ? "var(--status-unknown)" : STATUS_COLORS[loop.status] ?? "var(--text-secondary)" }}
           >
-            ● {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
+            ● {isUnreachable ? intl.formatMessage({ id: "loopDetail.statusUnknown" }) : intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
           </span>
         ) : null}
         <span style={{ flex: 1 }} />
@@ -81,6 +85,13 @@ export function LoopDetail(props: {
           <Clock size={14} />
         </button>
       </div>
+
+      {isUnreachable ? (
+        <div className="stale-banner">
+          <WifiOff size={13} />
+          {intl.formatMessage({ id: "loopDetail.staleBanner" })}
+        </div>
+      ) : null}
 
       {loop ? (
         <div className="card">

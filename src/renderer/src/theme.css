@@ -32,6 +32,7 @@
   --status-paused: #ffcc5c;
   --status-idle: #a4b1cd;
   --status-stopped: #ff8484;
+  --status-unknown: #64718c;
   --health-ok: #a9d95c;
   --health-offline: #ff8484;
   --health-unknown: #64718c;
@@ -50,6 +51,7 @@
   --pill-done: #a4b1cd;
   --pill-failed: #ff8484;
   --pill-idle: #64718c;
+  --pill-unknown: #64718c;
   --nt-failure: var(--danger);
   --nt-finished: var(--success);
   --nt-watch: var(--warning);
@@ -1025,6 +1027,24 @@ input {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Stale-data banner shown when instance is unreachable */
+.stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--health-unknown) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--health-unknown) 25%, transparent);
+  color: var(--health-unknown);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.stale-banner svg {
+  flex-shrink: 0;
 }
 
 .detail-title {

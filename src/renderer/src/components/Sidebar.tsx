@@ -65,9 +65,7 @@ interface LoopStatusDotProps {
 
 function LoopStatusDot({ status, lastExitCode, reachability }: LoopStatusDotProps): React.ReactNode {
   const fleetItem = loopStatusToFleetItem(status, lastExitCode, reachability);
-  const color = reachability === "unreachable" || reachability === "reconnecting"
-    ? "var(--health-offline)"
-    : PILL_COLORS[fleetItem];
+  const color = PILL_COLORS[fleetItem];
   return <span className="tree-dot" style={{ background: color }} />;
 }
 
@@ -350,8 +348,8 @@ export function Sidebar(props: {
                       const loopTitle = loop.description?.trim() || loop.id;
                       const envReachability = reachability?.[node.envId];
                       const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, envReachability);
-                      const isUnreachable = envReachability === "unreachable" || envReachability === "reconnecting";
-                      const loopColor = isUnreachable ? "var(--health-offline)" : PILL_COLORS[fleetItem];
+                      const loopColor = PILL_COLORS[fleetItem];
+                      const loopLabel = getPillLabel(fleetItem);
 
                       return (
                         <div
@@ -368,9 +366,9 @@ export function Sidebar(props: {
                           <span
                             className="tree-loop-status"
                             style={{ color: loopColor }}
-                            title={isUnreachable ? intl.formatMessage({ id: "sidebar.loopUnknown" }) : getPillLabel(fleetItem)}
+                            title={loopLabel}
                           >
-                            {isUnreachable ? intl.formatMessage({ id: "sidebar.loopUnknown" }) : getPillLabel(fleetItem)}
+                            {loopLabel}
                           </span>
                           <span className="tree-loop-runcount">
                             {loop.runCount > 0 ? `${loop.runCount}r` : ""}
@@ -412,6 +410,7 @@ export function Sidebar(props: {
             perEnvLoops={perEnvLoops}
             perEnvHealth={health}
             environments={environments}
+            reachability={reachability}
           />
         ) : null}
         <span style={{ flex: 1 }} />

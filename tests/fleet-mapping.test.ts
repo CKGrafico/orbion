@@ -32,6 +32,31 @@ describe("loopStatusToFleetItem", () => {
   it("maps exit code 0 with running as working (not failed)", () => {
     expect(loopStatusToFleetItem("running", 0)).toBe("working");
   });
+
+  // ── Reachability: unreachable loops render as "unknown" ──────────
+  it("returns 'unknown' for unreachable instance regardless of loop status", () => {
+    expect(loopStatusToFleetItem("running", 0, "unreachable")).toBe("unknown");
+    expect(loopStatusToFleetItem("running", 1, "unreachable")).toBe("unknown");
+    expect(loopStatusToFleetItem("stopped", null, "unreachable")).toBe("unknown");
+    expect(loopStatusToFleetItem("waiting", 0, "unreachable")).toBe("unknown");
+  });
+
+  it("returns 'unknown' for reconnecting instance regardless of loop status", () => {
+    expect(loopStatusToFleetItem("running", 0, "reconnecting")).toBe("unknown");
+    expect(loopStatusToFleetItem("running", 1, "reconnecting")).toBe("unknown");
+    expect(loopStatusToFleetItem("stopped", null, "reconnecting")).toBe("unknown");
+  });
+
+  it("does not override status when instance is connected", () => {
+    expect(loopStatusToFleetItem("running", 0, "connected")).toBe("working");
+    expect(loopStatusToFleetItem("waiting", 1, "connected")).toBe("failed");
+    expect(loopStatusToFleetItem("stopped", null, "connected")).toBe("failed");
+  });
+
+  it("does not override status when reachability is undefined (not yet tracked)", () => {
+    expect(loopStatusToFleetItem("running", 0)).toBe("working");
+    expect(loopStatusToFleetItem("stopped", null)).toBe("failed");
+  });
 });
 
 describe("chatTurnToFleetItem", () => {

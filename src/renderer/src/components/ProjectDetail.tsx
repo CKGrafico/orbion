@@ -1,5 +1,6 @@
 import { useIntl } from "react-intl";
 import type { LoopMeta, Project } from "../types";
+import type { ReachabilityState } from "../../../shared/ipc";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { PILL_COLORS, getPillLabel } from "../fleet-status";
 import { runsToday, avgDuration, formatDurationShort } from "../format";
@@ -31,9 +32,11 @@ function LoopActivitySummary({ loop }: { loop: LoopMeta }): React.ReactNode {
 export function ProjectDetail(props: {
   project: Project;
   loops: LoopMeta[];
+  /** Per-environment reachability state (its own health layer, separate from loop status). */
+  reachability?: ReachabilityState;
   onOpenLoop: (loopId: string) => void;
 }): React.ReactNode {
-  const { project, loops, onOpenLoop } = props;
+  const { project, loops, reachability, onOpenLoop } = props;
   const intl = useIntl();
 
   if (loops.length === 0) {
@@ -62,7 +65,7 @@ export function ProjectDetail(props: {
         <div className="card-body">
           <div className="loop-list">
             {loops.map((loop) => {
-              const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
+              const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, reachability);
               const loopTitle = loop.description?.trim() || loop.id;
               return (
                 <button

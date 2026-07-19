@@ -695,21 +695,28 @@ export class MockReachabilityService implements IReachabilityService {
   private listeners: ((status: ReachabilityStatus) => void)[] = [];
 
   async getStatus(environmentId: string): Promise<ReachabilityStatus | null> {
-    // Mock environments are always connected
+    const envs = await new MockConfigService().getEnvironments();
+    const env = envs.find((e) => e.id === environmentId);
+    // Environments named "offline" or "unreachable" simulate an unreachable
+    // state so the "unknown" loop rendering can be tested in dev mode.
+    const isUnreachable = env?.name.toLowerCase().includes("offline") || env?.name.toLowerCase().includes("unreachable");
     return {
       environmentId,
-      state: "connected",
+      state: isUnreachable ? "unreachable" as const : "connected" as const,
       changedAt: new Date().toISOString(),
     };
   }
 
   async getAll(): Promise<ReachabilityStatus[]> {
     const envs = await new MockConfigService().getEnvironments();
-    return envs.map((env) => ({
-      environmentId: env.id,
-      state: "connected" as const,
-      changedAt: new Date().toISOString(),
-    }));
+    return envs.map((env) => {
+      const isUnreachable = env.name.toLowerCase().includes("offline") || env.name.toLowerCase().includes("unreachable");
+      return {
+        environmentId: env.id,
+        state: isUnreachable ? "unreachable" as const : "connected" as const,
+        changedAt: new Date().toISOString(),
+      };
+    });
   }
 
   onStatusChange(cb: (status: ReachabilityStatus) => void): () => void {

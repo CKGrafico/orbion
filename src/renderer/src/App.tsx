@@ -596,6 +596,7 @@ export function App(): React.ReactNode {
             instance={selected}
             loops={loops}
             connectionPhase={connectionStatus[selected.id]?.phase}
+            reachability={reachability[selected.id]}
             onOpenLoop={openLoop}
             onOpenProject={openProject}
           />
@@ -617,6 +618,7 @@ export function App(): React.ReactNode {
           <ProjectDetail
             project={project}
             loops={projectLoops}
+            reachability={reachability[selected.id]}
             onOpenLoop={openLoop}
           />
         );
@@ -627,6 +629,7 @@ export function App(): React.ReactNode {
             instance={selected}
             loopId={view.loopId}
             initial={loops.find((l) => l.id === view.loopId) ?? null}
+            reachability={reachability[selected.id]}
             onBack={() => setView({ kind: "instance" })}
           />
         );

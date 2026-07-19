@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import type { Environment, LoopMeta, Project } from "../types";
+import type { ReachabilityState } from "../../../shared/ipc";
 import { fetchProjects } from "../api";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { PILL_COLORS, getPillLabel } from "../fleet-status";
@@ -34,10 +35,12 @@ export function InstanceDetail(props: {
   instance: Environment;
   loops: LoopMeta[];
   connectionPhase?: string;
+  /** Per-environment reachability state (its own health layer, separate from loop status). */
+  reachability?: ReachabilityState;
   onOpenLoop: (loopId: string) => void;
   onOpenProject: (projectId: string) => void;
 }): React.ReactNode {
-  const { instance, loops, connectionPhase, onOpenLoop, onOpenProject } = props;
+  const { instance, loops, connectionPhase, reachability, onOpenLoop, onOpenProject } = props;
   const intl = useIntl();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -117,7 +120,7 @@ export function InstanceDetail(props: {
                   <div className="row-empty">{intl.formatMessage({ id: "instanceDetail.noLoopsInProject" })}</div>
                 ) : (
                   projectLoops.map((loop) => {
-                    const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
+                    const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, reachability);
                     const loopTitle = loop.description?.trim() || loop.id;
                     return (
                       <button
@@ -158,7 +161,7 @@ export function InstanceDetail(props: {
           <div className="card-body">
             <div className="loop-list">
               {unassignedLoops.map((loop) => {
-                const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode);
+                const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, reachability);
                 const loopTitle = loop.description?.trim() || loop.id;
                 return (
                   <button

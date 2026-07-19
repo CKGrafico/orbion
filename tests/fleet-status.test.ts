@@ -56,8 +56,13 @@ describe("highestPriority", () => {
   });
 
   it("handles full priority chain", () => {
-    const all: FleetItemStatus[] = ["idle", "completed", "working", "failed", "awaiting-input", "pending-approval"];
+    const all: FleetItemStatus[] = ["idle", "completed", "working", "failed", "awaiting-input", "pending-approval", "unknown"];
     expect(highestPriority(all)).toBe("pending-approval");
+  });
+
+  it("unknown loses to idle (unknown is lowest priority)", () => {
+    expect(highestPriority(["unknown", "idle"])).toBe("idle");
+    expect(highestPriority(["unknown"])).toBe("unknown");
   });
 });
 
@@ -100,6 +105,10 @@ describe("isNotifiableStatus", () => {
 
   it("returns false for idle", () => {
     expect(isNotifiableStatus("idle")).toBe(false);
+  });
+
+  it("returns false for unknown — unreachable loops are not failures", () => {
+    expect(isNotifiableStatus("unknown")).toBe(false);
   });
 });
 

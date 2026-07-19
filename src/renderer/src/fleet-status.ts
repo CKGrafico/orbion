@@ -6,7 +6,8 @@ export type FleetItemStatus =
   | "working"
   | "completed"
   | "failed"
-  | "idle";
+  | "idle"
+  | "unknown";
 
 export const PRIORITY_ORDER: FleetItemStatus[] = [
   "pending-approval",
@@ -15,6 +16,7 @@ export const PRIORITY_ORDER: FleetItemStatus[] = [
   "working",
   "completed",
   "idle",
+  "unknown",
 ];
 
 export const PRIORITY_RANK: Record<FleetItemStatus, number> = Object.fromEntries(
@@ -28,6 +30,7 @@ const PILL_LABEL_KEYS: Record<FleetItemStatus, string> = {
   completed: "fleet.done",
   failed: "fleet.failed",
   idle: "fleet.idle",
+  unknown: "fleet.unknown",
 };
 
 export function getPillLabel(status: FleetItemStatus): string {
@@ -41,13 +44,15 @@ export const PILL_COLORS: Record<FleetItemStatus, string> = {
   working: "var(--pill-working)",
   completed: "var(--pill-done)",
   idle: "var(--pill-idle)",
+  unknown: "var(--pill-unknown)",
 };
 
 export function highestPriority(statuses: FleetItemStatus[]): FleetItemStatus {
   if (statuses.length === 0) return "idle";
-  let best: FleetItemStatus = "idle";
-  let bestRank = PRIORITY_RANK["idle"];
-  for (const s of statuses) {
+  let best: FleetItemStatus = statuses[0];
+  let bestRank = PRIORITY_RANK[statuses[0]] ?? PRIORITY_RANK["idle"];
+  for (let i = 1; i < statuses.length; i++) {
+    const s = statuses[i];
     const r = PRIORITY_RANK[s] ?? PRIORITY_RANK["idle"];
     if (r < bestRank) {
       bestRank = r;

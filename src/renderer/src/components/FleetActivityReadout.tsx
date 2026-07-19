@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useIntl } from "react-intl";
 import type { LoopMeta, EnvironmentHealth } from "../types";
+import type { ReachabilityState } from "../../../shared/ipc";
 import { runsToday } from "../format";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { PILL_COLORS } from "../fleet-status";
@@ -20,6 +21,7 @@ function isAgentLoop(loop: LoopMeta): boolean {
 interface LoopContributor {
   loopId: string;
   description: string;
+  envId: string;
   envName: string;
   runsToday: number;
   status: LoopMeta["status"];
@@ -30,8 +32,10 @@ export function FleetActivityReadout(props: {
   perEnvLoops: Record<string, LoopMeta[]>;
   perEnvHealth: Record<string, EnvironmentHealth>;
   environments: { id: string; name: string }[];
+  /** Per-environment reachability state (its own health layer, separate from loop status). */
+  reachability?: Record<string, ReachabilityState>;
 }): React.ReactNode {
-  const { perEnvLoops, perEnvHealth, environments } = props;
+  const { perEnvLoops, perEnvHealth, environments, reachability } = props;
   const intl = useIntl();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +51,7 @@ export function FleetActivityReadout(props: {
       if (health === "offline" || health === "blocked" || health === "unknown") continue;
 
       const envLoops = perEnvLoops[env.id] ?? [];
+      const envReachability = reachability?.[env.id];
 
       // Find agent loops; if none, use all loops as fallback
       const agentLoops = envLoops.filter(isAgentLoop);
@@ -59,6 +64,7 @@ export function FleetActivityReadout(props: {
           items.push({
             loopId: loop.id,
             description: loop.description?.trim() || loop.id,
+            envId: env.id,
             envName: env.name,
             runsToday: count,
             status: loop.status,
@@ -117,7 +123,7 @@ export function FleetActivityReadout(props: {
           ) : (
             <div className="fleet-activity-popover-list">
               {contributors.map((c) => {
-                const fleetItem = loopStatusToFleetItem(c.status, c.lastExitCode);
+                const fleetItem = loopStatusToFleetItem(c.status, c.lastExitCode, reachability?.[c.envId]);
                 const color = PILL_COLORS[fleetItem];
                 return (
                   <div key={`${c.envName}-${c.loopId}`} className="fleet-activity-row">

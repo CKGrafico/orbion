@@ -324,7 +324,9 @@
     "statusStopped": "stopped",
     "activityToday": "Runs today",
     "activityAvgDuration": "Avg duration",
-    "activityLastDuration": "Last run duration"
+    "activityLastDuration": "Last run duration",
+    "statusUnknown": "unknown",
+    "staleBanner": "Instance unreachable — showing last-known data"
   },
   "activitySummary": {
     "runsToday": "{count} today",
@@ -487,7 +489,8 @@
     "working": "working",
     "done": "done",
     "failed": "failed",
-    "idle": "idle"
+    "idle": "idle",
+    "unknown": "unknown"
   },
   "store": {
     "configError": "Configuration operation failed",
