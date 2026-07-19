@@ -429,6 +429,14 @@ keys, writes them into electron-store, and clears the keys. The renderer's
   formatting or HTML tags.
 - **External links:** `setWindowOpenHandler` denies in-app navigation and opens
   links in the system browser.
+- **CLI argument sanitization:** all user-controlled strings passed to `execFile("gh", ...)` and
+  `execFile("az", ...)` are validated before execution:
+  - Labels are validated against `^[a-zA-Z0-9_.:/-]+$` and rejected if they start with `--`.
+  - Repo strings must match the `owner/repo` format (`^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$`).
+  - Title and body fields have control characters (newlines, null bytes, tabs) stripped
+    via `sanitizeText()` before being passed as CLI arguments.
+  - This prevents argument injection, flag injection, and newline-based output confusion
+    at all `gh`/`az` invocation sites.
 - **Trust boundary:** renderer ⇄ preload ⇄ main. Only the main process performs
   network and filesystem I/O.
 - **Auth/secrets:** OpenCode endpoint passwords are encrypted at rest via
