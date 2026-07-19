@@ -10,6 +10,8 @@ import type {
   ChatSession,
   BootstrapSeedExportResult,
   BootstrapSeedImportResult,
+  RestoreAvailability,
+  PullRestoreResult,
 } from "../../../../shared/ipc";
 import type { IConfigService } from "../interfaces";
 
@@ -90,5 +92,11 @@ export class ConfigService implements IConfigService {
   }
   async importBootstrapSeed(seedString: string): Promise<BootstrapSeedImportResult> {
     return this.api.importBootstrapSeed(seedString);
+  }
+  async checkRestoreAvailable(): Promise<RestoreAvailability> {
+    return this.api.checkRestoreAvailable();
+  }
+  async pullRestore(): Promise<PullRestoreResult> {
+    return this.api.pullRestore();
   }
 }

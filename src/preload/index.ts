@@ -36,6 +36,8 @@ import type {
   McpToolCallResult,
   BootstrapSeedExportResult,
   BootstrapSeedImportResult,
+  RestoreAvailability,
+  PullRestoreResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -105,6 +107,10 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:exportBootstrapSeed") as Promise<BootstrapSeedExportResult>,
     importBootstrapSeed: (seedString: string) =>
       ipcRenderer.invoke("config:importBootstrapSeed", seedString) as Promise<BootstrapSeedImportResult>,
+    checkRestoreAvailable: () =>
+      ipcRenderer.invoke("config:checkRestoreAvailable") as Promise<RestoreAvailability>,
+    pullRestore: () =>
+      ipcRenderer.invoke("config:pullRestore") as Promise<PullRestoreResult>,
   },
 
   connection: {

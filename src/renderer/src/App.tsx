@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -22,6 +22,7 @@ import { LoopDetail } from "./components/LoopDetail";
 import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
+import { RestoreOffer } from "./components/RestoreOffer";
 import { InboxView } from "./features/inbox/InboxView";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
@@ -97,6 +98,10 @@ export function App(): React.ReactNode {
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
+  /** Restore offer: availability from the config-home VM */
+  const [restoreAvailability, setRestoreAvailability] = useState<RestoreAvailability | null>(null);
+  /** Whether the restore offer is showing */
+  const [restoreOfferOpen, setRestoreOfferOpen] = useState(false);
   /** The currently viewed chat session id (drives active-session highlighting in sidebar) */
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   /** All chat sessions — loaded from config store for header rendering */
@@ -565,11 +570,42 @@ export function App(): React.ReactNode {
 
   const handleVmWizardDone = (_environmentId: string, _environmentName: string, _daemonUrl: string): void => {
     setVmWizardOpen(false);
-    void reload().then(() => handleSelect(_environmentId));
+    void reload().then(async () => {
+      handleSelect(_environmentId);
+      // After the first VM is added, check if a config restore is available
+      try {
+        const availability = await configService.checkRestoreAvailable();
+        if (availability.available) {
+          setRestoreAvailability(availability);
+          setRestoreOfferOpen(true);
+        }
+      } catch {
+        // Restore check is best-effort; don't block the user
+      }
+    });
   };
 
   const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
   const openProject = (projectId: string): void => setView({ kind: "project", projectId });
+
+  const handlePullRestore = useCallback(async (): Promise<PullRestoreResult> => {
+    const result = await configService.pullRestore();
+    if (result.ok) {
+      await reload();
+      // Select the first restored environment
+      if (result.restored.length > 0) {
+        handleSelect(result.restored[0].id);
+      }
+      setRestoreOfferOpen(false);
+      setRestoreAvailability(null);
+    }
+    return result;
+  }, [configService, reload, handleSelect]);
+
+  const handleSkipRestore = useCallback((): void => {
+    setRestoreOfferOpen(false);
+    setRestoreAvailability(null);
+  }, []);
 
   const handleNavigateToSession = useCallback((sessionId: string): void => {
     setActiveSessionId(sessionId);
@@ -1058,6 +1094,14 @@ export function App(): React.ReactNode {
             setPickMainVmOpen(false);
           }}
           onSkip={() => setPickMainVmOpen(false)}
+        />
+      ) : null}
+
+      {restoreOfferOpen && restoreAvailability && restoreAvailability.available ? (
+        <RestoreOffer
+          availability={restoreAvailability}
+          onRestore={handlePullRestore}
+          onSkip={handleSkipRestore}
         />
       ) : null}
 

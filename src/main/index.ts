@@ -86,6 +86,8 @@ import {
   setExpandedProjects,
   exportBootstrapSeed,
   importBootstrapSeed,
+  checkRestoreAvailable,
+  pullRestore,
 } from "./config-store.js";
 import {
   getMessages as transcriptGetMessages,
@@ -901,6 +903,33 @@ app.whenReady().then(() => {
   safeHandle("config:importBootstrapSeed", (_event, ...rawArgs) => {
     const [seedString] = validateIpc<[string]>("config:importBootstrapSeed", rawArgs);
     return importBootstrapSeed(seedString);
+  });
+
+  safeHandle("config:checkRestoreAvailable", () => {
+    validateIpc("config:checkRestoreAvailable", []);
+    return checkRestoreAvailable();
+  });
+
+  safeHandle("config:pullRestore", async () => {
+    validateIpc("config:pullRestore", []);
+    const result = await pullRestore();
+
+    // After a successful restore, seed supervisors and tunnels for the new environments
+    if (result.ok) {
+      for (const env of result.restored) {
+        await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
+        const activeEp = env.activeEndpointId
+          ? env.endpoints.find((e) => e.id === env.activeEndpointId)
+          : env.endpoints[0];
+        const url = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
+        if (url) getOrCreateSupervisor(env.id, url);
+        syncEndpointTracker(env.id);
+        // Connect to the new environment's MCP server (fire-and-forget)
+        void connectMcp(env.id);
+      }
+    }
+
+    return result;
   });
 
   // ── CLI input sanitization (issue #191) ──────────────────────────────
