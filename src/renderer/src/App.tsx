@@ -979,6 +979,7 @@ export function App(): React.ReactNode {
             environments={environments.map((e) => ({ id: e.id, name: e.name }))}
             reachability={reachability[sessionEnvId]}
             loops={sessionLoops}
+            perEnvLoops={perEnvLoops}
           />
         );
       }

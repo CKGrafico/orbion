@@ -8,6 +8,7 @@ import type { LoopMeta } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar } from "./LoopSummaryBar";
+import { LoopCard } from "./LoopCard";
 import { WifiOff } from "lucide-react";
 
 const MarkdownContent = lazy(() =>
@@ -28,9 +29,11 @@ interface SessionChatViewProps {
   reachability?: ReachabilityState;
   /** Loops scoped to the session's home project x instance, for the summary bar. */
   loops: LoopMeta[];
+  /** All per-environment loops, for resolving loop-card rows. */
+  perEnvLoops: Record<string, LoopMeta[]>;
 }
 
-export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -362,6 +365,16 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                     <span className="transcript-handoff-line" />
                   </div>
                 );
+              case "loop-card": {
+                const envLoops = perEnvLoops[row.environmentId] ?? loops;
+                const loop = envLoops.find((l) => l.id === row.loopId);
+                if (!loop) return null;
+                return (
+                  <div key={row.id} className="transcript-loop-card">
+                    <LoopCard loop={loop} reachability={reachability} />
+                  </div>
+                );
+              }
               default:
                 return null;
             }

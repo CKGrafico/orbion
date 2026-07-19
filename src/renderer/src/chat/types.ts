@@ -72,7 +72,8 @@ export type RowKind =
   | "turn-fold"
   | "approval-request"
   | "question-request"
-  | "instance-handoff";
+  | "instance-handoff"
+  | "loop-card";
 
 export interface BaseRow {
   id: string;
@@ -128,6 +129,14 @@ export interface InstanceHandoffRow extends BaseRow {
   toInstance: string;
 }
 
+export interface LoopCardRow extends BaseRow {
+  kind: "loop-card";
+  /** The loop ID to look up from the loop store. */
+  loopId: string;
+  /** The environment (instance) that owns this loop. */
+  environmentId: string;
+}
+
 export type TranscriptRow =
   | UserMessageRow
   | AssistantMessageRow
@@ -136,4 +145,5 @@ export type TranscriptRow =
   | TurnFoldRow
   | ApprovalRow
   | QuestionRow
-  | InstanceHandoffRow;
+  | InstanceHandoffRow
+  | LoopCardRow;

@@ -1248,6 +1248,123 @@ input {
   white-space: nowrap;
 }
 
+/* ── Loop card (compact live card in the chat stream) ────────────── */
+
+.loop-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.loop-card--failed {
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border-subtle));
+  border-left: 3px solid var(--danger);
+}
+
+.loop-card--unreachable {
+  opacity: 0.6;
+}
+
+.loop-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.loop-card-dot {
+  flex-shrink: 0;
+}
+
+@keyframes loop-card-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.loop-card-dot--pulse {
+  animation: loop-card-pulse 2s ease-in-out infinite;
+}
+
+.loop-card-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.loop-card-status-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.loop-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  padding-left: 16px;
+}
+
+.loop-card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.loop-card-meta-label {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.loop-card-meta-value {
+  font-weight: 500;
+}
+
+.loop-card-meta-value--mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.loop-card-meta-value--exit-fail {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.loop-card-meta-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--border-subtle);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+/* ── Transcript loop-card row (padding inside the chat stream) ──── */
+
+.transcript-loop-card {
+  padding: 4px 18px;
+}
+
+
 /* Muted composer state when instance is unreachable */
 .composer-textarea:disabled {
   opacity: 0.5;

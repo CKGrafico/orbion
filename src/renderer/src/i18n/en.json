@@ -736,5 +736,22 @@
     "pausedCount": "{count} paused",
     "finishedCount": "{count} finished",
     "nextRun": "next: {loop} in {countdown}"
+  },
+  "loopCard": {
+    "interval": "interval",
+    "runs": "runs",
+    "lastExit": "exit",
+    "nextRun": "next",
+    "noNextRun": "-",
+    "unknown": "unknown",
+    "runningNow": "now",
+    "statusRunning": "running",
+    "statusWaiting": "waiting",
+    "statusPaused": "paused",
+    "statusIdle": "idle",
+    "statusStopped": "stopped",
+    "statusFailed": "failed",
+    "statusFinished": "finished",
+    "statusUnknown": "unknown"
   }
 }
