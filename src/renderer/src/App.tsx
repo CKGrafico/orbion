@@ -980,6 +980,7 @@ export function App(): React.ReactNode {
             reachability={reachability[sessionEnvId]}
             loops={sessionLoops}
             perEnvLoops={perEnvLoops}
+            instance={sessionEnv}
           />
         );
       }
