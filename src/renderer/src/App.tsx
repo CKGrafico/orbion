@@ -35,7 +35,8 @@ type View =
   | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
-  | { kind: "loop"; loopId: string };
+  | { kind: "loop"; loopId: string }
+  | { kind: "session"; sessionId: string };
 
 function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
   switch (phase) {
@@ -92,6 +93,8 @@ export function App(): React.ReactNode {
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
+  /** The currently viewed chat session id (drives active-session highlighting in sidebar) */
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -557,6 +560,11 @@ export function App(): React.ReactNode {
   const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
   const openProject = (projectId: string): void => setView({ kind: "project", projectId });
 
+  const handleNavigateToSession = useCallback((sessionId: string): void => {
+    setActiveSessionId(sessionId);
+    setView({ kind: "session", sessionId });
+  }, []);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -658,6 +666,17 @@ export function App(): React.ReactNode {
             onBack={() => setView({ kind: "instance" })}
           />
         );
+      case "session": {
+        // Session view: show the chat panel for the selected session
+        return (
+          <div className="content-inner">
+            <div className="session-chat-placeholder">
+              <h3>{intl.formatMessage({ id: "session.viewTitle" })}</h3>
+              <p>{intl.formatMessage({ id: "session.viewDescription" })}</p>
+            </div>
+          </div>
+        );
+      }
     }
   };
 
@@ -693,6 +712,15 @@ export function App(): React.ReactNode {
               {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
             </span>
           ) : null}
+          <span style={{ flex: 1 }} />
+        </div>
+      );
+    }
+
+    if (view.kind === "session") {
+      return (
+        <div className="main-header">
+          <span className="main-title">{intl.formatMessage({ id: "session.viewTitle" })}</span>
           <span style={{ flex: 1 }} />
         </div>
       );
@@ -877,6 +905,8 @@ export function App(): React.ReactNode {
                   onNavigateToInbox={() => {
                     setView({ kind: "inbox" });
                   }}
+                  onNavigateToSession={handleNavigateToSession}
+                  activeSessionId={activeSessionId}
                 />
               </aside>
             ) : null}

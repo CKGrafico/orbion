@@ -774,6 +774,74 @@ input {
   color: var(--text-primary);
 }
 
+/* ── Session rows in sidebar tree ────────────────────────────────── */
+
+.tree-session-row {
+  gap: 6px;
+}
+
+.tree-session-row.active-session {
+  color: var(--text-primary);
+}
+
+.tree-session-row.active-session .tree-session-icon {
+  color: var(--accent);
+}
+
+.tree-session-row.active-session .tree-session-time {
+  color: var(--text-secondary);
+}
+
+.tree-session-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.tree-session-time {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
+
+.tree-session-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.session-chat-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 40px;
+}
+
+.session-chat-placeholder h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.session-chat-placeholder p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 360px;
+}
+
 /* ── Status dots & chips ────────────────────────────────────────── */
 
 .dot {

@@ -33,6 +33,7 @@ import type {
   NotificationSendArgs,
   OutageEscalation,
   ReachabilityStatus,
+  ChatSession,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -97,6 +98,14 @@ const MOCK_LOOPS: LoopMeta[] = [
 const MOCK_TASKS: TaskDefinition[] = [
   { id: "task-1", name: "Build", command: "npm", commandArgs: ["run", "build"], commandRaw: "npm run build", onSuccessTaskId: null, onFailureTaskId: null, createdAt: iso(-86400000) },
   { id: "task-2", name: "Test", command: "pnpm", commandArgs: ["test"], commandRaw: "pnpm test", onSuccessTaskId: null, onFailureTaskId: null, createdAt: iso(-86400000) },
+];
+
+const MOCK_CHAT_SESSIONS: ChatSession[] = [
+  { id: "session-1", title: "Build pipeline setup", projectName: "Default", lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
+  { id: "session-2", title: "Fix flaky tests", projectName: "Default", lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
+  { id: "session-3", title: "ETL data migration", projectName: "ETL", lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
+  { id: "session-4", title: "Agent code review", projectName: "Agents", lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
+  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
 ];
 
 function mockRequest<T>(path: string): Promise<ApiResponse<T>> {
@@ -213,6 +222,47 @@ export class MockConfigService implements IConfigService {
   }
   async setProjectPickupLabels(_projectId: string, _labels: string[]): Promise<void> {
     // mock: no-op
+  }
+  async getChatSessions(): Promise<ChatSession[]> {
+    try {
+      const raw = localStorage.getItem("orbion.sessions.mock");
+      if (raw) return JSON.parse(raw) as ChatSession[];
+    } catch { /* empty */ }
+    return [...MOCK_CHAT_SESSIONS];
+  }
+  async addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession> {
+    const newSession: ChatSession = {
+      ...session,
+      id: `session-${Math.random().toString(36).slice(2, 10)}`,
+      createdAt: new Date().toISOString(),
+    };
+    const sessions = await this.getChatSessions();
+    sessions.push(newSession);
+    try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(sessions)); } catch { /* empty */ }
+    return newSession;
+  }
+  async removeChatSession(sessionId: string): Promise<void> {
+    const sessions = await this.getChatSessions();
+    const filtered = sessions.filter((s) => s.id !== sessionId);
+    try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(filtered)); } catch { /* empty */ }
+  }
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>): Promise<void> {
+    const sessions = await this.getChatSessions();
+    const idx = sessions.findIndex((s) => s.id === sessionId);
+    if (idx >= 0) {
+      sessions[idx] = { ...sessions[idx], ...updates };
+      try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(sessions)); } catch { /* empty */ }
+    }
+  }
+  async getExpandedProjects(): Promise<string[]> {
+    try {
+      const raw = localStorage.getItem("orbion.expanded.mock");
+      if (raw) return JSON.parse(raw) as string[];
+    } catch { /* empty */ }
+    return [];
+  }
+  async setExpandedProjects(expandedKeys: string[]): Promise<void> {
+    try { localStorage.setItem("orbion.expanded.mock", JSON.stringify(expandedKeys)); } catch { /* empty */ }
   }
 }
 

@@ -109,6 +109,12 @@ export interface ConfigBridge {
   getMainVmId: () => Promise<string | null>;
   getProjectPickupLabels: (projectId: string) => Promise<string[]>;
   setProjectPickupLabels: (projectId: string, labels: string[]) => Promise<void>;
+  getChatSessions: () => Promise<ChatSession[]>;
+  addChatSession: (session: Omit<ChatSession, "id" | "createdAt">) => Promise<ChatSession>;
+  removeChatSession: (sessionId: string) => Promise<void>;
+  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>) => Promise<void>;
+  getExpandedProjects: () => Promise<string[]>;
+  setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────
@@ -647,6 +653,20 @@ export interface ConditionWatchBridge {
   addWatch: (watch: Omit<ConditionWatch, "id" | "createdAt" | "tripped" | "trippedAt">) => Promise<ConditionWatch>;
   removeWatch: (watchId: string) => Promise<void>;
   tripWatch: (watchId: string) => Promise<void>;
+}
+
+// ── Chat sessions ────────────────────────────────────────────────────
+
+/** A persisted chat session, filed under a project in the sidebar. */
+export interface ChatSession {
+  id: string;
+  title: string;
+  /** Project this session is filed under (project name, matching sidebar merge key). */
+  projectName: string;
+  /** ISO timestamp of last activity in this session. */
+  lastActiveAt: string;
+  /** ISO timestamp when the session was created. */
+  createdAt: string;
 }
 
 // ── Native OS notifications ─────────────────────────────────────────

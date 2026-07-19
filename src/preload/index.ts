@@ -30,6 +30,7 @@ import type {
   DeepLinkTarget,
   OutageEscalation,
   ReachabilityStatus,
+  ChatSession,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -83,6 +84,18 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:getProjectPickupLabels", projectId) as Promise<string[]>,
     setProjectPickupLabels: (projectId: string, labels: string[]) =>
       ipcRenderer.invoke("config:setProjectPickupLabels", projectId, labels) as Promise<void>,
+    getChatSessions: () =>
+      ipcRenderer.invoke("config:getChatSessions") as Promise<ChatSession[]>,
+    addChatSession: (session: Omit<ChatSession, "id" | "createdAt">) =>
+      ipcRenderer.invoke("config:addChatSession", session) as Promise<ChatSession>,
+    removeChatSession: (sessionId: string) =>
+      ipcRenderer.invoke("config:removeChatSession", sessionId) as Promise<void>,
+    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>) =>
+      ipcRenderer.invoke("config:updateChatSession", sessionId, updates) as Promise<void>,
+    getExpandedProjects: () =>
+      ipcRenderer.invoke("config:getExpandedProjects") as Promise<string[]>,
+    setExpandedProjects: (expandedKeys: string[]) =>
+      ipcRenderer.invoke("config:setExpandedProjects", expandedKeys) as Promise<void>,
   },
 
   connection: {
