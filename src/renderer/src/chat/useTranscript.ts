@@ -1,7 +1,152 @@
-import { useCallback, useRef, useState } from "react";
-import type { AccessMode, ApprovalDecision, ChatTurn, TranscriptRow, ToolCall, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { cid, useInject } from "inversify-hooks";
+import type { TranscriptMessage, ToolCallRecord } from "../../../shared/ipc";
+import type { ITranscriptService } from "../services/interfaces";
+import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow } from "./types";
 
 const TOOL_CALLS_THRESHOLD = 3;
+
+/** A chat message is streaming if finishedAt is not set at all (undefined). */
+function isStreaming(finishedAt: number | boolean | undefined): boolean {
+  return finishedAt === undefined;
+}
+
+/** A chat message is finished if finishedAt is a number or boolean true. */
+function isFinished(finishedAt: number | boolean | undefined): boolean {
+  return finishedAt !== undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Conversion: ChatTurn ↔ TranscriptMessage
+// ---------------------------------------------------------------------------
+
+function toolCallToRecord(tc: ToolCall): ToolCallRecord {
+  return {
+    id: tc.id,
+    kind: tc.kind,
+    title: tc.title,
+    status: tc.status,
+    output: tc.output,
+    startedAt: tc.startedAt,
+    finishedAt: tc.finishedAt,
+  };
+}
+
+function recordToToolCall(rec: ToolCallRecord): ToolCall {
+  return {
+    id: rec.id,
+    kind: rec.kind,
+    title: rec.title,
+    status: rec.status,
+    output: rec.output,
+    startedAt: rec.startedAt,
+    finishedAt: rec.finishedAt,
+  };
+}
+
+function chatMessageToTranscriptMessage(
+  sessionId: string,
+  msg: ChatMessage,
+): TranscriptMessage {
+  return {
+    id: msg.id,
+    sessionId,
+    role: msg.role,
+    content: msg.content,
+    toolCalls: msg.toolCalls?.map(toolCallToRecord),
+    startedAt: msg.startedAt,
+    finishedAt: typeof msg.finishedAt === "number" ? msg.finishedAt : undefined,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
+  return {
+    id: tm.id,
+    role: tm.role as "user" | "assistant",
+    content: tm.content,
+    toolCalls: tm.toolCalls?.map(recordToToolCall),
+    startedAt: tm.startedAt,
+    finishedAt: tm.finishedAt != null ? tm.finishedAt : (tm.content ? true : undefined),
+  };
+}
+
+/**
+ * Group transcript messages into turns by pairing user and assistant messages.
+ * Messages are assumed to arrive in order: user, assistant, user, assistant, ...
+ * Tool messages (if any) are merged into the preceding assistant message.
+ */
+function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
+  const turns: ChatTurn[] = [];
+  let currentUser: ChatMessage | null = null;
+
+  for (const msg of messages) {
+    const chatMsg = transcriptMessageToChatMessage(msg);
+
+    if (msg.role === "user") {
+      if (currentUser && turns.length > 0) {
+        // Orphan user message without assistant; finalize previous turn
+        turns[turns.length - 1] = {
+          ...turns[turns.length - 1],
+          interrupted: true,
+          finished: true,
+        };
+      }
+      currentUser = chatMsg;
+    } else if (msg.role === "assistant" || msg.role === "tool") {
+      if (!currentUser) continue; // No user message to pair with
+
+      // Merge tool messages into the assistant message's toolCalls
+      if (msg.role === "tool") {
+        const lastTurn = turns[turns.length - 1];
+        if (lastTurn && lastTurn.userMessage.id === currentUser.id) {
+          if (chatMsg.toolCalls) {
+            lastTurn.assistantMessage.toolCalls = [
+              ...(lastTurn.assistantMessage.toolCalls ?? []),
+              ...chatMsg.toolCalls,
+            ];
+          }
+          continue;
+        }
+      }
+
+      const turnId = `turn-${currentUser.id}`;
+      turns.push({
+        id: turnId,
+        userMessage: currentUser,
+        assistantMessage: chatMsg,
+        finished: isFinished(chatMsg.finishedAt),
+        collapsed: false,
+        accessMode: "full",
+      });
+      currentUser = null;
+    }
+  }
+
+  // Handle the case where a user message exists without a paired assistant
+  if (currentUser) {
+    turns.push({
+      id: `turn-${currentUser.id}`,
+      userMessage: currentUser,
+      assistantMessage: {
+        id: `assistant-${currentUser.id}`,
+        role: "assistant",
+        content: "",
+        startedAt: Date.now(),
+        finishedAt: undefined,
+      },
+      finished: false,
+      collapsed: false,
+      accessMode: "full",
+    });
+  }
+
+  return turns;
+}
+
+// ---------------------------------------------------------------------------
+// Row building
+// ---------------------------------------------------------------------------
 
 function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
@@ -72,14 +217,14 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
       }
     }
 
-    const isStreaming = !turn.assistantMessage.finishedAt;
-    if (turn.assistantMessage.content || isStreaming) {
+    const messageStreaming = isStreaming(turn.assistantMessage.finishedAt);
+    if (turn.assistantMessage.content || messageStreaming) {
       rows.push({
         id: `assistant-${turn.id}`,
         kind: "assistant-message",
         turnId: turn.id,
         content: turn.assistantMessage.content,
-        streaming: isStreaming,
+        streaming: messageStreaming,
       });
     }
   }
@@ -87,10 +232,92 @@ function buildRowsFromTurns(turns: ChatTurn[]): TranscriptRow[] {
   return rows;
 }
 
-export function useTranscript() {
+// ---------------------------------------------------------------------------
+// useTranscript hook
+// ---------------------------------------------------------------------------
+
+export function useTranscript(sessionId: string | null) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [rows, setRows] = useState<TranscriptRow[]>([]);
   const expandedToolsRef = useRef<Set<string>>(new Set());
+  const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
+  const loadingRef = useRef(false);
+  const loadedSessionRef = useRef<string | null>(null);
+  const persistTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const PERSIST_DEBOUNCE_MS = 300;
+
+  // ── Debounced persistence ──────────────────────────────────────────
+
+  const persistUserMessage = useCallback(
+    (sessionId: string, msg: ChatMessage) => {
+      if (!transcriptService) return;
+      const tm = chatMessageToTranscriptMessage(sessionId, msg);
+      void transcriptService.appendMessage(tm);
+    },
+    [transcriptService],
+  );
+
+  const persistAssistantUpdate = useCallback(
+    (_sessionId: string, msgId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>) => {
+      if (!transcriptService) return;
+
+      // Debounce rapid streaming updates
+      const existing = persistTimerRef.current.get(msgId);
+      if (existing) clearTimeout(existing);
+
+      // For content updates during streaming, debounce
+      if ("content" in updates && !("finishedAt" in updates)) {
+        persistTimerRef.current.set(
+          msgId,
+          setTimeout(() => {
+            persistTimerRef.current.delete(msgId);
+            void transcriptService.updateMessage(msgId, updates);
+          }, PERSIST_DEBOUNCE_MS),
+        );
+      } else {
+        // For finishedAt or toolCalls updates, persist immediately
+        void transcriptService.updateMessage(msgId, updates);
+      }
+    },
+    [transcriptService],
+  );
+
+  const persistAssistantMessage = useCallback(
+    (sessionId: string, msg: ChatMessage) => {
+      if (!transcriptService) return;
+      const tm = chatMessageToTranscriptMessage(sessionId, msg);
+      void transcriptService.appendMessage(tm);
+    },
+    [transcriptService],
+  );
+
+  // ── Load from session ──────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!sessionId || sessionId === loadedSessionRef.current) return;
+    if (loadingRef.current) return;
+
+    let cancelled = false;
+    loadingRef.current = true;
+
+    transcriptService.getMessages(sessionId).then((messages) => {
+      if (cancelled) return;
+      const hydratedTurns = messagesToChatTurns(messages);
+      setTurns(hydratedTurns);
+      setRows(buildRowsFromTurns(hydratedTurns));
+      loadedSessionRef.current = sessionId;
+      loadingRef.current = false;
+    }).catch(() => {
+      if (cancelled) return;
+      loadingRef.current = false;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, transcriptService]);
+
+  // ── Row rebuild helpers ────────────────────────────────────────────
 
   const rebuildRows = useCallback((newTurns: ChatTurn[]): TranscriptRow[] => {
     const newRows = buildRowsFromTurns(newTurns);
@@ -108,6 +335,8 @@ export function useTranscript() {
     },
     [rebuildRows],
   );
+
+  // ── Turn mutations (with persistence) ──────────────────────────────
 
   const toggleTurnCollapse = useCallback(
     (turnId: string) => {
@@ -165,8 +394,14 @@ export function useTranscript() {
   const addTurn = useCallback(
     (turn: ChatTurn) => {
       setTurnsAndRebuild((prev) => [...prev, turn]);
+
+      // Persist both messages
+      if (sessionId) {
+        persistUserMessage(sessionId, turn.userMessage);
+        persistAssistantMessage(sessionId, turn.assistantMessage);
+      }
     },
-    [setTurnsAndRebuild],
+    [setTurnsAndRebuild, sessionId, persistUserMessage, persistAssistantMessage],
   );
 
   const updateTurn = useCallback(
@@ -183,23 +418,36 @@ export function useTranscript() {
       setTurns((prev) => {
         const next = prev.map((t) => {
           if (t.id !== turnId) return t;
+          const newContent = t.assistantMessage.content + chunk;
           return {
             ...t,
             assistantMessage: {
               ...t.assistantMessage,
-              content: t.assistantMessage.content + chunk,
+              content: newContent,
             },
           };
         });
         rebuildRows(next);
+
+        // Persist the content update (debounced)
+        if (sessionId) {
+          const turn = next.find((t) => t.id === turnId);
+          if (turn) {
+            persistAssistantUpdate(sessionId, turn.assistantMessage.id, {
+              content: turn.assistantMessage.content,
+            });
+          }
+        }
+
         return next;
       });
     },
-    [rebuildRows],
+    [rebuildRows, sessionId, persistAssistantUpdate],
   );
 
   const finishTurn = useCallback(
     (turnId: string) => {
+      const finishedAt = Date.now();
       setTurns((prev) => {
         const next = prev.map((t) => {
           if (t.id !== turnId) return t;
@@ -208,19 +456,31 @@ export function useTranscript() {
             finished: true,
             assistantMessage: {
               ...t.assistantMessage,
-              finishedAt: Date.now(),
+              finishedAt,
             },
           };
         });
         rebuildRows(next);
+
+        // Persist the finish
+        if (sessionId) {
+          const turn = next.find((t) => t.id === turnId);
+          if (turn) {
+            persistAssistantUpdate(sessionId, turn.assistantMessage.id, {
+              finishedAt,
+            });
+          }
+        }
+
         return next;
       });
     },
-    [rebuildRows],
+    [rebuildRows, sessionId, persistAssistantUpdate],
   );
 
   const interruptTurn = useCallback(
     (turnId: string) => {
+      const finishedAt = Date.now();
       setTurns((prev) => {
         const next = prev.map((t) => {
           if (t.id !== turnId) return t;
@@ -230,15 +490,26 @@ export function useTranscript() {
             interrupted: true,
             assistantMessage: {
               ...t.assistantMessage,
-              finishedAt: Date.now(),
+              finishedAt,
             },
           };
         });
         rebuildRows(next);
+
+        // Persist the finish
+        if (sessionId) {
+          const turn = next.find((t) => t.id === turnId);
+          if (turn) {
+            persistAssistantUpdate(sessionId, turn.assistantMessage.id, {
+              finishedAt,
+            });
+          }
+        }
+
         return next;
       });
     },
-    [rebuildRows],
+    [rebuildRows, sessionId, persistAssistantUpdate],
   );
 
   const resolveApproval = useCallback(

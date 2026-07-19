@@ -35,6 +35,7 @@ import type {
   OutageEscalation,
   ReachabilityStatus,
   ChatSession,
+  TranscriptMessage,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -164,4 +165,17 @@ export interface IReachabilityService {
   getStatus(environmentId: string): Promise<ReachabilityStatus | null>;
   getAll(): Promise<ReachabilityStatus[]>;
   onStatusChange(cb: (status: ReachabilityStatus) => void): () => void;
+}
+
+export interface ITranscriptService {
+  /** Get all messages for a session, ordered by createdAt. */
+  getMessages(sessionId: string): Promise<TranscriptMessage[]>;
+  /** Append a single message to a session. */
+  appendMessage(message: Omit<TranscriptMessage, "createdAt">): Promise<TranscriptMessage>;
+  /** Append multiple messages atomically. */
+  appendMessages(messages: Array<Omit<TranscriptMessage, "createdAt">>): Promise<TranscriptMessage[]>;
+  /** Update a specific message. */
+  updateMessage(messageId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>): Promise<void>;
+  /** Delete all messages for a session. */
+  deleteSession(sessionId: string): Promise<void>;
 }

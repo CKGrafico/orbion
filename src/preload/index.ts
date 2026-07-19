@@ -31,6 +31,7 @@ import type {
   OutageEscalation,
   ReachabilityStatus,
   ChatSession,
+  TranscriptMessage,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -305,6 +306,19 @@ const bridge: LoopTaskBridge = {
         ipcRenderer.removeListener("reachability:status", listener);
       };
     },
+  },
+
+  transcript: {
+    getMessages: (sessionId: string) =>
+      ipcRenderer.invoke("transcript:getMessages", sessionId) as Promise<TranscriptMessage[]>,
+    appendMessage: (message: Omit<TranscriptMessage, "createdAt">) =>
+      ipcRenderer.invoke("transcript:appendMessage", message) as Promise<TranscriptMessage>,
+    appendMessages: (messages: Array<Omit<TranscriptMessage, "createdAt">>) =>
+      ipcRenderer.invoke("transcript:appendMessages", messages) as Promise<TranscriptMessage[]>,
+    updateMessage: (messageId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>) =>
+      ipcRenderer.invoke("transcript:updateMessage", messageId, updates) as Promise<void>,
+    deleteSession: (sessionId: string) =>
+      ipcRenderer.invoke("transcript:deleteSession", sessionId) as Promise<void>,
   },
 };
 

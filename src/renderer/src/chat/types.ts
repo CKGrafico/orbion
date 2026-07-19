@@ -16,7 +16,8 @@ export interface ChatMessage {
   content: string;
   toolCalls?: ToolCall[];
   startedAt: number;
-  finishedAt?: boolean;
+  /** Timestamp when the message finished streaming, or true if finished. Undefined if still streaming. */
+  finishedAt?: number | boolean;
 }
 
 export type AccessMode = "supervised" | "full";
