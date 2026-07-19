@@ -84,6 +84,7 @@
     "newProject": "New project",
     "inbox": "Inbox",
     "projectHasFailure": "A loop in this project has failed",
+    "instanceCount": "{count} instances",
     "loopUnknown": "unknown"
   },
   "vmWizard": {
