@@ -89,6 +89,7 @@ export interface IVmWizardService {
   respondConsent(decision: "install" | "skip"): void;
   respondServiceSelection(selection: VmWizardServiceSelection): void;
   respondRuntimeConsent(decision: "install" | "skip"): void;
+  respondHostKey(accepted: boolean): void;
 }
 
 export interface IInfraService {

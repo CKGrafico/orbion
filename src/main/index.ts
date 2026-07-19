@@ -101,7 +101,7 @@ import {
 } from "./connection-supervisor.js";
 import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
-import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent } from "./vm-wizard.js";
+import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent, respondHostKey } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
 import { checkPlatformCli, resolvePlatformCli } from "./platform-cli.js";
 import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js";
@@ -810,6 +810,11 @@ app.whenReady().then(() => {
   safeHandle("vmWizard:respondRuntimeConsent", (_event, ...rawArgs) => {
     const [decision] = validateIpc<["install" | "skip"]>("vmWizard:respondRuntimeConsent", rawArgs);
     respondRuntimeConsent(decision);
+  });
+
+  safeHandle("vmWizard:respondHostKey", (_event, ...rawArgs) => {
+    const [accepted] = validateIpc<[boolean]>("vmWizard:respondHostKey", rawArgs);
+    respondHostKey(accepted);
   });
 
   safeHandle("opencode:getStatus", (_event, ...rawArgs): OpenCodeConnectionStatus => {

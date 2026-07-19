@@ -334,6 +334,13 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
+  "vmWizard:respondHostKey": (args) => {
+    const issues: string[] = [];
+    if (!isBoolean(args[0]))
+      issues.push("accepted must be a boolean");
+    return issues;
+  },
+
   // ── OpenCode ────────────────────────────────────────────
   "opencode:getStatus": (args) => {
     const issues: string[] = [];

@@ -1,6 +1,6 @@
 import type { AgentRuntime, SshHost, VmWizardProgress, VmWizardResult, VmWizardPairResult, VmWizardProbeResult, VmWizardServiceSelection, I18nMessage, ReachMethod, SessionToken, VmWizardStartOptions, RuntimeState } from "../shared/ipc.js";
 import { TOOL_DEFINITIONS } from "../shared/tool-definitions.js";
-import { listSshHosts, parseTarget } from "./ssh-config.js";
+import { listSshHosts, parseTarget, isHostInKnownHosts, fetchHostKey, appendToKnownHosts } from "./ssh-config.js";
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
 import { getEnvironments, addEnvironment, removeEnvironment, exchangePairingCode, storeSessionToken, storeSshKeyPassphrase, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded, setEnvironmentRuntimeState } from "./config-store.js";
@@ -14,6 +14,7 @@ let wizardCancelled = false;
 let consentResolver: ((decision: "install" | "skip") => void) | null = null;
 let serviceSelectionResolver: ((selection: VmWizardServiceSelection) => void) | null = null;
 let runtimeConsentResolver: ((decision: "install" | "skip") => void) | null = null;
+let hostKeyResolver: ((accepted: boolean) => void) | null = null;
 
 export function cancelWizard(): void {
   wizardCancelled = true;
@@ -28,6 +29,7 @@ export function resetWizardState(): void {
   consentResolver = null;
   serviceSelectionResolver = null;
   runtimeConsentResolver = null;
+  hostKeyResolver = null;
 }
 
 export function respondConsent(decision: "install" | "skip"): void {
@@ -48,6 +50,13 @@ export function respondRuntimeConsent(decision: "install" | "skip"): void {
   if (runtimeConsentResolver) {
     runtimeConsentResolver(decision);
     runtimeConsentResolver = null;
+  }
+}
+
+export function respondHostKey(accepted: boolean): void {
+  if (hostKeyResolver) {
+    hostKeyResolver(accepted);
+    hostKeyResolver = null;
   }
 }
 
@@ -193,6 +202,49 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
       probe: null,
     });
     throw new Error("vmWizard.mainAlreadyExists");
+  }
+
+  // Step 0: Host key verification (skip if host is already trusted)
+  const hostAlreadyTrusted = isHostInKnownHosts(host.hostName, host.port);
+  if (!hostAlreadyTrusted) {
+    emitProgress({ step: "host-key-verify", message: msg("vmWizard.mainHostKeyFetching", { label: host.label }), reachMethod: "ssh" });
+
+    const hostKeyResult = await fetchHostKey(host.hostName, host.port);
+
+    if (hostKeyResult) {
+      emitProgress({
+        step: "host-key-verify",
+        message: msg("vmWizard.mainHostKeyConfirm", { label: host.label }),
+        reachMethod: "ssh",
+        hostKeyFingerprint: hostKeyResult.fingerprint ?? hostKeyResult.rawLines,
+        hostKeyLine: hostKeyResult.rawLines,
+      });
+
+      const accepted = await new Promise<boolean>((resolve) => {
+        hostKeyResolver = resolve;
+      });
+
+      if (wizardCancelled) {
+        emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
+        throw new Error("vmWizard.mainCancelled");
+      }
+
+      if (!accepted) {
+        emitProgress({
+          step: "error",
+          message: msg("vmWizard.mainHostKeyRejected"),
+          reachMethod: "ssh",
+          probe: null,
+        });
+        throw new Error("vmWizard.mainHostKeyRejected");
+      }
+
+      // User accepted the key; write it to known_hosts so subsequent SSH
+      // connections (probe, launch, tunnel) will verify against it.
+      appendToKnownHosts(hostKeyResult.rawLines);
+    }
+    // If keyscan returned nothing (host unreachable), we proceed to the
+    // probe step which will surface the connectivity error naturally.
   }
 
   // Step 1: Probe

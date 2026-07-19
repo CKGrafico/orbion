@@ -332,6 +332,7 @@ export type VmWizardStep =
   | "pick-reach-method"
   | "pick-target"
   | "probing"
+  | "host-key-verify"
   | "pick-services"
   | "runtime-provision"
   | "runtime-consent"
@@ -411,6 +412,10 @@ export interface VmWizardProgress {
   pair?: VmWizardPairResult | null;
   consentPrompt?: I18nMessage | null;
   serviceSelection?: VmWizardServiceSelection | null;
+  /** Host key fingerprint for user verification (shown on host-key-verify step). */
+  hostKeyFingerprint?: string | null;
+  /** The raw known_hosts line to write if the user accepts the key. */
+  hostKeyLine?: string | null;
 }
 
 export interface VmWizardResult {
@@ -427,6 +432,7 @@ export interface VmWizardBridge {
   respondConsent: (decision: "install" | "skip") => void;
   respondServiceSelection: (selection: VmWizardServiceSelection) => void;
   respondRuntimeConsent: (decision: "install" | "skip") => void;
+  respondHostKey: (accepted: boolean) => void;
 }
 
 // ── Conversational inbox ────────────────────────────────────────────

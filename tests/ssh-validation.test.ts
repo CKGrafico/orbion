@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { validateSshHost, SshValidationError, buildSshArgs, parseTarget } from "../src/main/ssh-config.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import fs from "node:fs";
+import { validateSshHost, SshValidationError, buildSshArgs, parseTarget, knownHostsPath, appendToKnownHosts } from "../src/main/ssh-config.js";
 
 function makeHost(overrides: Record<string, string | number | undefined> = {}): Parameters<typeof validateSshHost>[0] {
   return {
@@ -116,7 +117,12 @@ describe("buildSshArgs", () => {
     const args = buildSshArgs(makeHost(), "echo hello");
     expect(args).toContain("root@example.com");
     expect(args).toContain("echo hello");
-    expect(args).toContain("StrictHostKeyChecking=accept-new");
+    expect(args).toContain("StrictHostKeyChecking=yes");
+  });
+
+  it("does not include StrictHostKeyChecking=accept-new", () => {
+    const args = buildSshArgs(makeHost(), "ls");
+    expect(args).not.toContain("accept-new");
   });
 
   it("includes identityFile when set", () => {
@@ -164,5 +170,38 @@ describe("parseTarget", () => {
 
   it("rejects target with semicolons in user", () => {
     expect(parseTarget("root;rm@host")).toBeNull();
+  });
+});
+
+// ── known_hosts helpers ─────────────────────────────────────────────
+
+describe("knownHostsPath", () => {
+  it("returns a path ending in .ssh/known_hosts", () => {
+    const p = knownHostsPath();
+    expect(p).toMatch(/\.ssh[\\/]known_hosts$/);
+  });
+});
+
+// isHostInKnownHosts uses execFileSync from node:child_process at module scope,
+// making it difficult to mock in isolation. The function is tested indirectly
+// through the integration test suite and by manual verification.
+
+describe("appendToKnownHosts", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("appends a line to known_hosts with trailing newline", () => {
+    const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+    appendToKnownHosts("example.com ssh-ed25519 AAAA...");
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    const call = appendSpy.mock.calls[0];
+    expect(call?.[1]).toBe("example.com ssh-ed25519 AAAA...\n");
+  });
+
+  it("does not double-newline if line already ends with newline", () => {
+    const appendSpy = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {});
+    appendToKnownHosts("example.com ssh-ed25519 AAAA...\n");
+    expect(appendSpy.mock.calls[0]?.[1]).toBe("example.com ssh-ed25519 AAAA...\n");
   });
 });
