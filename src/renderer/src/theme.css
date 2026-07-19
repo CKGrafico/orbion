@@ -2158,6 +2158,13 @@ input {
   font-size: 11.5px;
 }
 
+.tool-call-duration {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .tool-call-status {
   font-size: 12px;
   flex-shrink: 0;
@@ -2231,6 +2238,24 @@ input {
   overflow-y: auto;
 }
 
+.tool-call-expand-btn {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.tool-call-expand-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
 /* ── Expander (N earlier tool calls) ──────────────────────────────── */
 
 .transcript-expander {
@@ -2247,6 +2272,11 @@ input {
 .transcript-expander:hover {
   color: var(--accent);
   background: var(--bg-hover);
+}
+
+.transcript-expander-icon {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* ── Turn fold ────────────────────────────────────────────────────── */
@@ -2268,6 +2298,11 @@ input {
 .transcript-turn-fold:hover {
   color: var(--accent);
   background: var(--bg-hover);
+}
+
+.turn-fold-icon {
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
 /* ── Jump to latest ───────────────────────────────────────────────── */

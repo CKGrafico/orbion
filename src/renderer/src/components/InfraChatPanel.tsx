@@ -13,6 +13,9 @@ const MarkdownContent = lazy(() =>
 import { Server } from "lucide-react";
 import type { ApprovalDecision } from "../chat/types";
 import { QuestionPanel } from "../chat/QuestionPanel";
+import { ToolCallInlineBlock } from "../chat/ToolCallInlineBlock";
+import { ToolCallsExpander } from "../chat/ToolCallsExpander";
+import { TurnFold } from "../chat/TurnFold";
 import { translateMessage } from "../i18n";
 
 interface InfraChatPanelProps {
@@ -855,6 +858,33 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                       </Suspense>
                     </div>
                   </div>
+                );
+              case "tool-call":
+                return (
+                  <ToolCallInlineBlock
+                    key={row.id}
+                    rowId={row.id}
+                    toolCall={row.toolCall}
+                    expanded={row.expanded}
+                    onToggleExpand={toggleToolExpand}
+                  />
+                );
+              case "tool-calls-expander":
+                return (
+                  <ToolCallsExpander
+                    key={row.id}
+                    count={row.count}
+                    onClick={() => expandAllTurns()}
+                  />
+                );
+              case "turn-fold":
+                return (
+                  <TurnFold
+                    key={row.id}
+                    toolCallCount={row.toolCallCount}
+                    durationSec={row.durationSec}
+                    onClick={() => toggleTurnCollapse(row.turnId)}
+                  />
                 );
               case "question-request":
                 return (

@@ -3,9 +3,8 @@ import { useIntl } from "react-intl";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize from "rehype-sanitize";
-import type { ToolCall } from "./types";
 
-const KIND_ICONS: Record<string, string> = {
+export const KIND_ICONS: Record<string, string> = {
   read: "📄",
   write: "✏️",
   edit: "🔧",
@@ -16,7 +15,7 @@ const KIND_ICONS: Record<string, string> = {
   fetch: "🌐",
 };
 
-const STATUS_GLYPHS: Record<string, string> = {
+export const STATUS_GLYPHS: Record<string, string> = {
   running: "●",
   completed: "✓",
   error: "✗",
