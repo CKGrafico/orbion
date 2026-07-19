@@ -120,7 +120,7 @@ check_tool() {
   fi
 }
 
-${TOOL_DEFINITIONS.map((t) => `check_tool ${t.id} ${t.binary}`).join("\n")}
+${TOOL_DEFINITIONS.map((t) => `check_tool "${t.id}" "${t.binary}"`).join("\n")}
 `;
 
 export async function probeVm(host: SshHost): Promise<VmWizardProbeResult> {

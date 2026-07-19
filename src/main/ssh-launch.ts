@@ -65,7 +65,7 @@ function generateInstallBlock(tool: ToolDefinition): string {
   const header = `# ── Optional: ${id} ──────────────────────────────────────────
 INSTALL_${marker}="__INSTALL_${marker}__"
 if [ -n "$INSTALL_${marker}" ]; then
-  if ! command -v ${binary} >/dev/null 2>&1; then
+  if ! command -v "${binary}" >/dev/null 2>&1; then
     echo "${marker}_INSTALLING"`;
 
   const failureHandler = `echo "INSTALL_FAILED_${marker}"; exit 1;`;
@@ -84,7 +84,7 @@ fi`;
     }
     case "apt": {
       installLogic = `    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+      apt-get update -qq && apt-get install -y -qq "${binary}" 2>"${logFile}" || { ${failureHandler} }
     else
       ${installFailedNoPkg}
     fi`;
@@ -95,18 +95,18 @@ fi`;
         installLogic = `    if command -v apt-get >/dev/null 2>&1; then
       wget -qO- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg 2>/dev/null
       echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
-      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+      apt-get update -qq && apt-get install -y -qq "${binary}" 2>"${logFile}" || { ${failureHandler} }
     elif command -v brew >/dev/null 2>&1; then
-      brew install ${binary} 2>"${logFile}" || { ${failureHandler} }
+      brew install "${binary}" 2>"${logFile}" || { ${failureHandler} }
     else
       ${installFailedNoPkg}
     fi`;
       } else {
         // Generic apt-brew fallback
         installLogic = `    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+      apt-get update -qq && apt-get install -y -qq "${binary}" 2>"${logFile}" || { ${failureHandler} }
     elif command -v brew >/dev/null 2>&1; then
-      brew install ${binary} 2>"${logFile}" || { ${failureHandler} }
+      brew install "${binary}" 2>"${logFile}" || { ${failureHandler} }
     else
       ${installFailedNoPkg}
     fi`;
@@ -115,9 +115,9 @@ fi`;
     }
     case "apt-snap": {
       installLogic = `    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+      apt-get update -qq && apt-get install -y -qq "${binary}" 2>"${logFile}" || { ${failureHandler} }
     elif command -v snap >/dev/null 2>&1; then
-      snap install ${binary} 2>"${logFile}" || { ${failureHandler} }
+      snap install "${binary}" 2>"${logFile}" || { ${failureHandler} }
     else
       ${installFailedNoPkg}
     fi`;
@@ -135,9 +135,9 @@ fi`;
     az extension add --name azure-devops 2>/dev/null || true`;
       } else {
         installLogic = `    if command -v pip3 >/dev/null 2>&1; then
-      pip3 install ${binary} 2>"${logFile}" || { ${failureHandler} }
+      pip3 install "${binary}" 2>"${logFile}" || { ${failureHandler} }
     elif command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+      apt-get update -qq && apt-get install -y -qq "${binary}" 2>"${logFile}" || { ${failureHandler} }
     else
       ${installFailedNoPkg}
     fi`;
@@ -160,7 +160,7 @@ fi`;
       } else {
         // Generic apt-keys (shouldn't happen but for safety)
         installLogic = `    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update -qq && apt-get install -y -qq ${binary} 2>"${logFile}" || { ${failureHandler} }
+      apt-get update -qq && apt-get install -y -qq "${binary}" 2>"${logFile}" || { ${failureHandler} }
     else
       ${installFailedNoPkg}
     fi`;

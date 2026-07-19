@@ -133,24 +133,79 @@ export const NPM_PACKAGES = {
   claude: { pkg: "@anthropic-ai/claude-code", version: "2.1.212" },
 } as const;
 
+// ─── Shell-injection guards ────────────────────────────────────────────
+//
+// npm package names and versions are interpolated into remote shell scripts
+// executed via SSH.  An allowlist approach is strictly safer than a denylist:
+// only characters known to be valid in npm identifiers / semver strings are
+// permitted, making the entire class of shell-injection attacks impossible.
+
+/** Allowlist for unscoped npm package names (e.g. "loop-task", "opencode"). */
+const NPM_PKG_UNSCOPED_RE = /^[a-z0-9][-a-z0-9]*$/;
+
 /**
- * Validate that no NPM_PACKAGES entry uses `version: "latest"`.
- * Unversioned installs are a supply-chain attack vector on remote VMs.
- * This guard fails fast at startup rather than silently emitting insecure commands.
+ * Allowlist for scoped npm package names (e.g. "@anthropic-ai/claude-code",
+ * "@atlassian/acli").  The scope and package parts each follow the same
+ * character rules as unscoped names.
+ */
+const NPM_PKG_SCOPED_RE = /^@[a-z0-9][-a-z0-9]*\/[a-z0-9][-a-z0-9]*$/;
+
+/**
+ * Allowlist for semver version strings with optional prerelease tag
+ * (e.g. "2.2.2", "1.0.0-beta.1").  Must NOT match "latest" or any value
+ * containing shell metacharacters.
+ */
+const NPM_VERSION_RE = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/;
+
+/**
+ * Validate that an npm package name and version contain only characters that
+ * are safe for shell interpolation.  Uses an allowlist approach: only
+ * characters valid in npm package names and semver strings are permitted.
  *
- * @throws {Error} if any entry has version "latest"
+ * This prevents shell-injection attacks where a compromised or typoed
+ * `version` field (e.g. `0.0.0'; rm -rf /; echo ts`) would allow arbitrary
+ * remote command execution on the target VM.
+ *
+ * @throws {Error} if `pkg` or `version` contains disallowed characters
+ */
+export function validateNpmIdentifier(pkg: string, version: string, context?: string): void {
+  const label = context ?? `pkg=${pkg}, version=${version}`;
+
+  if (!(NPM_PKG_UNSCOPED_RE.test(pkg) || NPM_PKG_SCOPED_RE.test(pkg))) {
+    throw new Error(
+      `Shell-unsafe npm package name in ${label} — ` +
+        `only lowercase letters, digits, hyphens, and scoped @scope/name patterns are allowed. ` +
+        `See src/main/verified-install.ts.`,
+    );
+  }
+
+  if (!NPM_VERSION_RE.test(version)) {
+    throw new Error(
+      `Shell-unsafe npm version in ${label} — ` +
+        `only semver strings (e.g. "2.2.2", "1.0.0-beta.1") are allowed; ` +
+        `"latest" and values with shell metacharacters are forbidden. ` +
+        `See src/main/verified-install.ts.`,
+    );
+  }
+}
+
+/**
+ * Validate that no NPM_PACKAGES entry uses unsafe values.
+ * Guards against both unpinned versions ("latest") and shell-injection
+ * characters in package names or versions.  Fails fast at startup rather
+ * than silently emitting insecure commands.
+ *
+ * @throws {Error} if any entry has unsafe `pkg` or `version`
  */
 function validateNpmPackages(): void {
   for (const [key, entry] of Object.entries(NPM_PACKAGES)) {
     // Cast to string to satisfy strict `as const` type narrowing — the guard
     // must still run at runtime in case the const assertion is removed later.
+    const pkg = entry.pkg as string;
     const version = entry.version as string;
-    if (version === "latest") {
-      throw new Error(
-        `NPM_PACKAGES.${key} uses version "latest" — pinned version required for supply-chain safety. ` +
-          `See src/main/verified-install.ts.`,
-      );
-    }
+
+    // Shell-safety allowlist (rejects "latest", injection chars, etc.)
+    validateNpmIdentifier(pkg, version, `NPM_PACKAGES.${key}`);
   }
 }
 
@@ -160,8 +215,16 @@ validateNpmPackages();
  * Build an `npm install -g <pkg>@<version>` string for a pinned package.
  * This ensures every npm global install uses an explicit version specifier,
  * preventing supply-chain attacks via registry compromise.
+ *
+ * The `pkg` and `version` values are validated against a safe-character
+ * allowlist before interpolation to prevent shell injection via SSH.
+ *
+ * @throws {Error} if `pkg` or `version` contains shell-unsafe characters
  */
 export function pinnedNpmInstall(key: keyof typeof NPM_PACKAGES): string {
   const { pkg, version } = NPM_PACKAGES[key];
+  // Defense in depth: validate again at call time in case a future caller
+  // bypasses the module-load guard or passes dynamic input.
+  validateNpmIdentifier(pkg, version, `NPM_PACKAGES.${key}`);
   return `npm install -g ${pkg}@${version}`;
 }
