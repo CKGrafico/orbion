@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -34,6 +34,9 @@ import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
 import { SessionChatView } from "./components/SessionChatView";
+import { ModelSelector, getReasoningEffortsForModel } from "./components/ModelSelector";
+import { ReasoningEffortSelector } from "./components/ReasoningEffortSelector";
+import type { IAgentService } from "./services/interfaces";
 
 type View =
   | { kind: "inbox" }
@@ -82,6 +85,7 @@ export function App(): React.ReactNode {
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
+  const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [wizardSeed, setWizardSeed] = useState<BootstrapSeed | null>(null);
@@ -112,11 +116,32 @@ export function App(): React.ReactNode {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   /** All chat sessions — loaded from config store for header rendering */
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  /** Models per environment (keyed by environmentId) */
+  const [envModels, setEnvModels] = useState<Record<string, ModelInfo[]>>({});
 
   // Load sessions on mount and when activeSessionId changes
   useEffect(() => {
     void configService.getChatSessions().then((s) => setSessions(s));
   }, [configService, activeSessionId]);
+
+  // Load models for the active session's environment
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const session = sessions.find((s) => s.id === activeSessionId);
+    if (!session) return;
+    const envId = session.environmentId;
+    if (envModels[envId]) return; // already loaded
+    let cancelled = false;
+    void agentService.listModels(envId).then((result) => {
+      if (cancelled) return;
+      if (result.ok && result.models) {
+        setEnvModels((prev) =>
+          prev[envId] ? prev : { ...prev, [envId]: result.models! },
+        );
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activeSessionId, sessions, agentService, envModels]);
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -681,6 +706,48 @@ export function App(): React.ReactNode {
     void configService.getChatSessions().then((s) => setSessions(s));
   }, [sessions, configService, transcriptService, intl]);
 
+  /** Handle model switch in a chat session: persist the change and add a transcript note. */
+  const handleModelSwitch = useCallback((sessionId: string, newModelId: string): void => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session || session.activeModel === newModelId) return;
+
+    // Find the model label from envModels
+    const sessionModels = envModels[session.environmentId] ?? [];
+    const model = sessionModels.find((m) => m.id === newModelId);
+    const modelLabel = model?.label ?? newModelId;
+
+    // Persist the model change; clear reasoning effort if the new model doesn't support the current one
+    const newModelEfforts = model?.reasoningEfforts;
+    const currentEffort = session.reasoningEffort;
+    const shouldClearEffort = currentEffort && newModelEfforts && !newModelEfforts.includes(currentEffort);
+    const updates: Partial<Pick<ChatSession, "activeModel" | "reasoningEffort">> = { activeModel: newModelId };
+    if (shouldClearEffort) {
+      updates.reasoningEffort = undefined;
+    }
+    void configService.updateChatSession(sessionId, updates);
+    // Add a transcript note about the switch
+    void transcriptService.appendMessage({
+      id: `model-switch-${Date.now()}`,
+      sessionId,
+      role: "assistant",
+      content: intl.formatMessage({ id: "modelSelector.switchedModel" }, { model: modelLabel }),
+      startedAt: Date.now(),
+      finishedAt: Date.now(),
+    });
+    // Refresh sessions in local state
+    void configService.getChatSessions().then((s) => setSessions(s));
+  }, [sessions, configService, transcriptService, intl, envModels]);
+
+  /** Handle reasoning effort change in a chat session: persist the change. */
+  const handleReasoningEffortChange = useCallback((sessionId: string, effort: ReasoningEffort): void => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session || session.reasoningEffort === effort) return;
+
+    void configService.updateChatSession(sessionId, { reasoningEffort: effort });
+    // Refresh sessions in local state
+    void configService.getChatSessions().then((s) => setSessions(s));
+  }, [sessions, configService]);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -789,6 +856,8 @@ export function App(): React.ReactNode {
             sessionId={view.sessionId}
             environmentId={session?.environmentId ?? selected?.id ?? ""}
             activeRuntime={session?.activeRuntime ?? "opencode"}
+            model={session?.activeModel}
+            reasoningEffort={session?.reasoningEffort}
           />
         );
       }
@@ -845,6 +914,9 @@ export function App(): React.ReactNode {
         const instanceDefault = sessionEnv?.agentRuntime ?? "opencode";
         const sessionReachability = reachability[session.environmentId];
         const sessionRuntimeState = sessionEnv?.runtimeState;
+        // Resolve model and reasoning effort for this session
+        const sessionModels = envModels[session.environmentId] ?? [];
+        const reasoningEfforts = getReasoningEffortsForModel(sessionModels, session.activeModel);
         return (
           <div className="main-header">
             <span className="dot" style={{ background: projectColor }} />
@@ -861,6 +933,18 @@ export function App(): React.ReactNode {
               runtimeState={sessionRuntimeState}
               onChange={(runtime) => handleRuntimeSwitch(session.id, runtime)}
             />
+            <ModelSelector
+              environmentId={session.environmentId}
+              value={session.activeModel}
+              onChange={(modelId) => handleModelSwitch(session.id, modelId)}
+            />
+            {reasoningEfforts ? (
+              <ReasoningEffortSelector
+                value={session.reasoningEffort}
+                efforts={reasoningEfforts}
+                onChange={(effort) => handleReasoningEffortChange(session.id, effort)}
+              />
+            ) : null}
             <span style={{ flex: 1 }} />
           </div>
         );
@@ -1082,6 +1166,9 @@ export function App(): React.ReactNode {
                       // Derive the default runtime from the environment
                       const env = environments.find((e) => e.id === environmentId);
                       const defaultRuntime = env?.agentRuntime ?? "opencode";
+                      // Pick the first available model from envModels
+                      const envModelList = envModels[environmentId] ?? [];
+                      const defaultModel = envModelList.find((m) => m.available)?.id;
                       void configService
                         .addChatSession({
                           title: `Project: ${projectName}`,
@@ -1089,6 +1176,7 @@ export function App(): React.ReactNode {
                           environmentId,
                           workingDirectory,
                           activeRuntime: defaultRuntime,
+                          activeModel: defaultModel,
                           lastActiveAt: new Date().toISOString(),
                         })
                         .then((newSession) => {

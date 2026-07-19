@@ -1,6 +1,6 @@
-import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState } from "../../shared/ipc";
+import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult } from "../../shared/ipc";
 
-export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState };
+export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult };
 
 export type LoopStatus = "running" | "waiting" | "paused" | "idle" | "stopped";
 

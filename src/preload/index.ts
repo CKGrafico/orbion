@@ -43,6 +43,7 @@ import type {
   AgentStreamEvent,
   ConfigStamp,
   StampCheckedWriteResult,
+  ListModelsResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -102,7 +103,7 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:addChatSession", session) as Promise<ChatSession>,
     removeChatSession: (sessionId: string) =>
       ipcRenderer.invoke("config:removeChatSession", sessionId) as Promise<void>,
-    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>) =>
+    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort">>) =>
       ipcRenderer.invoke("config:updateChatSession", sessionId, updates) as Promise<void>,
     getExpandedProjects: () =>
       ipcRenderer.invoke("config:getExpandedProjects") as Promise<string[]>,
@@ -388,6 +389,8 @@ const bridge: LoopTaskBridge = {
         ipcRenderer.removeListener("agent:streamEvent", listener);
       };
     },
+    listModels: (environmentId: string) =>
+      ipcRenderer.invoke("agent:listModels", environmentId) as Promise<ListModelsResult>,
   },
 };
 

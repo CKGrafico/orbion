@@ -134,6 +134,7 @@ import {
   removeMcpSession,
 } from "./mcp-client.js";
 import { sendPromptToAgent, interruptAgent } from "./agent-client.js";
+import { listModelsForEnvironment } from "./agent-models.js";
 import type { AgentSendPromptArgs } from "../shared/ipc.js";
 
 const streams = new Map<string, AbortController>();
@@ -887,7 +888,7 @@ app.whenReady().then(() => {
   });
 
   safeHandle("config:updateChatSession", async (_event, ...rawArgs) => {
-    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>]>("config:updateChatSession", rawArgs);
+    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort">>]>("config:updateChatSession", rawArgs);
     await updateChatSession(sessionId, updates);
   });
 
@@ -1613,6 +1614,11 @@ app.whenReady().then(() => {
   safeHandle("agent:interrupt", async (_event, ...rawArgs) => {
     const [environmentId, sessionId] = validateIpc<[string, string | undefined]>("agent:interrupt", rawArgs);
     return interruptAgent(environmentId, sessionId);
+  });
+
+  safeHandle("agent:listModels", async (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>("agent:listModels", rawArgs);
+    return listModelsForEnvironment(environmentId);
   });
 
   // Prune old breaches on startup

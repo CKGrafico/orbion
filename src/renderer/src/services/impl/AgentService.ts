@@ -1,5 +1,5 @@
 import { injectable } from "inversify-hooks";
-import type { AgentSendPromptArgs, AgentSendPromptResult, AgentStreamEvent } from "../../../../shared/ipc";
+import type { AgentSendPromptArgs, AgentSendPromptResult, AgentStreamEvent, ListModelsResult } from "../../../../shared/ipc";
 import type { IAgentService } from "../interfaces";
 
 @injectable()
@@ -18,5 +18,9 @@ export class AgentService implements IAgentService {
 
   onStreamEvent(cb: (event: AgentStreamEvent) => void): () => void {
     return this.api.onStreamEvent(cb);
+  }
+
+  async listModels(environmentId: string): Promise<ListModelsResult> {
+    return this.api.listModels(environmentId);
   }
 }

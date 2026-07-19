@@ -129,6 +129,12 @@ export async function sendPromptToAgent(
     if (args.sessionId) {
       promptBody.sessionID = args.sessionId;
     }
+    if (args.model) {
+      promptBody.model = args.model;
+    }
+    if (args.reasoningEffort) {
+      promptBody.reasoningEffort = args.reasoningEffort;
+    }
 
     const promptTimeout = setTimeout(() => controller.abort(), PROMPT_TIMEOUT_MS);
 

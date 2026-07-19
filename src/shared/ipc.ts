@@ -72,6 +72,32 @@ export type AgentRuntime = "opencode" | "claude";
 
 export type RuntimeState = "available" | "unavailable" | "unknown";
 
+/** A reasoning effort level supported by a model. */
+export type ReasoningEffort = "low" | "medium" | "high";
+
+/** A model offered by a runtime adapter, with availability metadata. */
+export interface ModelInfo {
+  /** Unique model identifier (e.g. "openai/gpt-4o", "anthropic/claude-3.5-sonnet"). */
+  id: string;
+  /** Human-readable display name. */
+  label: string;
+  /** The provider or runtime family (e.g. "openai", "anthropic"). */
+  provider: string;
+  /** Whether this model can currently be used. */
+  available: boolean;
+  /** Human-readable reason if unavailable. */
+  unavailableReason?: string;
+  /** Reasoning effort levels this model supports (empty if unsupported). */
+  reasoningEfforts?: ReasoningEffort[];
+}
+
+/** Result of listing models from a runtime adapter. */
+export interface ListModelsResult {
+  ok: boolean;
+  models?: ModelInfo[];
+  error?: string | I18nMessage;
+}
+
 export interface EnvironmentCredentialRefs {
   sessionToken?: string;
   sshKeyPassphrase?: string;
@@ -171,7 +197,7 @@ export interface ConfigBridge {
   getChatSessions: () => Promise<ChatSession[]>;
   addChatSession: (session: Omit<ChatSession, "id" | "createdAt">) => Promise<ChatSession>;
   removeChatSession: (sessionId: string) => Promise<void>;
-  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>) => Promise<void>;
+  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort">>) => Promise<void>;
   getExpandedProjects: () => Promise<string[]>;
   setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
   exportBootstrapSeed: () => Promise<BootstrapSeedExportResult>;
@@ -745,6 +771,10 @@ export interface ChatSession {
   workingDirectory: string;
   /** The agent runtime currently active for this session. Defaults to the environment's agentRuntime. */
   activeRuntime: AgentRuntime;
+  /** The model ID currently selected for this session (e.g. "openai/gpt-4o"). Undefined means use runtime default. */
+  activeModel?: string;
+  /** The reasoning effort level for this session. Undefined means use model default. */
+  reasoningEffort?: ReasoningEffort;
   /** ISO timestamp of last activity in this session. */
   lastActiveAt: string;
   /** ISO timestamp when the session was created. */
@@ -881,6 +911,10 @@ export interface AgentSendPromptArgs {
   chatSessionId: string;
   /** The Orbion turn ID for correlating stream events. */
   turnId: string;
+  /** The model to use for this prompt (e.g. "openai/gpt-4o"). */
+  model?: string;
+  /** The reasoning effort level for this prompt. */
+  reasoningEffort?: ReasoningEffort;
 }
 
 /** A single streaming event from the agent runtime. */
@@ -907,6 +941,8 @@ export interface AgentBridge {
   interrupt: (environmentId: string, sessionId?: string) => Promise<void>;
   /** Subscribe to agent streaming events. */
   onStreamEvent: (cb: (event: AgentStreamEvent) => void) => () => void;
+  /** List available models from the runtime adapter for an environment. */
+  listModels: (environmentId: string) => Promise<ListModelsResult>;
 }
 
 // ── Full IPC bridge ─────────────────────────────────────────────────

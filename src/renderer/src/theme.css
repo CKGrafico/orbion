@@ -255,6 +255,111 @@ input {
   opacity: 1;
 }
 
+/* ── Model selector ──────────────────────────────────────────────── */
+
+.model-selector-wrapper {
+  position: relative;
+  margin: 2px;
+}
+
+.model-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--bg-segment);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.model-selector-trigger:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.model-selector-arrow {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.model-selector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  padding: 4px 0;
+}
+
+.model-selector-group-label {
+  padding: 6px 12px 4px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.model-selector-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  border: none;
+  background: none;
+  transition: background 0.1s;
+}
+
+.model-selector-option:hover {
+  background: var(--bg-hover);
+}
+
+.model-selector-option.selected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.model-selector-option.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.model-selector-option.disabled:hover {
+  background: none;
+}
+
+.model-selector-option-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-selector-option-reason {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
 /* ── Sidebar ────────────────────────────────────────────────────── */
 
 .sidebar {

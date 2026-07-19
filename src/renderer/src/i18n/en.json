@@ -696,5 +696,17 @@
     "userInitials": "You",
     "viewTitle": "Chat Session",
     "viewDescription": "Start a conversation with the agent by typing below."
+  },
+  "modelSelector": {
+    "selectModel": "Select model",
+    "unavailable": "unavailable",
+    "unavailableReason": "{model} is not available: {reason}",
+    "switchedModel": "Switched model to {model}. Next message will use {model}."
+  },
+  "reasoningEffort": {
+    "label": "Reasoning effort",
+    "low": "Low",
+    "medium": "Med",
+    "high": "High"
   }
 }

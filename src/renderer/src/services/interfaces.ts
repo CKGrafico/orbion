@@ -47,6 +47,7 @@ import type {
   AgentStreamEvent,
   ConfigStamp,
   StampCheckedWriteResult,
+  ListModelsResult,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -70,7 +71,7 @@ export interface IConfigService {
   getChatSessions(): Promise<ChatSession[]>;
   addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession>;
   removeChatSession(sessionId: string): Promise<void>;
-  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>): Promise<void>;
+  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort">>): Promise<void>;
   getExpandedProjects(): Promise<string[]>;
   setExpandedProjects(expandedKeys: string[]): Promise<void>;
   exportBootstrapSeed(): Promise<BootstrapSeedExportResult>;
@@ -223,4 +224,6 @@ export interface IAgentService {
   interrupt(environmentId: string, sessionId?: string): Promise<void>;
   /** Subscribe to agent streaming events. */
   onStreamEvent(cb: (event: AgentStreamEvent) => void): () => void;
+  /** List available models from the runtime adapter for an environment. */
+  listModels(environmentId: string): Promise<ListModelsResult>;
 }

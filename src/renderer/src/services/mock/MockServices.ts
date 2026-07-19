@@ -46,6 +46,8 @@ import type {
   AgentStreamEvent,
   ConfigStamp,
   StampCheckedWriteResult,
+  ModelInfo,
+  ListModelsResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -116,11 +118,11 @@ const MOCK_TASKS: TaskDefinition[] = [
 ];
 
 const MOCK_CHAT_SESSIONS: ChatSession[] = [
-  { id: "session-1", title: "Build pipeline setup", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
-  { id: "session-2", title: "Fix flaky tests", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
-  { id: "session-3", title: "ETL data migration", projectName: "ETL", environmentId: "mock-env-1", workingDirectory: "/home/user/etl-pipeline", activeRuntime: "opencode", lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
-  { id: "session-4", title: "Agent code review", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
-  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
+  { id: "session-1", title: "Build pipeline setup", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", activeModel: "openai/gpt-4o", reasoningEffort: "medium", lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
+  { id: "session-2", title: "Fix flaky tests", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", activeModel: "openai/gpt-4o", lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
+  { id: "session-3", title: "ETL data migration", projectName: "ETL", environmentId: "mock-env-1", workingDirectory: "/home/user/etl-pipeline", activeRuntime: "opencode", activeModel: "openai/o3-mini", reasoningEffort: "high", lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
+  { id: "session-4", title: "Agent code review", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-sonnet", reasoningEffort: "high", lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
+  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-haiku", lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
 ];
 
 function mockRequest<T>(path: string): Promise<ApiResponse<T>> {
@@ -268,7 +270,7 @@ export class MockConfigService implements IConfigService {
     const filtered = sessions.filter((s) => s.id !== sessionId);
     try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(filtered)); } catch { /* empty */ }
   }
-  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>): Promise<void> {
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort">>): Promise<void> {
     const sessions = await this.getChatSessions();
     const idx = sessions.findIndex((s) => s.id === sessionId);
     if (idx >= 0) {
@@ -1104,5 +1106,30 @@ export class MockAgentService implements IAgentService {
     for (const listener of this.streamListeners) {
       listener(event);
     }
+  }
+
+  async listModels(environmentId: string): Promise<ListModelsResult> {
+    // Return a realistic mock model catalog
+    const envs = await new MockConfigService().getEnvironments();
+    const env = envs.find((e) => e.id === environmentId);
+    const isClaude = env?.agentRuntime === "claude";
+
+    if (isClaude) {
+      const models: ModelInfo[] = [
+        { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet", provider: "anthropic", available: true, reasoningEfforts: ["low", "medium", "high"] },
+        { id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku", provider: "anthropic", available: true, reasoningEfforts: ["low", "medium"] },
+        { id: "anthropic/claude-3-opus", label: "Claude 3 Opus", provider: "anthropic", available: false, unavailableReason: "Not configured for this instance", reasoningEfforts: ["low", "medium", "high"] },
+      ];
+      return { ok: true, models };
+    }
+
+    const models: ModelInfo[] = [
+      { id: "openai/gpt-4o", label: "GPT-4o", provider: "openai", available: true, reasoningEfforts: ["low", "medium", "high"] },
+      { id: "openai/gpt-4o-mini", label: "GPT-4o Mini", provider: "openai", available: true, reasoningEfforts: [] },
+      { id: "openai/o1", label: "o1", provider: "openai", available: true, reasoningEfforts: ["low", "medium", "high"] },
+      { id: "openai/o3-mini", label: "o3-mini", provider: "openai", available: true, reasoningEfforts: ["low", "medium", "high"] },
+      { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet", provider: "anthropic", available: false, unavailableReason: "Missing API key", reasoningEfforts: ["low", "medium", "high"] },
+    ];
+    return { ok: true, models };
   }
 }

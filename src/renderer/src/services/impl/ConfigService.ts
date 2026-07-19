@@ -80,7 +80,7 @@ export class ConfigService implements IConfigService {
   async removeChatSession(sessionId: string): Promise<void> {
     return this.api.removeChatSession(sessionId);
   }
-  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime">>): Promise<void> {
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort">>): Promise<void> {
     return this.api.updateChatSession(sessionId, updates);
   }
   async getExpandedProjects(): Promise<string[]> {

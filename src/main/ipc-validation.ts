@@ -624,6 +624,12 @@ const validators: Record<string, Validator> = {
     if (args[1] !== undefined && !isString(args[1])) issues.push("sessionId must be a string if provided");
     return issues;
   },
+
+  "agent:listModels": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
 };
 
 // ── Structured IPC error result ───────────────────────────────────────

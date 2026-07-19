@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall } from "../chat/types";
-import type { AgentStreamEvent } from "../../../shared/ipc";
+import type { AgentStreamEvent, ReasoningEffort } from "../../../shared/ipc";
 import type { IAgentService, ITranscriptService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
@@ -18,9 +18,11 @@ interface SessionChatViewProps {
   sessionId: string;
   environmentId: string;
   activeRuntime: string;
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
-export function SessionChatView({ sessionId, environmentId, activeRuntime }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, activeRuntime, model, reasoningEffort }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -171,6 +173,8 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime }: Ses
           sessionId: opencodeSessionId,
           chatSessionId: sessionId,
           turnId,
+          model,
+          reasoningEffort,
         })
         .then((result) => {
           if (result.ok && result.sessionId) {
@@ -185,7 +189,7 @@ export function SessionChatView({ sessionId, environmentId, activeRuntime }: Ses
           }
         });
     },
-    [accessMode, addTurn, agentService, appendAssistantContent, environmentId, finishTurn, intl, opencodeSessionId, sessionId],
+    [accessMode, addTurn, agentService, appendAssistantContent, environmentId, finishTurn, intl, opencodeSessionId, sessionId, model, reasoningEffort],
   );
 
   // ── Interrupt handler ───────────────────────────────────────────────
