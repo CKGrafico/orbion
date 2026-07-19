@@ -380,6 +380,42 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
+  "config:getChatSessions": () => [],
+
+  "config:addChatSession": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) {
+      issues.push("session must be an object");
+      return issues;
+    }
+    const s = args[0] as Record<string, unknown>;
+    if (!isNonEmptyString(s.title)) issues.push("title must be a non-empty string");
+    if (!isNonEmptyString(s.projectName)) issues.push("projectName must be a non-empty string");
+    if (!isNonEmptyString(s.lastActiveAt)) issues.push("lastActiveAt must be a non-empty string");
+    return issues;
+  },
+
+  "config:removeChatSession": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
+    return issues;
+  },
+
+  "config:updateChatSession": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
+    if (!isObject(args[1])) issues.push("updates must be an object");
+    return issues;
+  },
+
+  "config:getExpandedProjects": () => [],
+
+  "config:setExpandedProjects": (args) => {
+    const issues: string[] = [];
+    if (!Array.isArray(args[0])) issues.push("expandedKeys must be an array");
+    return issues;
+  },
+
   // ── Infra ───────────────────────────────────────────────
   "infra:executeAction": (args) => {
     const issues: string[] = [];

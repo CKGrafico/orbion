@@ -86,7 +86,9 @@
     "projectHasFailure": "A loop in this project has failed",
     "instanceCount": "{count} instances",
     "loopCount": "{count} loops",
-    "loopUnknown": "unknown"
+    "loopUnknown": "unknown",
+    "sessionCount": "{count} sessions",
+    "sessionActive": "active"
   },
   "vmWizard": {
     "stepPickReachMethod": "Choose reach method",
@@ -602,5 +604,9 @@
     "daemonDownReason": "Daemon is not connected",
     "versionTooOldReason": "Runtime version is too old",
     "unknownReason": "{label} status unknown"
+  },
+  "session": {
+    "viewTitle": "Chat session",
+    "viewDescription": "Chat with the AI agent about this project's tasks and loops."
   }
 }

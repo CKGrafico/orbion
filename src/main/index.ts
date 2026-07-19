@@ -74,6 +74,12 @@ import {
   pruneResolvedItems,
   getProjectPickupLabels,
   setProjectPickupLabels,
+  getChatSessions,
+  addChatSession,
+  removeChatSession,
+  updateChatSession,
+  getExpandedProjects,
+  setExpandedProjects,
 } from "./config-store.js";
 import {
   ConnectionSupervisor,
@@ -873,6 +879,34 @@ app.whenReady().then(() => {
   safeHandle("config:setProjectPickupLabels", async (_event, ...rawArgs) => {
     const [projectId, labels] = validateIpc<[string, string[]]>("config:setProjectPickupLabels", rawArgs);
     await setProjectPickupLabels(projectId, labels);
+  });
+
+  safeHandle("config:getChatSessions", () => {
+    return getChatSessions();
+  });
+
+  safeHandle("config:addChatSession", async (_event, ...rawArgs) => {
+    const [session] = validateIpc<[Omit<import("../shared/ipc").ChatSession, "id" | "createdAt">]>("config:addChatSession", rawArgs);
+    return addChatSession(session);
+  });
+
+  safeHandle("config:removeChatSession", async (_event, ...rawArgs) => {
+    const [sessionId] = validateIpc<[string]>("config:removeChatSession", rawArgs);
+    await removeChatSession(sessionId);
+  });
+
+  safeHandle("config:updateChatSession", async (_event, ...rawArgs) => {
+    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt">>]>("config:updateChatSession", rawArgs);
+    await updateChatSession(sessionId, updates);
+  });
+
+  safeHandle("config:getExpandedProjects", () => {
+    return getExpandedProjects();
+  });
+
+  safeHandle("config:setExpandedProjects", async (_event, ...rawArgs) => {
+    const [expandedKeys] = validateIpc<[string[]]>("config:setExpandedProjects", rawArgs);
+    await setExpandedProjects(expandedKeys);
   });
 
   safeHandle("infra:executeAction", async (_event, ...rawArgs): Promise<InfraActionResult> => {

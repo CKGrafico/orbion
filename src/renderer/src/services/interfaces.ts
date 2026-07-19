@@ -34,6 +34,7 @@ import type {
   NotificationSendArgs,
   OutageEscalation,
   ReachabilityStatus,
+  ChatSession,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -54,6 +55,12 @@ export interface IConfigService {
   getMainVmId(): Promise<string | null>;
   getProjectPickupLabels(projectId: string): Promise<string[]>;
   setProjectPickupLabels(projectId: string, labels: string[]): Promise<void>;
+  getChatSessions(): Promise<ChatSession[]>;
+  addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession>;
+  removeChatSession(sessionId: string): Promise<void>;
+  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>): Promise<void>;
+  getExpandedProjects(): Promise<string[]>;
+  setExpandedProjects(expandedKeys: string[]): Promise<void>;
 }
 
 export interface IConnectionService {

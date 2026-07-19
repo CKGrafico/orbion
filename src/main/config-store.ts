@@ -1,6 +1,6 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
-import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState } from "../shared/ipc.js";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { getCredential, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
@@ -44,6 +44,8 @@ interface ConfigSchema {
   inboxDismissedIds: string[];
   inboxResolvedItems: ResolvedInboxItem[];
   projectPickupLabels: Record<string, string[]>;
+  chatSessions: ChatSession[];
+  expandedProjects: string[];
   [key: string]: unknown;
 }
 
@@ -60,6 +62,8 @@ const store = new Store<ConfigSchema>({
     inboxDismissedIds: [],
     inboxResolvedItems: [],
     projectPickupLabels: {},
+    chatSessions: [],
+    expandedProjects: [],
   },
 });
 
@@ -921,4 +925,58 @@ export function decryptValue(encryptedBase64: string): string | null {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Chat sessions — persisted in config store
+// ---------------------------------------------------------------------------
+
+export function getChatSessions(): ChatSession[] {
+  return store.get("chatSessions", []);
+}
+
+export async function addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession> {
+  return serialize(() => {
+    const sessions = store.get("chatSessions", []);
+    const newSession: ChatSession = {
+      ...session,
+      id: `session-${crypto.randomUUID()}`,
+      createdAt: new Date().toISOString(),
+    };
+    sessions.push(newSession);
+    store.set("chatSessions", sessions);
+    return newSession;
+  });
+}
+
+export function removeChatSession(sessionId: string): void {
+  void serialize(() => {
+    const sessions = store.get("chatSessions", []);
+    store.set("chatSessions", sessions.filter((s) => s.id !== sessionId));
+  });
+}
+
+export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>): void {
+  void serialize(() => {
+    const sessions = store.get("chatSessions", []);
+    const idx = sessions.findIndex((s) => s.id === sessionId);
+    if (idx >= 0) {
+      sessions[idx] = { ...sessions[idx], ...updates };
+      store.set("chatSessions", sessions);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Expanded project state — persisted in config store
+// ---------------------------------------------------------------------------
+
+export function getExpandedProjects(): string[] {
+  return store.get("expandedProjects", []);
+}
+
+export function setExpandedProjects(expandedKeys: string[]): void {
+  void serialize(() => {
+    store.set("expandedProjects", expandedKeys);
+  });
 }

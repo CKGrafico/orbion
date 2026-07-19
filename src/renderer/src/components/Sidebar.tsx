@@ -1,20 +1,24 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useIntl, type IntlShape } from "react-intl";
-import type { ConnectionStatus, ReachabilityState } from "../../../shared/ipc";
+import type { ChatSession, ConnectionStatus, ReachabilityState } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
-import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox } from "lucide-react";
+import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox, MessageSquare } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
 import { FleetHealthFooter } from "./FleetHealthFooter";
 import { translateMessage } from "../i18n";
+import { timeAgo } from "../format";
+import { cid, useInject } from "inversify-hooks";
+import type { IConfigService } from "../services/interfaces";
 
 type View =
   | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
-  | { kind: "loop"; loopId: string };
+  | { kind: "loop"; loopId: string }
+  | { kind: "session"; sessionId: string };
 
 /** Key for a merged project node — deduped by project name */
 function mergedProjectKey(projectName: string): string {
@@ -127,21 +131,50 @@ export function Sidebar(props: {
   onNavigateToProject?: (envId: string, projectId: string) => void;
   /** Navigate to the inbox view. */
   onNavigateToInbox?: () => void;
+  /** Navigate to a specific chat session. */
+  onNavigateToSession?: (sessionId: string) => void;
+  /** The currently active session id, if any. */
+  activeSessionId?: string | null;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
-    reachability, mainVmId,
+    reachability, mainVmId, onNavigateToSession, activeSessionId,
   } = props;
   const intl = useIntl();
+  const [configService] = useInject<IConfigService>(cid.IConfigService);
 
   // Text search filter
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Track which project nodes are expanded
+  // Track which project nodes are expanded — persisted across restarts
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const expandedPersisted = useRef(false);
+
+  // Load expanded project state from config store on mount
+  useEffect(() => {
+    if (expandedPersisted.current) return;
+    expandedPersisted.current = true;
+    void configService.getExpandedProjects().then((keys) => {
+      if (keys.length > 0) {
+        setExpandedProjects(new Set(keys));
+      }
+    });
+  }, [configService]);
+
+  // Chat sessions — loaded from config store
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const sessionsLoaded = useRef(false);
+
+  useEffect(() => {
+    if (sessionsLoaded.current) return;
+    sessionsLoaded.current = true;
+    void configService.getChatSessions().then((s) => {
+      setSessions(s);
+    });
+  }, [configService]);
 
   // Build merged project node list — one entry per project NAME across all instances.
   // Same-name projects on different instances merge into a single sidebar row.
@@ -227,49 +260,74 @@ export function Sidebar(props: {
     return [...byName.values()];
   }, [environments, perEnvProjects, perEnvLoops, mainVmId]);
 
+  // Group sessions by project name
+  const sessionsByProject = useMemo(() => {
+    const map = new Map<string, ChatSession[]>();
+    for (const session of sessions) {
+      const existing = map.get(session.projectName) ?? [];
+      existing.push(session);
+      map.set(session.projectName, existing);
+    }
+    // Sort sessions within each project by lastActiveAt (newest first)
+    for (const [key, list] of map) {
+      list.sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime());
+      map.set(key, list);
+    }
+    return map;
+  }, [sessions]);
+
   // Filter by search query
   const filteredNodes = useMemo(() => {
     if (!searchQuery.trim()) return projectNodes;
     const q = searchQuery.toLowerCase();
     return projectNodes.filter((node) => {
-      // Match project name, instance name, or any loop description
+      // Match project name, instance name, or any loop description, or session title
       if (node.projectName.toLowerCase().includes(q)) return true;
       if (node.instances.some((inst) => inst.envName.toLowerCase().includes(q))) return true;
       if (node.allLoops.some((l) => (l.description || l.id).toLowerCase().includes(q))) return true;
+      const projSessions = sessionsByProject.get(node.projectName) ?? [];
+      if (projSessions.some((s) => s.title.toLowerCase().includes(q))) return true;
       return false;
     });
-  }, [projectNodes, searchQuery]);
+  }, [projectNodes, searchQuery, sessionsByProject]);
 
   const toggleProject = useCallback((key: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      // Persist expanded state to config store
+      void configService.setExpandedProjects([...next]);
       return next;
     });
-  }, []);
+  }, [configService]);
 
   // Determine which environment is "selected" for a given merged project node.
-  // A merged project is selected if the current view is a project with a matching
-  // name, or if any child loop on the selected instance is active.
   const isProjectSelected = (node: MergedProjectNode): boolean => {
     if (view.kind === "project") {
-      // Check if any instance in this merged node has the selected project
       return node.instances.some(
         (inst) => inst.envId === selectedId && inst.projectId === view.projectId,
       );
     }
     if (view.kind === "loop") {
-      // Also selected if any child loop belongs to the selected instance
       return node.allLoops.some(
         (l) => l.id === view.loopId && node.instances.some((inst) => inst.envId === selectedId && inst.loops.some((il) => il.id === l.id)),
       );
+    }
+    // Also selected if any child session is active
+    if (view.kind === "session") {
+      const projSessions = sessionsByProject.get(node.projectName) ?? [];
+      return projSessions.some((s) => s.id === activeSessionId);
     }
     return false;
   };
 
   const isLoopSelected = (loopId: string): boolean => {
     return view.kind === "loop" && view.loopId === loopId;
+  };
+
+  const isSessionSelected = (sessionId: string): boolean => {
+    return view.kind === "session" && sessionId === activeSessionId;
   };
 
   // Total visible project count
@@ -339,7 +397,7 @@ export function Sidebar(props: {
         </button>
       </div>
 
-      {/* 2-level tree: Merged project > Loop */}
+      {/* 2-level tree: Merged project > Sessions (and optionally loops) */}
       <div className="sidebar-list">
         {filteredNodes.length === 0 ? (
           <div className="sidebar-empty">
@@ -351,7 +409,8 @@ export function Sidebar(props: {
           filteredNodes.map((node) => {
             const projectExpanded = expandedProjects.has(node.key);
             const projectSelected = isProjectSelected(node);
-            const hasChildren = node.allLoops.length > 0;
+            const projSessions = sessionsByProject.get(node.projectName) ?? [];
+            const hasChildren = projSessions.length > 0 || node.allLoops.length > 0;
             const instanceCount = node.instances.length;
 
             // Pick the primary instance for this merged project:
@@ -394,16 +453,44 @@ export function Sidebar(props: {
                       {instanceCount}
                     </span>
                   ) : null}
-                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.loopCount" }, { count: node.allLoops.length })}>
-                    {node.allLoops.length}
+                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.sessionCount" }, { count: projSessions.length })}>
+                    {projSessions.length}
                   </span>
                 </div>
 
-                {/* Loop children (level 1) — grouped by instance when multiple */}
+                {/* Session & loop children — rendered when expanded */}
                 {projectExpanded ? (
                   <div className="tree-children">
+                    {/* Chat sessions as indented rows */}
+                    {projSessions.map((session) => {
+                      const sessionSelected = isSessionSelected(session.id);
+                      const sessionActive = session.id === activeSessionId;
+                      const relativeTime = timeAgo(session.lastActiveAt);
+
+                      return (
+                        <div
+                          key={session.id}
+                          className={`tree-node tree-node-depth-1 tree-session-row${sessionSelected ? " selected" : ""}${sessionActive ? " active-session" : ""}`}
+                          onClick={() => {
+                            onNavigateToSession?.(session.id);
+                          }}
+                          title={session.title}
+                        >
+                          <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
+                          <span className="tree-session-icon">
+                            <MessageSquare size={12} />
+                          </span>
+                          <span className="tree-label">{session.title}</span>
+                          <span className="tree-session-time">{relativeTime}</span>
+                          {sessionActive ? (
+                            <span className="tree-session-active-dot" />
+                          ) : null}
+                        </div>
+                      );
+                    })}
+
+                    {/* Loop children — shown below sessions when multi-instance */}
                     {instanceCount > 1 ? (
-                      // Multi-instance: show instance group headers + loops
                       node.instances.map((inst) => {
                         if (inst.loops.length === 0) return null;
                         const instReachability = reachability?.[inst.envId];
@@ -449,7 +536,7 @@ export function Sidebar(props: {
                         );
                       })
                     ) : (
-                      // Single instance: show loops directly (same as before)
+                      // Single instance: show loops directly below sessions
                       node.allLoops.map((loop) => {
                         const loopSelected = isLoopSelected(loop.id);
                         const loopTitle = loop.description?.trim() || loop.id;

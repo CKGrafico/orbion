@@ -7,6 +7,7 @@ import type {
   PairingCodeExchangeResponse,
   OpenCodeEndpoint,
   SetOpenCodeEndpointResult,
+  ChatSession,
 } from "../../../../shared/ipc";
 import type { IConfigService } from "../interfaces";
 
@@ -63,5 +64,23 @@ export class ConfigService implements IConfigService {
   }
   async setProjectPickupLabels(projectId: string, labels: string[]): Promise<void> {
     return this.api.setProjectPickupLabels(projectId, labels);
+  }
+  async getChatSessions(): Promise<ChatSession[]> {
+    return this.api.getChatSessions();
+  }
+  async addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession> {
+    return this.api.addChatSession(session);
+  }
+  async removeChatSession(sessionId: string): Promise<void> {
+    return this.api.removeChatSession(sessionId);
+  }
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt">>): Promise<void> {
+    return this.api.updateChatSession(sessionId, updates);
+  }
+  async getExpandedProjects(): Promise<string[]> {
+    return this.api.getExpandedProjects();
+  }
+  async setExpandedProjects(expandedKeys: string[]): Promise<void> {
+    return this.api.setExpandedProjects(expandedKeys);
   }
 }
