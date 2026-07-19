@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -81,6 +81,7 @@ export function App(): React.ReactNode {
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
+  const [wizardSeed, setWizardSeed] = useState<BootstrapSeed | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pickMainVmOpen, setPickMainVmOpen] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
@@ -940,7 +941,16 @@ export function App(): React.ReactNode {
       <div className="body">
         {isColdOpen ? (
           <div className="panel main-panel">
-            <ColdOpen onAddVm={() => setVmWizardOpen(true)} />
+            <ColdOpen
+              onAddVm={() => {
+                setWizardSeed(null);
+                setVmWizardOpen(true);
+              }}
+              onImportSeed={(seed) => {
+                setWizardSeed(seed);
+                setVmWizardOpen(true);
+              }}
+            />
           </div>
         ) : (
           <>
@@ -958,7 +968,10 @@ export function App(): React.ReactNode {
                   mainVmId={mainVm?.id ?? null}
                   onSelect={handleSelect}
                   onNavigate={handleNavigate}
-                  onAddVm={() => setVmWizardOpen(true)}
+                  onAddVm={() => {
+                    setWizardSeed(null);
+                    setVmWizardOpen(true);
+                  }}
                   inboxItemCount={inboxItemCount}
                   onNavigateToLoop={(envId, loopId) => {
                     select(envId);
@@ -1029,7 +1042,11 @@ export function App(): React.ReactNode {
       {vmWizardOpen ? (
         <AddVmWizard
           onDone={handleVmWizardDone}
-          onCancel={() => setVmWizardOpen(false)}
+          onCancel={() => {
+            setVmWizardOpen(false);
+            setWizardSeed(null);
+          }}
+          initialSeed={wizardSeed}
         />
       ) : null}
 
