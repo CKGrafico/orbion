@@ -40,7 +40,7 @@ orbion/
 │   │   ├── index.ts            # Electron main: window lifecycle, IPC handlers,
 │   │   │                       #   HTTP proxy, SSE client, bounds persistence
 │   │   ├── http-utils.ts       # Shared fetch + envelope unwrapping (fetchAndUnwrap)
-│   │   ├── config-store.ts     # electron-store config + safeStorage wrapper
+│   │   ├── config-store.ts     # electron-store config + safeStorage wrapper + debounced config-home sync
 │   │   ├── credential-vault.ts # Dedicated safeStorage-encrypted credential records
 │   │   ├── sibling-decline-store.ts # Persistent decline memory for sibling structural offers
 │   │   ├── connection-supervisor.ts  # Periodic health probes + SSE reconnect
@@ -226,7 +226,14 @@ There is no separate server; the **Electron main process is the backend**
   writing, callers compare their last-known stamp against the file's current
   stamp; if stale (config changed on another machine), a warning dialog
   offers pull-remote or overwrite-anyway. Last-write-wins remains the model;
-  this is a guardrail, not a merge system.
+   this is a guardrail, not a merge system.
+   On every stamp bump, a **debounced config-sync writer** (2s) writes the
+   sanitized config to `~/.orbion/config.json` on the designated config-home
+   VM. For SSH endpoints, the write pipes JSON via stdin to `mkdir -p ~/.orbion
+   && cat > ~/.orbion/config.json && chmod 600 ~/.orbion/config.json`. For
+   direct endpoints, the write uses Node.js `fs.writeFileSync` with mode
+   `0o600`. The sync is fire-and-forget with console logging on failure; the
+   next mutation triggers a retry. Loop-task is not involved.
 - **SSH onboarding** (`vm-wizard.ts`, `ssh-probe.ts`, `ssh-launch.ts`, `runtime-adapter.ts`) — after
   SSH authentication, probes Node.js, the `loop-task` command, and daemon state.
   Node.js 20 or newer is required. A missing loop-task command produces an

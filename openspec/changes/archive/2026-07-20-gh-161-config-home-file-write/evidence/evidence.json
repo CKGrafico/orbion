@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-161-config-home-file-write",
+  "required": false,
+  "status": "skipped",
+  "reason": "The change only modifies the main process (config-store.ts) with a debounced background write to ~/.orbion/config.json on the config-home VM. No renderer, UI component, dialog, navigation, or user-visible Electron window behavior is affected. This is purely backend/infrastructure logic.",
+  "assets": [],
+  "prMarkdown": ""
+}
