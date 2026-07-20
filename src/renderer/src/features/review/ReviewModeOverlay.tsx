@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
@@ -6,6 +6,7 @@ import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
 import { GitPullRequest, X, ExternalLink } from "lucide-react";
 import { ReviewQueueStrip } from "./ReviewQueueStrip";
 import { ReviewDiffView } from "./ReviewDiffView";
+import { ReviewBriefingView } from "./ReviewBriefingView";
 
 /** Color class for PR risk level chip (shared with InboxView) */
 function riskChipClass(riskLevel: PrRiskLevel): string {
@@ -16,6 +17,8 @@ function riskChipClass(riskLevel: PrRiskLevel): string {
     case "uncertain": return "pr-risk-chip pr-risk-chip-uncertain";
   }
 }
+
+type ReviewTab = "briefing" | "raw-diff";
 
 export function ReviewModeOverlay(): React.ReactNode {
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
@@ -53,6 +56,7 @@ function ReviewModeContent({
   onExit: () => void;
 }): React.ReactNode {
   const intl = useIntl();
+  const [activeTab, setActiveTab] = useState<ReviewTab>("briefing");
 
   return (
     <div className="review-mode-overlay" role="dialog" aria-label={intl.formatMessage({ id: "reviewMode.dialogLabel" })}>
@@ -83,6 +87,21 @@ function ReviewModeContent({
           </div>
           <div className="review-mode-header-right">
             <div className="review-mode-actions">
+              {/* Tab toggle pill */}
+              <div className="review-mode-tab-toggle">
+                <button
+                  className={`review-mode-tab-btn${activeTab === "briefing" ? " review-mode-tab-btn-active" : ""}`}
+                  onClick={() => setActiveTab("briefing")}
+                >
+                  {intl.formatMessage({ id: "reviewMode.briefing.tabLabel" })}
+                </button>
+                <button
+                  className={`review-mode-tab-btn${activeTab === "raw-diff" ? " review-mode-tab-btn-active" : ""}`}
+                  onClick={() => setActiveTab("raw-diff")}
+                >
+                  {intl.formatMessage({ id: "reviewMode.briefing.rawDiffTab" })}
+                </button>
+              </div>
               <button
                 className="review-mode-action-btn review-mode-action-open"
                 title={intl.formatMessage({ id: "reviewMode.openOnPlatform" })}
@@ -106,7 +125,7 @@ function ReviewModeContent({
         <div className="review-mode-body">
           <ReviewQueueStrip />
           <div className="review-mode-main-area">
-            <ReviewDiffView />
+            {activeTab === "briefing" ? <ReviewBriefingView /> : <ReviewDiffView />}
           </div>
         </div>
       </div>

@@ -7332,6 +7332,285 @@ input {
   opacity: 0.5;
 }
 
+/* ── Review mode tab toggle ──────────────────────────────────────── */
+
+.review-mode-tab-toggle {
+  display: flex;
+  background: var(--bg-segment);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.review-mode-tab-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.review-mode-tab-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.review-mode-tab-btn-active {
+  color: var(--text-primary);
+  background: var(--bg-segment-active);
+}
+
+/* ── Briefing view ──────────────────────────────────────────────── */
+
+.review-briefing-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.review-briefing-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  gap: 8px;
+}
+
+.review-briefing-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--danger);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  gap: 8px;
+}
+
+.review-briefing-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.review-briefing-summary-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.review-briefing-summary-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  line-height: 1.5;
+}
+
+.review-briefing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-briefing-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.review-briefing-section-title {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.review-briefing-section-stats {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* ── Flagged files ──────────────────────────────────────────────── */
+
+.review-briefing-flagged-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-briefing-flagged-file {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.review-briefing-flagged-file-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.review-briefing-flagged-file-header:hover {
+  background: var(--bg-hover);
+}
+
+.review-briefing-flagged-file-toggle {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.review-briefing-flagged-file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.review-briefing-flagged-file-stats {
+  display: flex;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.review-briefing-flagged-file-diff {
+  border-top: 1px solid var(--border-subtle);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ── Boilerplate section ──────────────────────────────────────────── */
+
+.review-briefing-boilerplate {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.review-briefing-boilerplate-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.review-briefing-boilerplate-header:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.review-briefing-boilerplate-toggle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.review-briefing-boilerplate-summary {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.review-briefing-boilerplate-expand {
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  flex-shrink: 0;
+}
+
+.review-briefing-boilerplate-files {
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+}
+
+.review-briefing-boilerplate-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 28px;
+}
+
+.review-briefing-boilerplate-file:hover {
+  background: var(--bg-hover);
+}
+
+.review-briefing-boilerplate-file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.review-briefing-boilerplate-file-stats {
+  display: flex;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.review-briefing-no-flagged {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  gap: 8px;
+}
+
 /* ── Spinner animation ──────────────────────────────────────────── */
 
 @keyframes spin {

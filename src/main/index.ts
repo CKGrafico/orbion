@@ -46,12 +46,14 @@ import type {
   GetPrDiffParams,
   GetPrDiffResult,
   DiffFileEntry,
+  GetPrBriefingParams,
+  GetPrBriefingResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
-import { analyzeDiff } from "./diff-analyzer.js";
+import { analyzeDiff, classifyDiffSections } from "./diff-analyzer.js";
 import { classifyPlatform, parseGitRemoteOutput } from "./platform-classifier.js";
 import {
   getEnvironments,
@@ -1480,6 +1482,9 @@ app.whenReady().then(() => {
       case "get-pr-diff": {
         return handleGetPrDiff(args);
       }
+      case "get-pr-briefing": {
+        return handleGetPrBriefing(args);
+      }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
@@ -1785,6 +1790,62 @@ app.whenReady().then(() => {
           const truncated = Buffer.byteLength(stdout, "utf8") >= MAX_DIFF_BYTES * 0.95;
 
           const result: GetPrDiffResult = { diff: stdout, files, truncated };
+          resolve({ ok: true, data: result });
+        });
+      });
+    });
+  }
+
+  function handleGetPrBriefing(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as GetPrBriefingParams | undefined;
+    const repo = params?.repo;
+    const prNumber = params?.number;
+
+    if (!repo || !prNumber) {
+      return Promise.resolve({ ok: false, error: msg("issues.listFailed", { detail: "repo and number are required" }) });
+    }
+
+    return resolvePlatformCli(null, "issues").then((cliResolved) => {
+      if ("error" in cliResolved) {
+        return { ok: false, error: cliResolved.error } as InfraActionResult;
+      }
+      if (cliResolved.cli !== "gh") {
+        return { ok: false, error: msg("issues.ghRequiredForLabels") } as InfraActionResult;
+      }
+
+      try {
+        validateCliInputs({ repo });
+      } catch (validationErr) {
+        return { ok: false, error: (validationErr as Error).message } as InfraActionResult;
+      }
+
+      const ghArgs: string[] = [
+        "pr", "diff",
+        String(prNumber),
+        "--repo", repo,
+      ];
+
+      const MAX_DIFF_BYTES = 2 * 1024 * 1024;
+
+      return new Promise<InfraActionResult>((resolve) => {
+        execFile("gh", ghArgs, { maxBuffer: MAX_DIFF_BYTES }, (err, stdout, stderr) => {
+          if (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            if (code === "ENOENT") {
+              resolve({ ok: false, error: msg("issues.noPlatformCli") });
+              return;
+            }
+            resolve({ ok: false, error: msg("issues.listFailed", { detail: stderr || err.message }) });
+            return;
+          }
+
+          const classified = classifyDiffSections(stdout);
+          const result: GetPrBriefingResult = {
+            sections: classified.sections,
+            summary: classified.summary,
+            totalFlagged: classified.totalFlagged,
+            totalBoilerplate: classified.totalBoilerplate,
+          };
           resolve({ ok: true, data: result });
         });
       });

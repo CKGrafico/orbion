@@ -240,7 +240,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff" | "get-pr-briefing";
 
 export interface CreateIssueParams {
   title: string;
@@ -451,6 +451,50 @@ export interface GetPrDiffResult {
   files: DiffFileEntry[];
   /** Whether the diff was truncated due to size limits. */
   truncated: boolean;
+}
+
+// ── PR briefing (heuristic analysis from diff content) ────────────────
+
+/** A collapsible group of boilerplate files (formatting, imports, lock files). */
+export interface BriefingFileGroup {
+  /** Human-readable group label (e.g. "formatting & imports", "lock files"). */
+  label: string;
+  /** Total additions across all files in the group. */
+  additions: number;
+  /** Total deletions across all files in the group. */
+  deletions: number;
+  /** The files in this group. */
+  files: DiffFileEntry[];
+}
+
+/** A section in the agent briefing: flagged (risky) or boilerplate (collapsible). */
+export interface BriefingSection {
+  /** Whether this section contains flagged/risky changes or boilerplate noise. */
+  kind: "flagged" | "boilerplate";
+  /** Human-readable section title. */
+  title: string;
+  /** Files in this section. */
+  files: DiffFileEntry[];
+  /** For boilerplate sections: the collapsible group metadata. */
+  group?: BriefingFileGroup;
+}
+
+export interface GetPrBriefingParams {
+  /** Repository in "owner/repo" format. */
+  repo: string;
+  /** PR number. */
+  number: number;
+}
+
+export interface GetPrBriefingResult {
+  /** Structured briefing sections (flagged and boilerplate). */
+  sections: BriefingSection[];
+  /** One-line summary of the briefing (e.g. "3 flagged files: auth, config. +240/-30 formatting collapsed"). */
+  summary: string;
+  /** Number of flagged files. */
+  totalFlagged: number;
+  /** Number of boilerplate files. */
+  totalBoilerplate: number;
 }
 
 export interface ListPrsAwaitingReviewParams {

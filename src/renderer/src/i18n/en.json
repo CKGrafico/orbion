@@ -965,6 +965,16 @@
       "truncated": "Large diff \u2014 some lines omitted",
       "noFileSelected": "Select a file to view its diff",
       "fileStats": "+{additions} \u2212{deletions}"
+    },
+    "briefing": {
+      "tabLabel": "Briefing",
+      "rawDiffTab": "Raw diff",
+      "flaggedChanges": "Flagged changes",
+      "expand": "expand",
+      "collapse": "collapse",
+      "noFlagged": "No flagged changes in this PR",
+      "loading": "Analyzing PR\u2026",
+      "loadError": "Failed to analyze PR"
     }
   }
 }

@@ -26,10 +26,12 @@ import { gh150OvernightPrDigestScenario } from "./scenarios/gh-150-overnight-pr-
 import { gh151ReviewModeFromNotificationScenario } from "./scenarios/gh-151-review-mode-from-notification.js";
 import { gh152ReviewQueueStripScenario } from "./scenarios/gh-152-review-queue-strip.js";
 import { gh153DiffViewReviewModeScenario } from "./scenarios/gh-153-diff-view-review-mode.js";
+import { gh154AgentBriefingDefaultScenario } from "./scenarios/gh-154-agent-briefing-default.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
-  readonly app: ElectronApplication;
+  /** The Electron app — null when running in web (mock) mode. */
+  readonly app: ElectronApplication | null;
   readonly window: Page;
   readonly temp: TempPaths;
   readonly config: VisualEvidenceConfig;
@@ -128,4 +130,10 @@ registerScenario({
   changeId: "gh-153-diff-view-review-mode",
   runner: gh153DiffViewReviewModeScenario,
   description: "Diff viewer in review mode with file list, unified diff, and binary file labels",
+});
+
+registerScenario({
+  changeId: "gh-154-agent-briefing-default",
+  runner: gh154AgentBriefingDefaultScenario,
+  description: "Agent briefing as the default PR review view with flagged hunks inline and boilerplate collapsed",
 });

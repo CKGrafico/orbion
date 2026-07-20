@@ -6,7 +6,7 @@
  * inventing findings it cannot observe.
  */
 
-import type { PrVerdict } from "../shared/ipc.js";
+import type { PrVerdict, BriefingSection, BriefingFileGroup, DiffFileEntry } from "../shared/ipc.js";
 
 // ── Risk pattern heuristics ──────────────────────────────────────────
 
@@ -224,5 +224,246 @@ export function analyzeDiff(
   return {
     verdict: `Small change (${totalLines} line${totalLines !== 1 ? "s" : ""} in ${summary.filesChanged} file${summary.filesChanged !== 1 ? "s" : ""})`,
     riskLevel: "low",
+  };
+}
+
+// ── Briefing classification ──────────────────────────────────────────
+
+/** Patterns for files that are always boilerplate regardless of content. */
+const BOILERPLATE_PATH_PATTERNS: readonly RegExp[] = [
+  ...LOCK_FILE_PATTERNS,
+  /\.min\.(js|css)$/i,
+  /\.map$/i,
+  /\.d\.ts$/i,
+  /(^|[/])dist\//i,
+  /(^|[/])build\//i,
+  /(^|[/])\.next\//i,
+  /(^|[/])node_modules\//i,
+  /(^|[/])coverage\//i,
+  /(^|[/])__snapshots__\//i,
+];
+
+/** Patterns for generated or auto-formatted files. */
+const GENERATED_FILE_PATTERNS: readonly RegExp[] = [
+  /\.generated\./i,
+  /\.auto\./i,
+  /(^|[/])generated\//i,
+  /(^|[/])\.eslintrc/i,
+  /(^|[/])\.prettierrc/i,
+];
+
+/** Check if all additions in a per-file diff section are whitespace-only. */
+function isFormattingOnly(lines: string[]): boolean {
+  let hasAddition = false;
+  for (const line of lines) {
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      hasAddition = true;
+      const content = line.slice(1);
+      // Whitespace-only: empty, spaces, tabs, trailing comma/semicolon/spinner
+      if (content.trim().length > 0 && !/^[,;{}[\]()]\s*$/.test(content.trim())) {
+        return false;
+      }
+    }
+  }
+  return hasAddition;
+}
+
+/** Check if all additions/removals in a per-file diff are import/export statements. */
+function isImportOnly(lines: string[]): boolean {
+  let hasChange = false;
+  for (const line of lines) {
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      hasChange = true;
+      const content = line.slice(1).trim();
+      if (!content.startsWith("import ") && !content.startsWith("export ") && !content.startsWith("} from ") && content !== "") {
+        return false;
+      }
+    }
+    if (line.startsWith("-") && !line.startsWith("---")) {
+      hasChange = true;
+      const content = line.slice(1).trim();
+      if (!content.startsWith("import ") && !content.startsWith("export ") && !content.startsWith("} from ") && content !== "") {
+        return false;
+      }
+    }
+  }
+  return hasChange;
+}
+
+/**
+ * Parse a full unified diff into per-file entries with line stats.
+ * This is a more detailed version that also returns the raw lines per file
+ * for content-based classification.
+ */
+interface PerFileDiff {
+  entry: DiffFileEntry;
+  lines: string[];
+}
+
+function parseDiffPerFile(diff: string): PerFileDiff[] {
+  const files: PerFileDiff[] = [];
+  if (!diff || diff.trim().length === 0) return files;
+
+  const lines = diff.split("\n");
+  let currentPath = "";
+  let additions = 0;
+  let deletions = 0;
+  let isBinary = false;
+  let currentLines: string[] = [];
+  const seenPaths = new Set<string>();
+
+  const flushFile = (): void => {
+    if (currentPath && !seenPaths.has(currentPath)) {
+      seenPaths.add(currentPath);
+      files.push({
+        entry: { path: currentPath, additions, deletions, isBinary },
+        lines: currentLines,
+      });
+    }
+  };
+
+  for (const line of lines) {
+    const gitMatch = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
+    if (gitMatch) {
+      flushFile();
+      currentPath = gitMatch[2];
+      additions = 0;
+      deletions = 0;
+      isBinary = false;
+      currentLines = [line];
+      continue;
+    }
+
+    if (currentPath) {
+      currentLines.push(line);
+
+      if (line.startsWith("Binary files") || line.startsWith("GIT binary patch")) {
+        isBinary = true;
+        continue;
+      }
+
+      if (line.startsWith("+") && !line.startsWith("+++")) {
+        additions++;
+        continue;
+      }
+
+      if (line.startsWith("-") && !line.startsWith("---")) {
+        deletions++;
+      }
+    }
+  }
+  flushFile();
+
+  return files;
+}
+
+/** Determine the boilerplate group label for a set of classified files. */
+function boilerplateLabel(files: DiffFileEntry[]): string {
+  const hasLock = files.some((f) => LOCK_FILE_PATTERNS.some((p) => p.test(f.path)));
+  const hasFormatting = files.some((f) => {
+    // Non-lock, non-generated files classified as boilerplate due to content
+    return !LOCK_FILE_PATTERNS.some((p) => p.test(f.path))
+      && !GENERATED_FILE_PATTERNS.some((p) => p.test(f.path));
+  });
+
+  const parts: string[] = [];
+  if (hasFormatting) parts.push("formatting");
+  if (hasLock) parts.push("imports & locks");
+  return parts.length > 0 ? parts.join(", ") : "other";
+}
+
+/**
+ * Classify a PR diff into briefing sections: flagged (risky) and boilerplate
+ * (formatting, imports, lock files, generated). The briefing derives only
+ * from actual diff content using heuristic pattern matching.
+ */
+export function classifyDiffSections(diff: string): {
+  sections: BriefingSection[];
+  summary: string;
+  totalFlagged: number;
+  totalBoilerplate: number;
+} {
+  const perFile = parseDiffPerFile(diff);
+
+  const flaggedFiles: DiffFileEntry[] = [];
+  const boilerplateFiles: DiffFileEntry[] = [];
+
+  for (const file of perFile) {
+    const path = file.entry.path;
+
+    // Explicit risk patterns always flag the file
+    const isHighRisk = HIGH_RISK_PATTERNS.some((p) => p.test(path));
+    const isMediumRisk = MEDIUM_RISK_PATTERNS.some((p) => p.test(path));
+
+    if (isHighRisk || isMediumRisk) {
+      flaggedFiles.push(file.entry);
+      continue;
+    }
+
+    // Explicit boilerplate path patterns (locks, generated, dist)
+    const isBoilerplatePath = BOILERPLATE_PATH_PATTERNS.some((p) => p.test(path))
+      || GENERATED_FILE_PATTERNS.some((p) => p.test(path));
+
+    if (isBoilerplatePath) {
+      boilerplateFiles.push(file.entry);
+      continue;
+    }
+
+    // Content-based classification for remaining files
+    if (isFormattingOnly(file.lines) || isImportOnly(file.lines)) {
+      boilerplateFiles.push(file.entry);
+      continue;
+    }
+
+    // Default: anything not classified as boilerplate is flagged
+    flaggedFiles.push(file.entry);
+  }
+
+  // Build sections
+  const sections: BriefingSection[] = [];
+
+  if (flaggedFiles.length > 0) {
+    sections.push({
+      kind: "flagged",
+      title: flaggedFiles.length === 1 ? "1 flagged file" : `${flaggedFiles.length} flagged files`,
+      files: flaggedFiles,
+    });
+  }
+
+  if (boilerplateFiles.length > 0) {
+    const group: BriefingFileGroup = {
+      label: boilerplateLabel(boilerplateFiles),
+      additions: boilerplateFiles.reduce((s, f) => s + f.additions, 0),
+      deletions: boilerplateFiles.reduce((s, f) => s + f.deletions, 0),
+      files: boilerplateFiles,
+    };
+    sections.push({
+      kind: "boilerplate",
+      title: `${group.additions}/${group.deletions} ${group.label}`,
+      files: boilerplateFiles,
+      group,
+    });
+  }
+
+  // Build summary
+  const parts: string[] = [];
+  if (flaggedFiles.length > 0) {
+    const names = flaggedFiles.slice(0, 3).map((f) => f.path.split("/").pop() ?? f.path);
+    const suffix = flaggedFiles.length > 3 ? ` +${flaggedFiles.length - 3} more` : "";
+    parts.push(`${flaggedFiles.length} flagged: ${names.join(", ")}${suffix}`);
+  }
+  if (boilerplateFiles.length > 0) {
+    const totalAdd = boilerplateFiles.reduce((s, f) => s + f.additions, 0);
+    const totalDel = boilerplateFiles.reduce((s, f) => s + f.deletions, 0);
+    parts.push(`+${totalAdd}/-${totalDel} ${boilerplateLabel(boilerplateFiles)} collapsed`);
+  }
+
+  const summary = parts.length > 0 ? parts.join(". ") : "No changes found";
+
+  return {
+    sections,
+    summary,
+    totalFlagged: flaggedFiles.length,
+    totalBoilerplate: boilerplateFiles.length,
   };
 }

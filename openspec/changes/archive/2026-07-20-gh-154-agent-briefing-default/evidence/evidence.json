@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "changeId": "gh-154-agent-briefing-default",
+  "required": true,
+  "status": "passed",
+  "scenario": {
+    "title": "Agent briefing as default PR review view",
+    "steps": [
+      "Enter review mode from a PR inbox notification",
+      "Verify briefing view is the default (not raw diff)",
+      "Verify briefing summary text is visible",
+      "Verify flagged files with risk chips and inline hunks",
+      "Verify tab toggle shows Briefing and Raw diff options",
+      "Verify clicking Raw diff tab switches to the diff viewer",
+      "Verify clicking Briefing tab returns to briefing view",
+      "Verify boilerplate section can be expanded to show collated files",
+      "Press Escape and verify review mode closes"
+    ]
+  },
+  "assertions": [
+    { "description": "Briefing view is the default in review mode (not raw diff)", "status": "passed" },
+    { "description": "Briefing summary is visible with analysis text", "status": "passed" },
+    { "description": "Flagged files are visible with risk chips and inline diff hunks", "status": "passed" },
+    { "description": "Tab toggle shows both Briefing and Raw diff options", "status": "passed" },
+    { "description": "Clicking Raw diff tab switches to the raw diff view", "status": "passed" },
+    { "description": "Clicking Briefing tab returns to the briefing view", "status": "passed" },
+    { "description": "Boilerplate section is present and can be expanded", "status": "passed" },
+    { "description": "Pressing Escape closes review mode", "status": "passed" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence\n\n**Change: Agent briefing first; raw diff as the fallback**\n\n### What changed\n\nThe PR review mode now opens with an **agent briefing** as the default view instead of the raw diff. The briefing:\n\n- Shows a summary of what changed, why, and where risk is\n- Displays **flagged files inline** with risk level chips (high/medium/low) and diff hunks\n- **Collapses boilerplate** changes (formatting, imports, lock files) into a one-line summary like `+240/-30 formatting & imports - expand`\n- One click on **Raw diff** tab switches to the full unified diff viewer\n- One click on **Briefing** tab returns to the briefing view\n\n### Acceptance criteria verified\n\n1. **Default: agent briefing** - Review mode opens to `ReviewBriefingView`, not `ReviewDiffView`\n2. **Flagged hunks inline** - Files matching high/medium risk patterns show inline diff lines with add/remove coloring\n3. **Boilerplate collapsed** - Lock files, formatting-only files, import-only files collapsed into expandable section\n4. **One action switches to full raw diff** - Pill toggle in header switches between Briefing and Raw diff\n5. **Briefing derives only from diff content** - Classification uses pure heuristic pattern matching in `diff-analyzer.ts`"
+}

@@ -6,7 +6,7 @@
  * output formats.
  */
 
-import type { DiffFileEntry } from "../../../../shared/ipc";
+import type { DiffFileEntry, BriefingSection } from "../../../../shared/ipc";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -219,4 +219,35 @@ export function splitDiffByFile(diff: string): Map<string, string> {
   flushSection();
 
   return result;
+}
+
+// ── Briefing view utilities ─────────────────────────────────────────────
+
+/** Compute totals across all briefing sections. */
+export function getBriefingTotals(
+  sections: BriefingSection[],
+): { totalFlaggedAdd: number; totalFlaggedDel: number; totalBoilerplateAdd: number; totalBoilerplateDel: number } {
+  let totalFlaggedAdd = 0;
+  let totalFlaggedDel = 0;
+  let totalBoilerplateAdd = 0;
+  let totalBoilerplateDel = 0;
+
+  for (const section of sections) {
+    if (section.kind === "flagged") {
+      for (const file of section.files) {
+        totalFlaggedAdd += file.additions;
+        totalFlaggedDel += file.deletions;
+      }
+    } else if (section.kind === "boilerplate" && section.group) {
+      totalBoilerplateAdd += section.group.additions;
+      totalBoilerplateDel += section.group.deletions;
+    }
+  }
+
+  return { totalFlaggedAdd, totalFlaggedDel, totalBoilerplateAdd, totalBoilerplateDel };
+}
+
+/** Format a +N/-M stats string for a briefing section. */
+export function formatBriefingStats(additions: number, deletions: number): string {
+  return `+${additions}/-${deletions}`;
 }

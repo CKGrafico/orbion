@@ -56,6 +56,8 @@ import type {
   ReviewModeItem,
   DiffFileEntry,
   GetPrDiffResult,
+  BriefingSection,
+  GetPrBriefingResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -804,6 +806,41 @@ index 1111111..2222222 100644
       ];
 
       const result: GetPrDiffResult = { diff: diffText, files, truncated: false };
+      return { ok: true, data: result };
+    }
+    if (args.action === "get-pr-briefing") {
+      const flaggedFiles: DiffFileEntry[] = [
+        { path: "src/middleware/auth.ts", additions: 42, deletions: 0, isBinary: false },
+        { path: "src/routes/api.ts", additions: 3, deletions: 1, isBinary: false },
+        { path: "src/config.ts", additions: 2, deletions: 2, isBinary: false },
+      ];
+      const boilerplateFiles: DiffFileEntry[] = [
+        { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
+      ];
+      const sections: BriefingSection[] = [
+        {
+          kind: "flagged",
+          title: "3 flagged files",
+          files: flaggedFiles,
+        },
+        {
+          kind: "boilerplate",
+          title: "+0/-0 other",
+          files: boilerplateFiles,
+          group: {
+            label: "other",
+            additions: 0,
+            deletions: 0,
+            files: boilerplateFiles,
+          },
+        },
+      ];
+      const result: GetPrBriefingResult = {
+        sections,
+        summary: "3 flagged: auth.ts, api.ts, config.ts. +0/-0 other collapsed",
+        totalFlagged: 3,
+        totalBoilerplate: 1,
+      };
       return { ok: true, data: result };
     }
     return { ok: false, error: "mock" };

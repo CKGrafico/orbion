@@ -50,7 +50,7 @@ orbion/
 │   │   ├── platform-classifier.ts  # Git remote URL → platform classification
 │   │   ├── transcript-store.ts # Per-session chat transcript file storage
 │   │   ├── sse-parser.ts     # Spec-compliant SSE stream parser (eventsource-parser)
-│   │   ├── diff-analyzer.ts   # Heuristic PR diff risk analysis (verdict + risk level)
+│   │   ├── diff-analyzer.ts   # Heuristic PR diff risk analysis (verdict + risk level + briefing classification)
 │   │   └── ssh-probe.ts        # SSH VM, Node 20+, loop-task, and daemon probing
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
@@ -74,8 +74,11 @@ orbion/
 │           │   │   ├── InboxPanel.tsx  # Conversational inbox with fleet-scoped queries + inline actions
 │           │   │   └── InboxView.tsx   # Full-page inbox view (active items, Done archive, fleet queries)
 │           │   └── review/
-│           │       ├── ReviewModeOverlay.tsx  # Full-screen PR review overlay (header + body with queue strip)
-│           │       └── ReviewQueueStrip.tsx   # Left strip listing PR batch with risk verdicts + disposed indicators
+│           │       ├── ReviewModeOverlay.tsx  # Full-screen PR review overlay (header with Briefing/Raw diff toggle + body with queue strip)
+│           │       ├── ReviewBriefingView.tsx # Agent briefing as default view (flagged hunks inline, boilerplate collapsed)
+│           │       ├── ReviewDiffView.tsx     # Raw unified diff viewer (file list + per-file diff with on-demand loading)
+│           │       ├── ReviewQueueStrip.tsx   # Left strip listing PR batch with risk verdicts + disposed indicators
+│           │       └── parse-diff.ts          # Pure diff parsing utilities (DiffLine, file entries, briefing helpers)
 │           └── components/
 │               ├── Sidebar.tsx           # Instance list + health dots
 │               ├── FleetHealthFooter.tsx # Fleet health summary (instance count, failures, unreachable) in sidebar footer
@@ -331,6 +334,18 @@ renders a left queue strip (`ReviewQueueStrip`) listing every PR in the batch,
 each showing its number, title, risk chip, and one-line verdict; disposed PRs
 (approved/changes-requested) are ticked off with a checkmark and muted style.
 Selecting a row in the strip switches the active PR in the main area.
+
+The default main area shows the **agent briefing** view (`ReviewBriefingView`):
+flagged (risky) files with inline diff hunks and risk-level chips, plus
+boilerplate changes (formatting, imports, lock files) collapsed into a
+one-line expandable summary. A pill toggle in the header switches between
+"Briefing" and "Raw diff"; the raw diff view (`ReviewDiffView`) shows the
+full file list and per-file unified diffs with on-demand loading. The
+briefing data comes from a `get-pr-briefing` infra action that classifies
+diff files using heuristic pattern matching in `src/main/diff-analyzer.ts`
+(`classifyDiffSections`) — it derives content only from actual diff data,
+no LLM involved.
+
 `PrPollingService` polls the main VM every 60s via the `list-prs-awaiting-review`
 infra action; `PrVerdictService` fetches and caches verdicts via `get-pr-verdict`.
 PR items auto-resolve when they disappear from the polling results.
