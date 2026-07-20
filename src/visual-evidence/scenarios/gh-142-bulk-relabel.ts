@@ -35,6 +35,9 @@ export async function gh142BulkRelabelScenario(ctx: ScenarioContext): Promise<Sc
         await expectVisibleText(currentPage, "Apply these labels to all listed issues?");
         await expectVisibleText(currentPage, "to-refine");
         for (const title of issueTitles) await expectVisibleText(currentPage, title);
+        await currentPage.locator(".infra-chat-scroll").evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+        });
         await ctx.captureCheckpoint(
           "confirmation",
           "Bulk relabel confirmation naming every affected issue",
@@ -49,6 +52,9 @@ export async function gh142BulkRelabelScenario(ctx: ScenarioContext): Promise<Sc
         await expectVisibleText(currentPage, "2 succeeded, 1 failed");
         await expectVisibleText(currentPage, "Label is protected");
         for (const title of issueTitles) await expectVisibleText(currentPage, title);
+        await currentPage.locator(".infra-chat-scroll").evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+        });
         await ctx.captureCheckpoint(
           "result",
           "Bulk relabel per-item results with success and failure",

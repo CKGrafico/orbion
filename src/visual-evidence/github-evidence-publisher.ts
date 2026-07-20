@@ -165,7 +165,9 @@ export function upsertEvidenceComment(
     repoRoot,
   );
   const comments = JSON.parse(commentsJson || "[]") as GitHubComment[];
-  const existing = comments.find((comment) => comment.body?.includes(marker));
+  const existing = comments.find((comment) => comment.body?.includes(marker))
+    ?? comments.find((comment) =>
+      comment.body?.includes("## Visual Evidence") && comment.body.includes(changeId));
 
   if (existing) {
     runner(

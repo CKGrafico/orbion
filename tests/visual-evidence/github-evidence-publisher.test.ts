@@ -65,4 +65,18 @@ describe("GitHub evidence publisher", () => {
     expect(calls.some((call) => call.includes("--method PATCH"))).toBe(true);
     expect(calls.some((call) => call.includes("--method POST"))).toBe(false);
   });
+
+  it("upgrades a legacy evidence comment for the same change", () => {
+    const calls: string[] = [];
+    const runner: CommandRunner = (command, args) => {
+      calls.push(`${command} ${args.join(" ")}`);
+      if (args.includes("--paginate")) {
+        return JSON.stringify([{ id: 88, body: "## Visual Evidence\nChange gh-142-x" }]);
+      }
+      return "";
+    };
+    const id = upsertEvidenceComment("/repo", repo, 142, "gh-142-x", "evidence", runner);
+    expect(id).toBe(88);
+    expect(calls.some((call) => call.includes("--method PATCH"))).toBe(true);
+  });
 });
