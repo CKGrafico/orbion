@@ -123,6 +123,7 @@ import {
   closeAllRegistryTunnels,
   forceKillAllRegistryTunnels,
   onTunnelReconnect,
+  isTunnelLocalPort,
 } from "./tunnel-registry.js";
 import {
   getMcpStatus,
@@ -325,12 +326,58 @@ function showEncryptionWarning(): void {
   });
 }
 
+function isAllowedHost(url: URL, allowLoopback: boolean): boolean {
+  const host = url.hostname.toLowerCase();
+
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") {
+    return allowLoopback;
+  }
+
+  if (host === "169.254.169.254" || host === "169.254.169.253") {
+    return false;
+  }
+
+  if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) {
+    return false;
+  }
+
+  if (host === "[fd00:ec2::254]") {
+    return false;
+  }
+
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+    return allowLoopback;
+  }
+
+  return true;
+}
+
 function isAllowedBaseUrl(baseUrl: string): boolean {
   try {
     const url = new URL(baseUrl);
-    return url.protocol === "http:" || url.protocol === "https:";
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    return isAllowedHost(url, true);
   } catch {
     return false;
+  }
+}
+
+function isEffectiveUrlAllowed(effectiveUrl: string): { allowed: boolean; host: string } {
+  try {
+    const url = new URL(effectiveUrl);
+    const host = url.hostname.toLowerCase();
+    if (!isAllowedHost(url, false)) {
+      if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+        const port = parseInt(url.port, 10);
+        if (port && isTunnelLocalPort(port)) {
+          return { allowed: true, host };
+        }
+      }
+      return { allowed: false, host };
+    }
+    return { allowed: true, host };
+  } catch {
+    return { allowed: false, host: effectiveUrl };
   }
 }
 
@@ -387,6 +434,11 @@ async function handleApiRequest(args: ApiRequestArgs): Promise<ApiResponse> {
   // goes through the local forwarded port instead of the unreachable remote host.
   const effectiveBaseUrl = resolveEffectiveUrlForBaseUrl(envId, args.baseUrl);
 
+  const effectiveUrlCheck = isEffectiveUrlAllowed(effectiveBaseUrl);
+  if (!effectiveUrlCheck.allowed) {
+    return { ok: false, status: 0, error: msg("vmWizard.mainHostBlocked", { host: effectiveUrlCheck.host }) };
+  }
+
   return fetchAndUnwrap(joinUrl(effectiveBaseUrl, args.path), {
     method: args.method,
     headers,
@@ -434,6 +486,14 @@ async function handleStreamSubscribe(
 
   // For SSH endpoints, resolve the effective (tunneled) URL.
   const effectiveBaseUrl = resolveEffectiveUrlForBaseUrl(envId, args.baseUrl);
+
+  const effectiveUrlCheck = isEffectiveUrlAllowed(effectiveBaseUrl);
+  if (!effectiveUrlCheck.allowed) {
+    send("error", `Host blocked: ${effectiveUrlCheck.host}`);
+    streams.delete(args.subId);
+    streamEnvironments.delete(args.subId);
+    return;
+  }
 
   try {
     const res = await fetch(joinUrl(effectiveBaseUrl, args.path), {

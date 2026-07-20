@@ -273,6 +273,17 @@ export function getTunnelLocalPort(environmentId: string, endpointId: string): n
 }
 
 /**
+ * Check if a local port corresponds to an active SSH tunnel.
+ * Used by host validation to exempt loopback URLs that route through tunnels.
+ */
+export function isTunnelLocalPort(port: number): boolean {
+  for (const entry of registry.values()) {
+    if (entry.localPort === port) return true;
+  }
+  return false;
+}
+
+/**
  * Resolve the effective API base URL for an endpoint.
  *
  * - For SSH endpoints with an active tunnel: `http://127.0.0.1:<localPort>`
