@@ -2452,6 +2452,150 @@ input {
   max-width: 480px;
 }
 
+/* ── Chain edit proposal — shared-task warning ─────────────────────────── */
+
+.chain-edit-proposal-warning {
+  background: var(--bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--warning) 20%, var(--border-subtle));
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chain-edit-proposal-warning--needs-decision {
+  border-left-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 4%, var(--bg-elevated));
+}
+
+.chain-edit-proposal-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.chain-edit-proposal-warning-icon {
+  font-size: 13px;
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.chain-edit-proposal-warning-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.chain-edit-proposal-warning-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding-left: 20px;
+}
+
+.chain-edit-proposal-warning-loops {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.chain-edit-proposal-warning-loop-item {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.chain-edit-proposal-warning-actions {
+  display: flex;
+  gap: 8px;
+  padding-left: 20px;
+  margin-top: 2px;
+}
+
+.chain-edit-proposal-btn--change-all {
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+
+.chain-edit-proposal-btn--change-all:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.chain-edit-proposal-btn--change-all:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.chain-edit-proposal-btn--change-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chain-edit-proposal-btn--fork-copy {
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition: all 0.15s ease;
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+
+.chain-edit-proposal-btn--fork-copy:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.chain-edit-proposal-btn--fork-copy:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.chain-edit-proposal-btn--fork-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chain-edit-proposal-warning-decision {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  margin-left: 20px;
+}
+
+.chain-edit-proposal-warning-decision--fork {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.chain-edit-proposal-warning-decision--change-all {
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+  color: var(--warning);
+}
 
 /* Muted composer state when instance is unreachable */
 .composer-textarea:disabled {

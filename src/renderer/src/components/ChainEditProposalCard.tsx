@@ -16,6 +16,8 @@ interface ChainEditProposalCardProps {
   onRejected: (proposalId: string) => void;
   /** Callback when the proposal status changes (e.g., applying, error). */
   onStatusChange: (proposalId: string, status: ChainEditProposalStatus, error?: string) => void;
+  /** Callback when the user chooses a fork strategy for a shared-task warning. */
+  onForkDecision?: (proposalId: string, decision: "change-all" | "fork-copy") => void;
 }
 
 /**
@@ -25,13 +27,14 @@ interface ChainEditProposalCardProps {
  * this card appears in the chat stream showing:
  * - A preview of the proposed chain (via TaskChainView)
  * - A summary of operations (e.g., "Add step: Run tests after Build")
+ * - A shared-task warning if the edited task is referenced by other loops
  * - Approve / Reject buttons
  *
  * On approval, the parent (SessionChatView) calls the MCP service to
  * apply the chain edit. On rejection, the proposal is marked as rejected.
  * No form-based editing is provided — the chat is the editor.
  */
-export function ChainEditProposalCard({ row, instance, onApproved, onRejected, onStatusChange }: ChainEditProposalCardProps): React.ReactNode {
+export function ChainEditProposalCard({ row, instance, onApproved, onRejected, onStatusChange, onForkDecision }: ChainEditProposalCardProps): React.ReactNode {
   const intl = useIntl();
 
   const isPending = row.status === "pending";
@@ -40,6 +43,11 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
   const isRejected = row.status === "rejected";
   const isError = row.status === "error";
   const isTerminal = isApplied || isRejected;
+
+  const warning = row.sharedTaskWarning;
+  const hasWarning = warning != null && warning.referencingLoops.length > 0;
+  const needsDecision = hasWarning && warning.decision === null;
+  const hasDecision = hasWarning && warning.decision !== null;
 
   const handleApprove = useCallback((): void => {
     if (!instance) return;
@@ -55,6 +63,22 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
   const handleReject = useCallback((): void => {
     onRejected(row.proposalId);
   }, [onRejected, row.proposalId]);
+
+  const handleChangeAll = useCallback((): void => {
+    onForkDecision?.(row.proposalId, "change-all");
+  }, [onForkDecision, row.proposalId]);
+
+  const handleForkCopy = useCallback((): void => {
+    onForkDecision?.(row.proposalId, "fork-copy");
+  }, [onForkDecision, row.proposalId]);
+
+  // Build the approve button label based on the fork decision
+  const approveLabel = (() => {
+    if (isApplying) return intl.formatMessage({ id: "chainEditProposal.applying" });
+    if (warning?.decision === "fork-copy") return intl.formatMessage({ id: "chainEditProposal.approveFork" });
+    if (warning?.decision === "change-all") return intl.formatMessage({ id: "chainEditProposal.approveChangeAll" });
+    return intl.formatMessage({ id: "chainEditProposal.approve" });
+  })();
 
   return (
     <div className={`chain-edit-proposal-card${isTerminal ? " chain-edit-proposal-card--terminal" : ""}${isError ? " chain-edit-proposal-card--error" : ""}`}>
@@ -88,6 +112,60 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
         </div>
       )}
 
+      {/* Shared-task warning */}
+      {hasWarning && (
+        <div className={`chain-edit-proposal-warning${needsDecision ? " chain-edit-proposal-warning--needs-decision" : ""}`}>
+          <div className="chain-edit-proposal-warning-header">
+            <span className="chain-edit-proposal-warning-icon">⚠</span>
+            <span className="chain-edit-proposal-warning-title">
+              {intl.formatMessage({ id: "chainEditProposal.sharedTaskWarning.title" })}
+            </span>
+          </div>
+          <div className="chain-edit-proposal-warning-body">
+            {intl.formatMessage(
+              { id: "chainEditProposal.sharedTaskWarning.description" },
+              { count: warning.referencingLoops.length },
+            )}
+            <ul className="chain-edit-proposal-warning-loops">
+              {warning.referencingLoops.map((loop) => (
+                <li key={loop.loopId} className="chain-edit-proposal-warning-loop-item">
+                  {loop.loopName}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Fork strategy choice — shown when decision is pending */}
+          {needsDecision && isPending && (
+            <div className="chain-edit-proposal-warning-actions">
+              <button
+                className="chain-edit-proposal-btn chain-edit-proposal-btn--change-all"
+                onClick={handleChangeAll}
+                type="button"
+              >
+                {intl.formatMessage({ id: "chainEditProposal.sharedTaskWarning.changeAll" })}
+              </button>
+              <button
+                className="chain-edit-proposal-btn chain-edit-proposal-btn--fork-copy"
+                onClick={handleForkCopy}
+                type="button"
+              >
+                {intl.formatMessage({ id: "chainEditProposal.sharedTaskWarning.forkCopy" })}
+              </button>
+            </div>
+          )}
+
+          {/* Decision badge — shown after the user has chosen */}
+          {hasDecision && (
+            <div className={`chain-edit-proposal-warning-decision${warning.decision === "fork-copy" ? " chain-edit-proposal-warning-decision--fork" : " chain-edit-proposal-warning-decision--change-all"}`}>
+              {warning.decision === "fork-copy"
+                ? intl.formatMessage({ id: "chainEditProposal.sharedTaskWarning.forkCopyBadge" })
+                : intl.formatMessage({ id: "chainEditProposal.sharedTaskWarning.changeAllBadge" })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Proposed chain preview */}
       {row.proposedSteps.length > 0 && (
         <div className="chain-edit-proposal-chain-preview">
@@ -103,8 +181,8 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
         <div className="chain-edit-proposal-error">{row.error}</div>
       )}
 
-      {/* Action buttons */}
-      {isPending && (
+      {/* Action buttons — hidden when warning needs a decision first */}
+      {isPending && !needsDecision && (
         <div className="chain-edit-proposal-actions">
           <button
             className="chain-edit-proposal-btn chain-edit-proposal-btn--reject"
@@ -118,9 +196,7 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
             onClick={handleApprove}
             disabled={isApplying}
           >
-            {isApplying
-              ? intl.formatMessage({ id: "chainEditProposal.applying" })
-              : intl.formatMessage({ id: "chainEditProposal.approve" })}
+            {approveLabel}
           </button>
         </div>
       )}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { TranscriptMessage, ToolCallRecord } from "../../../shared/ipc";
 import type { ITranscriptService } from "../services/interfaces";
-import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow, LoopProposalRow, LoopProposalStatus, ChainEditProposalRow, ChainEditProposalStatus, FailureDiagnosisRow } from "./types";
+import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow, LoopProposalRow, LoopProposalStatus, ChainEditProposalRow, ChainEditProposalStatus, SharedTaskWarning, FailureDiagnosisRow } from "./types";
 import type { FailureCategory } from "./diagnoseFailure";
 
 const TOOL_CALLS_THRESHOLD = 3;
@@ -214,6 +214,15 @@ function parseChainEditProposalMessage(msg: TranscriptMessage): ChainEditProposa
   try {
     const parsed = JSON.parse(msg.content);
     if (parsed.kind !== "chain-edit-proposal") return null;
+    const sharedTaskWarning: SharedTaskWarning | undefined =
+      parsed.sharedTaskWarning
+        ? {
+            taskIds: Array.isArray(parsed.sharedTaskWarning.taskIds) ? parsed.sharedTaskWarning.taskIds : [],
+            referencingLoops: Array.isArray(parsed.sharedTaskWarning.referencingLoops) ? parsed.sharedTaskWarning.referencingLoops : [],
+            decision: parsed.sharedTaskWarning.decision ?? null,
+          }
+        : undefined;
+
     return {
       id: msg.id,
       kind: "chain-edit-proposal",
@@ -225,6 +234,7 @@ function parseChainEditProposalMessage(msg: TranscriptMessage): ChainEditProposa
       operationSummaries: Array.isArray(parsed.operationSummaries) ? parsed.operationSummaries : [],
       status: parsed.status ?? "pending",
       error: parsed.error ?? null,
+      sharedTaskWarning,
     };
   } catch {
     return null;
@@ -1049,6 +1059,7 @@ export function useTranscript(sessionId: string | null) {
           operationSummaries: proposal.operationSummaries,
           status: proposal.status ?? "pending",
           error: proposal.error,
+          sharedTaskWarning: proposal.sharedTaskWarning,
         }),
         startedAt: timestamp,
         finishedAt: timestamp,
@@ -1081,6 +1092,42 @@ export function useTranscript(sessionId: string | null) {
               ...parsed,
               status,
               ...(extras?.error != null ? { error: extras.error } : {}),
+            };
+            const newContent = JSON.stringify(newParsed);
+            // Persist the update
+            void transcriptService.updateMessage(msg.id, { content: newContent });
+            return { ...msg, content: newContent };
+          } catch {
+            return msg;
+          }
+        });
+        return updated;
+      });
+    },
+    [sessionId, transcriptService],
+  );
+
+  /**
+   * Update the fork decision on a chain-edit proposal's shared-task warning.
+   * The decision ("change-all" | "fork-copy") is stored inside the
+   * sharedTaskWarning object within the persisted chain-edit-proposal message.
+   */
+  const updateChainEditProposalForkDecision = useCallback(
+    (proposalId: string, decision: "change-all" | "fork-copy") => {
+      if (!sessionId) return;
+
+      setChainEditProposalMessages((prev) => {
+        const updated = prev.map((msg) => {
+          if (!msg.id.startsWith("chain-edit-proposal-")) return msg;
+          try {
+            const parsed = JSON.parse(msg.content);
+            if (parsed.proposalId !== proposalId) return msg;
+            const newParsed = {
+              ...parsed,
+              sharedTaskWarning: {
+                ...(parsed.sharedTaskWarning ?? {}),
+                decision,
+              },
             };
             const newContent = JSON.stringify(newParsed);
             // Persist the update
@@ -1144,6 +1191,7 @@ export function useTranscript(sessionId: string | null) {
     updateLoopProposalStatus,
     insertChainEditProposal,
     updateChainEditProposalStatus,
+    updateChainEditProposalForkDecision,
     reloadTranscript,
   };
 }

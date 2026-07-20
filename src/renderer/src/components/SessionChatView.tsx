@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, LoopProposalRow, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus } from "../chat/types";
+import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus, SharedTaskWarning } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
 import type { IAgentService, IMcpService, ITranscriptService } from "../services/interfaces";
 import type { LoopMeta, Environment } from "../types";
@@ -22,6 +22,70 @@ const MarkdownContent = lazy(() =>
 import { ToolCallInlineBlock } from "../chat/ToolCallInlineBlock";
 import { ToolCallsExpander } from "../chat/ToolCallsExpander";
 import { TurnFold } from "../chat/TurnFold";
+
+// ── Shared-task detection ──────────────────────────────────────────────────
+
+/**
+ * Detect whether a chain-edit proposal modifies a task that is shared by
+ * loops other than the one being edited.
+ *
+ * A task is "shared" when:
+ * - It is the `taskId` on another loop, OR
+ * - It is reachable via `onSuccessTaskId` / `onFailureTaskId` chains from
+ *   another loop's task.
+ *
+ * Returns a `SharedTaskWarning` if any `update-task` operations in the
+ * proposal target shared tasks, or `undefined` if no sharing is detected.
+ */
+function detectSharedTaskWarning(
+  editedLoopId: string,
+  operationSummaries: ChainEditOperationSummary[],
+  allLoops: LoopMeta[],
+): SharedTaskWarning | undefined {
+  // Only "update-task" operations can modify shared tasks
+  const updateOps = operationSummaries.filter((op) => op.kind === "update-task");
+  if (updateOps.length === 0) return undefined;
+
+  // Collect all task IDs referenced by other loops.
+  // For each loop's taskId, walk the chain (onSuccess/onFailure) to find
+  // all transitively referenced task IDs. Since we don't have the full task
+  // definitions here (they're on the daemon), we rely on the loop's taskId
+  // as the entry point. The "shared" check is: is the taskId of another loop
+  // the same as a task being updated?
+  //
+  // We can only check direct taskId references at this level. Deeper chain
+  // references (onSuccessTaskId / onFailureTaskId) require fetching tasks
+  // from the daemon, which is asynchronous and not suitable for inline
+  // detection in the stream event handler. The MCP tool on the daemon side
+  // performs the full transitive check and includes sharedTaskWarning data
+  // in the proposal payload if deeper sharing exists.
+
+  // Best-effort: check if any other loop references the same taskId as
+  // the edited loop. This catches the common case of shared entry-point tasks.
+  const editedLoop = allLoops.find((l) => l.id === editedLoopId);
+  const editedTaskId = editedLoop?.taskId;
+  if (!editedTaskId) return undefined;
+
+  const referencingLoops: Array<{ loopId: string; loopName: string }> = [];
+
+  for (const loop of allLoops) {
+    if (loop.id === editedLoopId) continue;
+    if (loop.taskId === editedTaskId) {
+      referencingLoops.push({
+        loopId: loop.id,
+        loopName: loop.description?.trim() || loop.id,
+      });
+    }
+  }
+
+  if (referencingLoops.length === 0) return undefined;
+
+  return {
+    taskIds: [editedTaskId],
+    referencingLoops,
+    decision: null,
+  };
+}
 
 interface SessionChatViewProps {
   sessionId: string;
@@ -62,6 +126,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     updateLoopProposalStatus,
     insertChainEditProposal,
     updateChainEditProposalStatus,
+    updateChainEditProposalForkDecision,
   } = useTranscript(sessionId);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("full");
@@ -161,18 +226,32 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             // When the agent's MCP tool call returns a payload with
             // `chainEditProposal: true`, parse it and insert a
             // chain-edit-proposal row into the transcript for user approval.
+            // If the proposal modifies a task shared by other loops, include
+            // a SharedTaskWarning so the user can choose to fork or apply globally.
             if (event.status === "completed" && event.output) {
               try {
                 const parsed = JSON.parse(event.output);
                 if (parsed && parsed.chainEditProposal === true) {
+                  const loopId = parsed.loopId ?? "";
+                  const operationSummaries = Array.isArray(parsed.operationSummaries) ? parsed.operationSummaries as ChainEditOperationSummary[] : [];
+
+                  // Detect shared-task references: check if any "update-task" operation
+                  // targets a task that's referenced by other loops
+                  const sharedTaskWarning = detectSharedTaskWarning(
+                    loopId,
+                    operationSummaries,
+                    loops,
+                  );
+
                   insertChainEditProposal({
                     proposalId: parsed.proposalId ?? `cep-${Date.now()}`,
-                    loopId: parsed.loopId ?? "",
+                    loopId,
                     environmentId: parsed.environmentId ?? environmentId,
                     proposedSteps: Array.isArray(parsed.proposedSteps) ? parsed.proposedSteps : [],
-                    operationSummaries: Array.isArray(parsed.operationSummaries) ? parsed.operationSummaries as ChainEditOperationSummary[] : [],
+                    operationSummaries,
                     status: "pending",
                     error: null,
+                    sharedTaskWarning,
                   });
                 }
               } catch {
@@ -403,10 +482,19 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
 
   const handleChainEditApproved = useCallback(
     (proposalId: string, loopId: string, envId: string) => {
+      // Find the proposal row to extract the fork decision
+      const chainEditRow = rows.find(
+        (r): r is import("../chat/types").ChainEditProposalRow =>
+          r.kind === "chain-edit-proposal" && r.proposalId === proposalId,
+      );
+      const forkStrategy = chainEditRow?.sharedTaskWarning?.decision ?? "change-all";
+
       // Apply the chain edit by calling the MCP service with an apply flag.
       // The MCP tool that produced the proposal will re-execute with the
       // apply flag set, actually creating/updating the tasks on the daemon.
-      void mcpService.callTool(envId, "apply_chain_edit", { proposalId, loopId }).then((result) => {
+      // If forkStrategy is "fork-copy", the daemon creates a new copy of
+      // any shared task and re-points only this loop's chain.
+      void mcpService.callTool(envId, "apply_chain_edit", { proposalId, loopId, forkStrategy }).then((result) => {
         if (result.ok) {
           updateChainEditProposalStatus(proposalId, "applied");
           // Invalidate chain cache so the LoopCard re-fetches tasks on next expand
@@ -423,7 +511,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         });
       });
     },
-    [mcpService, updateChainEditProposalStatus, intl],
+    [mcpService, updateChainEditProposalStatus, intl, rows],
   );
 
   const handleChainEditRejected = useCallback(
@@ -438,6 +526,13 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       updateChainEditProposalStatus(proposalId, status, error ? { error } : undefined);
     },
     [updateChainEditProposalStatus],
+  );
+
+  const handleChainEditForkDecision = useCallback(
+    (proposalId: string, decision: "change-all" | "fork-copy") => {
+      updateChainEditProposalForkDecision(proposalId, decision);
+    },
+    [updateChainEditProposalForkDecision],
   );
 
   return (
@@ -567,6 +662,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onApproved={handleChainEditApproved}
                       onRejected={handleChainEditRejected}
                       onStatusChange={handleChainEditStatusChange}
+                      onForkDecision={handleChainEditForkDecision}
                     />
                   </div>
                 );

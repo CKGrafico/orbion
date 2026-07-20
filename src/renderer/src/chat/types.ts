@@ -202,6 +202,16 @@ export interface ChainEditOperationSummary {
   kind: "create-task" | "update-task" | "delete-task";
 }
 
+/** Warning shown when a chain-edit proposal modifies a task shared by multiple loops. */
+export interface SharedTaskWarning {
+  /** The IDs of shared tasks being modified by this proposal. */
+  taskIds: string[];
+  /** Loops (other than the one being edited) that reference the shared task(s). */
+  referencingLoops: Array<{ loopId: string; loopName: string }>;
+  /** The user's decision on how to handle the shared task. Null = pending decision. */
+  decision: null | "change-all" | "fork-copy";
+}
+
 /** A row representing a proposed chain edit, rendered as a preview card. */
 export interface ChainEditProposalRow extends BaseRow {
   kind: "chain-edit-proposal";
@@ -219,6 +229,8 @@ export interface ChainEditProposalRow extends BaseRow {
   status: ChainEditProposalStatus;
   /** Populated on apply error. */
   error: string | null;
+  /** Warning about shared task references, shown before approve/reject. */
+  sharedTaskWarning?: SharedTaskWarning;
 }
 
 export type TranscriptRow =

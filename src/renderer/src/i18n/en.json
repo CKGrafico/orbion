@@ -819,7 +819,17 @@
     "applying": "Applying…",
     "statusApplied": "Applied",
     "statusRejected": "Rejected",
-    "applyError": "Failed to apply chain edit"
+    "applyError": "Failed to apply chain edit",
+    "sharedTaskWarning": {
+      "title": "Shared task warning",
+      "description": "This task is also used by {count, plural, one {# other loop} other {# other loops}}:",
+      "changeAll": "Change for all",
+      "forkCopy": "Fork a copy for this loop",
+      "changeAllBadge": "Changing for all",
+      "forkCopyBadge": "Forking a copy"
+    },
+    "approveFork": "Approve (fork)",
+    "approveChangeAll": "Approve (change all)"
   },
   "diagnosis": {
     "title": "Diagnosis",

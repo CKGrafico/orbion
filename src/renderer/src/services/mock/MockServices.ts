@@ -119,6 +119,7 @@ const MOCK_LOOPS: LoopMeta[] = [
   mockLoop({ id: "loop-7", status: "finished", command: "node seed-data.js", description: "Database seed", intervalHuman: "1w", maxRuns: 3, runCount: 3, lastExitCode: 0, lastRunAt: iso(-86400000), projectId: "etl", runHistory: [
     { runNumber: 3, startedAt: iso(-86400000), exitCode: 0, duration: 5000, logSize: 1024, status: "completed", logOffset: 0 },
   ] }),
+  mockLoop({ id: "loop-8", status: "waiting", command: "npm run lint:strict", description: "ETL quality gate", intervalHuman: "15m", runCount: 0, lastExitCode: null, lastRunAt: null, projectId: "etl", taskId: "task-4" }),
 ];
 
 const MOCK_TASKS: TaskDefinition[] = [
@@ -1129,6 +1130,17 @@ export class MockMcpService implements IMcpService {
         { task: { id: "task-3", name: "Notify failure", command: "slack-cli", commandArgs: ["send", "#ci", "Failed"], commandRaw: "slack-cli send #ci 'Failed'", onSuccessTaskId: null, onFailureTaskId: null, createdAt: new Date().toISOString() }, stepNumber: 4, branchType: "failure", parentHasBranch: true, depth: 1 },
       ];
 
+      // When the target loop's taskId is shared (task-4 is referenced by loop-3b & loop-8),
+      // include a sharedTaskWarning so the UI can render the fork/change-all decision.
+      const targetLoop = MOCK_LOOPS.find((l) => l.id === loopId);
+      const sharedTaskWarning = targetLoop?.taskId === "task-4"
+        ? {
+            taskIds: ["task-4"],
+            referencingLoops: [{ loopId: "loop-3b", loopName: "Load test" }],
+            decision: null,
+          }
+        : undefined;
+
       return {
         ok: true,
         data: {
@@ -1145,6 +1157,7 @@ export class MockMcpService implements IMcpService {
               kind: toolName === "create_task" ? "create-task" as const : "update-task" as const,
             },
           ],
+          sharedTaskWarning,
         },
       };
     }
@@ -1152,7 +1165,30 @@ export class MockMcpService implements IMcpService {
     // Mock: return a generic success response
     // Mock: apply_chain_edit simulates applying a chain edit proposal
     if (toolName === "apply_chain_edit") {
-      // Simulate applying by adding a new task to MOCK_TASKS
+      const forkStrategy = args.forkStrategy as string | undefined;
+
+      if (forkStrategy === "fork-copy") {
+        // Simulate forking: find the existing task (by proposalId or taskId) and create a copy
+        const sourceTaskId = (args.taskId as string) ?? "task-4";
+        const sourceTask = MOCK_TASKS.find((t) => t.id === sourceTaskId);
+        const newTaskId = `task-${Date.now()}`;
+        const newTask: TaskDefinition = sourceTask
+          ? { ...sourceTask, id: newTaskId, createdAt: new Date().toISOString() }
+          : {
+              id: newTaskId,
+              name: "Forked step",
+              command: "echo done",
+              commandArgs: [],
+              commandRaw: "echo done",
+              onSuccessTaskId: null,
+              onFailureTaskId: null,
+              createdAt: new Date().toISOString(),
+            };
+        MOCK_TASKS.push(newTask);
+        return { ok: true, data: { applied: true, taskId: newTaskId, forked: true } };
+      }
+
+      // Default (forkStrategy === "change-all" or not specified): apply normally
       const newTask: TaskDefinition = {
         id: `task-${Date.now()}`,
         name: "New step",
