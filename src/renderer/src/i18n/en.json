@@ -954,6 +954,17 @@
     "placeholderTitle": "PR Review Mode",
     "placeholderDescription": "The agent briefing, diff viewer, and review actions will appear here in a future update.",
     "queueLabel": "PR review queue",
-    "queueTitle": "{count, plural, one {# PR in queue} other {# PRs in queue}}"
+    "queueTitle": "{count, plural, one {# PR in queue} other {# PRs in queue}}",
+    "diffView": {
+      "filesChanged": "Files changed",
+      "additions": "{count, plural, one {# addition} other {# additions}}",
+      "deletions": "{count, plural, one {# deletion} other {# deletions}}",
+      "binaryFile": "Binary file",
+      "loading": "Loading diff\u2026",
+      "loadError": "Failed to load diff",
+      "truncated": "Large diff \u2014 some lines omitted",
+      "noFileSelected": "Select a file to view its diff",
+      "fileStats": "+{additions} \u2212{deletions}"
+    }
   }
 }

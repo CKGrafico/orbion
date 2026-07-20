@@ -2,28 +2,14 @@
   "version": 1,
   "changeId": "gh-142-bulk-relabel",
   "required": true,
-  "status": "passed",
-  "assets": [
-    {
-      "type": "screenshot",
-      "path": "openspec/changes/gh-142-bulk-relabel/evidence/final.webp",
-      "caption": "gh-142-bulk-relabel",
-      "width": 1280,
-      "height": 720,
-      "bytes": 1708,
-      "format": "webp"
-    }
-  ],
-  "scenario": {
-    "title": "gh-142-bulk-relabel",
-    "steps": []
+  "status": "failed",
+  "assets": [],
+  "temporaryArtifacts": {
+    "screenshot": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-142-bulk-relabel/failure.png",
+    "video": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-142-bulk-relabel/video.webm",
+    "trace": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-142-bulk-relabel/trace.zip"
   },
-  "assertions": [
-    {
-      "description": "Expected visible heading: \"Orbion\"",
-      "status": "failed",
-      "error": "Expected visible heading: \"Orbion\""
-    }
-  ],
-  "prMarkdown": "## Visual Evidence\n### gh-142-bulk-relabel\n\n![gh-142-bulk-relabel](https://raw.githubusercontent.com/CKGrafico/orbion/8263158e1a041250cbcdd9bc308be99eb58656a1/openspec/changes/gh-142-bulk-relabel/evidence/final.webp)\n\n"
+  "failedStep": "assertions",
+  "error": "1 assertion(s) failed:\n  - Expected visible heading: \"Orbion\" (Expected visible heading: \"Orbion\")",
+  "prMarkdown": "## Visual Evidence\n\n⚠️ **Automated visual evidence failed.**\n\nFailed step: assertions\n\nError:\n```\n1 assertion(s) failed:\n  - Expected visible heading: \"Orbion\" (Expected visible heading: \"Orbion\")\n```\n\nTemporary artifacts (not committed):\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-142-bulk-relabel/failure.png\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-142-bulk-relabel/video.webm\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-142-bulk-relabel/trace.zip"
 }

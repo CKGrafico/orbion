@@ -93,7 +93,7 @@ export async function gh152ReviewQueueStripScenario(ctx: ScenarioContext): Promi
         const allRows = p.locator(".review-queue-strip-row");
         const activeRows = p.locator(".review-queue-strip-row-active");
         const totalCount = await allRows.count();
-        const activeCount = await activeRows.count();
+        void activeRows; // referenced for the active-count check below when totalCount > 1
         if (totalCount <= 1) {
           // Only one PR; skip this assertion gracefully
           return;

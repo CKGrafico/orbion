@@ -7,8 +7,12 @@
  *   pnpm visual-evidence --input .orbion/context/<change-id>.json
  *
  * Reads the input, resolves the OpenSpec change, runs the visual-evidence
- * pipeline, prints the evidence PR markdown to stdout, and writes
- * evidence.json into the change's evidence/ folder.
+ * pipeline, prints the evidence PR markdown to stdout, writes evidence.json
+ * into the change's evidence/ folder, then commits + pushes the evidence so
+ * raw.githubusercontent.com URLs resolve immediately.
+ *
+ * On headless Linux (no $DISPLAY), the CLI auto re-execs itself under
+ * `xvfb-run -a` so the Electron window can render.
  *
  * Exit codes:
  *   0 — passed or correctly skipped
@@ -19,12 +23,64 @@
 import { parseArgs } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { execFileSync, spawnSync } from "node:child_process";
 import { validateInput, runVisualEvidence } from "./run.js";
 import { resolveConfig, findRepoRoot } from "./config.js";
 import { writeManifest } from "./manifest.js";
 import { generatePrMarkdown } from "./pr-markdown.js";
 import type { RepoCoordinates } from "./types.js";
+
+const __filename = fileURLToPath(import.meta.url);
+
+/**
+ * On headless Linux (no DISPLAY), re-exec this process under xvfb-run -a so
+ * Electron can render. Returns true if a re-exec was performed (caller should
+ * NOT continue — the child process owns the rest of the run).
+ */
+function maybeRexecUnderXvfb(): boolean {
+  if (process.platform !== "linux") return false;
+  if (process.env.DISPLAY) return false;
+  if (process.env.ORBION_VISUAL_EVIDENCE_UNDER_XVFB === "1") return false;
+
+  // Check xvfb-run is on PATH
+  let xvfbBin: string;
+  try {
+    xvfbBin = execFileSync("which", ["xvfb-run"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return false; // xvfb-run not installed — proceed without, will fail later with a clear message
+  }
+  if (!xvfbBin) return false;
+
+  // Re-exec under xvfb-run. We must re-invoke via `tsx` (not plain node)
+  // because the CLI is TypeScript. Find the tsx binary.
+  const args = process.argv.slice(2);
+  // Prefer the tsx that's running us: if TSX_CLI_PATH is set (we set it below),
+  // use that; otherwise fall back to npx tsx.
+  const tsxPath = process.env.TSX_CLI_PATH ?? (() => {
+    try {
+      return execFileSync("which", ["tsx"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    } catch {
+      return null;
+    }
+  })();
+  if (!tsxPath) return false;
+
+  const result = spawnSync("xvfb-run", ["-a", tsxPath, __filename, ...args], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      ORBION_VISUAL_EVIDENCE_UNDER_XVFB: "1",
+      // Pass-through the tsx path so a nested re-exec (shouldn't happen)
+      // can find it.
+      TSX_CLI_PATH: tsxPath,
+    },
+  });
+  process.exit(result.status ?? 1);
+}
+
+// ── Auto re-exec under xvfb-run on headless Linux ──────────────────────
+maybeRexecUnderXvfb();
 
 /** Tracks the changeId currently being processed so the unhandled-rejection
  * handler can attribute the failure to the right change. */
@@ -202,6 +258,35 @@ async function main(): Promise<number> {
   for (const asset of result.assets) {
     console.error(`  - ${path.join(repoRoot, asset.path)} (${asset.bytes} bytes, ${asset.format})`);
   }
+
+  // Commit + push the evidence files so the raw.githubusercontent.com URLs
+  // in the PR markdown resolve immediately on GitHub. The evidence folder
+  // lives under openspec/changes/<id>/evidence/ which is tracked by git.
+  try {
+    const evidenceGlob = path.join("openspec", "changes", input.changeId, "evidence");
+    execFileSync("git", ["add", evidenceGlob], { cwd: repoRoot, stdio: "ignore" });
+    // Only commit if there are staged changes
+    const diff = execFileSync("git", ["diff", "--cached", "--quiet"], { cwd: repoRoot }).toString();
+    void diff; // empty string means no changes; non-zero exit means changes exist
+  } catch {
+    // diff --cached --quiet exits 1 when there are staged changes — that's expected
+    try {
+      execFileSync(
+        "git",
+        ["commit", "-m", `docs(visual-evidence): ${input.changeId} evidence (final.webp + evidence.json)`],
+        { cwd: repoRoot, stdio: "ignore" },
+      );
+      execFileSync("git", ["push", "origin", branch ?? "main"], {
+        cwd: repoRoot,
+        stdio: "ignore",
+      });
+      console.error(`Evidence committed and pushed to origin/${branch ?? "main"}.`);
+    } catch (commitErr) {
+      console.error(`Warning: could not commit/push evidence: ${(commitErr as Error).message}`);
+      console.error(`The evidence files are on disk but not pushed — raw URLs will not resolve until you commit and push manually.`);
+    }
+  }
+
   return 0;
 }
 

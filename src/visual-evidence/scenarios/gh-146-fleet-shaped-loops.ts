@@ -18,7 +18,6 @@
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
-  expectVisibleText,
   runAssertions,
 } from "../assertions.js";
 
@@ -76,9 +75,8 @@ export async function gh146FleetShapedLoopsScenario(ctx: ScenarioContext): Promi
       run: async (p) => {
         // Verify the FleetShapedProposalCard component renders the provenance
         // badge by checking for the data-structure in the DOM
-        const badge = p.locator(".loop-proposal-provenance");
-        // If no proposal is currently shown (common in fresh app), verify
-        // indirectly by checking the import chain works
+        // (If no proposal is currently shown (common in fresh app), verify
+        // indirectly by checking the import chain works)
         const body = await p.textContent("body");
         if (body === null) {
           throw new Error("Page body is empty — app may not have loaded");
