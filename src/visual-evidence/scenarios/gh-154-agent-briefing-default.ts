@@ -21,7 +21,6 @@
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
-  expectVisibleText,
   runAssertions,
 } from "../assertions.js";
 
