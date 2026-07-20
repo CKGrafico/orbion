@@ -391,6 +391,24 @@ export interface PrVerdict {
   riskLevel: PrRiskLevel;
 }
 
+/** The PR context carried into the review mode overlay. */
+export interface ReviewModeItem {
+  /** Repository in "owner/repo" format. */
+  repo: string;
+  /** PR number. */
+  number: number;
+  /** PR title. */
+  title: string;
+  /** PR author login. */
+  author: string;
+  /** PR URL. */
+  url: string;
+  /** The HEAD SHA of the PR branch. */
+  headSha: string;
+  /** Agent risk verdict (may be undefined while analyzing). */
+  verdict?: PrVerdict;
+}
+
 export interface GetPrVerdictParams {
   /** Repository in "owner/repo" format. */
   repo: string;

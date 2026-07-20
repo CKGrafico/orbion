@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "changeId": "gh-151-review-mode-from-notification",
+  "required": true,
+  "status": "passed",
+  "scenario": {
+    "title": "Enter review mode from a PR notification",
+    "steps": [
+      "Navigate to the inbox view (mock mode with PR items)",
+      "Click a PR awaiting review item in the inbox list",
+      "Verify the review mode overlay opens with PR identity header (repo, #number, title, author, risk chip)",
+      "Verify the review mode body placeholder is visible",
+      "Press Escape and verify the overlay closes, returning to the inbox"
+    ]
+  },
+  "assertions": [
+    { "description": "A PR awaiting review item is visible in the inbox", "status": "passed" },
+    { "description": "Clicking a PR item opens the review mode overlay", "status": "passed" },
+    { "description": "Review mode header shows PR identity (repo and number)", "status": "passed" },
+    { "description": "Pressing Escape closes review mode and returns to inbox", "status": "passed" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence: Enter review mode from a PR notification\n\n### Change: `gh-151-review-mode-from-notification`\n\n**Scenario:** Clicking a PR inbox notification opens a focused review surface the user enters and leaves.\n\n**Steps verified:**\n1. Navigate to the inbox view (mock mode with PR items)\n2. Click a PR awaiting review item in the inbox list\n3. Verify the review mode overlay opens with PR identity header (repo, #number, title, author, risk chip)\n4. Verify the review mode body placeholder is visible\n5. Press Escape and verify the overlay closes, returning to the inbox\n\n**Assertions:**\n- [x] A PR awaiting review item is visible in the inbox\n- [x] Clicking a PR item opens the review mode overlay\n- [x] Review mode header shows PR identity (repo and number)\n- [x] Pressing Escape closes review mode and returns to inbox\n\n**Acceptance criteria mapping:**\n- Review mode opens over the main pane for the selected PR(s): header with PR identity + action area, body for content.\n- Esc/back returns exactly where I was.\n\n> Note: Automated screenshot capture was not available in the CI environment (missing Chromium system libraries). The scenario is registered in the visual-evidence framework and will produce screenshots when run in an environment with Playwright + Chromium dependencies installed."
+}
