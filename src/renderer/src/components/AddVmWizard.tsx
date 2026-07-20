@@ -95,6 +95,7 @@ export function AddVmWizard(props: {
 
   useEffect(() => {
     const unsub = vmWizardService.onProgress((p: VmWizardProgress) => {
+      console.log("[AddVmWizard] progress:", p.step, p.message);
       setProgress(p);
       if (p.serviceSelection) setServiceSelection(p.serviceSelection);
       if (p.step === "done" || p.step === "error") {
