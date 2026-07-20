@@ -21,6 +21,7 @@
     "vite.web.config.ts",
     "src/main/**/*",
     "src/preload/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "src/visual-evidence/**/*"
   ]
 }
