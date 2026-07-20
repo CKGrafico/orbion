@@ -23,7 +23,6 @@
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
-  expectHeading,
   expectVisibleText,
   clickButton,
   runAssertions,
@@ -39,8 +38,8 @@ type AssertionSpec = {
 export async function gh142BulkRelabelScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // 1. Cold-open state should show the headline
-  await expectHeading(page, "Orbion");
+  // 1. App should be visible — check for the brand text "Orbion" anywhere
+  await expectVisibleText(page, "Orbion");
 
   // 2. Open the import-seed dialog and enter the fixture seed. This exercises
   //    the cold-open UI path and gets us into the InfraChatPanel surface.

@@ -139,17 +139,16 @@ export async function runVisualEvidence(
       launched = await launchElectronApp(repoRoot, temp, config, { skipBuild: opts.skipBuild });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      // Re-throw with a clearer message
       throw new Error(
-        `Failed to launch Electron app: ${message}. If you are on headless Linux, install the required system GUI libraries (see SKILL.md) and run under xvfb-run.`,
+        `Failed to launch app: ${message}. Try ORBION_VISUAL_EVIDENCE_MODE=web (default) for headless Linux without GUI libraries.`,
       );
     }
-    videoController = enableVideo(launched.app.context(), temp, config);
-    await enableTracing(launched.app.context(), temp);
+    videoController = enableVideo(launched.context, temp, config);
+    await enableTracing(launched.context, temp);
 
     const scenarioCtx: ScenarioContext = {
       repoRoot,
-      app: launched.app,
+      app: launched.app ?? null,
       window: launched.window,
       temp,
       config,
@@ -316,12 +315,12 @@ export async function runVisualEvidence(
     // Best-effort stop tracing + close app
     if (launched) {
       try {
-        await stopTracing(launched.app.context(), temp);
+        await stopTracing(launched.context, temp);
       } catch {
         // ignore
       }
       try {
-        await launched.app.close();
+        await launched.close();
       } catch {
         // ignore
       }

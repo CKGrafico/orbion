@@ -480,6 +480,22 @@ function AppInner(): React.ReactNode {
     };
   }, [prPollingService, prVerdictService]);
 
+  // Compute inbox build params early — used by the digest notification effect
+  // below and the sidebar badge count further down. Must be declared before
+  // any effect that references it to avoid temporal-dead-zone errors.
+  const inboxBuildParams = useMemo<InboxBuildParams>(() => ({
+    perEnvLoops,
+    perEnvHealth: health,
+    environments,
+    breaches: budgetWatch.breaches,
+    dismissedIds: inboxDismissedIds,
+    escalatedOutages,
+    prAwaitingReview,
+    mainVmEnvironmentId: mainVm?.id ?? null,
+    mainVmEnvironmentName: mainVm?.name ?? "",
+    prVerdicts,
+  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages, prAwaitingReview, mainVm, prVerdicts]);
+
   // Fire a single OS notification when a new PR digest appears
   const prevDigestIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -653,19 +669,6 @@ function AppInner(): React.ReactNode {
   }, [environments, perEnvLoops, isUnread]);
 
   // Compute inbox item count for the sidebar badge
-  const inboxBuildParams = useMemo<InboxBuildParams>(() => ({
-    perEnvLoops,
-    perEnvHealth: health,
-    environments,
-    breaches: budgetWatch.breaches,
-    dismissedIds: inboxDismissedIds,
-    escalatedOutages,
-    prAwaitingReview,
-    mainVmEnvironmentId: mainVm?.id ?? null,
-    mainVmEnvironmentName: mainVm?.name ?? "",
-    prVerdicts,
-  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages, prAwaitingReview, mainVm, prVerdicts]);
-
   const inboxItemCount = useMemo(() => inboxService.buildItems(inboxBuildParams).length, [inboxService, inboxBuildParams]);
 
   const prevFleetStatus = useRef<Record<string, FleetItemStatus>>({});

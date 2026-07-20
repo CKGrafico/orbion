@@ -26,6 +26,9 @@ importers:
       inversify-hooks:
         specifier: ^4.0.0
         version: 4.0.0(react@19.2.7)(reflect-metadata@0.2.2)
+      inversify-props:
+        specifier: ^3.0.0
+        version: 3.0.0(reflect-metadata@0.2.2)
       lucide-react:
         specifier: ^0.469.0
         version: 0.469.0(react@19.2.7)
@@ -41,6 +44,9 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
       rehype-highlight:
         specifier: ^7.0.2
         version: 7.0.2

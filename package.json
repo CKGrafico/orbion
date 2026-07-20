@@ -22,11 +22,13 @@
     "eventsource-parser": "^3.1.0",
     "highlight.js": "^11.11.1",
     "inversify-hooks": "^4.0.0",
+    "inversify-props": "^3.0.0",
     "lucide-react": "^0.469.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-intl": "^10.1.16",
     "react-markdown": "^10.1.0",
+    "reflect-metadata": "^0.2.2",
     "rehype-highlight": "^7.0.2",
     "rehype-sanitize": "^6.0.0"
   },

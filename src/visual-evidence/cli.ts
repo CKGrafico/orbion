@@ -6,13 +6,12 @@
  *   pnpm visual-evidence --change <change-id>
  *   pnpm visual-evidence --input .orbion/context/<change-id>.json
  *
- * Reads the input, resolves the OpenSpec change, runs the visual-evidence
- * pipeline, prints the evidence PR markdown to stdout, writes evidence.json
- * into the change's evidence/ folder, then commits + pushes the evidence so
- * raw.githubusercontent.com URLs resolve immediately.
+ * Default mode (ORBION_VISUAL_EVIDENCE_MODE=web): starts the Vite dev server
+ * with the mock adapter and takes screenshots via headless Chromium. Works on
+ * headless Linux without any GUI libraries or xvfb.
  *
- * On headless Linux (no $DISPLAY), the CLI auto re-execs itself under
- * `xvfb-run -a` so the Electron window can render.
+ * Electron mode (ORBION_VISUAL_EVIDENCE_MODE=electron): builds and launches
+ * the real Electron app. Requires system GUI libs + xvfb on headless Linux.
  *
  * Exit codes:
  *   0 — passed or correctly skipped
@@ -23,64 +22,12 @@
 import { parseArgs } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { validateInput, runVisualEvidence } from "./run.js";
 import { resolveConfig, findRepoRoot } from "./config.js";
 import { writeManifest } from "./manifest.js";
 import { generatePrMarkdown } from "./pr-markdown.js";
 import type { RepoCoordinates } from "./types.js";
-
-const __filename = fileURLToPath(import.meta.url);
-
-/**
- * On headless Linux (no DISPLAY), re-exec this process under xvfb-run -a so
- * Electron can render. Returns true if a re-exec was performed (caller should
- * NOT continue — the child process owns the rest of the run).
- */
-function maybeRexecUnderXvfb(): boolean {
-  if (process.platform !== "linux") return false;
-  if (process.env.DISPLAY) return false;
-  if (process.env.ORBION_VISUAL_EVIDENCE_UNDER_XVFB === "1") return false;
-
-  // Check xvfb-run is on PATH
-  let xvfbBin: string;
-  try {
-    xvfbBin = execFileSync("which", ["xvfb-run"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  } catch {
-    return false; // xvfb-run not installed — proceed without, will fail later with a clear message
-  }
-  if (!xvfbBin) return false;
-
-  // Re-exec under xvfb-run. We must re-invoke via `tsx` (not plain node)
-  // because the CLI is TypeScript. Find the tsx binary.
-  const args = process.argv.slice(2);
-  // Prefer the tsx that's running us: if TSX_CLI_PATH is set (we set it below),
-  // use that; otherwise fall back to npx tsx.
-  const tsxPath = process.env.TSX_CLI_PATH ?? (() => {
-    try {
-      return execFileSync("which", ["tsx"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-    } catch {
-      return null;
-    }
-  })();
-  if (!tsxPath) return false;
-
-  const result = spawnSync("xvfb-run", ["-a", tsxPath, __filename, ...args], {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      ORBION_VISUAL_EVIDENCE_UNDER_XVFB: "1",
-      // Pass-through the tsx path so a nested re-exec (shouldn't happen)
-      // can find it.
-      TSX_CLI_PATH: tsxPath,
-    },
-  });
-  process.exit(result.status ?? 1);
-}
-
-// ── Auto re-exec under xvfb-run on headless Linux ──────────────────────
-maybeRexecUnderXvfb();
 
 /** Tracks the changeId currently being processed so the unhandled-rejection
  * handler can attribute the failure to the right change. */

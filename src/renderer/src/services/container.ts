@@ -1,4 +1,5 @@
 import { cid, container } from "inversify-hooks";
+import { addIdToCache } from "inversify-props";
 import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IOutageService, IReachabilityService, ITranscriptService, IMcpService, IAgentService, ILoopShapeCacheService, ISiblingOfferService, IPrPollingService, IPrVerdictService, IReviewModeService } from "./interfaces";
 import { ConfigService } from "./impl/ConfigService";
 import { ConnectionService } from "./impl/ConnectionService";
@@ -45,9 +46,47 @@ import {
 
 let built = false;
 
+/** Pre-populate the cid cache with string IDs for every service interface.
+ *  Under Vite's dev server + esbuild, the @injectable() decorator may not
+ *  run before addSingleton is called, leaving cid.IXxx = undefined.
+ *  Registering explicit string IDs here ensures the container always has
+ *  valid identifiers. */
+function ensureCidIds(): void {
+  const ids = [
+    "IConfigService",
+    "IConnectionService",
+    "IOpenCodeService",
+    "IVmWizardService",
+    "IInfraService",
+    "IApiService",
+    "IStreamService",
+    "ITailscaleService",
+    "INotificationService",
+    "IBudgetService",
+    "IInboxService",
+    "IOutageService",
+    "IReachabilityService",
+    "ITranscriptService",
+    "IMcpService",
+    "IAgentService",
+    "ILoopShapeCacheService",
+    "ISiblingOfferService",
+    "IPrPollingService",
+    "IPrVerdictService",
+    "IReviewModeService",
+  ];
+  for (const id of ids) {
+    if (!(cid as Record<string, unknown>)[id]) {
+      addIdToCache(id, id);
+    }
+  }
+}
+
 export function buildContainer(): void {
   if (built) return;
   built = true;
+
+  ensureCidIds();
 
   const isElectron = typeof window !== "undefined" && !!window.api;
 

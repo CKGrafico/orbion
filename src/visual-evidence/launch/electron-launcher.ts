@@ -1,20 +1,24 @@
 /**
- * Launch the Orbion Electron app under Playwright for deterministic
- * visual-evidence capture.
+ * Launch the Orbion app under Playwright for deterministic visual-evidence
+ * capture.
  *
- * - Builds the app first (`pnpm build`) unless the build output exists or
- *   `ORBION_VISUAL_EVIDENCE_SKIP_BUILD=1` is set.
- * - Uses a temp Electron user-data dir (no saved bounds, no credentials, no
- *   personal state).
- * - Pre-writes `window-bounds.json` so the launched window is exactly the
- *   configured size.
- * - Sets `ELECTRON_DISABLE_SECURITY_WARNINGS` to silence noisy console output.
+ * Supports two modes:
  *
- * Returns the Playwright `ElectronApplication` + first `Page`. The caller
- * owns closing the app.
+ * 1. **Web mock mode** (default, `ORBION_VISUAL_EVIDENCE_MODE=web`):
+ *    Starts `pnpm dev:web` (Vite dev server on port 5183) which serves the
+ *    renderer with the mock adapter (no Electron, no daemon, no real data).
+ *    Playwright's headless Chromium navigates to the dev server. This is
+ *    fast, fully deterministic, and works on headless Linux without GUI
+ *    system libraries.
+ *
+ * 2. **Electron mode** (`ORBION_VISUAL_EVIDENCE_MODE=electron`):
+ *    Builds and launches the real Electron app. Requires system GUI libs
+ *    (libatk, libgtk-3, etc.) and xvfb-run on headless Linux.
+ *
+ * The caller owns closing the app/browser.
  */
-import { _electron as electron } from "playwright";
-import { spawn } from "node:child_process";
+import { chromium } from "playwright";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -32,25 +36,14 @@ interface WindowBounds {
 }
 
 export interface LaunchedApp {
-  readonly app: import("playwright").ElectronApplication;
+  /** The Electron app (when in electron mode) or null (web mode). */
+  readonly app: import("playwright").ElectronApplication | null;
+  /** The browser context backing the page (for tracing/video). */
+  readonly context: import("playwright").BrowserContext;
+  /** The main window page — either the Electron window or the Chromium tab. */
   readonly window: import("playwright").Page;
-}
-
-function electronBinaryPath(repoRoot: string): string {
-  // pnpm symlinks node_modules/electron → .pnpm/electron@*/node_modules/electron
-  // electron/index.js exports the binary path string (CJS).
-  const electronPkg = path.join(repoRoot, "node_modules", "electron");
-  try {
-    const resolved = requireFromCjs(electronPkg) as unknown as string;
-    if (!fs.existsSync(resolved)) {
-      throw new Error(`Electron binary path resolved to "${resolved}" but the file does not exist. If you are on Linux, the system may need GUI libraries (libatk, libgtk-3, etc.) — see SKILL.md.`);
-    }
-    return resolved;
-  } catch (err) {
-    throw new Error(
-      `Failed to resolve Electron binary path. Ensure 'electron' is installed in node_modules/electron.\n  Underlying error: ${(err as Error).message}`,
-    );
-  }
+  /** Call to shut everything down (browser, dev server, Electron). */
+  close: () => Promise<void>;
 }
 
 function outputExists(repoRoot: string): boolean {
@@ -93,8 +86,82 @@ function prepareUserData(paths: TempPaths, config: VisualEvidenceConfig): void {
   fs.writeFileSync(path.join(paths.userDataDir, "window-bounds.json"), JSON.stringify(bounds));
 }
 
+function electronBinaryPath(repoRoot: string): string {
+  const electronPkg = path.join(repoRoot, "node_modules", "electron");
+  try {
+    const resolved = requireFromCjs(electronPkg) as unknown as string;
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`Electron binary path resolved to "${resolved}" but the file does not exist.`);
+    }
+    return resolved;
+  } catch (err) {
+    throw new Error(
+      `Failed to resolve Electron binary path. Ensure 'electron' is installed.\n  Underlying error: ${(err as Error).message}`,
+    );
+  }
+}
+
 /**
- * Launch the Electron app. Caller must call `app.close()` when done.
+ * Wait for the React renderer to mount real content inside #root.
+ * Works for both Electron and Chromium pages.
+ */
+async function waitForReactMount(page: import("playwright").Page): Promise<void> {
+  try {
+    await page.waitForSelector("#root", { state: "attached", timeout: 15_000 });
+    await page.waitForFunction(
+      () => {
+        const root = document.getElementById("root");
+        if (!root) return false;
+        return root.children.length > 0 && (root.textContent ?? "").trim().length > 0;
+      },
+      { timeout: 20_000 },
+    );
+  } catch {
+    // Best-effort: assertions will report the failure
+  }
+}
+
+/**
+ * Start the Vite dev server (`pnpm dev:web`) on the configured port and
+ * wait for it to be ready.
+ */
+function startDevServer(repoRoot: string, port: number): { process: ChildProcess; url: string } {
+  const proc = spawn("pnpm", ["dev:web", "--port", String(port), "--strictPort"], {
+    cwd: repoRoot,
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: process.platform === "win32",
+    env: { ...process.env, ORBION_VISUAL_EVIDENCE: "1" },
+  });
+  const url = `http://localhost:${port}`;
+  return { process: proc, url };
+}
+
+/**
+ * Wait for the Vite dev server to respond.
+ */
+async function waitForDevServer(url: string, timeoutMs = 30_000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const resp = await fetch(url);
+      if (resp.ok || resp.status === 200) return;
+    } catch {
+      // Server not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Vite dev server at ${url} did not respond within ${timeoutMs}ms`);
+}
+
+/**
+ * Launch the app in the mode selected by ORBION_VISUAL_EVIDENCE_MODE.
+ *
+ * Default: "web" (mock adapter via Vite dev server + headless Chromium).
+ *   - Fast, no system GUI libs needed, fully deterministic.
+ *   - Works on headless Linux without xvfb.
+ *
+ * "electron": build + launch the real Electron app.
+ *   - Requires system GUI libs + xvfb on headless Linux.
  */
 export async function launchElectronApp(
   repoRoot: string,
@@ -102,15 +169,67 @@ export async function launchElectronApp(
   config: VisualEvidenceConfig,
   opts?: { skipBuild?: boolean },
 ): Promise<LaunchedApp> {
+  const mode = process.env.ORBION_VISUAL_EVIDENCE_MODE ?? "web";
+
+  if (mode === "electron") {
+    return launchElectronMode(repoRoot, paths, config, opts);
+  }
+  return launchWebMode(repoRoot, paths, config);
+}
+
+async function launchWebMode(
+  repoRoot: string,
+  _paths: TempPaths,
+  config: VisualEvidenceConfig,
+): Promise<LaunchedApp> {
+  const port = 5183;
+  const { process: devProc, url } = startDevServer(repoRoot, port);
+  let browser: import("playwright").Browser | null = null;
+
+  try {
+    await waitForDevServer(url, 30_000);
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: { width: config.window.width, height: config.window.height },
+    });
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });
+    await waitForReactMount(page);
+
+    return {
+      app: null,
+      context,
+      window: page,
+      close: async () => {
+        try { await context.close(); } catch { /* ignore */ }
+        try { await browser?.close(); } catch { /* ignore */ }
+        try { devProc.kill("SIGTERM"); } catch { /* ignore */ }
+      },
+    };
+  } catch (err) {
+    try { devProc.kill("SIGTERM"); } catch { /* ignore */ }
+    try { await browser?.close(); } catch { /* ignore */ }
+    throw err;
+  }
+}
+
+async function launchElectronMode(
+  repoRoot: string,
+  paths: TempPaths,
+  config: VisualEvidenceConfig,
+  opts?: { skipBuild?: boolean },
+): Promise<LaunchedApp> {
+  // Lazy-import electron only in electron mode (avoids requiring Playwright's
+  // electron module in web mode).
+  const { _electron: electron } = await import("playwright");
+
   await ensureBuilt(repoRoot, { skip: opts?.skipBuild ?? process.env.ORBION_VISUAL_EVIDENCE_SKIP_BUILD === "1" });
   prepareUserData(paths, config);
 
   const executablePath = electronBinaryPath(repoRoot);
   const mainEntry = path.join(repoRoot, "out", "main", "index.js");
   if (!fs.existsSync(mainEntry)) {
-    throw new Error(
-      `Built main entry not found at ${mainEntry}. Run 'pnpm build' first or unset ORBION_VISUAL_EVIDENCE_SKIP_BUILD.`,
-    );
+    throw new Error(`Built main entry not found at ${mainEntry}. Run 'pnpm build' first.`);
   }
 
   let app: import("playwright").ElectronApplication;
@@ -130,42 +249,27 @@ export async function launchElectronApp(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `Failed to launch Electron app: ${msg}. On headless Linux, install the required system GUI libraries (libatk1.0-0 libcups2 libgtk-3-0 libnss3 etc.; see SKILL.md) and run under xvfb-run.`,
+      `Failed to launch Electron app: ${msg}. On headless Linux, install the required system GUI libraries (see SKILL.md) and run under xvfb-run, or use ORBION_VISUAL_EVIDENCE_MODE=web.`,
     );
   }
 
   const window = await app.firstWindow();
+  const context = app.context();
 
-  // Force the viewport to a deterministic size regardless of any platform chrome.
   try {
     await window.setViewportSize({ width: config.window.width, height: config.window.height });
   } catch {
-    // Best-effort — ignore if headless/unsupported
+    // Best-effort
   }
 
-  // Wait for the React renderer to actually mount content. firstWindow()
-  // returns as soon as the native window exists — but the page is still dark
-  // navy (the BrowserWindow backgroundColor) until React renders the app.
-  // We wait for the #root element to have non-empty children, plus actual
-  // text content (which is present in every state: cold-open headline,
-  // sidebar brand, etc.).
-  try {
-    await window.waitForSelector("#root", { state: "attached", timeout: 15_000 });
-    // Wait for real content inside #root (not just the empty div). The
-    // function body is a string evaluated in the page context, so no DOM
-    // types are needed in this file.
-    await window.waitForFunction(
-      () => {
-        const root = document.getElementById("root");
-        if (!root) return false;
-        return root.children.length > 0 && (root.textContent ?? "").trim().length > 0;
-      },
-      { timeout: 20_000 },
-    );
-  } catch {
-    // Best-effort: if the React app didn't mount in time, we still capture
-    // what's on screen (the scenario assertions will then report failure).
-  }
+  await waitForReactMount(window);
 
-  return { app, window };
+  return {
+    app,
+    context,
+    window,
+    close: async () => {
+      try { await app.close(); } catch { /* ignore */ }
+    },
+  };
 }
