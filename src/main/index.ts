@@ -148,6 +148,7 @@ import {
   closeTunnelsForEnvironment,
   resolveEffectiveUrl,
   closeAllRegistryTunnels,
+  forceKillAllRegistryTunnels,
   onTunnelReconnect,
 } from "./tunnel-registry.js";
 import {
@@ -2262,4 +2263,12 @@ app.on("window-all-closed", () => {
   endpointTrackers.clear();
   closeAllRegistryTunnels();
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  closeAllRegistryTunnels();
+});
+
+process.on("exit", () => {
+  forceKillAllRegistryTunnels();
 });
