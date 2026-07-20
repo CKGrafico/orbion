@@ -91,6 +91,7 @@ export interface RunOptions {
   readonly repo?: RepoCoordinates;
   readonly sha?: string;
   readonly skipBuild?: boolean;
+  readonly allowArchived?: boolean;
 }
 
 export async function runVisualEvidence(
@@ -103,7 +104,7 @@ export async function runVisualEvidence(
   // 1. Resolve the OpenSpec change
   let ctx;
   try {
-    ctx = readChangeContext(repoRoot, input.changeId);
+    ctx = readChangeContext(repoRoot, input.changeId, { allowArchived: opts.allowArchived });
   } catch (err) {
     return blockedResult(input.changeId, `Failed to resolve OpenSpec change: ${(err as Error).message}`);
   }

@@ -249,4 +249,30 @@ registerScenario({
   changeId: "gh-154-agent-briefing-default",
   runner: gh154AgentBriefingDefaultScenario,
   description: "Agent briefing as the default PR review view with flagged hunks inline and boilerplate collapsed",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "briefing-default",
+        description: "Review mode opens on the agent briefing instead of raw diff.",
+        assertionDescriptions: [
+          "The briefing view is the default view in review mode (not raw diff)",
+          "The briefing summary is visible with analysis text",
+          "Flagged files are visible with risk chips and inline diff hunks",
+        ],
+        captureLabels: ["briefing"],
+      },
+      {
+        id: "boilerplate-disclosure",
+        description: "Boilerplate files remain grouped behind a disclosure.",
+        assertionDescriptions: ["Boilerplate section is present and collapsed by default"],
+        captureLabels: ["briefing"],
+      },
+      {
+        id: "raw-diff-fallback",
+        description: "The raw diff remains available as a fallback.",
+        assertionDescriptions: ["Clicking the Raw diff tab switches to the raw diff view"],
+        captureLabels: ["raw-diff"],
+      },
+    ],
+  },
 });

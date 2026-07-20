@@ -3,30 +3,78 @@
   "changeId": "gh-154-agent-briefing-default",
   "required": true,
   "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/archive/2026-07-20-gh-154-agent-briefing-default/evidence/01-raw-diff.webp",
+      "caption": "Raw diff remains available as the review fallback",
+      "width": 1280,
+      "height": 720,
+      "bytes": 46788,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/archive/2026-07-20-gh-154-agent-briefing-default/evidence/02-briefing.webp",
+      "caption": "Agent briefing shown by default with flagged and boilerplate files",
+      "width": 1280,
+      "height": 720,
+      "bytes": 43152,
+      "format": "webp"
+    }
+  ],
   "scenario": {
     "title": "Agent briefing as default PR review view",
     "steps": [
-      "Enter review mode from a PR inbox notification",
+      "Navigate to the inbox view",
+      "Click a PR awaiting review item",
       "Verify briefing view is the default (not raw diff)",
       "Verify briefing summary text is visible",
       "Verify flagged files with risk chips and inline hunks",
-      "Verify tab toggle shows Briefing and Raw diff options",
-      "Verify clicking Raw diff tab switches to the diff viewer",
+      "Verify tab toggle shows Briefing and Raw diff",
+      "Verify clicking Raw diff tab switches to diff view",
       "Verify clicking Briefing tab returns to briefing view",
-      "Verify boilerplate section can be expanded to show collated files",
+      "Verify boilerplate section is collapsed by default",
       "Press Escape and verify review mode closes"
     ]
   },
   "assertions": [
-    { "description": "Briefing view is the default in review mode (not raw diff)", "status": "passed" },
-    { "description": "Briefing summary is visible with analysis text", "status": "passed" },
-    { "description": "Flagged files are visible with risk chips and inline diff hunks", "status": "passed" },
-    { "description": "Tab toggle shows both Briefing and Raw diff options", "status": "passed" },
-    { "description": "Clicking Raw diff tab switches to the raw diff view", "status": "passed" },
-    { "description": "Clicking Briefing tab returns to the briefing view", "status": "passed" },
-    { "description": "Boilerplate section is present and can be expanded", "status": "passed" },
-    { "description": "Pressing Escape closes review mode", "status": "passed" }
+    {
+      "description": "Review mode is accessible (via inbox or direct entry)",
+      "status": "passed"
+    },
+    {
+      "description": "The briefing view is the default view in review mode (not raw diff)",
+      "status": "passed"
+    },
+    {
+      "description": "The briefing summary is visible with analysis text",
+      "status": "passed"
+    },
+    {
+      "description": "Flagged files are visible with risk chips and inline diff hunks",
+      "status": "passed"
+    },
+    {
+      "description": "The tab toggle shows both Briefing and Raw diff options",
+      "status": "passed"
+    },
+    {
+      "description": "Clicking the Raw diff tab switches to the raw diff view",
+      "status": "passed"
+    },
+    {
+      "description": "Clicking the Briefing tab returns to the briefing view",
+      "status": "passed"
+    },
+    {
+      "description": "Boilerplate section is present and collapsed by default",
+      "status": "passed"
+    },
+    {
+      "description": "Pressing Escape closes review mode and returns to inbox",
+      "status": "passed"
+    }
   ],
-  "assets": [],
-  "prMarkdown": "## Visual Evidence\n\n**Change: Agent briefing first; raw diff as the fallback**\n\n### What changed\n\nThe PR review mode now opens with an **agent briefing** as the default view instead of the raw diff. The briefing:\n\n- Shows a summary of what changed, why, and where risk is\n- Displays **flagged files inline** with risk level chips (high/medium/low) and diff hunks\n- **Collapses boilerplate** changes (formatting, imports, lock files) into a one-line summary like `+240/-30 formatting & imports - expand`\n- One click on **Raw diff** tab switches to the full unified diff viewer\n- One click on **Briefing** tab returns to the briefing view\n\n### Acceptance criteria verified\n\n1. **Default: agent briefing** - Review mode opens to `ReviewBriefingView`, not `ReviewDiffView`\n2. **Flagged hunks inline** - Files matching high/medium risk patterns show inline diff lines with add/remove coloring\n3. **Boilerplate collapsed** - Lock files, formatting-only files, import-only files collapsed into expandable section\n4. **One action switches to full raw diff** - Pill toggle in header switches between Briefing and Raw diff\n5. **Briefing derives only from diff content** - Classification uses pure heuristic pattern matching in `diff-analyzer.ts`"
+  "prMarkdown": "## Visual Evidence\n### Agent briefing as default PR review view\n\n![Raw diff remains available as the review fallback](https://raw.githubusercontent.com/CKGrafico/orbion/878a1f30fa4347bd3d1417a55329346c964d760b/openspec/changes/archive/2026-07-20-gh-154-agent-briefing-default/evidence/01-raw-diff.webp)\n![Agent briefing shown by default with flagged and boilerplate files](https://raw.githubusercontent.com/CKGrafico/orbion/878a1f30fa4347bd3d1417a55329346c964d760b/openspec/changes/archive/2026-07-20-gh-154-agent-briefing-default/evidence/02-briefing.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Navigate to the inbox view\n2. Click a PR awaiting review item\n3. Verify briefing view is the default (not raw diff)\n4. Verify briefing summary text is visible\n5. Verify flagged files with risk chips and inline hunks\n6. Verify tab toggle shows Briefing and Raw diff\n7. Verify clicking Raw diff tab switches to diff view\n8. Verify clicking Briefing tab returns to briefing view\n9. Verify boilerplate section is collapsed by default\n10. Press Escape and verify review mode closes\n\n</details>"
 }

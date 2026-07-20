@@ -38,6 +38,7 @@ let pendingChangeId: string | null = null;
 interface ParsedArgs {
   change?: string;
   input?: string;
+  allowArchived?: boolean;
 }
 
 function parseCliArgs(argv: readonly string[]): ParsedArgs {
@@ -46,11 +47,12 @@ function parseCliArgs(argv: readonly string[]): ParsedArgs {
     options: {
       change: { type: "string" },
       input: { type: "string" },
+      "allow-archived": { type: "boolean" },
     },
     strict: true,
     allowPositionals: false,
   });
-  return { change: values.change, input: values.input };
+  return { change: values.change, input: values.input, allowArchived: values["allow-archived"] };
 }
 
 function readInputFile(p: string): unknown {
@@ -155,7 +157,13 @@ async function main(): Promise<number> {
 
   let result;
   try {
-    result = await runVisualEvidence(input, { config, repo, sha, skipBuild: process.env.ORBION_VISUAL_EVIDENCE_SKIP_BUILD === "1" });
+    result = await runVisualEvidence(input, {
+      config,
+      repo,
+      sha,
+      skipBuild: process.env.ORBION_VISUAL_EVIDENCE_SKIP_BUILD === "1",
+      allowArchived: parsed.allowArchived,
+    });
   } catch (err) {
     console.error(`Visual-evidence run failed unexpectedly: ${(err as Error).message}`);
     return 1;

@@ -29,6 +29,10 @@ type AssertionSpec = {
   run: (p: Page) => Promise<void>;
 };
 
+function prItem(page: Page) {
+  return page.locator(".digest-child-item, .inbox-view-item").filter({ hasText: /#/ }).first();
+}
+
 export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
@@ -53,10 +57,15 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
     await page.waitForTimeout(1000);
   }
 
+  const digestHeader = page.locator(".digest-view-item-header").first();
+  if ((await digestHeader.count()) > 0) {
+    await digestHeader.click();
+  }
+
   // Check if we have PR items - if not, try to navigate directly into review mode
   // by triggering review mode from the mock service
   let hasPrItems = false;
-  const prItems = page.locator(".inbox-view-item").filter({ hasText: /#/ });
+  const prItems = page.locator(".digest-child-item, .inbox-view-item").filter({ hasText: /#/ });
   if ((await prItems.count()) > 0) {
     hasPrItems = true;
   }
@@ -72,7 +81,7 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
     }
 
     // Re-check for PR items after potential navigation
-    const recheckPrItems = page.locator(".inbox-view-item").filter({ hasText: /#/ });
+    const recheckPrItems = page.locator(".digest-child-item, .inbox-view-item").filter({ hasText: /#/ });
     if ((await recheckPrItems.count()) > 0) {
       hasPrItems = true;
     }
@@ -104,9 +113,9 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
       run: async (p) => {
         // If we have PR items, click one to enter review mode
         if (hasPrItems) {
-          const prItem = p.locator(".inbox-view-item").filter({ hasText: /#/ }).first();
-          if ((await prItem.count()) > 0) {
-            await prItem.click();
+            const item = prItem(p);
+            if ((await item.count()) > 0) {
+              await item.click();
             await p.waitForTimeout(2000);
           }
         }
@@ -189,6 +198,10 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
         if ((await diffView.count()) === 0) {
           throw new Error("Raw diff view did not appear after clicking Raw diff tab");
         }
+        await ctx.captureCheckpoint(
+          "raw-diff",
+          "Raw diff remains available as the review fallback",
+        );
       },
     },
     {
@@ -204,24 +217,23 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
       },
     },
     {
-      description: "Boilerplate section is present and can be expanded",
+      description: "Boilerplate section is present and collapsed by default",
       run: async (p) => {
-        const boilerplateSection = p.locator(".review-briefing-boilerplate");
+        const boilerplateSection = p.locator(".review-briefing-boilerplate:visible").first();
         if ((await boilerplateSection.count()) === 0) {
-          // No boilerplate is valid for some diffs; skip gracefully
-          return;
+          throw new Error("Boilerplate section is not present");
         }
-        const boilerplateHeader = p.locator(".review-briefing-boilerplate-header");
+        const boilerplateHeader = p.locator(".review-briefing-boilerplate-header:visible").first();
         if ((await boilerplateHeader.count()) === 0) {
           throw new Error("Boilerplate section header not visible");
         }
-        // Click to expand
-        await boilerplateHeader.click();
-        await p.waitForTimeout(500);
-        const expandedFiles = p.locator(".review-briefing-boilerplate-file");
-        if ((await expandedFiles.count()) === 0) {
-          throw new Error("Boilerplate files not visible after expanding");
+        if ((await boilerplateHeader.getAttribute("aria-expanded")) !== "false") {
+          throw new Error("Boilerplate section is not collapsed by default");
         }
+        await ctx.captureCheckpoint(
+          "briefing",
+          "Agent briefing shown by default with flagged and boilerplate files",
+        );
       },
     },
     {
@@ -251,7 +263,7 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
         "Verify tab toggle shows Briefing and Raw diff",
         "Verify clicking Raw diff tab switches to diff view",
         "Verify clicking Briefing tab returns to briefing view",
-        "Verify boilerplate section can be expanded",
+        "Verify boilerplate section is collapsed by default",
         "Press Escape and verify review mode closes",
       ],
     },
