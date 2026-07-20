@@ -1230,6 +1230,8 @@ function AppInner(): React.ReactNode {
             reachability={reachability[sessionEnvId]}
             loops={isUnhomed ? [] : sessionLoops}
             perEnvLoops={perEnvLoops}
+            fleetReachability={reachability}
+            perEnvProjects={perEnvProjects}
             instance={sessionEnv}
             isEphemeral={!session?.persisted}
             onPersistSession={() => handlePersistSession(view.sessionId)}

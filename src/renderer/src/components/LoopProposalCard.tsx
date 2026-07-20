@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from "react";
 import { useIntl } from "react-intl";
 import type { LoopProposalRow, LoopProposalStatus } from "../chat/types";
+import type { SimilarLoopMatch } from "../fleet-similarity";
 import type { Environment } from "../types";
 import { commandLine } from "../format";
-import { createLoop, isAgentCommand, SUGGESTED_MAX_RUNS } from "../api";
+import { createLoop, SUGGESTED_MAX_RUNS } from "../api";
 
 interface LoopProposalCardProps {
   row: LoopProposalRow;
@@ -15,9 +16,11 @@ interface LoopProposalCardProps {
   onRejected: (proposalId: string) => void;
   /** Callback when the proposal status changes (e.g., creating, error). */
   onStatusChange: (proposalId: string, status: LoopProposalStatus, error?: string) => void;
+  /** Similar loops from other reachable instances (transient, computed on render). */
+  similarLoops?: SimilarLoopMatch[];
 }
 
-export function LoopProposalCard({ row, instance, onApproved, onRejected, onStatusChange }: LoopProposalCardProps): React.ReactNode {
+export function LoopProposalCard({ row, instance, onApproved, onRejected, onStatusChange, similarLoops }: LoopProposalCardProps): React.ReactNode {
   const intl = useIntl();
 
   const isPending = row.status === "pending";
@@ -27,21 +30,27 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
   const isError = row.status === "error";
   const isTerminal = isCreated || isRejected;
 
-  // Local editable state for max-runs and run-immediately
+  // Local editable state for command, interval, max-runs, and run-immediately
+  const [command, setCommand] = useState(row.command);
+  const [commandArgs] = useState(row.commandArgs);
+  const [interval, setInterval] = useState(row.interval);
   const [maxRuns, setMaxRuns] = useState<number | null>(row.maxRuns);
   const [runImmediately, setRunImmediately] = useState(row.runImmediately);
 
   // Whether this is an agent command that got a suggestion
   const hasSuggestion = row.suggestedMaxRuns !== null && maxRuns === null;
-  const agentDetected = isAgentCommand(row.command);
 
   // Toggle for command disclosure
   const [commandExpanded, setCommandExpanded] = useState(false);
-  const fullCommand = commandLine(row.command, row.commandArgs);
+  const fullCommand = commandLine(command, commandArgs);
   const isLongCommand = fullCommand.length > 80;
   const displayCommand = isLongCommand && !commandExpanded
     ? fullCommand.slice(0, 77) + "..."
     : fullCommand;
+
+  // Similar loops section toggle
+  const [similarExpanded, setSimilarExpanded] = useState(false);
+  const hasSimilar = similarLoops && similarLoops.length > 0;
 
   const handleApprove = useCallback(async (): Promise<void> => {
     if (!instance) return;
@@ -50,9 +59,9 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
 
     try {
       const result = await createLoop(instance, {
-        command: row.command,
-        commandArgs: row.commandArgs,
-        interval: row.interval,
+        command,
+        commandArgs,
+        interval,
         projectId: row.projectId,
         runImmediately,
         maxRuns,
@@ -69,7 +78,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
     } catch {
       onStatusChange(row.proposalId, "error", intl.formatMessage({ id: "loopProposal.createError" }));
     }
-  }, [instance, row, maxRuns, runImmediately, onApproved, onStatusChange, intl]);
+  }, [instance, row, command, commandArgs, interval, maxRuns, runImmediately, onApproved, onStatusChange, intl]);
 
   const handleReject = useCallback((): void => {
     onRejected(row.proposalId);
@@ -89,6 +98,12 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
         setMaxRuns(Math.floor(num));
       }
     }
+  }, []);
+
+  const handleUseAsStartingPoint = useCallback((match: SimilarLoopMatch): void => {
+    setCommand(match.loop.command);
+    setInterval(match.loop.intervalHuman);
+    setSimilarExpanded(false);
   }, []);
 
   return (
@@ -125,7 +140,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
       <div className="loop-proposal-meta">
         <span className="loop-proposal-meta-item">
           <span className="loop-proposal-meta-label">{intl.formatMessage({ id: "loopProposal.interval" })}</span>
-          <span className="loop-proposal-meta-value loop-proposal-meta-value--mono">{row.interval}</span>
+          <span className="loop-proposal-meta-value loop-proposal-meta-value--mono">{interval}</span>
         </span>
         <span className="loop-proposal-meta-sep" />
         <span className="loop-proposal-meta-item">
@@ -133,6 +148,61 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
           <span className="loop-proposal-meta-value">{row.projectName}</span>
         </span>
       </div>
+
+      {/* Similar loops section */}
+      {hasSimilar && isPending && (
+        <div className="similar-loops-section">
+          <button
+            className="similar-loops-header"
+            onClick={() => setSimilarExpanded(!similarExpanded)}
+          >
+            <span className="similar-loops-header-icon">⚡</span>
+            <span className="similar-loops-header-text">
+              {intl.formatMessage(
+                { id: "similarLoops.titleWithCount" },
+                { count: similarLoops!.length },
+              )}
+            </span>
+            <span className={`similar-loops-toggle${similarExpanded ? " similar-loops-toggle--expanded" : ""}`}>
+              {similarExpanded ? "▴" : "▾"}
+            </span>
+          </button>
+          {similarExpanded && (
+            <div className="similar-loops-list">
+              {similarLoops!.map((match) => (
+                <div key={match.loop.id} className="similar-loop-item">
+                  <div className="similar-loop-attribution">
+                    <span className="similar-loop-instance">{match.environmentName}</span>
+                    <span className="similar-loop-sep">·</span>
+                    <span className="similar-loop-project">{match.projectName}</span>
+                  </div>
+                  <div className="similar-loop-command">
+                    {commandLine(match.loop.command, match.loop.commandArgs)}
+                  </div>
+                  <div className="similar-loop-meta">
+                    <span className="similar-loop-interval">{match.loop.intervalHuman}</span>
+                    {match.matchReasons.length > 0 && (
+                      <span className="similar-loop-reasons">
+                        {match.matchReasons.map((reason) => (
+                          <span key={reason} className="similar-loop-reason-tag">
+                            {intl.formatMessage({ id: reason })}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="similar-loop-use-btn"
+                    onClick={() => handleUseAsStartingPoint(match)}
+                  >
+                    {intl.formatMessage({ id: "similarLoops.useAsStartingPoint" })}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Options row */}
       {isPending && (

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus, SharedTaskWarning } from "../chat/types";
@@ -7,6 +7,7 @@ import type { IAgentService, IMcpService, ITranscriptService, IConfigService, II
 import type { LoopMeta, Environment, LoopWithOrigin, FleetLoopRollup } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { diagnoseFailure } from "../chat/diagnoseFailure";
+import { computeSimilarLoops } from "../fleet-similarity";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { usePipelineCounts } from "./usePipelineCounts";
@@ -88,6 +89,31 @@ function detectSharedTaskWarning(
   };
 }
 
+function buildFleetLoopsWithOrigin(
+  perEnvLoops: Record<string, LoopMeta[]>,
+  environments: Array<{ id: string; name: string }>,
+  perEnvProjects: Record<string, import("../types").Project[]>,
+  reachability: Record<string, ReachabilityState>,
+): LoopWithOrigin[] {
+  const result: LoopWithOrigin[] = [];
+  for (const env of environments) {
+    const state = reachability[env.id];
+    if (state === "unreachable" || state === "reconnecting") continue;
+    const envLoops = perEnvLoops[env.id] ?? [];
+    const envProjects = perEnvProjects[env.id] ?? [];
+    for (const loop of envLoops) {
+      const project = envProjects.find((p) => p.id === (loop.projectId ?? "default"));
+      result.push({
+        loop,
+        environmentId: env.id,
+        environmentName: env.name,
+        projectName: project?.name ?? "Default",
+      });
+    }
+  }
+  return result;
+}
+
 interface SessionChatViewProps {
   sessionId: string;
   environmentId: string;
@@ -101,6 +127,10 @@ interface SessionChatViewProps {
   loops: LoopMeta[];
   /** All per-environment loops, for resolving loop-card rows. */
   perEnvLoops: Record<string, LoopMeta[]>;
+  /** Per-environment reachability map, for similar-loops computation. */
+  fleetReachability?: Record<string, ReachabilityState>;
+  /** Per-environment projects, for resolving project names in similar-loop results. */
+  perEnvProjects?: Record<string, import("../types").Project[]>;
   /** The full environment instance, for log tail in loop cards. */
   instance?: Environment;
   /** Whether this session is ephemeral (scratch). */
@@ -127,7 +157,7 @@ interface SessionChatViewProps {
   projectId?: string;
 }
 
-export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, instance, isEphemeral = false, onPersistSession, turnCount, onTurnSent, autoPersistedJustNow, onDeclineAutoPersist, onUnpersistSession, fleetMode, fleetRollup, fleetLoopsWithOrigin, projectId }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, fleetReachability, perEnvProjects, instance, isEphemeral = false, onPersistSession, turnCount, onTurnSent, autoPersistedJustNow, onDeclineAutoPersist, onUnpersistSession, fleetMode, fleetRollup, fleetLoopsWithOrigin, projectId }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [mcpService] = useInject<IMcpService>(cid.IMcpService);
@@ -182,6 +212,12 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     });
     return () => { cancelled = true; };
   }, [projectId, fleetMode, configService]);
+
+  // ── Fleet-wide loops for similar-loop computation ────────────────────
+  const fleetLoopsForSimilarity = useMemo(() => {
+    if (!fleetReachability || !perEnvProjects) return fleetLoopsWithOrigin ?? [];
+    return buildFleetLoopsWithOrigin(perEnvLoops, environments, perEnvProjects, fleetReachability);
+  }, [perEnvLoops, environments, perEnvProjects, fleetReachability, fleetLoopsWithOrigin]);
 
   // ── Auto-persist notice ──────────────────────────────────────────────
   const [showAutoPersistNotice, setShowAutoPersistNotice] = useState(false);
@@ -880,6 +916,14 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 );
               }
               case "loop-proposal": {
+                const similar = row.status === "pending" && fleetReachability
+                  ? computeSimilarLoops({
+                      proposal: { command: row.command, interval: row.interval, projectName: row.projectName },
+                      fleetLoops: fleetLoopsForSimilarity,
+                      reachability: fleetReachability,
+                      ownEnvironmentId: environmentId,
+                    })
+                  : undefined;
                 return (
                   <div key={row.id} className="transcript-loop-proposal">
                     <LoopProposalCard
@@ -888,6 +932,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onApproved={handleProposalApproved}
                       onRejected={handleProposalRejected}
                       onStatusChange={handleProposalStatusChange}
+                      similarLoops={similar}
                     />
                   </div>
                 );

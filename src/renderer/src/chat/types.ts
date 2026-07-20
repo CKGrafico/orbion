@@ -1,4 +1,5 @@
 import type { ChainStep } from "../components/TaskChainView";
+import type { SimilarLoopMatch } from "../fleet-similarity";
 import type { FailureCategory } from "./diagnoseFailure";
 
 export type ToolCallStatus = "running" | "completed" | "error";
@@ -189,6 +190,8 @@ export interface LoopProposalRow extends BaseRow {
   createdLoopId: string | null;
   /** Populated on creation error. */
   error: string | null;
+  /** Similar loops from other reachable instances, computed transiently. */
+  similarLoops?: SimilarLoopMatch[];
 }
 
 /** Status lifecycle for a chain-edit proposal. */

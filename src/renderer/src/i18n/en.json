@@ -858,6 +858,15 @@
     "statusRejected": "Rejected",
     "createError": "Failed to create loop"
   },
+  "similarLoops": {
+    "titleWithCount": "{count, plural, one {# similar loop} other {# similar loops}} on other instances",
+    "useAsStartingPoint": "Use as starting point",
+    "reason": {
+      "commandMatch": "Same command",
+      "intervalMatch": "Same interval",
+      "projectMatch": "Same project"
+    }
+  },
   "chainEditProposal": {
     "title": "Chain edit proposal",
     "previewLabel": "PROPOSED CHAIN",
