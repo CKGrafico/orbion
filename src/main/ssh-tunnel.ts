@@ -4,6 +4,7 @@ import { validateSshHost } from "./ssh-config.js";
 import { msg } from "./i18n.js";
 
 const TUNNEL_CONNECT_TIMEOUT_MS = 15_000;
+const SIGKILL_TIMEOUT_MS = 2_000;
 
 export interface TunnelExitEvent {
   tunnelId: string;
@@ -20,6 +21,8 @@ interface TunnelHandle {
   host: SshHost;
   /** True if closeTunnel() was called intentionally (not an unexpected exit). */
   intentionalClose: boolean;
+  /** Scheduled SIGKILL fallback if process doesn't exit after SIGTERM. */
+  killTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const activeTunnels = new Map<string, TunnelHandle>();
@@ -95,7 +98,7 @@ export function openTunnel(
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        const handle: TunnelHandle = { process: proc, localPort, remotePort, host, intentionalClose: false };
+        const handle: TunnelHandle = { process: proc, localPort, remotePort, host, intentionalClose: false, killTimer: null };
         activeTunnels.set(tunnelId, handle);
         registered = true;
         resolve({
@@ -148,6 +151,10 @@ export function openTunnel(
     proc.on("exit", (code) => {
       const handle = activeTunnels.get(tunnelId);
       const wasIntentional = handle?.intentionalClose ?? false;
+      if (handle?.killTimer) {
+        clearTimeout(handle.killTimer);
+        handle.killTimer = null;
+      }
       activeTunnels.delete(tunnelId);
 
       if (!resolved) {
@@ -177,18 +184,51 @@ export function openTunnel(
 
 export function closeTunnel(tunnelId: string): void {
   const handle = activeTunnels.get(tunnelId);
-  if (handle) {
-    handle.intentionalClose = true;
+  if (!handle) return;
+  handle.intentionalClose = true;
+  if (handle.process.exitCode === null) {
     handle.process.kill();
+    handle.killTimer = setTimeout(() => {
+      handle.killTimer = null;
+      if (handle.process.exitCode === null) {
+        handle.process.kill("SIGKILL");
+      }
+    }, SIGKILL_TIMEOUT_MS);
+  } else {
     activeTunnels.delete(tunnelId);
   }
 }
 
 export function closeAllTunnels(): void {
   for (const [id, handle] of activeTunnels) {
-    handle.process.kill();
-    activeTunnels.delete(id);
+    handle.intentionalClose = true;
+    if (handle.process.exitCode === null) {
+      handle.process.kill();
+      handle.killTimer = setTimeout(() => {
+        handle.killTimer = null;
+        if (handle.process.exitCode === null) {
+          handle.process.kill("SIGKILL");
+        }
+      }, SIGKILL_TIMEOUT_MS);
+    } else {
+      activeTunnels.delete(id);
+    }
   }
+}
+
+/** Synchronous last-resort kill: sends SIGKILL to all tracked tunnel processes.
+ *  Used from process.on("exit") where async timers cannot fire. */
+export function forceKillAllTunnels(): void {
+  for (const handle of activeTunnels.values()) {
+    if (handle.process.exitCode === null) {
+      try {
+        handle.process.kill("SIGKILL");
+      } catch {
+        // Process may have already exited between check and kill
+      }
+    }
+  }
+  activeTunnels.clear();
 }
 
 export function getTunnelId(host: SshHost, remotePort: number): string {

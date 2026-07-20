@@ -16,7 +16,7 @@
  */
 
 import type { SshHost, AccessEndpoint } from "../shared/ipc.js";
-import { openTunnel, closeTunnel, closeAllTunnels, getTunnelId, findExistingTunnel, onTunnelExit, isTunnelAlive, type TunnelExitEvent } from "./ssh-tunnel.js";
+import { openTunnel, closeTunnel, closeAllTunnels, forceKillAllTunnels, getTunnelId, findExistingTunnel, onTunnelExit, isTunnelAlive, type TunnelExitEvent } from "./ssh-tunnel.js";
 import { parseTarget, listSshHosts, validateSshHost } from "./ssh-config.js";
 
 /** Port range for auto-assigned local tunnel ports. */
@@ -326,6 +326,17 @@ export function closeAllRegistryTunnels(): void {
 /** Register a callback for tunnel reconnection status changes. */
 export function onTunnelReconnect(cb: TunnelReconnectCallback): void {
   reconnectCallback = cb;
+}
+
+/** Synchronous last-resort kill for process exit. Sends SIGKILL to all SSH tunnel child processes. */
+export function forceKillAllRegistryTunnels(): void {
+  for (const entry of registry.values()) {
+    if (entry.reconnect?.retryTimer) {
+      clearTimeout(entry.reconnect.retryTimer);
+    }
+  }
+  registry.clear();
+  forceKillAllTunnels();
 }
 
 /**
