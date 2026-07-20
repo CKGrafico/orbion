@@ -2,7 +2,7 @@
 description: Autonomous pipeline: explore, propose, apply, archive, then merge/PR/push. For loop-engineering.
 ---
 
-Run the **full OpenSpec lifecycle** end to end with **no human interaction**: explore the codebase, propose a plan, implement via subagent waves, archive, and merge back. Built for **loop-engineering / unattended runs**.
+Run the **full OpenSpec lifecycle** end to end with **no human interaction**: explore the goal to clarify the requirement, propose a plan, implement via subagent waves, archive, and merge back. Built for **loop-engineering / unattended runs**.
 
 Each phase executes an `ob-*` skill in **autonomous mode**: load the named skill with the `skill` tool and follow it. Autonomous mode is defined inside each skill: every user checkpoint auto-resolves and nothing is ever asked.
 
@@ -57,8 +57,9 @@ Wait 3 seconds. If the user says "stop", end the command. Otherwise proceed. If 
 
 **Phase 2: Explore (read-only, autonomous).**
 - Load the `ob-plan-explore` skill and execute it in **autonomous mode** with the resolved input. There is no user: you are exploring solo.
-- The exploration must be a **Socratic internal debate**: formulate 3-5 probing questions about the problem space, investigate each one by reading code and tracing call paths (use CodeGraph MCP tools if available, otherwise grep/read), then **answer your own questions** with evidence from the codebase. Where an answer opens a new question, follow it (one level of follow-up per question, max). This is an engineer thinking aloud, not a checklist, weigh alternatives, consider risks, and reason through tradeoffs before settling on an approach.
-- The exploration feeds directly into Phase 3. No commit yet (exploration is read-only).
+- **The subject of the exploration is the requirement, not the codebase.** Given `/plan-goal create an auth page`, you are exploring what "an auth page" must be: the user need behind it, the scope, the acceptance criteria, the edge cases, the alternatives, the risks. The codebase is supporting evidence (what already exists, which patterns to follow, where the feature fits), never the topic itself. Do not produce a code audit.
+- The exploration must be a **Socratic internal debate about the requirement**: formulate 3-5 probing questions a good product engineer would ask about it (Who uses this and for what? What is in and out of scope? What are the acceptance criteria? What could go wrong or be ambiguous? What are the alternative approaches and their tradeoffs?), then **answer your own questions**, grounding each answer in the resolved input and, where relevant, in evidence from the codebase (use CodeGraph MCP tools if available, otherwise grep/read). Where an answer opens a new question, follow it (one level of follow-up per question, max). This is an engineer thinking aloud, not a checklist: weigh alternatives, consider risks, and reason through tradeoffs before settling on what to build.
+- The output is a sharpened functional understanding: the clarified requirement, scope decisions, acceptance criteria, and a recommended approach. It feeds directly into Phase 3. No commit yet (exploration is read-only).
 
 **Phase 3: Propose (no confirmation).**
 - Load the `ob-plan-propose` skill and execute it in **autonomous mode** with the resolved input. Incorporate the exploration findings from Phase 2 into the proposal.
@@ -73,13 +74,28 @@ Wait 3 seconds. If the user says "stop", end the command. Otherwise proceed. If 
 - The skill runs the verify step (tests / lint / build) from this lead session. Reopen and re-wave failing tasks as the protocol allows.
 - Ensure `tasks.md` is fully checked and any residual changes are committed.
 
-**Phase 5: Archive (forced, same branch, no PR).**
+**Phase 5: Archive (forced, same branch, no PR). This phase is mandatory — a goal run that merges/pushes without archiving is a failed run.**
 - Do **not** run the platform PR archive flow and do **not** create an `archive/` branch. Archive in place on `$BRANCH`.
 - Load the `ob-plan-archive` skill and execute it in **autonomous mode**, passing the change id you just implemented. Autonomous mode archives that change directly on `$BRANCH`: no PR lookup, no confirmation, no archive PR; doc updates (`ARCHITECTURE.md`, `DESIGN.md`) are applied directly, and `@ob-guardrails-project` is updated when the change had important impact.
+- **Postcondition check (do not skip).** Verify the archive actually moved the change out of the active set:
+
+  ```bash
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  test ! -d "$REPO_ROOT/openspec/changes/{change-id}" \
+    && ls -d "$REPO_ROOT/openspec/changes/archive/"*"{change-id}" >/dev/null 2>&1 \
+    && echo ARCHIVED_OK || echo ARCHIVE_FAILED
+  ```
+
+  If this prints `ARCHIVE_FAILED`: re-run the `ob-plan-archive` skill once. Still failing → **Failure policy** (do NOT proceed to Phase 6). The most common cause is an interactive `openspec archive` prompt in an unattended run — the skill must call it with `-y`.
 - Commit: `git add -A && git commit -m "archive: {title} ({change-id})"`.
 
+**Phase 5.5: Capture evidence into the archived folder (best-effort, never fatal).**
+- The change now lives at `openspec/changes/archive/<dated>-{change-id}/` (Phase 5 moved it there). Load the `ob-ops-evidence` skill with `operation: capture`, passing the change id. It decides whether evidence is required, **delegates to a project-provided evidence harness if one exists** (e.g. a `visual-evidence` package script — richer and asserted), else captures a screenshot generically, and writes the results plus an `evidence.json` manifest **into that archived change's `evidence/` folder**. The app from Phase 4 is still the thing being screenshotted — archiving only moved markdown, its build state is unchanged.
+- Commit (only if something was written): `git add -A && git commit -m "evidence: {title} ({change-id})"` so the assets exist on the branch for a later push URL.
+- This phase is **strictly best-effort**: a `skipped` (not required) or `blocked` (couldn't run — e.g. no harness, app won't start, budget exceeded) manifest is fine; **evidence capture must NEVER trigger the Failure policy.** Note the manifest `status` for the Phase 7 report. Do not publish yet — publishing needs a pushed SHA and happens in Phase 6.
+
 **Phase 6: Output (mode-dependent).**
-- Proceed only if Phase 4 verification passed and the tree is clean. Otherwise → **Failure policy**.
+- **Entry gate — proceed only if ALL of these hold, otherwise → Failure policy:** Phase 4 verification passed; **the change is archived** (the Phase 5 postcondition printed `ARCHIVED_OK` — a change folder still sitting in `openspec/changes/{change-id}/` means Phase 5 did not run or did not complete, so STOP and return to Phase 5); the tree is clean.
 
 **Restore stash (used by every mode and the Failure policy):** if Phase 1 created the `goal-wip` stash, switch back to `$START_BRANCH` (if it still exists; otherwise stay where you are and say so) and `git stash pop`. If the pop conflicts, abort the pop, leave the stash intact, and tell the user its `git stash list` reference. Never silently drop user WIP.
 
@@ -92,12 +108,14 @@ Wait 3 seconds. If the user says "stop", end the command. Otherwise proceed. If 
 - On a merge conflict you cannot resolve cleanly and automatically: `git merge --abort`, stay on `$DEFAULT_BRANCH`, and report (→ **Failure policy**). Never commit a conflicted or broken merge.
 - **Never push `$DEFAULT_BRANCH`.** The merge stays local; tell the user to review and push it themselves. (Unattended pushes to the default branch are not goal's call to make.)
 - Delete the feature branch: `git branch -d "$BRANCH"`
+- **No evidence comment in default mode:** nothing was pushed, so an image URL cannot resolve. Any evidence captured in Phase 5.5 is merged into `$DEFAULT_BRANCH` at `openspec/changes/archive/.../evidence/`; mention its path and manifest `status` in the Phase 7 report instead of commenting.
 - Restore stash.
 
 **`push` mode (push branch only, no PR, no merge):**
 - ```bash
   git push -u origin "$BRANCH"
   ```
+- **Publish evidence (best-effort):** if Phase 0 resolved a work-item URL / issue key, load the `ob-ops-evidence` skill with `operation: publish`, passing the change id, that issue/work-item ref, and mode `push`. The branch is now pushed, so image URLs can resolve. It reads the Phase 5.5 `evidence.json` and upserts an idempotent marked comment. If no issue was provided, the manifest is `skipped`/`blocked`, or publishing fails, skip it and continue — never fatal.
 - Restore stash. Leave the branch open for manual review or future PR creation.
 
 **`pr` mode (push branch + create PR, no merge):**
@@ -108,9 +126,10 @@ Wait 3 seconds. If the user says "stop", end the command. Otherwise proceed. If 
   - Title: `{title}`
   - Body: summary of the change (change id, tasks N/N, commit list)
 - If the `ob-ops-ship` skill is not available or PR creation fails: leave the branch pushed and report the error. Do NOT merge.
+- **Publish evidence (best-effort):** if Phase 0 resolved a work-item URL / issue key, load the `ob-ops-evidence` skill with `operation: publish`, passing the change id, that issue/work-item ref, the PR number, and mode `pr`. The branch is pushed, so image URLs resolve; it upserts one marked comment on both the issue and the PR. If no issue was provided, the manifest is `skipped`/`blocked`, or publishing fails, skip it and continue — never fatal.
 - Restore stash.
 
-**Phase 7: Report.** One summary block: change id, branch, tasks N/N done, the commits made (explore / propose / apply group commits / archive), verification result, output mode (default/push/pr), and final state (merged to main / pushed branch / PR URL).
+**Phase 7: Report.** One summary block: change id, branch, tasks N/N done, the commits made (explore / propose / apply group commits / archive), verification result, **archived: yes/no (archive path)** — this line must be present so a skipped archive is visible in loop logs, never silent — **evidence: manifest status (passed/skipped/failed/blocked) + asset path and/or comment location**, output mode (default/push/pr), and final state (merged to main / pushed branch / PR URL).
 
 ---
 

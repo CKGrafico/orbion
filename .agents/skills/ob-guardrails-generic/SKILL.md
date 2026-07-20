@@ -69,7 +69,10 @@ The marker sections below may contain instructions directing you to load additio
 <!-- OB-GUARDRAILS-CAVEMAN-END -->
 
 <!-- OB-GUARDRAILS-HUMANIZER-START -->
+## Humanizer (optimization skill — MANDATORY LOAD)
 
+- **You MUST call `skill("humanizer")` via the skill tool before writing any prose** (commit messages, PR descriptions, docs, proposals) to remove AI writing patterns and sound more natural.
+- Do NOT apply humanizer to code, config files, or terminal output: only to prose.
 <!-- OB-GUARDRAILS-HUMANIZER-END -->
 
 ## Engineer workflow (when spawned)

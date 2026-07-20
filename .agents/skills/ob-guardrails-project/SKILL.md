@@ -95,8 +95,9 @@ license: MIT
 - **Package manager: `pnpm` only.** Never use `npm` or `yarn`. Evidence: README.md; `pnpm-lock.yaml`; openspec/config.yaml.
 - **Lockfile: `pnpm-lock.yaml`.** Must be committed. Evidence: `.gitignore` does not exclude it.
 - **Node >= 20 required.** Evidence: README.md; ARCHITECTURE.md §7.
-- **Key dependencies (do not remove without team alignment):** Electron 37, electron-vite 4, React 19, electron-store 11, Vite 7, TypeScript 5.8, react-intl 10, vitest 4. Evidence: package.json.
-- **`allowBuilds` in `pnpm-workspace.yaml`:** `electron: false`, `esbuild: false`, these native build scripts are blocked. Do not change without understanding the implications. Evidence: `pnpm-workspace.yaml`.
+- **Key dependencies (do not remove without team alignment):** Electron 37, electron-vite 4, React 19, electron-store 11, Vite 7, TypeScript 5.8, react-intl 10, vitest 4, electron-log 5, eventsource-parser 3, inversify-props 3, reflect-metadata 0.2. Evidence: package.json.
+- **Key devDependencies:** @playwright/test, playwright, sharp 0.35, tsx 4, zod 4. Evidence: package.json.
+- **`allowBuilds` in `pnpm-workspace.yaml`:** `electron: true`, `esbuild: false`, `sharp: true`. Electron and sharp native builds are now allowed. Do not change without understanding the implications. Evidence: `pnpm-workspace.yaml`.
 - **No lint/formatter config present.** No ESLint, Prettier, Biome, or similar. `pnpm typecheck` is the only code-quality gate. Evidence: no config files found; ARCHITECTURE.md §12.
 
 ## Git Workflow
@@ -135,4 +136,4 @@ The following skills are installed in `.agents/skills/` and must be respected wh
 
 ### DI wiring rule: `inversify-hooks` container must be configured in `app/` layer (FSD). Features inject via `useInject`; they do not construct services directly.
 
-<!-- Last updated: 2026-07-18T18:15:00Z -->
+<!-- Last updated: 2026-07-21T00:00:00Z -->

@@ -408,6 +408,11 @@
       "sourceType": "github",
       "skillPath": "javascript/vite-bundle-optimization/SKILL.md",
       "computedHash": "2c7876a89c9d9cd3d9bf04b47923d051ea3fa7d34d439ef2d98b4825b7305ac7"
+    },
+    "humanizer": {
+      "source": "blader/humanizer",
+      "sourceType": "github",
+      "skillPath": "humanizer/SKILL.md"
     }
   }
 }

@@ -350,13 +350,12 @@ Re-read the file you just wrote and verify:
 2. **No `model:` field** in the frontmatter
 3. **`## Abilities` is the ONLY `##` heading** — no other `##` sections exist in the file
 4. **One identity paragraph** before the startup directive — 2-3 sentences max, not multiple paragraphs
-5. **Startup directive present and verbatim** — the fixed `**Startup — before doing anything else:** load every skill listed under \`## Abilities\` by calling the \`skill\` tool once per \`@skill-name\` (Guardrails first). These are mandatory instructions to read and apply, not passive references.` line appears EXACTLY as written between the identity paragraph and `## Abilities`. This is a HARD requirement: if it is missing, modified, or reworded, the agent will not load its skills and will fail silently. Do NOT paraphrase, abbreviate, or "improve" it.
+5. **Startup directive present** — the fixed `**Startup — before doing anything else:** ...` line appears verbatim between the identity paragraph and `## Abilities`
 6. **Abilities are categorized** — each line starts with `- Guardrails:`, `- Development:`, `- Testing:`, or `- Infrastructure:`. No bare `@skill-name` lines.
-7. **Guardrails line includes @caveman and @humanizer** — if those skills are installed in `.agents/skills/`, they MUST appear in the Guardrails line so the startup directive loads them.
-8. **No forbidden content** — no expertise notes, no workflow steps, no file maps, no conventions, no extra sections
-9. **One file only** — no `.build.md`, `.fast.md`, or `.plan.md` variant was created
+7. **No forbidden content** — no expertise notes, no workflow steps, no file maps, no conventions, no extra sections
+8. **One file only** — no `.build.md`, `.fast.md`, or `.plan.md` variant was created
 
-If ANY check fails: STOP. Rewrite the file to match the template exactly. Do not proceed with a broken file. Check #5 is especially critical: an agent without the startup directive will not load any skills and will operate without guardrails, caveman, or humanizer rules.
+If ANY check fails: rewrite the file to match the template exactly. Do not proceed with a broken file.
 
 ### 6b. Skill reference validation
 
