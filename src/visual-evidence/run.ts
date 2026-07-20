@@ -134,7 +134,15 @@ export async function runVisualEvidence(
   let videoController: ReturnType<typeof enableVideo> | null = null;
 
   try {
-    launched = await launchElectronApp(repoRoot, temp, config, { skipBuild: opts.skipBuild });
+    try {
+      launched = await launchElectronApp(repoRoot, temp, config, { skipBuild: opts.skipBuild });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Re-throw with a clearer message
+      throw new Error(
+        `Failed to launch Electron app: ${message}. If you are on headless Linux, install the required system GUI libraries (see SKILL.md) and run under xvfb-run.`,
+      );
+    }
     videoController = enableVideo(launched.app.context(), temp, config);
     await enableTracing(launched.app.context(), temp);
 

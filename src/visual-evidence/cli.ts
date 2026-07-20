@@ -26,6 +26,10 @@ import { writeManifest } from "./manifest.js";
 import { generatePrMarkdown } from "./pr-markdown.js";
 import type { RepoCoordinates } from "./types.js";
 
+/** Tracks the changeId currently being processed so the unhandled-rejection
+ * handler can attribute the failure to the right change. */
+let pendingChangeId: string | null = null;
+
 interface ParsedArgs {
   change?: string;
   input?: string;
@@ -136,6 +140,7 @@ async function main(): Promise<number> {
     console.error((err as Error).message);
     return 3;
   }
+  pendingChangeId = input.changeId;
 
   const repoRoot = findRepoRoot();
   const config = resolveConfig();
@@ -208,3 +213,37 @@ main()
     console.error(`Unhandled error: ${(err as Error).message}`);
     process.exit(1);
   });
+
+// Catch async rejections that escape Playwright's internal dispatcher back into
+// the caller — particularly the "Process failed to launch!" error, which
+// Playwright emits on a Promise that is not awaited by `electron.launch()`.
+// Without this, the structured `failed` result we built in run.ts is skipped
+// because the unhandled rejection kills the process first.
+process.on("unhandledRejection", async (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error(`Visual evidence: unhandled rejection from Playwright/internal: ${msg}`);
+  console.error("The Electron process failed to launch. On headless Linux, install the required system GUI libraries (see SKILL.md) and run under xvfb-run.");
+  // Best-effort: write a failed manifest so the audit trail is preserved.
+  try {
+    const cfg = resolveConfig();
+    const root = findRepoRoot();
+    writeManifest(root, pendingChangeId ?? "unknown", cfg, {
+      changeId: pendingChangeId ?? "unknown",
+      required: true,
+      status: "failed",
+    }, {
+      repo: { owner: "CKGrafico", name: "orbion" },
+      sha: process.env.ORBION_VISUAL_EVIDENCE_SHA ?? resolveHeadSha(root),
+      failedStep: "launch",
+      error: msg,
+      temporaryArtifacts: {
+        screenshot: `.tmp/visual-evidence/${pendingChangeId ?? "unknown"}/failure.png`,
+        video: `.tmp/visual-evidence/${pendingChangeId ?? "unknown"}/video.webm`,
+        trace: `.tmp/visual-evidence/${pendingChangeId ?? "unknown"}/trace.zip`,
+      },
+    });
+  } catch {
+    // best-effort
+  }
+  process.exit(1);
+});

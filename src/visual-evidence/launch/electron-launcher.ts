@@ -17,8 +17,11 @@ import { _electron as electron } from "playwright";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import type { VisualEvidenceConfig } from "../config.js";
 import type { TempPaths } from "./deterministic-env.js";
+
+const requireFromCjs = createRequire(import.meta.url);
 
 interface WindowBounds {
   x?: number;
@@ -35,13 +38,12 @@ export interface LaunchedApp {
 
 function electronBinaryPath(repoRoot: string): string {
   // pnpm symlinks node_modules/electron → .pnpm/electron@*/node_modules/electron
-  // electron/index.js exports the binary path string.
+  // electron/index.js exports the binary path string (CJS).
   const electronPkg = path.join(repoRoot, "node_modules", "electron");
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const resolved = require(electronPkg) as unknown as string;
+    const resolved = requireFromCjs(electronPkg) as unknown as string;
     if (!fs.existsSync(resolved)) {
-      throw new Error(`Electron binary path resolved to "${resolved}" but the file does not exist.`);
+      throw new Error(`Electron binary path resolved to "${resolved}" but the file does not exist. If you are on Linux, the system may need GUI libraries (libatk, libgtk-3, etc.) — see SKILL.md.`);
     }
     return resolved;
   } catch (err) {
@@ -111,19 +113,26 @@ export async function launchElectronApp(
     );
   }
 
-  const app = await electron.launch({
-    executablePath,
-    args: [mainEntry, `--user-data-dir=${paths.userDataDir}`],
-    env: {
-      ...process.env,
-      ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
-      ORBION_VISUAL_EVIDENCE: "1",
-      // Default locale/stable; the app reads Intl directly.
-      LANG: process.env.LANG ?? "en_US.UTF-8",
-      TZ: process.env.TZ ?? "UTC",
-    },
-    cwd: repoRoot,
-  });
+  let app: import("playwright").ElectronApplication;
+  try {
+    app = await electron.launch({
+      executablePath,
+      args: [mainEntry, `--user-data-dir=${paths.userDataDir}`],
+      env: {
+        ...process.env,
+        ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
+        ORBION_VISUAL_EVIDENCE: "1",
+        LANG: process.env.LANG ?? "en_US.UTF-8",
+        TZ: process.env.TZ ?? "UTC",
+      },
+      cwd: repoRoot,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to launch Electron app: ${msg}. On headless Linux, install the required system GUI libraries (libatk1.0-0 libcups2 libgtk-3-0 libnss3 etc.; see SKILL.md) and run under xvfb-run.`,
+    );
+  }
 
   const window = await app.firstWindow();
 
