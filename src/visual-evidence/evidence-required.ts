@@ -125,19 +125,21 @@ export function decideEvidenceRequired(ctx: ChangeContext): EvidenceDecision {
         reason: "No changed files or proposal text available to assess visual impact.",
       };
     }
-    const requiresUi = REQUIRE_KEYWORDS.some((re) => re.test(proposal));
-    if (requiresUi) {
-      return {
-        required: true,
-        reason:
-          "Proposal indicates user-visible UI, styling, or interaction change.",
-      };
-    }
+    // Skip keywords take precedence: if a proposal explicitly describes an
+    // internal refactor / dependency update / logging change, evidence is
+    // not required even if the word "visible" appears later in the text.
     if (SKIP_KEYWORDS.some((re) => re.test(proposal))) {
       return {
         required: false,
         reason:
           "Proposal describes an internal refactor, dependency update, or logging change with no user-visible behavior.",
+      };
+    }
+    if (REQUIRE_KEYWORDS.some((re) => re.test(proposal))) {
+      return {
+        required: true,
+        reason:
+          "Proposal indicates user-visible UI, styling, or interaction change.",
       };
     }
     return {

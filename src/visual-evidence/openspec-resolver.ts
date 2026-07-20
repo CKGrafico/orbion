@@ -94,13 +94,26 @@ function readIfExists(file: string): string | undefined {
 }
 
 function extractSection(md: string, heading: string): string | null {
-  // Match a heading like "## Solution", "### Approach", "# Proposal"
-  const re = new RegExp(
-    `^#{1,6}\\s+${escapeRegex(heading)}\\s*$([\\s\\S]*?)(?=^#{1,6}\\s+|$)`,
-    "m",
-  );
-  const m = md.match(re);
-  return m ? m[1]!.trim() : null;
+  // Find a heading line and capture everything from the NEXT line until the
+  // next same-or-higher-level heading, or end of document. We avoid the
+  // regex `$` anchor (which matches end-of-line, leaving the capture empty)
+  // by scanning line-by-line.
+  const lines = md.split("\n");
+  const headingRe = new RegExp(`^#{1,6}\\s+${escapeRegex(heading)}\\b\\s*$`, "i");
+  const nextHeadingRe = /^#{1,6}\s+/;
+  let inSection = false;
+  const body: string[] = [];
+  for (const line of lines) {
+    if (nextHeadingRe.test(line)) {
+      if (inSection) break;
+      if (headingRe.test(line)) inSection = true;
+      continue;
+    }
+    if (inSection) body.push(line);
+  }
+  if (!inSection) return null;
+  const text = body.join("\n").trim();
+  return text.length > 0 ? text : null;
 }
 
 function escapeRegex(s: string): string {
@@ -144,10 +157,16 @@ function parseAffectedFiles(proposal: string | undefined, archive: string | unde
       extractSection(md, "Files Modified") ??
       extractSection(md, "Scope");
     if (!section) continue;
+    // Strip trailing descriptions after em-dash (—), en-dash (—), or " -- ":
+    // keep only the path token before the separator.
     const items = splitListItems(section)
-      .map((l) => l.split("`")[1] ?? l.split(/\s--\s|--/)[0]?.trim() ?? l)
-      .map((l) => l.trim())
-      .filter(Boolean);
+      .map((l) => {
+        // Stop at the first em-dash / en-dash / " -- " / " - "
+        const cut = l.replace(/\s+[—–-].*$/, "").replace(/\s+--.*$/, "").trim();
+        return cut;
+      })
+      .map((l) => l.replace(/^`+|`+$/g, "").trim())
+      .filter((l) => l.length > 0 && !/^[-—–]$/.test(l));
     if (items.length) return items;
   }
   return [];

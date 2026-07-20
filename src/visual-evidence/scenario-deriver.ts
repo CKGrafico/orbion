@@ -42,15 +42,30 @@ function fromAcceptanceCriteria(criteria: readonly string[]): Scenario | null {
 
 function extractStepsFromProposal(proposal: string | undefined): Scenario | null {
   if (!proposal) return null;
-  // Look for "## Solution" / "### Approach" sections
-  const sectionMatch = proposal.match(
-    /^#{2,3}\s+(?:Solution|Approach|What)\s*$([\s\S]*?)(?=^#{1,6}\s+|$)/m,
-  );
-  const body = sectionMatch?.[1] ?? proposal;
-  // Pull numbered list items (1. 2. 3.) or bullet items
-  const lines = body.split("\n");
-  const steps: string[] = [];
+  // Find the body under "## Solution" / "### Approach" / "### What" — i.e.,
+  // everything from the line after the heading until the next same-or-higher
+  // level heading or end of document.
+  const lines = proposal.split("\n");
+  let inSection = false;
+  const bodyLines: string[] = [];
   for (const line of lines) {
+    const isHeading = /^#{1,6}\s+/.test(line);
+    if (isHeading) {
+      if (inSection) break; // Next heading ends the section
+      if (/^#{2,3}\s+(?:Solution|Approach|What)\b/i.test(line)) {
+        inSection = true;
+      }
+      continue;
+    }
+    if (inSection) bodyLines.push(line);
+  }
+  const body = bodyLines.join("\n");
+  const bodyOrProposal = body.length > 0 ? body : proposal;
+
+  // Pull numbered list items (1. 2. 3.) or bullet items
+  const stepLines = bodyOrProposal.split("\n");
+  const steps: string[] = [];
+  for (const line of stepLines) {
     const trimmed = line.trim();
     const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
     const bulleted = trimmed.match(/^[-*]\s+(.+)$/);

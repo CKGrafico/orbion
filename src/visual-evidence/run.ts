@@ -71,7 +71,7 @@ const EvidenceInputSchema = z.object({
   prNumber: z.number().int().positive().optional(),
   branchName: z.string().optional(),
   commitSha: z.string().optional(),
-});
+}).strict();
 
 export function validateInput(input: unknown): EvidenceInput {
   const parsed = EvidenceInputSchema.parse(input);
