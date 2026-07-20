@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { TranscriptMessage, ToolCallRecord } from "../../../shared/ipc";
 import type { ITranscriptService } from "../services/interfaces";
-import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow } from "./types";
+import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow } from "./types";
 
 const TOOL_CALLS_THRESHOLD = 3;
 
@@ -78,7 +78,7 @@ function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
  * (e.g., instance switch, runtime switch, model switch).
  */
 function isSystemNoteMessage(msg: TranscriptMessage): boolean {
-  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-");
+  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-") || msg.id.startsWith("loop-summon-");
 }
 
 /**
@@ -98,6 +98,32 @@ function parseInstanceHandoff(msg: TranscriptMessage): { fromInstance: string; t
     return { fromInstance: "", toInstance: toMatch[1].trim() };
   }
   return { fromInstance: "", toInstance: msg.content };
+}
+
+/**
+ * Check whether a transcript message is a loop-card summon record
+ * (produced when the user clicks a loop-summary-bar segment).
+ * These use the convention: id starts with "loop-summon-", role "user",
+ * and content is a JSON array of loop IDs.
+ */
+function isLoopSummonMessage(msg: TranscriptMessage): boolean {
+  return msg.id.startsWith("loop-summon-");
+}
+
+/**
+ * Parse a loop-summon transcript message into an array of loop IDs.
+ * Returns null if parsing fails.
+ */
+function parseLoopSummon(msg: TranscriptMessage): { loopIds: string[]; environmentId: string } | null {
+  try {
+    const parsed = JSON.parse(msg.content);
+    if (Array.isArray(parsed.loopIds)) {
+      return { loopIds: parsed.loopIds, environmentId: parsed.environmentId ?? msg.environmentId ?? "" };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -182,7 +208,7 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
 // Row building
 // ---------------------------------------------------------------------------
 
-function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = []): TranscriptRow[] {
+function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = [], loopSummonMessages: TranscriptMessage[] = []): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
 
   // Build handoff rows from system note messages
@@ -200,6 +226,28 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
         },
         timestamp: msg.startedAt,
       });
+    }
+  }
+
+  // Build loop-card rows from loop-summon messages
+  // Each loop-summon message can produce multiple LoopCardRows (one per loop ID)
+  const loopCardRows: Array<{ row: LoopCardRow; timestamp: number }> = [];
+  for (const msg of loopSummonMessages) {
+    const summon = parseLoopSummon(msg);
+    if (summon) {
+      for (let i = 0; i < summon.loopIds.length; i++) {
+        const loopId = summon.loopIds[i];
+        loopCardRows.push({
+          row: {
+            id: `${msg.id}-lc-${loopId}`,
+            kind: "loop-card",
+            turnId: msg.id,
+            loopId,
+            environmentId: summon.environmentId,
+          },
+          timestamp: msg.startedAt + i, // Ensure stable ordering within a summon
+        });
+      }
     }
   }
 
@@ -288,16 +336,19 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     turnRows.push({ rows: turnRowsList, timestamp: turn.userMessage.startedAt });
   }
 
-  // Merge turn groups and handoff dividers by timestamp
-  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number };
+  // Merge turn groups, handoff dividers, and loop-card rows by timestamp
+  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number } | { kind: "loop-card"; row: LoopCardRow; timestamp: number };
   const merged: MergeItem[] = [
     ...turnRows.map((t) => ({ kind: "turn" as const, rows: t.rows, timestamp: t.timestamp })),
     ...handoffRows.map((h) => ({ kind: "handoff" as const, row: h.row, timestamp: h.timestamp })),
+    ...loopCardRows.map((l) => ({ kind: "loop-card" as const, row: l.row, timestamp: l.timestamp })),
   ];
   merged.sort((a, b) => a.timestamp - b.timestamp);
 
   for (const item of merged) {
     if (item.kind === "handoff") {
+      rows.push(item.row);
+    } else if (item.kind === "loop-card") {
       rows.push(item.row);
     } else {
       rows.push(...item.rows);
@@ -314,6 +365,7 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
 export function useTranscript(sessionId: string | null) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [handoffMessages, setHandoffMessages] = useState<TranscriptMessage[]>([]);
+  const [loopSummonMessages, setLoopSummonMessages] = useState<TranscriptMessage[]>([]);
   const [rows, setRows] = useState<TranscriptRow[]>([]);
   const expandedToolsRef = useRef<Set<string>>(new Set());
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -380,10 +432,13 @@ export function useTranscript(sessionId: string | null) {
     transcriptService.getMessages(sessionId).then((messages) => {
       if (cancelled) return;
       const hydratedTurns = messagesToChatTurns(messages);
-      const handoffs = messages.filter(isSystemNoteMessage);
+      const systemNotes = messages.filter(isSystemNoteMessage);
+      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m));
+      const loopSummons = systemNotes.filter(isLoopSummonMessage);
       setTurns(hydratedTurns);
       setHandoffMessages(handoffs);
-      setRows(buildRowsFromTurns(hydratedTurns, handoffs));
+      setLoopSummonMessages(loopSummons);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons));
       loadedSessionRef.current = sessionId;
       loadingRef.current = false;
     }).catch(() => {
@@ -402,16 +457,16 @@ export function useTranscript(sessionId: string | null) {
   turnsRef.current = turns;
 
   const rebuildRows = useCallback((newTurns: ChatTurn[]): TranscriptRow[] => {
-    const newRows = buildRowsFromTurns(newTurns, handoffMessages);
+    const newRows = buildRowsFromTurns(newTurns, handoffMessages, loopSummonMessages);
     setRows(newRows);
     return newRows;
-  }, [handoffMessages]);
+  }, [handoffMessages, loopSummonMessages]);
 
-  // Rebuild rows when handoffMessages changes (e.g., when a new handoff is added)
+  // Rebuild rows when handoffMessages or loopSummonMessages changes
   useEffect(() => {
-    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages);
+    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages, loopSummonMessages);
     setRows(newRows);
-  }, [handoffMessages]);
+  }, [handoffMessages, loopSummonMessages]);
 
   const setTurnsAndRebuild = useCallback(
     (updater: (prev: ChatTurn[]) => ChatTurn[]) => {
@@ -655,6 +710,39 @@ export function useTranscript(sessionId: string | null) {
     [],
   );
 
+  /**
+   * Insert loop cards into the transcript when the user clicks a
+   * loop-summary-bar segment. Each call creates a persisted "loop-summon"
+   * system message (role "user", id starting with "loop-summon-") whose
+   * content is JSON { loopIds, environmentId }. The buildRowsFromTurns
+   * function hydrates these into LoopCardRow entries on reload.
+   */
+  const insertLoopCards = useCallback(
+    (loopIds: string[], environmentId: string) => {
+      if (!sessionId || loopIds.length === 0) return;
+
+      const timestamp = Date.now();
+      const summonId = `loop-summon-${timestamp}`;
+
+      const message: Omit<TranscriptMessage, "createdAt"> = {
+        id: summonId,
+        sessionId,
+        role: "user",
+        content: JSON.stringify({ loopIds, environmentId }),
+        startedAt: timestamp,
+        finishedAt: timestamp,
+        environmentId,
+      };
+
+      // Persist the summon message
+      void transcriptService.appendMessage(message).then((persisted) => {
+        // Add to local state so the UI updates immediately
+        setLoopSummonMessages((prev) => [...prev, persisted]);
+      });
+    },
+    [sessionId, transcriptService],
+  );
+
   /** Force a reload of the transcript from the persistence layer. */
   const reloadTranscript = useCallback(() => {
     if (!sessionId) return;
@@ -662,10 +750,13 @@ export function useTranscript(sessionId: string | null) {
     loadingRef.current = false;
     transcriptService.getMessages(sessionId).then((messages) => {
       const hydratedTurns = messagesToChatTurns(messages);
-      const handoffs = messages.filter(isSystemNoteMessage);
+      const systemNotes = messages.filter(isSystemNoteMessage);
+      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m));
+      const loopSummons = systemNotes.filter(isLoopSummonMessage);
       setTurns(hydratedTurns);
       setHandoffMessages(handoffs);
-      setRows(buildRowsFromTurns(hydratedTurns, handoffs));
+      setLoopSummonMessages(loopSummons);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons));
       loadedSessionRef.current = sessionId;
     }).catch(() => {
       // Ignore errors
@@ -688,6 +779,7 @@ export function useTranscript(sessionId: string | null) {
     answerQuestion,
     setTurnAccessMode,
     addHandoffMessage,
+    insertLoopCards,
     reloadTranscript,
   };
 }

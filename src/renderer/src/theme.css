@@ -1247,6 +1247,29 @@ input {
   white-space: nowrap;
 }
 
+/* Clickable segment in the loop summary bar — indicates the user can click
+   to summon matching loop cards into the chat stream. */
+.loop-summary-segment--clickable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  margin: -1px -5px;
+  transition: background 0.1s ease;
+}
+
+.loop-summary-segment--clickable:hover {
+  background: var(--bg-hover);
+}
+
+.loop-summary-segment--clickable:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.loop-summary-segment--clickable:active {
+  background: var(--bg-active);
+}
+
 /* ── Loop card (compact live card in the chat stream) ────────────── */
 
 .loop-card {

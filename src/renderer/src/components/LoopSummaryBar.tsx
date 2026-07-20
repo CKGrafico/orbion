@@ -3,11 +3,18 @@ import { useIntl } from "react-intl";
 import type { LoopMeta, LoopStatus } from "../types";
 import { useNextRunCountdown } from "./useNextRunCountdown";
 
+/** A segment that can be clicked in the summary bar.
+ *  "healthy" covers running + waiting loops.
+ *  Individual exception statuses (failed, paused, stopped, finished) are their own segments. */
+export type LoopSegmentKind = "healthy" | "failed" | "paused" | "stopped" | "finished";
+
 interface LoopSummaryBarProps {
   /** Loops scoped to the session's home project x instance. */
   loops: LoopMeta[];
   /** Whether the instance is reachable. When not connected, the bar shows a muted unknown state. */
   reachability?: "connected" | "reconnecting" | "unreachable";
+  /** Called when the user clicks a bar segment. The handler should summon matching loop cards. */
+  onSegmentClick?: (kind: LoopSegmentKind) => void;
 }
 
 /** Healthy statuses that collapse to a single count. */
@@ -26,7 +33,7 @@ const EXCEPTION_COLORS: Record<string, string> = {
   finished: "var(--status-finished)",
 };
 
-export function LoopSummaryBar({ loops, reachability }: LoopSummaryBarProps): React.ReactNode {
+export function LoopSummaryBar({ loops, reachability, onSegmentClick }: LoopSummaryBarProps): React.ReactNode {
   const intl = useIntl();
 
   const isReachable = reachability === "connected" || reachability === undefined;
@@ -106,7 +113,14 @@ export function LoopSummaryBar({ loops, reachability }: LoopSummaryBarProps): Re
       <div className="loop-summary-segments">
         {/* Healthy count: collapsed to a single number */}
         {healthyCount > 0 ? (
-          <span className="loop-summary-segment loop-summary-healthy">
+          <span
+            className="loop-summary-segment loop-summary-healthy loop-summary-segment--clickable"
+            role="button"
+            tabIndex={0}
+            aria-label={intl.formatMessage({ id: "loopSummary.healthyCountAria" }, { count: healthyCount })}
+            onClick={onSegmentClick ? () => onSegmentClick("healthy") : undefined}
+            onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick("healthy"); } } : undefined}
+          >
             {intl.formatMessage(
               { id: "loopSummary.healthyCount" },
               { count: healthyCount },
@@ -120,8 +134,13 @@ export function LoopSummaryBar({ loops, reachability }: LoopSummaryBarProps): Re
             key={status}
             className={`loop-summary-segment loop-summary-exception${
               status === "failed" ? " loop-summary-exception--failed" : ""
-            }`}
+            } loop-summary-segment--clickable`}
             style={{ color: EXCEPTION_COLORS[status] }}
+            role="button"
+            tabIndex={0}
+            aria-label={intl.formatMessage({ id: `loopSummary.${status}CountAria` }, { count: counts[status] })}
+            onClick={onSegmentClick ? () => onSegmentClick(status as LoopSegmentKind) : undefined}
+            onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick(status as LoopSegmentKind); } } : undefined}
           >
             {intl.formatMessage(
               { id: `loopSummary.${status}Count` },
