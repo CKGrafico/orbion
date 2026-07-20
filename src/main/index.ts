@@ -132,7 +132,7 @@ import {
   fetchFingerprint,
 } from "./connection-supervisor.js";
 import { fetchPeers } from "./tailscale.js";
-import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus } from "./opencode-client.js";
+import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus, destroyAllOpenCodeStatus } from "./opencode-client.js";
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent, respondHostKey } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
 import { checkPlatformCli, resolvePlatformCli } from "./platform-cli.js";
@@ -172,6 +172,7 @@ import {
 import { isDeclined as isSiblingDeclined, recordDecline as recordSiblingDecline } from "./sibling-decline-store.js";
 
 const streams = new Map<string, AbortController>();
+const streamEnvironments = new Map<string, string>();
 
 const notificationService = new NotificationService();
 
@@ -303,6 +304,16 @@ function removeSupervisor(environmentId: string): void {
   outageTracker.removeEnvironment(environmentId);
   reachabilityTracker.removeEnvironment(environmentId);
   closeTunnelsForEnvironment(environmentId);
+}
+
+function abortStreamsForEnvironment(environmentId: string): void {
+  for (const [subId, envId] of streamEnvironments) {
+    if (envId === environmentId) {
+      streams.get(subId)?.abort();
+      streams.delete(subId);
+      streamEnvironments.delete(subId);
+    }
+  }
 }
 
 function wakeupAll(): void {
@@ -448,6 +459,7 @@ async function handleStreamSubscribe(
 
   const controller = new AbortController();
   streams.set(args.subId, controller);
+  streamEnvironments.set(args.subId, envId);
 
   const send = (kind: "data" | "event" | "end" | "error", text: string): void => {
     if (!sender.isDestroyed()) {
@@ -483,6 +495,7 @@ async function handleStreamSubscribe(
     }
   } finally {
     streams.delete(args.subId);
+    streamEnvironments.delete(args.subId);
   }
 }
 
@@ -637,6 +650,7 @@ app.whenReady().then(() => {
     const [subId] = validateIpc<[string]>("stream:unsubscribe", rawArgs);
     streams.get(subId)?.abort();
     streams.delete(subId);
+    streamEnvironments.delete(subId);
   });
 
   safeHandle("config:getEnvironments", () => {
@@ -696,8 +710,10 @@ app.whenReady().then(() => {
   safeHandle("config:removeEnvironment", async (_event, ...rawArgs) => {
     const [id] = validateIpc<[string]>("config:removeEnvironment", rawArgs);
     removeSupervisor(id);
+    clearOpenCodeStatus(id);
     removeMcpSession(id);
     removeEnvironmentShapes(id);
+    abortStreamsForEnvironment(id);
     await removeEnvironment(id);
   });
   safeHandle("config:updateEnvironment", async (_event, ...rawArgs) => {
@@ -2257,10 +2273,12 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   for (const controller of streams.values()) controller.abort();
   streams.clear();
+  streamEnvironments.clear();
   for (const supervisor of supervisors.values()) supervisor.destroy();
   supervisors.clear();
   for (const tracker of endpointTrackers.values()) tracker.destroy();
   endpointTrackers.clear();
+  destroyAllOpenCodeStatus();
   closeAllRegistryTunnels();
   if (process.platform !== "darwin") app.quit();
 });

@@ -1,0 +1,6 @@
+- [ ] 1.1 Add clearOpenCodeStatus(id) to config:removeEnvironment handler <!-- agent: fullstack-engineer.build, depends_on: [], touches: [src/main/index.ts] -->
+- [ ] 1.2 Add evictExpiredStatusCache() to refreshOpenCodeStatus in opencode-client.ts <!-- agent: fullstack-engineer.build, depends_on: [], touches: [src/main/opencode-client.ts] -->
+- [ ] 1.3 Add destroyAllOpenCodeStatus() to opencode-client.ts, call from window-all-closed <!-- agent: fullstack-engineer.build, depends_on: [1.2], touches: [src/main/opencode-client.ts, src/main/index.ts] -->
+- [ ] 2.1 Add streamEnvironments Map, track envId per stream, abort streams for removed environment <!-- agent: fullstack-engineer.build, depends_on: [], touches: [src/main/index.ts] -->
+- [ ] 3.1 Write tests for statusCache eviction and stream cleanup <!-- agent: fullstack-engineer.build, depends_on: [1.2, 2.1], touches: [tests/opencode-client.test.ts] -->
+- [ ] 4.1 Run typecheck and fix errors <!-- agent: fullstack-engineer.fast, depends_on: [1.1, 1.3, 2.1], touches: [] -->
