@@ -50,6 +50,7 @@
   ListModelsResult,
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
+  LoopShape,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -232,4 +233,15 @@ export interface IAgentService {
   onStreamEvent(cb: (event: AgentStreamEvent) => void): () => void;
   /** List available models from the runtime adapter for an environment. */
   listModels(environmentId: string): Promise<ListModelsResult>;
+}
+
+export interface ILoopShapeCacheService {
+  /** Get cached loop shapes for a specific environment. */
+  getCached(environmentId: string): Promise<LoopShape[]>;
+  /** Get cached loop shapes for all environments. */
+  getAll(): Promise<LoopShape[]>;
+  /** Force-refresh cache for a specific environment from the daemon API. */
+  refresh(environmentId: string): Promise<LoopShape[]>;
+  /** Subscribe to cache updates pushed from the main process. */
+  onUpdate(cb: (shapes: LoopShape[]) => void): () => void;
 }

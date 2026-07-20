@@ -37,6 +37,7 @@ import type {
   TranscriptMessage,
   McpConnectionStatus,
   McpToolCallResult,
+  LoopShape,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -142,6 +143,14 @@ import {
 import { sendPromptToAgent, interruptAgent } from "./agent-client.js";
 import { listModelsForEnvironment } from "./agent-models.js";
 import type { AgentSendPromptArgs } from "../shared/ipc.js";
+import {
+  initLoopShapeCache,
+  getCached as getLoopShapeCached,
+  getAllCached as getAllLoopShapeCached,
+  refreshForEnvironment as refreshLoopShapesForEnvironment,
+  removeEnvironmentShapes,
+  onCacheUpdate as onLoopShapeCacheUpdate,
+} from "./loop-shape-cache.js";
 
 const streams = new Map<string, AbortController>();
 
@@ -177,6 +186,14 @@ const outageTracker = new OutageTracker(
 );
 
 const reachabilityTracker = new ReachabilityTracker();
+
+// Forward loop-shape cache updates to the renderer
+onLoopShapeCacheUpdate((shapes: LoopShape[]) => {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send("loopShapeCache:update", shapes);
+  }
+});
 
 // Wire tunnel auto-reconnect into the connection supervisor.
 // When a tunnel drops, the supervisor will see probe failures and enter backoff.
@@ -506,6 +523,8 @@ async function seedSupervisors(): Promise<void> {
     }
     // Connect to the environment's MCP server (fire-and-forget)
     void connectMcp(env.id);
+    // Refresh loop-shape cache for this environment (fire-and-forget)
+    void refreshLoopShapesForEnvironment(env.id);
   }
 }
 
@@ -659,6 +678,7 @@ app.whenReady().then(() => {
     const [id] = validateIpc<[string]>("config:removeEnvironment", rawArgs);
     removeSupervisor(id);
     removeMcpSession(id);
+    removeEnvironmentShapes(id);
     await removeEnvironment(id);
   });
   safeHandle("config:addEndpoint", async (_event, ...rawArgs) => {
@@ -1711,8 +1731,28 @@ app.whenReady().then(() => {
     return listModelsForEnvironment(environmentId);
   });
 
+  // ── Loop shape cache IPC handlers ──────────────────────────────────
+
+  safeHandle("loopShapeCache:getCached", (_event, ...rawArgs): LoopShape[] => {
+    const [environmentId] = validateIpc<[string]>("loopShapeCache:getCached", rawArgs);
+    return getLoopShapeCached(environmentId);
+  });
+
+  safeHandle("loopShapeCache:getAll", (): LoopShape[] => {
+    validateIpc("loopShapeCache:getAll", []);
+    return getAllLoopShapeCached();
+  });
+
+  safeHandle("loopShapeCache:refresh", async (_event, ...rawArgs): Promise<LoopShape[]> => {
+    const [environmentId] = validateIpc<[string]>("loopShapeCache:refresh", rawArgs);
+    return refreshLoopShapesForEnvironment(environmentId);
+  });
+
   // Prune old breaches on startup
   void pruneOldBreaches();
+
+  // Initialize the loop-shape cache and trigger a refresh for all connected environments
+  initLoopShapeCache();
 
   void autoPromoteFirstEnvIfNeeded();
   createWindow();
