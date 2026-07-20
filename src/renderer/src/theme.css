@@ -1822,9 +1822,10 @@ input {
 .task-chain-step-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   flex: 1;
+  flex-wrap: wrap;
 }
 
 .task-chain-step-name {
@@ -1834,16 +1835,17 @@ input {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .task-chain-step-toggle-cmd {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 500;
   color: var(--text-muted);
   background: transparent;
-  border: none;
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
-  padding: 1px 4px;
+  padding: 0 5px;
   border-radius: 3px;
   font-family: var(--font-ui);
   transition: all 0.15s ease;
@@ -1854,6 +1856,12 @@ input {
 .task-chain-step-toggle-cmd:hover {
   color: var(--text-secondary);
   background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.task-chain-step-toggle-cmd[aria-expanded="true"] {
+  color: var(--accent-task);
+  border-color: color-mix(in srgb, var(--accent-task) 30%, var(--border-subtle));
 }
 
 .task-chain-step-command {
@@ -1866,6 +1874,14 @@ input {
   line-height: 1.45;
   color: var(--text-secondary);
   word-break: break-all;
+  overflow: hidden;
+  /* Graceful truncation: clamp to --cmd-max-lines (default 4 lines).
+     When the command exceeds the limit, it truncates with an ellipsis
+     via -webkit-line-clamp. Older browsers fall through to max-height. */
+  display: -webkit-box;
+  -webkit-line-clamp: var(--cmd-max-lines, 4);
+  -webkit-box-orient: vertical;
+  max-height: calc(1.45em * var(--cmd-max-lines, 4) + 8px);
 }
 
 .task-chain-step-command code {

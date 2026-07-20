@@ -110,8 +110,8 @@ export function TaskChainView({ steps }: TaskChainViewProps): React.ReactNode {
     );
   }
 
-  // Check if there are any branches
-  const hasBranches = steps.some((s) => s.isOnFailureBranch || s.isOnSuccessBranch);
+  // Branches are indicated per-step via isOnFailureBranch/isOnSuccessBranch,
+  // so no top-level "hasBranches" flag is needed.
 
   return (
     <div className="task-chain">
@@ -129,7 +129,6 @@ export function TaskChainView({ steps }: TaskChainViewProps): React.ReactNode {
             key={step.task.id}
             step={step}
             showConnector={idx > 0}
-            hasBranches={hasBranches}
           />
         ))}
       </div>
@@ -140,15 +139,22 @@ export function TaskChainView({ steps }: TaskChainViewProps): React.ReactNode {
 interface TaskChainStepProps {
   step: ChainStep;
   showConnector: boolean;
-  hasBranches: boolean;
 }
 
-function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps): React.ReactNode {
+/** Maximum visible lines for a disclosed command before truncation. */
+const COMMAND_MAX_LINES = 4;
+
+function TaskChainStep({ step, showConnector }: TaskChainStepProps): React.ReactNode {
   const intl = useIntl();
   const [commandExpanded, setCommandExpanded] = useState(false);
 
   const cmdLine = commandLine(step.task.command, step.task.commandArgs);
-  const displayName = step.task.name || cmdLine;
+  // Description-forward: task name is the primary label; command is behind the fold.
+  // When the task has no name, we still use the command as the fallback display name
+  // but keep a collapsed disclosure so the raw CLI string doesn't dominate the layout.
+  const taskName = step.task.name.trim();
+  const displayName = taskName || cmdLine;
+  const hasNamedTask = taskName.length > 0;
 
   // Branch label
   let branchLabel: string | null = null;
@@ -179,26 +185,32 @@ function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps)
         {/* Step number badge */}
         <span className="task-chain-step-number">{step.stepNumber}</span>
 
-        {/* Step content */}
+        {/* Step content — description-forward layout */}
         <div className="task-chain-step-content">
           <div className="task-chain-step-name">{displayName}</div>
 
-          {/* Command disclosure */}
-          <button
-            className="task-chain-step-toggle-cmd"
-            onClick={() => setCommandExpanded((prev) => !prev)}
-            type="button"
-          >
-            {commandExpanded
-              ? intl.formatMessage({ id: "taskChain.hideCommand" })
-              : intl.formatMessage({ id: "taskChain.showCommand" })}
-          </button>
+          {/* Command disclosure toggle — always present when there is a command */}
+          {(hasNamedTask || cmdLine) && (
+            <button
+              className="task-chain-step-toggle-cmd"
+              onClick={() => setCommandExpanded((prev) => !prev)}
+              type="button"
+              aria-expanded={commandExpanded}
+            >
+              {commandExpanded
+                ? intl.formatMessage({ id: "taskChain.hideCommand" })
+                : intl.formatMessage({ id: "taskChain.showCommand" })}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Collapsed command */}
-      {commandExpanded && (
-        <div className="task-chain-step-command">
+      {/* Raw command behind per-step disclosure, truncated gracefully */}
+      {commandExpanded && cmdLine && (
+        <div
+          className="task-chain-step-command"
+          style={{ "--cmd-max-lines": COMMAND_MAX_LINES } as React.CSSProperties}
+        >
           <code>{cmdLine}</code>
         </div>
       )}
