@@ -137,13 +137,15 @@ export function Sidebar(props: {
   activeSessionId?: string | null;
   /** Open or create a chat session for a project on a specific instance. */
   onOpenProjectChat?: (projectName: string, environmentId: string, workingDirectory: string) => void;
+  /** Chat sessions — passed from parent so sidebar stays in sync with persist/unpersist changes. */
+  sessions?: ChatSession[];
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
-    reachability, mainVmId, onNavigateToSession, activeSessionId, onOpenProjectChat,
+    reachability, mainVmId,     onNavigateToSession, activeSessionId, onOpenProjectChat, sessions: propSessions,
   } = props;
   const intl = useIntl();
   const [configService] = useInject<IConfigService>(cid.IConfigService);
@@ -166,17 +168,20 @@ export function Sidebar(props: {
     });
   }, [configService]);
 
-  // Chat sessions — loaded from config store
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  // Chat sessions — prefer prop sessions (stays in sync with persist/unpersist),
+  // fall back to loading from config store
+  const [localSessions, setLocalSessions] = useState<ChatSession[]>([]);
+  const sessions = propSessions ?? localSessions;
   const sessionsLoaded = useRef(false);
 
   useEffect(() => {
+    if (propSessions) return; // Prop-driven, no need to load locally
     if (sessionsLoaded.current) return;
     sessionsLoaded.current = true;
     void configService.getChatSessions().then((s) => {
-      setSessions(s);
+      setLocalSessions(s);
     });
-  }, [configService]);
+  }, [configService, propSessions]);
 
   // Build merged project node list — one entry per project NAME across all instances.
   // Same-name projects on different instances merge into a single sidebar row.

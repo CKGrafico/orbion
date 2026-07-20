@@ -118,12 +118,24 @@ export function App(): React.ReactNode {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   /** All chat sessions — loaded from config store for header rendering */
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  /** Tracks the previous persisted state per session to detect auto-persist transitions */
+  const [prevPersistedState, setPrevPersistedState] = useState<Record<string, boolean>>({});
   /** Models per environment (keyed by environmentId) */
   const [envModels, setEnvModels] = useState<Record<string, ModelInfo[]>>({});
 
   // Load sessions on mount and when activeSessionId changes
   useEffect(() => {
-    void configService.getChatSessions().then((s) => setSessions(s));
+    void configService.getChatSessions().then((s) => {
+      // Detect auto-persist transitions (session was ephemeral, now persisted)
+      setPrevPersistedState((prev) => {
+        const next: Record<string, boolean> = {};
+        for (const session of s) {
+          next[session.id] = session.persisted ?? false;
+        }
+        return next;
+      });
+      setSessions(s);
+    });
   }, [configService, activeSessionId]);
 
   // Load models for the active session's environment
@@ -861,6 +873,55 @@ export function App(): React.ReactNode {
     void configService.getChatSessions().then((s) => setSessions(s));
   }, [configService]);
 
+  /** Un-persist a session (make it ephemeral again) — requires confirmation. */
+  const [confirmUnpersistId, setConfirmUnpersistId] = useState<string | null>(null);
+
+  const handleUnpersistSession = useCallback((sessionId: string): void => {
+    void configService.updateChatSession(sessionId, { persisted: false });
+    setConfirmUnpersistId(null);
+    // Refresh sessions in local state
+    void configService.getChatSessions().then((s) => setSessions(s));
+  }, [configService]);
+
+  /** Auto-persist: when a configurable turn-count threshold is crossed, persist the session. */
+  const AUTO_PERSIST_TURN_THRESHOLD = 8;
+
+  const handleTurnCountChange = useCallback((sessionId: string, turnCount: number): void => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    // Already persisted — nothing to do
+    if (session.persisted) return;
+    // Check decline suppression
+    if (session.declineAutoPersistUntil) {
+      const declineUntil = new Date(session.declineAutoPersistUntil).getTime();
+      if (Date.now() < declineUntil) return;
+    }
+    // Update turn count on the session
+    void configService.updateChatSession(sessionId, { turnCount });
+    // Crossed threshold?
+    if (turnCount >= AUTO_PERSIST_TURN_THRESHOLD && (session.turnCount ?? 0) < AUTO_PERSIST_TURN_THRESHOLD) {
+      void configService.updateChatSession(sessionId, { persisted: true });
+      // Refresh sessions in local state
+      void configService.getChatSessions().then((s) => setSessions(s));
+    }
+  }, [configService, sessions]);
+
+  /** Decline auto-persist offer — remember for this session. */
+  const handleDeclineAutoPersist = useCallback((sessionId: string): void => {
+    // Suppress for 24 hours
+    const declineUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    void configService.updateChatSession(sessionId, { declineAutoPersistUntil: declineUntil });
+  }, [configService]);
+
+  /** Determine if auto-persist just happened for a session (was ephemeral, now persisted, not via user toggle). */
+  const getAutoPersistedJustNow = useCallback((sessionId: string): boolean => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return false;
+    const wasEphemeral = prevPersistedState[sessionId] === false;
+    const isNowPersisted = session.persisted === true;
+    return wasEphemeral && isNowPersisted;
+  }, [sessions, prevPersistedState]);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -990,6 +1051,11 @@ export function App(): React.ReactNode {
             instance={sessionEnv}
             isEphemeral={!session?.persisted}
             onPersistSession={() => handlePersistSession(view.sessionId)}
+            turnCount={session?.turnCount}
+            onTurnSent={() => handleTurnCountChange(view.sessionId, (session?.turnCount ?? 0) + 1)}
+            autoPersistedJustNow={getAutoPersistedJustNow(view.sessionId)}
+            onDeclineAutoPersist={() => handleDeclineAutoPersist(view.sessionId)}
+            onUnpersistSession={() => setConfirmUnpersistId(view.sessionId)}
           />
         );
       }
@@ -1054,10 +1120,26 @@ export function App(): React.ReactNode {
             <span className="dot" style={{ background: projectColor }} />
             <span className="main-title">{session.projectName}</span>
             {!session.persisted ? (
-              <span className="chip chip-ephemeral" title={intl.formatMessage({ id: "session.ephemeralMarker" })}>
+              <span
+                className="chip chip-ephemeral chip-clickable"
+                title={intl.formatMessage({ id: "session.ephemeralMarker" })}
+                onClick={() => handlePersistSession(session.id)}
+                role="button"
+                tabIndex={0}
+              >
                 {intl.formatMessage({ id: "session.ephemeralMarker" })}
               </span>
-            ) : null}
+            ) : (
+              <span
+                className="chip chip-persisted chip-clickable"
+                title={intl.formatMessage({ id: "session.unpersistAction" })}
+                onClick={() => setConfirmUnpersistId(session.id)}
+                role="button"
+                tabIndex={0}
+              >
+                {intl.formatMessage({ id: "session.persistedMarker" })}
+              </span>
+            )}
             {session.workingDirectory ? (
               <span className="chip mono session-directory" title={session.workingDirectory}>
                 {session.workingDirectory}
@@ -1298,6 +1380,7 @@ export function App(): React.ReactNode {
                   }}
                   onNavigateToSession={handleNavigateToSession}
                   activeSessionId={activeSessionId}
+                  sessions={sessions}
                   onOpenProjectChat={useCallback((projectName: string, environmentId: string, workingDirectory: string) => {
                     // Find or create a session for this project on this instance
                     const existing = sessions.find(
@@ -1416,6 +1499,34 @@ export function App(): React.ReactNode {
                   onClick={() => handleRemove(confirmRemoveId)}
                 >
                   {intl.formatMessage({ id: "app.removeConfirmBtn" })}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })() : null}
+
+      {confirmUnpersistId ? (() => {
+        const session = sessions.find((s) => s.id === confirmUnpersistId);
+        return (
+          <div className="modal-backdrop" onClick={() => setConfirmUnpersistId(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 380 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+                {intl.formatMessage({ id: "session.unpersistTitle" })}
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 20px", lineHeight: 1.5 }}>
+                {intl.formatMessage({ id: "session.unpersistConfirm" }, { title: session?.title ?? "" })}
+              </p>
+              <div className="modal-actions">
+                <button className="btn" onClick={() => setConfirmUnpersistId(null)}>
+                  {intl.formatMessage({ id: "session.unpersistCancel" })}
+                </button>
+                <button
+                  className="btn"
+                  style={{ background: "color-mix(in srgb, var(--warning) 18%, transparent)", color: "var(--warning)", borderColor: "color-mix(in srgb, var(--warning) 30%, transparent)" }}
+                  onClick={() => handleUnpersistSession(confirmUnpersistId)}
+                >
+                  {intl.formatMessage({ id: "session.unpersistConfirmBtn" })}
                 </button>
               </div>
             </div>

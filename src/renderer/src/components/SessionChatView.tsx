@@ -106,9 +106,19 @@ interface SessionChatViewProps {
   isEphemeral?: boolean;
   /** Callback to persist (save) an ephemeral session. */
   onPersistSession?: () => void;
+  /** Current turn count for this session (from ChatSession.turnCount). */
+  turnCount?: number;
+  /** Callback when a user turn is sent (for turn-count tracking and auto-persist). */
+  onTurnSent?: () => void;
+  /** Whether auto-persist just triggered (for the "kept — this became a session" notice). */
+  autoPersistedJustNow?: boolean;
+  /** Callback when the user declines the auto-persist offer. */
+  onDeclineAutoPersist?: () => void;
+  /** Callback to un-persist a session (make it ephemeral again, usually requires confirm). */
+  onUnpersistSession?: () => void;
 }
 
-export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, instance, isEphemeral = false, onPersistSession }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, instance, isEphemeral = false, onPersistSession, turnCount, onTurnSent, autoPersistedJustNow, onDeclineAutoPersist, onUnpersistSession }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [mcpService] = useInject<IMcpService>(cid.IMcpService);
@@ -140,6 +150,24 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
   const [chainVersion, setChainVersion] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialEnvRef = useRef<string | null>(null);
+
+  // ── Auto-persist notice ──────────────────────────────────────────────
+  const [showAutoPersistNotice, setShowAutoPersistNotice] = useState(false);
+  const autoPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Show the "kept — this became a session" notice when auto-persist triggers
+  useEffect(() => {
+    if (autoPersistedJustNow) {
+      setShowAutoPersistNotice(true);
+      if (autoPersistTimerRef.current) clearTimeout(autoPersistTimerRef.current);
+      autoPersistTimerRef.current = setTimeout(() => {
+        setShowAutoPersistNotice(false);
+      }, 5000);
+    }
+    return () => {
+      if (autoPersistTimerRef.current) clearTimeout(autoPersistTimerRef.current);
+    };
+  }, [autoPersistedJustNow]);
 
   // ── Reachability ──────────────────────────────────────────────────────
   const isReachable = reachability === "connected" || reachability === undefined;
@@ -288,10 +316,35 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     };
   }, [agentService, appendAssistantContent, finishTurn, interruptTurn, turns, transcriptService]);
 
+  // ── Conversational intent detection ──────────────────────────────────
+  // Detect phrases like "keep this chat", "save this chat", "keep this",
+  // "save this conversation", etc. in the user's message. When detected
+  // in an ephemeral session, auto-persist the session.
+  const CONVERSATIONAL_PERSIST_PATTERNS = [
+    /\bkeep\s+(this\s+)?(chat|conversation|session)\b/i,
+    /\bsave\s+(this\s+)?(chat|conversation|session)\b/i,
+    /\bdon't\s+(lose|lose|loose|delete)\s+(this\s+)?(chat|conversation)\b/i,
+    /\bpersist\s+(this\s+)?(chat|conversation|session)\b/i,
+    /\bkeep\s+this\b/i,
+    /\bsave\s+this\b/i,
+  ];
+
+  function detectConversationalPersistIntent(text: string): boolean {
+    return CONVERSATIONAL_PERSIST_PATTERNS.some((p) => p.test(text));
+  }
+
   // ── Send prompt handler ─────────────────────────────────────────────
 
   const handleSendPrompt = useCallback(
     (text: string) => {
+      // ── Conversational intent: persist the session if user says "keep this" ──
+      if (isEphemeral && detectConversationalPersistIntent(text)) {
+        onPersistSession?.();
+      }
+
+      // ── Track turn count for auto-persist ──
+      onTurnSent?.();
+
       const timestamp = Date.now();
       const turnId = `agent-turn-${timestamp}`;
       const userMsgId = `agent-msg-${timestamp}-u`;
@@ -551,6 +604,21 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         </div>
       ) : null}
       <LoopSummaryBar loops={loops} reachability={reachability} onSegmentClick={handleSegmentClick} />
+      {showAutoPersistNotice ? (
+        <div className="auto-persist-notice">
+          <span className="auto-persist-notice-text">
+            {intl.formatMessage({ id: "session.autoPersistNotice" })}
+          </span>
+          {onDeclineAutoPersist ? (
+            <button
+              className="auto-persist-decline-btn"
+              onClick={onDeclineAutoPersist}
+            >
+              {intl.formatMessage({ id: "session.autoPersistDecline" })}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="session-chat-scroll" ref={scrollRef}>
         {rows.length === 0 ? (
           <div className="session-chat-empty">
@@ -699,6 +767,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         isReachable={isReachable}
         isEphemeral={isEphemeral}
         onPersistSession={onPersistSession}
+        onUnpersistSession={onUnpersistSession}
       />
     </div>
   );

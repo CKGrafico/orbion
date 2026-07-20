@@ -197,7 +197,7 @@ export interface ConfigBridge {
   getChatSessions: () => Promise<ChatSession[]>;
   addChatSession: (session: Omit<ChatSession, "id" | "createdAt">) => Promise<ChatSession>;
   removeChatSession: (sessionId: string) => Promise<void>;
-  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted">>) => Promise<void>;
+  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>) => Promise<void>;
   getExpandedProjects: () => Promise<string[]>;
   setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
   exportBootstrapSeed: () => Promise<BootstrapSeedExportResult>;
@@ -781,6 +781,12 @@ export interface ChatSession {
   /** Whether this session is persisted in the sidebar. False = ephemeral (scratch) chat.
    *  Ephemeral chats are fully functional but not listed in the sidebar until persisted. */
   persisted?: boolean;
+  /** Number of user turns in this session (used for auto-persist depth threshold). */
+  turnCount?: number;
+  /** ISO timestamp until which auto-persist offers are suppressed for this session.
+   *  When the user declines an auto-persist offer, this is set to the session's
+   *  createdAt timestamp of the next day, effectively silencing offers until reset. */
+  declineAutoPersistUntil?: string;
   /** ISO timestamp of last activity in this session. */
   lastActiveAt: string;
   /** ISO timestamp when the session was created. */

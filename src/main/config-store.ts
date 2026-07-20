@@ -1191,7 +1191,7 @@ export function removeChatSession(sessionId: string): Promise<void> {
   });
 }
 
-export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted">>): Promise<void> {
+export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>): Promise<void> {
   return serialize(() => {
     const sessions = store.get("chatSessions", []);
     const idx = sessions.findIndex((s) => s.id === sessionId);

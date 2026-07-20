@@ -340,7 +340,7 @@ export class MockConfigService implements IConfigService {
     const filtered = sessions.filter((s) => s.id !== sessionId);
     try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(filtered)); } catch { /* empty */ }
   }
-  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted">>): Promise<void> {
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>): Promise<void> {
     const sessions = await this.getChatSessions();
     const idx = sessions.findIndex((s) => s.id === sessionId);
     if (idx >= 0) {

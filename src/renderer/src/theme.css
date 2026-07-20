@@ -2711,6 +2711,23 @@ input {
   font-style: italic;
 }
 
+.chip-clickable {
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chip-clickable:hover {
+  background: color-mix(in srgb, var(--text-muted) 25%, transparent);
+  color: var(--text-secondary);
+}
+
+.chip-persisted {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 500;
+}
+
 .mono {
   font-family: var(--font-mono);
 }
@@ -4305,6 +4322,52 @@ input {
 .composer-persist-btn:hover {
   background: var(--bg-active);
   color: var(--text-primary);
+}
+
+.composer-persist-btn-active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.composer-persist-btn-active:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-hover);
+}
+
+/* ── Auto-persist notice ─────────────────────────────────────────── */
+
+.auto-persist-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 18px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.auto-persist-notice-text {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.auto-persist-decline-btn {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 1px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.auto-persist-decline-btn:hover {
+  background: var(--bg-active);
+  color: var(--text-secondary);
 }
 
 /* ── Access mode chips ───────────────────────────────────────────── */
