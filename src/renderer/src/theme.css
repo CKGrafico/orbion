@@ -68,6 +68,63 @@
   --font-mono: "Cascadia Code", "Consolas", "JetBrains Mono", monospace;
 }
 
+[data-theme="light"] {
+  --bg-frame: #f4f5f7;
+  --bg-panel: #ffffff;
+  --bg-sidebar: #edf0f4;
+  --bg-elevated: #f8f9fb;
+  --bg-input: #ffffff;
+  --bg-hover: #e4e8ee;
+  --bg-active: #d8dce4;
+  --bg-segment: #edf0f4;
+  --bg-segment-active: #dde1e9;
+  --border: #c8cdd8;
+  --border-subtle: #dde1e9;
+  --text-primary: #1a1d23;
+  --text-secondary: #4a5060;
+  --text-muted: #8a90a0;
+  --accent: #6b9e1f;
+  --accent-hover: #7fb82e;
+  --accent-ink: #ffffff;
+  --accent-task: #9c5cc4;
+  --accent-infra: #c4842e;
+  --accent-blue: #3088d6;
+  --chip-warm: #c49a2e;
+  --success: #5a9418;
+  --danger: #cc3333;
+  --warning: #c49a2e;
+  --status-running: #5a9418;
+  --status-waiting: #3088d6;
+  --status-paused: #c49a2e;
+  --status-stopped: #c4842e;
+  --status-failed: #cc3333;
+  --status-finished: #5a9418;
+  --status-unknown: #8a90a0;
+  --health-ok: #5a9418;
+  --health-offline: #cc3333;
+  --health-unknown: #8a90a0;
+  --health-connecting: #b8922e;
+  --health-backoff: #c4682e;
+  --health-blocked: #a832a8;
+  --endpoint-connected: #5a9418;
+  --endpoint-backoff: #c4682e;
+  --endpoint-offline: #cc3333;
+  --opencode-authenticated: #5a9418;
+  --opencode-unauthenticated: #b8922e;
+  --opencode-unknown: #8a90a0;
+  --pill-approval: #cc3333;
+  --pill-input: #c49a2e;
+  --pill-working: #5a9418;
+  --pill-done: #4a5060;
+  --pill-failed: #cc3333;
+  --pill-idle: #8a90a0;
+  --pill-unknown: #8a90a0;
+}
+
+[data-theme="light"] ::selection {
+  background: rgba(107, 158, 31, 0.22);
+}
+
 * {
   box-sizing: border-box;
 }
