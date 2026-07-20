@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "changeId": "gh-166-global-settings-panel",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-166-global-settings-panel/evidence/01-settings-panel-open.webp",
+      "caption": "Global Settings Panel opened from sidebar gear icon",
+      "width": 1280,
+      "height": 720,
+      "bytes": 23486,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Global settings panel (deliberately thin)",
+    "steps": [
+      "Verify sidebar footer has gear icon",
+      "Click gear to open settings drawer",
+      "Verify all 5 settings rows are present",
+      "Verify Dark theme is the active segment",
+      "Verify notification mute toggle exists",
+      "Close the settings drawer"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The sidebar footer contains a settings gear icon",
+      "status": "passed"
+    },
+    {
+      "description": "Clicking the gear icon opens the settings drawer",
+      "status": "passed"
+    },
+    {
+      "description": "The settings panel contains all 5 settings rows",
+      "status": "passed"
+    },
+    {
+      "description": "Theme setting shows Dark as the active segment",
+      "status": "passed"
+    },
+    {
+      "description": "Notification mute toggle is present",
+      "status": "passed"
+    },
+    {
+      "description": "Closing the settings drawer hides it",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Global settings panel (deliberately thin)\n\n![Global Settings Panel opened from sidebar gear icon](https://raw.githubusercontent.com/CKGrafico/orbion/42a683589f6f5caaeadb977768967be8a79c0c32/openspec/changes/gh-166-global-settings-panel/evidence/01-settings-panel-open.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Verify sidebar footer has gear icon\n2. Click gear to open settings drawer\n3. Verify all 5 settings rows are present\n4. Verify Dark theme is the active segment\n5. Verify notification mute toggle exists\n6. Close the settings drawer\n\n</details>"
+}
