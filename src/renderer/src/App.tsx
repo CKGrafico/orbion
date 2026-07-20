@@ -171,6 +171,13 @@ function AppInner(): React.ReactNode {
   // When the user navigates away from an ephemeral session, show a discard
   // toast with an "Undo" button. If undo is not clicked within 5s, delete
   // the session and its transcript.
+  //
+  // SIDE-EFFECT PERMANENCE INVARIANT: discarding a chat ONLY removes local
+  // session metadata and transcript. It NEVER rolls back side effects that
+  // were executed on the loop-task daemon (loops created, chain edits
+  // applied, etc.). Those effects live on the daemon, not in Orbion's
+  // local state, and remain intact regardless of whether the chat that
+  // caused them is kept or discarded.
   const prevViewRef = useRef<View>(view);
   const pendingDiscardRef = useRef<string | null>(null);
 
