@@ -952,6 +952,8 @@
     "openOnPlatform": "Open on GitHub",
     "close": "Close review (Esc)",
     "placeholderTitle": "PR Review Mode",
-    "placeholderDescription": "The agent briefing, diff viewer, and review actions will appear here in a future update."
+    "placeholderDescription": "The agent briefing, diff viewer, and review actions will appear here in a future update.",
+    "queueLabel": "PR review queue",
+    "queueTitle": "{count, plural, one {# PR in queue} other {# PRs in queue}}"
   }
 }

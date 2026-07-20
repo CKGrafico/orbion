@@ -4,6 +4,7 @@ import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
 import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
 import { GitPullRequest, X, ExternalLink } from "lucide-react";
+import { ReviewQueueStrip } from "./ReviewQueueStrip";
 
 /** Color class for PR risk level chip (shared with InboxView) */
 function riskChipClass(riskLevel: PrRiskLevel): string {
@@ -16,7 +17,6 @@ function riskChipClass(riskLevel: PrRiskLevel): string {
 }
 
 export function ReviewModeOverlay(): React.ReactNode {
-  const intl = useIntl();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
 
   const activeItem = reviewModeService.getActiveItem();
@@ -81,7 +81,6 @@ function ReviewModeContent({
             )}
           </div>
           <div className="review-mode-header-right">
-            {/* Action placeholder: will be wired in a separate issue */}
             <div className="review-mode-actions">
               <button
                 className="review-mode-action-btn review-mode-action-open"
@@ -102,12 +101,15 @@ function ReviewModeContent({
           </div>
         </div>
 
-        {/* Body placeholder */}
+        {/* Body: two-column layout with queue strip */}
         <div className="review-mode-body">
-          <div className="review-mode-placeholder">
-            <GitPullRequest size={32} strokeWidth={1.2} />
-            <h3>{intl.formatMessage({ id: "reviewMode.placeholderTitle" })}</h3>
-            <p>{intl.formatMessage({ id: "reviewMode.placeholderDescription" })}</p>
+          <ReviewQueueStrip />
+          <div className="review-mode-main-area">
+            <div className="review-mode-placeholder">
+              <GitPullRequest size={32} strokeWidth={1.2} />
+              <h3>{intl.formatMessage({ id: "reviewMode.placeholderTitle" })}</h3>
+              <p>{intl.formatMessage({ id: "reviewMode.placeholderDescription" })}</p>
+            </div>
           </div>
         </div>
       </div>

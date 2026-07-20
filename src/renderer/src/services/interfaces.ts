@@ -289,12 +289,20 @@ export interface IPrVerdictService {
 }
 
 export interface IReviewModeService {
-  /** Enter review mode for the given PR item. */
+  /** Enter review mode for the given PR item (single-PR batch). */
   enter(item: ReviewModeItem): void;
+  /** Enter review mode with a batch of PR items, selecting the one at `selectedIndex` (default 0). */
+  enterBatch(items: ReviewModeItem[], selectedIndex?: number): void;
   /** Exit review mode (return to previous view). */
   exit(): void;
   /** Get the currently active review item, or null if not in review mode. */
   getActiveItem(): ReviewModeItem | null;
-  /** Subscribe to review mode state changes (enter/exit). */
+  /** Get all PR items in the current review batch (empty when not in review mode). */
+  getBatchItems(): ReviewModeItem[];
+  /** Mark a PR as disposed (approved or changes-requested). */
+  markDisposed(repo: string, number: number): void;
+  /** Get the set of disposed PR keys ("repo:number") in the current review session. */
+  getDisposedPrs(): Set<string>;
+  /** Subscribe to review mode state changes (enter/exit/selection/disposed). */
   onStateChange(cb: (item: ReviewModeItem | null) => void): () => void;
 }

@@ -1204,24 +1204,25 @@ function AppInner(): React.ReactNode {
           prVerdicts={prVerdicts}
           onClickItem={(item) => {
             if (item.kind === "pr-awaiting-review" && item.prRepo && item.prNumber) {
-              // Open review mode for PR items
-              const prData = prAwaitingReview.find(
+              // Open review mode with the full batch of PRs
+              const selectedIndex = prAwaitingReview.findIndex(
                 (pr) => pr.repo === item.prRepo && pr.number === item.prNumber,
               );
-              if (prData) {
-                const verdictKey = `${prData.repo}:${prData.number}`;
+              const batchItems = prAwaitingReview.map((pr) => {
+                const verdictKey = `${pr.repo}:${pr.number}`;
                 const verdict = prVerdicts.get(verdictKey);
-                reviewModeService.enter({
-                  repo: prData.repo,
-                  number: prData.number,
-                  title: prData.title,
-                  author: prData.author,
-                  url: prData.url,
-                  headSha: prData.headSha,
+                return {
+                  repo: pr.repo,
+                  number: pr.number,
+                  title: pr.title,
+                  author: pr.author,
+                  url: pr.url,
+                  headSha: pr.headSha,
                   verdict,
-                });
-                return;
-              }
+                };
+              });
+              reviewModeService.enterBatch(batchItems, selectedIndex >= 0 ? selectedIndex : 0);
+              return;
             }
             select(item.environmentId);
             if (item.loopId) {
