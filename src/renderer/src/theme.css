@@ -1669,6 +1669,255 @@ input {
   padding: 4px 18px;
 }
 
+.transcript-loop-proposal {
+  padding: 4px 18px;
+}
+
+/* ── Loop Proposal Card ──────────────────────────────────────────────── */
+
+.loop-proposal-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.loop-proposal-card--terminal {
+  opacity: 0.85;
+}
+
+.loop-proposal-card--error {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border-subtle));
+  border-left: 3px solid var(--danger);
+}
+
+.loop-proposal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.loop-proposal-icon {
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.loop-proposal-title {
+  font-size: var(--font-label-upper-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--font-label-upper-spacing);
+  color: var(--text-secondary);
+}
+
+.loop-proposal-status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+.loop-proposal-status--created {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.loop-proposal-status--rejected {
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  color: var(--text-muted);
+}
+
+.loop-proposal-command {
+  background: var(--bg-log);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  overflow-x: auto;
+}
+
+.loop-proposal-command-content {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.loop-proposal-command-expand {
+  display: block;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.loop-proposal-command-expand:hover {
+  text-decoration: underline;
+}
+
+.loop-proposal-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loop-proposal-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.loop-proposal-meta-label {
+  font-size: var(--font-meta-size);
+  color: var(--text-muted);
+}
+
+.loop-proposal-meta-value {
+  font-size: var(--font-meta-size);
+  color: var(--text-secondary);
+}
+
+.loop-proposal-meta-value--mono {
+  font-family: var(--font-mono);
+}
+
+.loop-proposal-meta-sep {
+  width: 1px;
+  height: 10px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.loop-proposal-options {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.loop-proposal-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.loop-proposal-option-label {
+  font-size: var(--font-meta-size);
+  color: var(--text-secondary);
+}
+
+.loop-proposal-checkbox {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.loop-proposal-max-runs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.loop-proposal-max-runs-input {
+  width: 60px;
+  padding: 2px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+}
+
+.loop-proposal-max-runs-input::placeholder {
+  color: var(--text-muted);
+}
+
+.loop-proposal-max-runs-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.loop-proposal-suggestion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.loop-proposal-suggestion-badge:hover {
+  background: color-mix(in srgb, var(--warning) 25%, transparent);
+}
+
+.loop-proposal-error {
+  font-size: 12px;
+  color: var(--danger);
+  padding: 4px 0;
+}
+
+.loop-proposal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.loop-proposal-btn {
+  padding: 4px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s;
+}
+
+.loop-proposal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loop-proposal-btn--reject {
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.loop-proposal-btn--reject:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.loop-proposal-btn--approve {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.loop-proposal-btn--approve:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
 
 /* Muted composer state when instance is unreachable */
 .composer-textarea:disabled {

@@ -79,6 +79,58 @@ export function triggerLoop(env: Environment, loopId: string): Promise<ApiRespon
   return apiRequest(env, `/api/loops/${encodeURIComponent(loopId)}/trigger`, "POST");
 }
 
+// ── Loop creation ──
+
+export interface CreateLoopParams {
+  command: string;
+  commandArgs?: string[];
+  interval: string;
+  projectId?: string;
+  description?: string;
+  runImmediately?: boolean;
+  maxRuns?: number | null;
+}
+
+export function createLoop(env: Environment, params: CreateLoopParams): Promise<ApiResponse<LoopMeta>> {
+  const body: Record<string, unknown> = {
+    command: params.command,
+    interval: params.interval,
+  };
+  if (params.commandArgs?.length) body.commandArgs = params.commandArgs;
+  if (params.projectId) body.projectId = params.projectId;
+  if (params.description) body.description = params.description;
+  if (params.runImmediately) body.runImmediately = true;
+  if (params.maxRuns != null) body.maxRuns = params.maxRuns;
+
+  return apiRequest<LoopMeta>(env, "/api/loops", "POST", body);
+}
+
+// ── Agent command detection ──
+
+/** Known agent runtime commands that should trigger a max-runs suggestion. */
+const AGENT_COMMANDS = new Set([
+  "opencode",
+  "claude-code",
+  "claude",
+  "codex",
+]);
+
+/**
+ * Detect whether a command invokes an agent runtime.
+ * Used to nudge the user towards setting a max-runs cap.
+ */
+export function isAgentCommand(command: string): boolean {
+  const baseCommand = command.trim().split(/\s+/)[0] ?? "";
+  // Strip path prefix to get the bare command name
+  const basename = baseCommand.split("/").pop() ?? baseCommand;
+  // Also strip common extensions
+  const bare = basename.replace(/\.(exe|cmd|bat|sh)$/, "");
+  return AGENT_COMMANDS.has(bare);
+}
+
+/** Default suggested max-runs cap for agent commands. */
+export const SUGGESTED_MAX_RUNS = 10;
+
 // ── SSE log streaming (standalone) ──
 
 const streamHandlers = new Map<string, LogStreamHandlers>();

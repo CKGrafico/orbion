@@ -73,7 +73,8 @@ export type RowKind =
   | "approval-request"
   | "question-request"
   | "instance-handoff"
-  | "loop-card";
+  | "loop-card"
+  | "loop-proposal";
 
 export interface BaseRow {
   id: string;
@@ -137,6 +138,38 @@ export interface LoopCardRow extends BaseRow {
   environmentId: string;
 }
 
+export type LoopProposalStatus = "pending" | "approved" | "rejected" | "creating" | "created" | "error";
+
+export interface LoopProposalRow extends BaseRow {
+  kind: "loop-proposal";
+  /** Unique proposal identifier for tracking state. */
+  proposalId: string;
+  /** The shell command to run. */
+  command: string;
+  /** Command arguments. */
+  commandArgs: string[];
+  /** Interval syntax (e.g., "30s", "5m", "1h", "1d", "1w"). */
+  interval: string;
+  /** Target project ID. */
+  projectId: string;
+  /** Target project display name. */
+  projectName: string;
+  /** Whether to trigger the first run right away. */
+  runImmediately: boolean;
+  /** Cap on number of runs (null = unlimited). */
+  maxRuns: number | null;
+  /** The suggested cap (only set for agent commands when maxRuns is null). */
+  suggestedMaxRuns: number | null;
+  /** Which environment to create the loop on. */
+  environmentId: string;
+  /** Current status of the proposal. */
+  status: LoopProposalStatus;
+  /** Populated after successful creation. */
+  createdLoopId: string | null;
+  /** Populated on creation error. */
+  error: string | null;
+}
+
 export type TranscriptRow =
   | UserMessageRow
   | AssistantMessageRow
@@ -146,4 +179,5 @@ export type TranscriptRow =
   | ApprovalRow
   | QuestionRow
   | InstanceHandoffRow
-  | LoopCardRow;
+  | LoopCardRow
+  | LoopProposalRow;

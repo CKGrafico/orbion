@@ -781,5 +781,21 @@
     "resultStopped": "Stopped",
     "resultTriggered": "Triggered",
     "resultError": "Action failed"
+  },
+  "loopProposal": {
+    "title": "Loop proposal",
+    "interval": "interval",
+    "project": "project",
+    "runImmediately": "Run immediately",
+    "maxRuns": "Max runs",
+    "maxRunsPlaceholder": "∞",
+    "suggestedMaxRuns": "Suggested: {count}",
+    "expandCommand": "Show full command",
+    "approve": "Approve",
+    "reject": "Reject",
+    "creating": "Creating…",
+    "statusCreated": "Created",
+    "statusRejected": "Rejected",
+    "createError": "Failed to create loop"
   }
 }

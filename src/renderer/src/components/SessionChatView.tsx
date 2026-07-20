@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall } from "../chat/types";
+import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, LoopProposalRow } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
 import type { IAgentService, ITranscriptService } from "../services/interfaces";
 import type { LoopMeta, Environment } from "../types";
@@ -9,6 +9,7 @@ import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { LoopCard } from "./LoopCard";
+import { LoopProposalCard } from "./LoopProposalCard";
 import { WifiOff } from "lucide-react";
 
 const MarkdownContent = lazy(() =>
@@ -51,6 +52,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     interruptTurn,
     reloadTranscript,
     insertLoopCards,
+    insertLoopProposal,
+    updateLoopProposalStatus,
   } = useTranscript(sessionId);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("full");
@@ -292,6 +295,31 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [loops, environmentId, insertLoopCards],
   );
 
+  // ── Loop proposal callbacks ───────────────────────────────────────────
+
+  const handleProposalApproved = useCallback(
+    (proposalId: string, loopId: string, envId: string) => {
+      updateLoopProposalStatus(proposalId, "created", { createdLoopId: loopId });
+      // Insert a live loop card for the newly created loop
+      insertLoopCards([loopId], envId);
+    },
+    [updateLoopProposalStatus, insertLoopCards],
+  );
+
+  const handleProposalRejected = useCallback(
+    (proposalId: string) => {
+      updateLoopProposalStatus(proposalId, "rejected");
+    },
+    [updateLoopProposalStatus],
+  );
+
+  const handleProposalStatusChange = useCallback(
+    (proposalId: string, status: "creating" | "error", error?: string) => {
+      updateLoopProposalStatus(proposalId, status as "creating" | "error", error ? { error } : undefined);
+    },
+    [updateLoopProposalStatus],
+  );
+
   return (
     <div className="session-chat-panel">
       {!isReachable ? (
@@ -394,6 +422,19 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 return (
                   <div key={row.id} className="transcript-loop-card">
                     <LoopCard loop={loop} reachability={reachability} instance={instance} scrollContainerRef={scrollRef} />
+                  </div>
+                );
+              }
+              case "loop-proposal": {
+                return (
+                  <div key={row.id} className="transcript-loop-proposal">
+                    <LoopProposalCard
+                      row={row}
+                      instance={instance}
+                      onApproved={handleProposalApproved}
+                      onRejected={handleProposalRejected}
+                      onStatusChange={handleProposalStatusChange}
+                    />
                   </div>
                 );
               }

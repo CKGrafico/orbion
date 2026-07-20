@@ -134,7 +134,7 @@ const MOCK_CHAT_SESSIONS: ChatSession[] = [
   { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-haiku", lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
 ];
 
-function mockRequest<T>(path: string, method: string = "GET"): Promise<ApiResponse<T>> {
+function mockRequest<T>(path: string, method: string = "GET", body?: unknown): Promise<ApiResponse<T>> {
   // ── Loop action mutations (POST) ─────────────────────────────
   if (method === "POST") {
     const loopActionMatch = path.match(/^\/api\/loops\/([^/]+)\/(pause|resume|stop|trigger)$/);
@@ -161,6 +161,28 @@ function mockRequest<T>(path: string, method: string = "GET"): Promise<ApiRespon
         }
       }
       return Promise.resolve({ ok: true, status: 200, data: undefined as T });
+    }
+
+    // Loop creation (POST /api/loops)
+    if (path === "/api/loops" && body && typeof body === "object") {
+      const params = body as Record<string, unknown>;
+      const newLoop = mockLoop({
+        id: `loop-mock-${Date.now()}`,
+        status: params.runImmediately ? "running" : "waiting",
+        command: String(params.command ?? "echo hello"),
+        commandArgs: Array.isArray(params.commandArgs) ? params.commandArgs as string[] : [],
+        intervalHuman: String(params.interval ?? "5m"),
+        description: params.description ? String(params.description) : undefined,
+        maxRuns: typeof params.maxRuns === "number" ? params.maxRuns : null,
+        projectId: params.projectId ? String(params.projectId) : "default",
+        nextRunAt: new Date(Date.now() + 300000).toISOString(),
+        runCount: 0,
+        lastExitCode: null,
+        lastRunAt: null,
+        runHistory: [],
+      });
+      MOCK_LOOPS.push(newLoop);
+      return Promise.resolve({ ok: true, status: 201, data: newLoop as T });
     }
   }
 
@@ -589,7 +611,7 @@ export class MockInfraService implements IInfraService {
 @injectable()
 export class MockApiService implements IApiService {
   async request<T>(args: ApiRequestArgs): Promise<ApiResponse<T>> {
-    return mockRequest<T>(args.path, args.method);
+    return mockRequest<T>(args.path, args.method, args.body);
   }
 }
 
@@ -1054,7 +1076,7 @@ export class MockMcpService implements IMcpService {
     // Mock: no-op
   }
 
-  async callTool(environmentId: string, toolName: string, _args: Record<string, unknown>): Promise<McpToolCallResult> {
+  async callTool(environmentId: string, toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
     const status = await this.getStatus(environmentId);
     if (status.state !== "connected") {
       return { ok: false, error: "MCP server not connected" };
@@ -1063,6 +1085,25 @@ export class MockMcpService implements IMcpService {
     const known = status.tools.some((t) => t.name === toolName);
     if (!known) {
       return { ok: false, error: `Unknown MCP tool: ${toolName}` };
+    }
+
+    // Mock: create_loop returns a proposal payload for the UI to render as a proposal card
+    if (toolName === "create_loop") {
+      return {
+        ok: true,
+        data: {
+          proposal: true,
+          command: args.command ?? "echo hello",
+          commandArgs: args.commandArgs ?? [],
+          interval: args.interval ?? "5m",
+          projectId: args.projectId ?? "default",
+          projectName: "Default",
+          runImmediately: args.runImmediately ?? false,
+          maxRuns: args.maxRuns ?? null,
+          suggestedMaxRuns: null,
+          environmentId,
+        },
+      };
     }
 
     // Mock: return a generic success response

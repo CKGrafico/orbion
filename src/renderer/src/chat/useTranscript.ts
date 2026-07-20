@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { TranscriptMessage, ToolCallRecord } from "../../../shared/ipc";
 import type { ITranscriptService } from "../services/interfaces";
-import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow } from "./types";
+import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow, LoopProposalRow, LoopProposalStatus } from "./types";
 
 const TOOL_CALLS_THRESHOLD = 3;
 
@@ -78,7 +78,7 @@ function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
  * (e.g., instance switch, runtime switch, model switch).
  */
 function isSystemNoteMessage(msg: TranscriptMessage): boolean {
-  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-") || msg.id.startsWith("loop-summon-");
+  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-") || msg.id.startsWith("loop-summon-") || msg.id.startsWith("loop-proposal-");
 }
 
 /**
@@ -121,6 +121,45 @@ function parseLoopSummon(msg: TranscriptMessage): { loopIds: string[]; environme
       return { loopIds: parsed.loopIds, environmentId: parsed.environmentId ?? msg.environmentId ?? "" };
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether a transcript message is a loop-proposal record.
+ * These use the convention: id starts with "loop-proposal-", role "user".
+ */
+function isLoopProposalMessage(msg: TranscriptMessage): boolean {
+  return msg.id.startsWith("loop-proposal-");
+}
+
+/**
+ * Parse a loop-proposal transcript message into a LoopProposalRow.
+ * Returns null if parsing fails.
+ */
+function parseLoopProposalMessage(msg: TranscriptMessage): LoopProposalRow | null {
+  try {
+    const parsed = JSON.parse(msg.content);
+    if (parsed.kind !== "loop-proposal") return null;
+    return {
+      id: msg.id,
+      kind: "loop-proposal",
+      turnId: msg.id,
+      proposalId: parsed.proposalId ?? msg.id,
+      command: parsed.command ?? "",
+      commandArgs: parsed.commandArgs ?? [],
+      interval: parsed.interval ?? "",
+      projectId: parsed.projectId ?? "",
+      projectName: parsed.projectName ?? "",
+      runImmediately: parsed.runImmediately ?? false,
+      maxRuns: parsed.maxRuns ?? null,
+      suggestedMaxRuns: parsed.suggestedMaxRuns ?? null,
+      environmentId: parsed.environmentId ?? msg.environmentId ?? "",
+      status: parsed.status ?? "pending",
+      createdLoopId: parsed.createdLoopId ?? null,
+      error: parsed.error ?? null,
+    };
   } catch {
     return null;
   }
@@ -208,7 +247,7 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
 // Row building
 // ---------------------------------------------------------------------------
 
-function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = [], loopSummonMessages: TranscriptMessage[] = []): TranscriptRow[] {
+function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = [], loopSummonMessages: TranscriptMessage[] = [], loopProposalMessages: TranscriptMessage[] = []): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
 
   // Build handoff rows from system note messages
@@ -248,6 +287,15 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
           timestamp: msg.startedAt + i, // Ensure stable ordering within a summon
         });
       }
+    }
+  }
+
+  // Build loop-proposal rows from loop-proposal messages
+  const loopProposalRows: Array<{ row: LoopProposalRow; timestamp: number }> = [];
+  for (const msg of loopProposalMessages) {
+    const proposalRow = parseLoopProposalMessage(msg);
+    if (proposalRow) {
+      loopProposalRows.push({ row: proposalRow, timestamp: msg.startedAt });
     }
   }
 
@@ -336,12 +384,13 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     turnRows.push({ rows: turnRowsList, timestamp: turn.userMessage.startedAt });
   }
 
-  // Merge turn groups, handoff dividers, and loop-card rows by timestamp
-  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number } | { kind: "loop-card"; row: LoopCardRow; timestamp: number };
+  // Merge turn groups, handoff dividers, loop-card rows, and loop-proposal rows by timestamp
+  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number } | { kind: "loop-card"; row: LoopCardRow; timestamp: number } | { kind: "loop-proposal"; row: LoopProposalRow; timestamp: number };
   const merged: MergeItem[] = [
     ...turnRows.map((t) => ({ kind: "turn" as const, rows: t.rows, timestamp: t.timestamp })),
     ...handoffRows.map((h) => ({ kind: "handoff" as const, row: h.row, timestamp: h.timestamp })),
     ...loopCardRows.map((l) => ({ kind: "loop-card" as const, row: l.row, timestamp: l.timestamp })),
+    ...loopProposalRows.map((l) => ({ kind: "loop-proposal" as const, row: l.row, timestamp: l.timestamp })),
   ];
   merged.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -349,6 +398,8 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     if (item.kind === "handoff") {
       rows.push(item.row);
     } else if (item.kind === "loop-card") {
+      rows.push(item.row);
+    } else if (item.kind === "loop-proposal") {
       rows.push(item.row);
     } else {
       rows.push(...item.rows);
@@ -366,6 +417,7 @@ export function useTranscript(sessionId: string | null) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [handoffMessages, setHandoffMessages] = useState<TranscriptMessage[]>([]);
   const [loopSummonMessages, setLoopSummonMessages] = useState<TranscriptMessage[]>([]);
+  const [loopProposalMessages, setLoopProposalMessages] = useState<TranscriptMessage[]>([]);
   const [rows, setRows] = useState<TranscriptRow[]>([]);
   const expandedToolsRef = useRef<Set<string>>(new Set());
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -433,12 +485,14 @@ export function useTranscript(sessionId: string | null) {
       if (cancelled) return;
       const hydratedTurns = messagesToChatTurns(messages);
       const systemNotes = messages.filter(isSystemNoteMessage);
-      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m));
+      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m) && !isLoopProposalMessage(m));
       const loopSummons = systemNotes.filter(isLoopSummonMessage);
+      const loopProposals = systemNotes.filter(isLoopProposalMessage);
       setTurns(hydratedTurns);
       setHandoffMessages(handoffs);
       setLoopSummonMessages(loopSummons);
-      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons));
+      setLoopProposalMessages(loopProposals);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals));
       loadedSessionRef.current = sessionId;
       loadingRef.current = false;
     }).catch(() => {
@@ -457,16 +511,16 @@ export function useTranscript(sessionId: string | null) {
   turnsRef.current = turns;
 
   const rebuildRows = useCallback((newTurns: ChatTurn[]): TranscriptRow[] => {
-    const newRows = buildRowsFromTurns(newTurns, handoffMessages, loopSummonMessages);
+    const newRows = buildRowsFromTurns(newTurns, handoffMessages, loopSummonMessages, loopProposalMessages);
     setRows(newRows);
     return newRows;
-  }, [handoffMessages, loopSummonMessages]);
+  }, [handoffMessages, loopSummonMessages, loopProposalMessages]);
 
-  // Rebuild rows when handoffMessages or loopSummonMessages changes
+  // Rebuild rows when handoffMessages, loopSummonMessages, or loopProposalMessages changes
   useEffect(() => {
-    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages, loopSummonMessages);
+    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages, loopSummonMessages, loopProposalMessages);
     setRows(newRows);
-  }, [handoffMessages, loopSummonMessages]);
+  }, [handoffMessages, loopSummonMessages, loopProposalMessages]);
 
   const setTurnsAndRebuild = useCallback(
     (updater: (prev: ChatTurn[]) => ChatTurn[]) => {
@@ -743,6 +797,86 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
+  /**
+   * Insert a loop proposal into the transcript. This creates a persisted
+   * "loop-proposal" system message (role "user", id starting with "loop-proposal-")
+   * whose content is JSON with the proposal fields.
+   */
+  const insertLoopProposal = useCallback(
+    (proposal: Omit<LoopProposalRow, "id" | "kind" | "turnId">) => {
+      if (!sessionId) return;
+
+      const timestamp = Date.now();
+      const proposalId = proposal.proposalId ?? `lp-${timestamp}`;
+      const messageId = `loop-proposal-${timestamp}`;
+
+      const message: Omit<TranscriptMessage, "createdAt"> = {
+        id: messageId,
+        sessionId,
+        role: "user",
+        content: JSON.stringify({
+          kind: "loop-proposal",
+          proposalId,
+          command: proposal.command,
+          commandArgs: proposal.commandArgs,
+          interval: proposal.interval,
+          projectId: proposal.projectId,
+          projectName: proposal.projectName,
+          runImmediately: proposal.runImmediately,
+          maxRuns: proposal.maxRuns,
+          suggestedMaxRuns: proposal.suggestedMaxRuns,
+          environmentId: proposal.environmentId,
+          status: proposal.status ?? "pending",
+          createdLoopId: proposal.createdLoopId,
+          error: proposal.error,
+        }),
+        startedAt: timestamp,
+        finishedAt: timestamp,
+        environmentId: proposal.environmentId,
+      };
+
+      // Persist the proposal message
+      void transcriptService.appendMessage(message).then((persisted) => {
+        setLoopProposalMessages((prev) => [...prev, persisted]);
+      });
+    },
+    [sessionId, transcriptService],
+  );
+
+  /**
+   * Update a loop proposal's status in the persisted transcript.
+   * Finds and updates the corresponding loop-proposal message content.
+   */
+  const updateLoopProposalStatus = useCallback(
+    (proposalId: string, status: LoopProposalStatus, extras?: { createdLoopId?: string; error?: string }) => {
+      if (!sessionId) return;
+
+      setLoopProposalMessages((prev) => {
+        const updated = prev.map((msg) => {
+          if (!msg.id.startsWith("loop-proposal-")) return msg;
+          try {
+            const parsed = JSON.parse(msg.content);
+            if (parsed.proposalId !== proposalId) return msg;
+            const newParsed = {
+              ...parsed,
+              status,
+              ...(extras?.createdLoopId != null ? { createdLoopId: extras.createdLoopId } : {}),
+              ...(extras?.error != null ? { error: extras.error } : {}),
+            };
+            const newContent = JSON.stringify(newParsed);
+            // Persist the update
+            void transcriptService.updateMessage(msg.id, { content: newContent });
+            return { ...msg, content: newContent };
+          } catch {
+            return msg;
+          }
+        });
+        return updated;
+      });
+    },
+    [sessionId, transcriptService],
+  );
+
   /** Force a reload of the transcript from the persistence layer. */
   const reloadTranscript = useCallback(() => {
     if (!sessionId) return;
@@ -751,12 +885,14 @@ export function useTranscript(sessionId: string | null) {
     transcriptService.getMessages(sessionId).then((messages) => {
       const hydratedTurns = messagesToChatTurns(messages);
       const systemNotes = messages.filter(isSystemNoteMessage);
-      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m));
+      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m) && !isLoopProposalMessage(m));
       const loopSummons = systemNotes.filter(isLoopSummonMessage);
+      const loopProposals = systemNotes.filter(isLoopProposalMessage);
       setTurns(hydratedTurns);
       setHandoffMessages(handoffs);
       setLoopSummonMessages(loopSummons);
-      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons));
+      setLoopProposalMessages(loopProposals);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals));
       loadedSessionRef.current = sessionId;
     }).catch(() => {
       // Ignore errors
@@ -780,6 +916,8 @@ export function useTranscript(sessionId: string | null) {
     setTurnAccessMode,
     addHandoffMessage,
     insertLoopCards,
+    insertLoopProposal,
+    updateLoopProposalStatus,
     reloadTranscript,
   };
 }
