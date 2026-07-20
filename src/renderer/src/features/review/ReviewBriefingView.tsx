@@ -8,7 +8,7 @@ import type {
   InfraActionResult,
 } from "../../../../shared/ipc";
 import { parseDiffLines, type DiffLine, getBriefingTotals, formatBriefingStats } from "./parse-diff";
-import { Shield, ChevronDown, ChevronRight, FileCode2, Loader2, AlertCircle } from "lucide-react";
+import { Shield, ChevronDown, ChevronRight, FileCode2, Loader2, AlertCircle, AlertTriangle } from "lucide-react";
 
 /** Risk chip class for a flagged file (derived from path analysis). */
 function fileRiskClass(path: string): string {
@@ -35,6 +35,16 @@ export function ReviewBriefingView(): React.ReactNode {
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
 
   const activeItem = reviewModeService.getActiveItem();
+
+  // Force re-renders when overlap data changes
+  const [overlapVersion, setOverlapVersion] = useState(0);
+  useEffect(() => {
+    return reviewModeService.onOverlapUpdate(() => {
+      setOverlapVersion((v) => v + 1);
+    });
+  }, [reviewModeService]);
+
+  const overlapResult = reviewModeService.getOverlapResult();
 
   const [briefing, setBriefing] = useState<GetPrBriefingResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -147,6 +157,29 @@ export function ReviewBriefingView(): React.ReactNode {
     [briefing],
   );
 
+  // Build a map: filePath → list of other PR numbers that also change this file
+  const overlapFileMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    if (!overlapResult || !activeItem) return map;
+
+    const currentKey = `${activeItem.repo}:${activeItem.number}`;
+    for (const overlap of overlapResult.overlaps) {
+      // Only consider overlaps involving the current PR
+      if (overlap.prA !== currentKey && overlap.prB !== currentKey) continue;
+      const otherNum = overlap.prA === currentKey
+        ? parseInt(overlap.prB.split(":").pop() ?? "0", 10)
+        : parseInt(overlap.prA.split(":").pop() ?? "0", 10);
+      for (const file of overlap.sharedFiles) {
+        const existing = map.get(file) ?? [];
+        if (!existing.includes(otherNum)) {
+          existing.push(otherNum);
+        }
+        map.set(file, existing);
+      }
+    }
+    return map;
+  }, [overlapResult, activeItem?.repo, activeItem?.number]);
+
   if (!activeItem) return null;
 
   if (loading) {
@@ -203,6 +236,7 @@ export function ReviewBriefingView(): React.ReactNode {
                 key={file.path}
                 file={file}
                 diffLines={flaggedDiffCache.get(file.path)}
+                overlapPrNumbers={overlapFileMap.get(file.path)}
                 intl={intl}
               />
             ))}
@@ -264,10 +298,12 @@ export function ReviewBriefingView(): React.ReactNode {
 function FlaggedFileBlock({
   file,
   diffLines,
+  overlapPrNumbers,
   intl,
 }: {
   file: DiffFileEntry;
   diffLines: DiffLine[] | undefined;
+  overlapPrNumbers: number[] | undefined;
   intl: ReturnType<typeof useIntl>;
 }): React.ReactNode {
   const [expanded, setExpanded] = useState(true);
@@ -293,6 +329,19 @@ function FlaggedFileBlock({
           <span className="review-diff-file-item-deletions">-{file.deletions}</span>
         </span>
       </button>
+      {overlapPrNumbers && overlapPrNumbers.length > 0 && (
+        <div className="review-briefing-file-overlap-note">
+          <AlertTriangle size={11} className="review-briefing-file-overlap-icon" />
+          <span>
+            {intl.formatMessage(
+              { id: "reviewMode.overlap.fileAlsoChangedBy" },
+              {
+                prNumbers: overlapPrNumbers.map((n) => `#${n}`).join(", "),
+              },
+            )}
+          </span>
+        </div>
+      )}
       {expanded && diffLines && diffLines.length > 0 && (
         <div className="review-briefing-flagged-file-diff">
           <table className="review-diff-table">

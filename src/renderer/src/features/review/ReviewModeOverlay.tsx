@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
-import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
-import { GitPullRequest, X, ExternalLink, CheckCircle2, MessageCircleWarning, Loader2 } from "lucide-react";
+import type { ReviewModeItem, PrRiskLevel, BatchOverlapResult } from "../../../../shared/ipc";
+import { GitPullRequest, X, ExternalLink, CheckCircle2, MessageCircleWarning, Loader2, AlertTriangle } from "lucide-react";
 import { ReviewQueueStrip } from "./ReviewQueueStrip";
 import { ReviewDiffView } from "./ReviewDiffView";
 import { ReviewBriefingView } from "./ReviewBriefingView";
@@ -62,6 +62,14 @@ function ReviewModeContent({
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [overlapVersion, setOverlapVersion] = useState(0);
+
+  // Subscribe to overlap updates to trigger re-renders
+  useEffect(() => {
+    return reviewModeService.onOverlapUpdate(() => {
+      setOverlapVersion((v) => v + 1);
+    });
+  }, [reviewModeService]);
 
   const disposedPrs = reviewModeService.getDisposedPrs();
   const isDisposed = disposedPrs.has(`${item.repo}:${item.number}`);
@@ -112,6 +120,24 @@ function ReviewModeContent({
     setShowCommentInput((prev) => !prev);
     setSubmitError(null);
   }, []);
+
+  const overlapResult = reviewModeService.getOverlapResult();
+  const hasOverlaps = overlapResult && overlapResult.overlaps.length > 0;
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Reset banner when batch changes
+  useEffect(() => {
+    setBannerDismissed(false);
+  }, [item.repo, item.number]);
+
+  const batchItems = reviewModeService.getBatchItems();
+
+  const handleOrderClick = useCallback((prKey: string) => {
+    const match = batchItems.find((bi) => `${bi.repo}:${bi.number}` === prKey);
+    if (match) {
+      reviewModeService.enterBatch(batchItems, batchItems.indexOf(match));
+    }
+  }, [batchItems, reviewModeService]);
 
   return (
     <div className="review-mode-overlay" role="dialog" aria-label={intl.formatMessage({ id: "reviewMode.dialogLabel" })}>
@@ -248,6 +274,38 @@ function ReviewModeContent({
         {submitError && (
           <div className="review-mode-submit-error">
             {submitError}
+          </div>
+        )}
+
+        {/* Overlap review order banner */}
+        {hasOverlaps && !bannerDismissed && (
+          <div className="review-order-banner">
+            <AlertTriangle size={14} className="review-order-banner-icon" />
+            <span className="review-order-banner-text">
+              {intl.formatMessage(
+                { id: "reviewMode.overlap.bannerTitle" },
+                { count: overlapResult.overlaps.length },
+              )}
+              {" — "}
+              {overlapResult.suggestedOrder.map((entry, idx) => (
+                <span key={entry.prKey}>
+                  {idx > 0 && <span className="review-order-banner-arrow"> → </span>}
+                  <button
+                    className="review-order-banner-pr-link"
+                    onClick={() => handleOrderClick(entry.prKey)}
+                  >
+                    #{entry.number}
+                  </button>
+                </span>
+              ))}
+            </span>
+            <button
+              className="review-order-banner-dismiss"
+              onClick={() => setBannerDismissed(true)}
+              aria-label={intl.formatMessage({ id: "reviewMode.overlap.dismissBanner" })}
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
 

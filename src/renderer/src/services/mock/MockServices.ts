@@ -719,7 +719,13 @@ export class MockInfraService implements IInfraService {
       return { ok: true, data: { verdict } };
     }
     if (args.action === "get-pr-diff") {
-      const MOCK_DIFF = `diff --git a/src/middleware/auth.ts b/src/middleware/auth.ts
+      const params = args.params as { repo?: string; number?: number; path?: string } | undefined;
+      const prNumber = params?.number ?? 127;
+      const filePath = params?.path;
+
+      // Per-PR mock diffs for overlap detection scenarios
+      const MOCK_DIFFS: Record<number, string> = {
+        127: `diff --git a/src/middleware/auth.ts b/src/middleware/auth.ts
 new file mode 100644
 index 0000000..abc1234
 --- /dev/null
@@ -747,29 +753,6 @@ index 0000000..abc1234
 +    return { authenticated: false };
 +  }
 +}
-+
-+export function authMiddleware(request: NextRequest): NextResponse {
-+  const result = authenticate(request);
-+
-+  if (!result.authenticated) {
-+    return NextResponse.json(
-+      { error: 'Unauthorized' },
-+      { status: 401 }
-+    );
-+  }
-+
-+  return NextResponse.next();
-+}
-+
-+export function requireAuth(handler: Function) {
-+  return async (request: NextRequest) => {
-+    const result = authenticate(request);
-+    if (!result.authenticated) {
-+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-+    }
-+    return handler(request, result.userId);
-+  };
-+}
 diff --git a/src/routes/api.ts b/src/routes/api.ts
 index def5678..abc9012 100644
 --- a/src/routes/api.ts
@@ -780,15 +763,6 @@ index def5678..abc9012 100644
 +import { authMiddleware } from '../middleware/auth';
  
  const router = Router();
- 
-@@ -10,6 +11,8 @@ router.use('/health', healthRouter);
- // Protected routes
--const protectedRouter = Router();
-+const protectedRouter = Router();
-+protectedRouter.use(authMiddleware);
- 
- protectedRouter.get('/profile', getProfile);
- protectedRouter.post('/settings', updateSettings);
 diff --git a/assets/logo.png b/assets/logo.png
 Binary files /dev/null and b/assets/logo.png differ
 diff --git a/src/config.ts b/src/config.ts
@@ -802,13 +776,63 @@ index 1111111..2222222 100644
    logLevel: 'info',
 -  jwtSecret: 'hardcoded-secret',
 +  jwtSecret: process.env.JWT_SECRET || '',
- };
-`;
-      const params = args.params as { repo?: string; number?: number; path?: string } | undefined;
-      const filePath = params?.path;
+ };`,
+        131: `diff --git a/src/middleware/auth.ts b/src/middleware/auth.ts
+index abc1234..def5678 100644
+--- a/src/middleware/auth.ts
++++ b/src/middleware/auth.ts
+@@ -20,6 +20,10 @@ export function authenticate(request: NextRequest): AuthResult {
+   try {
++    if (token.length > 4096) {
++      return { authenticated: false };
++    }
+     const payload = verifyToken(token);
+     return { authenticated: true, userId: payload.sub };
+   } catch {
+diff --git a/src/sse/client.ts b/src/sse/client.ts
+index 1111111..2222222 100644
+--- a/src/sse/client.ts
++++ b/src/sse/client.ts
+@@ -10,7 +10,7 @@ export class SSEClient {
+   private reconnectDelay = 1000;
+-  private maxRetries = 3;
++  private maxRetries = 10;
+ 
+   connect(url: string): void {
+diff --git a/src/config.ts b/src/config.ts
+index 1111111..3333333 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -5,7 +5,7 @@ export const config = {
+   port: 3000,
+   debug: false,
+-  logLevel: 'info',
++  logLevel: 'debug',
+   jwtSecret: process.env.JWT_SECRET || '',
+ };`,
+        135: `diff --git a/package.json b/package.json
+index aaa1111..bbb2222 100644
+--- a/package.json
++++ b/package.json
+@@ -10,10 +10,10 @@
+   "dependencies": {
+-    "express": "4.18.2",
++    "express": "4.19.0",
+   }
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index ccc3333..ddd4444 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -1,5 +1,5 @@
+ lockfileVersion: '6.0'
+-imports:
++dependencies:
+   express: 4.19.0`,
+      };
+
+      let diffText = MOCK_DIFFS[prNumber] ?? MOCK_DIFFS[127];
 
       // If a specific file is requested, return only that file's section
-      let diffText = MOCK_DIFF;
       if (filePath) {
         const sections = diffText.split(/(?=^diff --git )/m);
         const matching = sections.find((s) => {
@@ -818,50 +842,114 @@ index 1111111..2222222 100644
         diffText = matching ?? "";
       }
 
-      const files: DiffFileEntry[] = [
-        { path: "src/middleware/auth.ts", additions: 42, deletions: 0, isBinary: false },
-        { path: "src/routes/api.ts", additions: 3, deletions: 1, isBinary: false },
-        { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
-        { path: "src/config.ts", additions: 2, deletions: 2, isBinary: false },
-      ];
+      // Per-PR file entries for overlap detection
+      const MOCK_PR_FILES: Record<number, DiffFileEntry[]> = {
+        127: [
+          { path: "src/middleware/auth.ts", additions: 42, deletions: 0, isBinary: false },
+          { path: "src/routes/api.ts", additions: 3, deletions: 1, isBinary: false },
+          { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
+          { path: "src/config.ts", additions: 2, deletions: 2, isBinary: false },
+        ],
+        131: [
+          { path: "src/middleware/auth.ts", additions: 4, deletions: 0, isBinary: false },
+          { path: "src/sse/client.ts", additions: 1, deletions: 1, isBinary: false },
+          { path: "src/config.ts", additions: 1, deletions: 1, isBinary: false },
+        ],
+        135: [
+          { path: "package.json", additions: 2, deletions: 2, isBinary: false },
+          { path: "pnpm-lock.yaml", additions: 1, deletions: 1, isBinary: false },
+        ],
+      };
 
+      const files = MOCK_PR_FILES[prNumber] ?? MOCK_PR_FILES[127];
       const result: GetPrDiffResult = { diff: diffText, files, truncated: false };
       return { ok: true, data: result };
     }
     if (args.action === "get-pr-briefing") {
-      const flaggedFiles: DiffFileEntry[] = [
-        { path: "src/middleware/auth.ts", additions: 42, deletions: 0, isBinary: false },
-        { path: "src/routes/api.ts", additions: 3, deletions: 1, isBinary: false },
-        { path: "src/config.ts", additions: 2, deletions: 2, isBinary: false },
-      ];
-      const boilerplateFiles: DiffFileEntry[] = [
-        { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
-      ];
-      const sections: BriefingSection[] = [
-        {
-          kind: "flagged",
-          title: "3 flagged files",
-          files: flaggedFiles,
+      const briefingParams = args.params as { repo?: string; number?: number } | undefined;
+      const briefingNumber = briefingParams?.number ?? 127;
+
+      // Per-PR briefing results
+      const MOCK_BRIEFINGS: Record<number, GetPrBriefingResult> = {
+        127: {
+          sections: [
+            {
+              kind: "flagged",
+              title: "3 flagged files",
+              files: [
+                { path: "src/middleware/auth.ts", additions: 42, deletions: 0, isBinary: false },
+                { path: "src/routes/api.ts", additions: 3, deletions: 1, isBinary: false },
+                { path: "src/config.ts", additions: 2, deletions: 2, isBinary: false },
+              ],
+            },
+            {
+              kind: "boilerplate",
+              title: "+0/-0 other",
+              files: [
+                { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
+              ],
+              group: {
+                label: "other",
+                additions: 0,
+                deletions: 0,
+                files: [
+                  { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
+                ],
+              },
+            },
+          ],
+          summary: "3 flagged: auth.ts, api.ts, config.ts. +0/-0 other collapsed",
+          totalFlagged: 3,
+          totalBoilerplate: 1,
         },
-        {
-          kind: "boilerplate",
-          title: "+0/-0 other",
-          files: boilerplateFiles,
-          group: {
-            label: "other",
-            additions: 0,
-            deletions: 0,
-            files: boilerplateFiles,
-          },
+        131: {
+          sections: [
+            {
+              kind: "flagged",
+              title: "3 flagged files",
+              files: [
+                { path: "src/middleware/auth.ts", additions: 4, deletions: 0, isBinary: false },
+                { path: "src/sse/client.ts", additions: 1, deletions: 1, isBinary: false },
+                { path: "src/config.ts", additions: 1, deletions: 1, isBinary: false },
+              ],
+            },
+          ],
+          summary: "3 flagged: auth.ts, client.ts, config.ts",
+          totalFlagged: 3,
+          totalBoilerplate: 0,
         },
-      ];
-      const result: GetPrBriefingResult = {
-        sections,
-        summary: "3 flagged: auth.ts, api.ts, config.ts. +0/-0 other collapsed",
-        totalFlagged: 3,
-        totalBoilerplate: 1,
+        135: {
+          sections: [
+            {
+              kind: "flagged",
+              title: "1 flagged file",
+              files: [
+                { path: "package.json", additions: 2, deletions: 2, isBinary: false },
+              ],
+            },
+            {
+              kind: "boilerplate",
+              title: "+1/-1 lock files",
+              files: [
+                { path: "pnpm-lock.yaml", additions: 1, deletions: 1, isBinary: false },
+              ],
+              group: {
+                label: "imports & locks",
+                additions: 1,
+                deletions: 1,
+                files: [
+                  { path: "pnpm-lock.yaml", additions: 1, deletions: 1, isBinary: false },
+                ],
+              },
+            },
+          ],
+          summary: "1 flagged: package.json. +1/-1 imports & locks collapsed",
+          totalFlagged: 1,
+          totalBoilerplate: 1,
+        },
       };
-      return { ok: true, data: result };
+
+      return { ok: true, data: MOCK_BRIEFINGS[briefingNumber] ?? MOCK_BRIEFINGS[127] };
     }
     if (args.action === "submit-pr-review") {
       const params = args.params as { repo?: string; number?: number; event?: string; body?: string } | undefined;

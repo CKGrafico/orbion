@@ -983,6 +983,11 @@
       "noFlagged": "No flagged changes in this PR",
       "loading": "Analyzing PR\u2026",
       "loadError": "Failed to analyze PR"
+    },
+    "overlap": {
+      "bannerTitle": "{count, plural, one {# overlapping PR} other {# overlapping PRs}} detected",
+      "dismissBanner": "Dismiss",
+      "fileAlsoChangedBy": "also changed by {prNumbers}"
     }
   },
   "review": {

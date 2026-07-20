@@ -54,6 +54,8 @@
   PrAwaitingReviewItem,
   PrVerdict,
   ReviewModeItem,
+  BatchOverlapResult,
+  PrOverlap,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -309,4 +311,8 @@ export interface IReviewModeService {
   openOnWeb(url: string): void;
   /** Subscribe to review mode state changes (enter/exit/selection/disposed). */
   onStateChange(cb: (item: ReviewModeItem | null) => void): () => void;
+  /** Get the batch overlap analysis result, or null if not yet computed. */
+  getOverlapResult(): BatchOverlapResult | null;
+  /** Subscribe to overlap result updates. */
+  onOverlapUpdate(cb: (result: BatchOverlapResult | null) => void): () => void;
 }

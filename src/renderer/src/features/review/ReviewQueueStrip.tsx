@@ -1,9 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
-import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
-import { GitPullRequest, CheckCircle2 } from "lucide-react";
+import type { ReviewModeItem, PrRiskLevel, BatchOverlapResult } from "../../../../shared/ipc";
+import { GitPullRequest, CheckCircle2, AlertTriangle } from "lucide-react";
 
 /** Color class for PR risk level chip */
 function riskChipClass(riskLevel: PrRiskLevel): string {
@@ -23,9 +23,18 @@ export function ReviewQueueStrip(): React.ReactNode {
   const intl = useIntl();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
 
+  // Force re-renders when overlap data changes
+  const [overlapVersion, setOverlapVersion] = useState(0);
+  useEffect(() => {
+    return reviewModeService.onOverlapUpdate(() => {
+      setOverlapVersion((v) => v + 1);
+    });
+  }, [reviewModeService]);
+
   const batchItems = reviewModeService.getBatchItems();
   const activeItem = reviewModeService.getActiveItem();
   const disposedPrs = reviewModeService.getDisposedPrs();
+  const overlapResult = reviewModeService.getOverlapResult();
 
   const handleSelect = useCallback((item: ReviewModeItem): void => {
     reviewModeService.enterBatch(batchItems, batchItems.indexOf(item));
@@ -46,10 +55,12 @@ export function ReviewQueueStrip(): React.ReactNode {
         {batchItems.map((item) => {
           const isActive = activeItem?.repo === item.repo && activeItem?.number === item.number;
           const isDisposed = disposedPrs.has(prKey(item.repo, item.number));
+          const key = prKey(item.repo, item.number);
+          const overlapNotes = overlapResult?.perPrNotes.get(key);
 
           return (
             <button
-              key={prKey(item.repo, item.number)}
+              key={key}
               className={`review-queue-strip-row${isActive ? " review-queue-strip-row-active" : ""}${isDisposed ? " review-queue-strip-row-disposed" : ""}`}
               onClick={() => handleSelect(item)}
               role="listitem"
@@ -81,6 +92,14 @@ export function ReviewQueueStrip(): React.ReactNode {
                   <span className="review-queue-strip-row-verdict">
                     <span className="pr-risk-chip pr-risk-chip-pending">
                       {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
+                    </span>
+                  </span>
+                )}
+                {overlapNotes && overlapNotes.length > 0 && (
+                  <span className="review-queue-strip-row-overlap">
+                    <AlertTriangle size={11} className="review-queue-strip-row-overlap-icon" />
+                    <span className="review-queue-strip-row-overlap-text">
+                      {overlapNotes.join(" · ")}
                     </span>
                   </span>
                 )}

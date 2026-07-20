@@ -546,6 +546,45 @@ export interface OpenPrInBrowserParams {
   url: string;
 }
 
+// ── Cross-PR overlap detection ────────────────────────────────────────
+
+/** Overlap severity between two PRs in a batch. */
+export type OverlapKind = "conflict" | "duplicate" | "touching";
+
+/** Detected overlap between two PRs in a batch. */
+export interface PrOverlap {
+  /** Key of the first PR ("repo:number"). */
+  prA: string;
+  /** Key of the second PR ("repo:number"). */
+  prB: string;
+  /** Overlap classification. */
+  kind: OverlapKind;
+  /** File paths shared between both PRs. */
+  sharedFiles: string[];
+  /** Human-readable note (e.g. "Both modify auth/middleware.ts — potential merge conflict"). */
+  note: string;
+}
+
+/** Entry in the suggested review order when overlaps exist. */
+export interface ReviewOrderEntry {
+  /** PR key ("repo:number"). */
+  prKey: string;
+  /** PR number. */
+  number: number;
+  /** Why this position in the order. */
+  reason: string;
+}
+
+/** Result of overlap analysis for an entire PR batch. */
+export interface BatchOverlapResult {
+  /** All detected overlaps between pairs of PRs. */
+  overlaps: PrOverlap[];
+  /** Suggested review order (empty if no overlaps). */
+  suggestedOrder: ReviewOrderEntry[];
+  /** Overlap notes per PR key (for quick lookup by the queue strip). */
+  perPrNotes: Map<string, string[]>;
+}
+
 export interface InfraActionArgs {
   action: InfraAction;
   params?: Record<string, unknown>;
