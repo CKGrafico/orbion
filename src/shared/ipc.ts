@@ -238,7 +238,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel";
 
 export interface CreateIssueParams {
   title: string;
@@ -328,6 +328,32 @@ export interface EditIssueResult {
     labelsAdded?: string[];
     labelsRemoved?: string[];
   };
+}
+
+export interface BulkRelabelParams {
+  /** Issue numbers to relabel. */
+  issueNumbers: number[];
+  /** Labels to ADD (appended to existing). */
+  addLabels: string[];
+  /** Labels to REMOVE from issues. */
+  removeLabels?: string[];
+  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
+  repo?: string;
+}
+
+export interface BulkRelabelItemResult {
+  issueNumber: number;
+  ok: boolean;
+  error?: string;
+}
+
+export interface BulkRelabelResult {
+  /** Per-item results showing exactly which succeeded and which failed. */
+  items: BulkRelabelItemResult[];
+  /** Number of items that succeeded. */
+  succeeded: number;
+  /** Number of items that failed. */
+  failed: number;
 }
 
 export interface InfraActionArgs {

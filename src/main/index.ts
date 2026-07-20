@@ -27,6 +27,9 @@ import type {
   AddLabelResult,
   EditIssueParams,
   EditIssueResult,
+  BulkRelabelParams,
+  BulkRelabelResult,
+  BulkRelabelItemResult,
   OutageEscalation,
   ResolvedInboxItem,
   VmWizardStartOptions,
@@ -1361,6 +1364,70 @@ app.whenReady().then(() => {
             }
           });
         });
+      }
+      case "bulk-relabel": {
+        const params = args.params as BulkRelabelParams | undefined;
+        if (!params?.issueNumbers?.length) {
+          return { ok: false, error: msg("bulkRelabel.issueNumbersRequired") };
+        }
+        if (!params.addLabels?.length && !params.removeLabels?.length) {
+          return { ok: false, error: msg("bulkRelabel.noLabels") };
+        }
+
+        const cliResolved = await resolvePlatformCli(null, "labels");
+        if ("error" in cliResolved) {
+          return { ok: false, error: cliResolved.error };
+        }
+        if (cliResolved.cli !== "gh") {
+          return { ok: false, error: msg("labels.ghRequiredForLabels") };
+        }
+
+        try {
+          validateCliInputs({
+            labels: [...(params.addLabels ?? []), ...(params.removeLabels ?? [])],
+            repo: params.repo,
+          });
+        } catch (validationErr) {
+          return { ok: false, error: (validationErr as Error).message };
+        }
+
+        // Apply label changes to each issue sequentially, collecting per-item results.
+        const items: BulkRelabelItemResult[] = [];
+        let succeeded = 0;
+        let failed = 0;
+
+        for (const issueNumber of params.issueNumbers) {
+          const ghArgs: string[] = ["issue", "edit", String(issueNumber)];
+          if (params.addLabels.length) {
+            ghArgs.push("--add-label", params.addLabels.join(","));
+          }
+          if (params.removeLabels?.length) {
+            ghArgs.push("--remove-label", params.removeLabels.join(","));
+          }
+          if (params.repo) {
+            ghArgs.push("--repo", params.repo);
+          }
+
+          const itemResult = await new Promise<BulkRelabelItemResult>((resolve) => {
+            execFile("gh", ghArgs, (err, _stdout, stderr) => {
+              if (err) {
+                resolve({ issueNumber, ok: false, error: stderr || err.message });
+              } else {
+                resolve({ issueNumber, ok: true });
+              }
+            });
+          });
+
+          items.push(itemResult);
+          if (itemResult.ok) {
+            succeeded++;
+          } else {
+            failed++;
+          }
+        }
+
+        const result: BulkRelabelResult = { items, succeeded, failed };
+        return { ok: true, data: result };
       }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };

@@ -377,7 +377,7 @@
     "botInitials": "INF",
     "noData": "No machine data available.",
     "unreachable": "Unable to reach the infrastructure runtime. Check that the main VM is connected.",
-    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item\n- edit issue: update an existing issue's title, body, or labels\n- detect-platform: identify a project's hosting platform from git remotes\n- list issues / what's labeled X?: view a filtered slice of the backlog as compact cards",
+    "helpText": "I can help you with fleet operations. Try:\n- machine-status: get the health of all VMs\n- clone repo: clone a git repository on a VM\n- create issue: file a new GitHub issue or ADO work item\n- edit issue: update an existing issue's title, body, or labels\n- detect-platform: identify a project's hosting platform from git remotes\n- list issues / what's labeled X?: view a filtered slice of the backlog as compact cards\n- mark these as X: bulk-add a label to all issues from the last list",
     "fleetStatusHeader": "Fleet Status",
     "cloneInitiated": "## Clone initiated\n\n{data}",
     "errorMessage": "**Error:** {detail}",
@@ -446,6 +446,19 @@
     "summaryBody": "body changed",
     "summaryLabelsAdded": "added {labels}",
     "summaryLabelsRemoved": "removed {labels}"
+  },
+  "bulkRelabel": {
+    "preview": "**Bulk relabel — add {labels} to {count} issue{count, plural, one {} other {s}}:**\n\n{issueList}",
+    "applyQuestion": "Apply these labels to all listed issues?",
+    "optionApply": "Apply to all",
+    "optionCancel": "Cancel",
+    "allApplied": "**Applied {labels} to {count} issue{count, plural, one {} other {s}}:**\n\n{itemLines}",
+    "partiallyApplied": "**Partially applied {labels} — {succeeded} succeeded, {failed} failed:**\n\n{itemLines}",
+    "applyFailed": "**Bulk relabel failed:** {detail}",
+    "noLabelSpecified": "Which label should I apply? Try: \"mark these as to-refine\" or \"add label bug to these\".",
+    "noIssuesInContext": "No issues in context. List some issues first (e.g. \"list issues labeled to-implement\"), then say \"mark these as to-refine\".",
+    "issueNumbersRequired": "Issue numbers are required for bulk relabel.",
+    "noLabels": "At least one label (add or remove) is required for bulk relabel."
   },
   "pickMainVm": {
     "title": "Pick a new main VM",

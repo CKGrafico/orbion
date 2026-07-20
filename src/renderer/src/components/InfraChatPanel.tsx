@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 
 import { useIntl, type IntlShape } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode } from "../types";
-import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult, EditIssueResult } from "../../../shared/ipc";
+import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult, EditIssueResult, BulkRelabelResult, IssueCard } from "../../../shared/ipc";
 import type { IInfraService, IConfigService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
@@ -108,6 +108,10 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   const [pendingEdits, setPendingEdits] = useState<Record<string, { issueNumber: number; title?: string; body?: string; addLabels?: string[]; removeLabels?: string[]; repo?: string }>>({});
   /** Pending label offers keyed by turnId, awaiting user acceptance */
   const [pendingLabelOffers, setPendingLabelOffers] = useState<Record<string, { issueNumber: number; labels: string[]; repo?: string }>>({});
+  /** Last issue list returned by a list-issues query, used for "mark these as X" resolution */
+  const lastIssueListRef = useRef<IssueCard[]>([]);
+  /** Pending bulk relabels keyed by turnId, awaiting user confirmation */
+  const [pendingBulkRelabels, setPendingBulkRelabels] = useState<Record<string, { issueNumbers: number[]; addLabels: string[]; removeLabels?: string[]; repo?: string; issueTitles: Map<number, string> }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Map from issue number to URL, used for issue:// link click-through */
   const issueUrlMap = useRef<Map<number, string>>(new Map());
@@ -444,6 +448,139 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         return;
       }
 
+      // Detect "mark these as X" / "relabel these as X" / "add label X to these" intent
+      const isBulkRelabel =
+        (lower.includes("mark") && (lower.includes(" as ") || lower.includes(" these") || lower.includes(" those"))) ||
+        (lower.includes("relabel") && (lower.includes(" as ") || lower.includes(" these") || lower.includes(" those"))) ||
+        (lower.includes("label") && (lower.includes(" these") || lower.includes(" those") || lower.includes(" all"))) ||
+        (lower.includes("add label") && (lower.includes(" these") || lower.includes(" those") || lower.includes(" all"))) ||
+        lower.includes("mark all as") ||
+        lower.includes("relabel all as");
+
+      if (isBulkRelabel) {
+        // Extract labels from patterns like:
+        // "mark these as to-refine" / "relabel these as bug" / "mark all as to-implement"
+        // "add label bug to these" / "label these as feature"
+        let addLabels: string[] = [];
+        const asMatch = text.match(/(?:mark|relabel|label)\s+(?:these|those|all)\s+as\s+[:\-]?\s*([a-zA-Z0-9\-_,\s]+)/i);
+        const addLabelToMatch = text.match(/add\s+labels?\s+[:\-]?\s*([a-zA-Z0-9\-_,\s]+)\s+to\s+(?:these|those|all)/i);
+
+        if (asMatch) {
+          addLabels = asMatch[1].split(",").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+        } else if (addLabelToMatch) {
+          addLabels = addLabelToMatch[1].split(",").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+        }
+
+        if (addLabels.length === 0) {
+          const turn: ChatTurn = {
+            id: turnId,
+            userMessage: {
+              id: `infra-msg-${now}-u`,
+              role: "user",
+              content: text,
+              startedAt: now,
+            },
+            assistantMessage: {
+              id: `infra-msg-${now}-a`,
+              role: "assistant",
+              content: intl.formatMessage({ id: "bulkRelabel.noLabelSpecified" }),
+              toolCalls: [],
+              startedAt: now + 100,
+              finishedAt: now + 100,
+            },
+            finished: true,
+            collapsed: false,
+            accessMode,
+          };
+          addTurn(turn);
+          setActiveTurnId(null);
+          return;
+        }
+
+        // Resolve issue set from the last listed issues
+        const lastIssues = lastIssueListRef.current;
+        if (lastIssues.length === 0) {
+          const turn: ChatTurn = {
+            id: turnId,
+            userMessage: {
+              id: `infra-msg-${now}-u`,
+              role: "user",
+              content: text,
+              startedAt: now,
+            },
+            assistantMessage: {
+              id: `infra-msg-${now}-a`,
+              role: "assistant",
+              content: intl.formatMessage({ id: "bulkRelabel.noIssuesInContext" }),
+              toolCalls: [],
+              startedAt: now + 100,
+              finishedAt: now + 100,
+            },
+            finished: true,
+            collapsed: false,
+            accessMode,
+          };
+          addTurn(turn);
+          setActiveTurnId(null);
+          return;
+        }
+
+        // Build the confirmation card listing every affected issue
+        const issueNumbers = lastIssues.map((iss) => iss.number);
+        const issueTitles = new Map(lastIssues.map((iss) => [iss.number, iss.title]));
+
+        const issueListLines = lastIssues.map(
+          (iss) => `- [#${iss.number}](issue://${iss.number}) ${escapeMd(iss.title)}`,
+        );
+
+        const previewText = intl.formatMessage(
+          { id: "bulkRelabel.preview" },
+          {
+            count: issueNumbers.length,
+            labels: addLabels.map((l: string) => `\`${l}\``).join(" "),
+            issueList: issueListLines.join("\n"),
+          },
+        );
+
+        const questionId = `bulk-relabel-q-${now}`;
+        const turn: ChatTurn = {
+          id: turnId,
+          userMessage: {
+            id: `infra-msg-${now}-u`,
+            role: "user",
+            content: text,
+            startedAt: now,
+          },
+          assistantMessage: {
+            id: `infra-msg-${now}-a`,
+            role: "assistant",
+            content: previewText,
+            toolCalls: [],
+            startedAt: now + 100,
+            finishedAt: undefined,
+          },
+          finished: false,
+          collapsed: false,
+          accessMode,
+          question: {
+            id: questionId,
+            turnId,
+            text: intl.formatMessage({ id: "bulkRelabel.applyQuestion" }),
+            options: [
+              { key: "apply-bulk-relabel", label: intl.formatMessage({ id: "bulkRelabel.optionApply" }) },
+              { key: "cancel-bulk-relabel", label: intl.formatMessage({ id: "bulkRelabel.optionCancel" }) },
+            ],
+            singleChoice: true,
+            allowFreeText: false,
+            resolved: false,
+          },
+        };
+        addTurn(turn);
+        setActiveTurnId(turnId);
+        setPendingBulkRelabels((prev) => ({ ...prev, [turnId]: { issueNumbers, addLabels, issueTitles } }));
+        return;
+      }
+
       const turn: ChatTurn = {
         id: turnId,
         userMessage: {
@@ -517,6 +654,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                 for (const issue of issueResult.issues) {
                   issueUrlMap.current.set(issue.number, issue.url);
                 }
+                // Store the last-listed issues for "mark these as X" resolution
+                lastIssueListRef.current = issueResult.issues;
               }
             } else {
               responseText = JSON.stringify(result.data, null, 2);
@@ -672,6 +811,85 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         return;
       }
 
+      // Check for pending bulk relabel confirmation
+      const pendingBulk = pendingBulkRelabels[activeTurnId];
+      if (pendingBulk) {
+        if (answer === "apply-bulk-relabel") {
+          void infraService
+            .executeAction({
+              action: "bulk-relabel",
+              params: {
+                issueNumbers: pendingBulk.issueNumbers,
+                addLabels: pendingBulk.addLabels,
+                removeLabels: pendingBulk.removeLabels,
+                repo: pendingBulk.repo,
+              },
+            })
+            .then((result) => {
+              let responseText: string;
+              if (result.ok) {
+                const bulkResult = result.data as BulkRelabelResult;
+
+                // Build per-item result lines
+                const itemLines: string[] = [];
+                for (const item of bulkResult.items) {
+                  const title = pendingBulk.issueTitles.get(item.issueNumber) ?? `#${item.issueNumber}`;
+                  if (item.ok) {
+                    itemLines.push(`- ✓ [#${item.issueNumber}](issue://${item.issueNumber}) ${escapeMd(title)}`);
+                  } else {
+                    itemLines.push(`- ✗ [#${item.issueNumber}](issue://${item.issueNumber}) ${escapeMd(title)} — ${escapeMd(item.error ?? "unknown error")}`);
+                  }
+                }
+
+                if (bulkResult.failed === 0) {
+                  responseText = intl.formatMessage(
+                    { id: "bulkRelabel.allApplied" },
+                    {
+                      count: bulkResult.succeeded,
+                      labels: pendingBulk.addLabels.map((l) => `\`${l}\``).join(" "),
+                      itemLines: itemLines.join("\n"),
+                    },
+                  );
+                } else {
+                  responseText = intl.formatMessage(
+                    { id: "bulkRelabel.partiallyApplied" },
+                    {
+                      succeeded: bulkResult.succeeded,
+                      failed: bulkResult.failed,
+                      labels: pendingBulk.addLabels.map((l) => `\`${l}\``).join(" "),
+                      itemLines: itemLines.join("\n"),
+                    },
+                  );
+                }
+              } else {
+                responseText = intl.formatMessage(
+                  { id: "bulkRelabel.applyFailed" },
+                  { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+                );
+              }
+              appendAssistantContent(activeTurnId!, responseText);
+              finishTurn(activeTurnId!);
+              setActiveTurnId(null);
+              setPendingBulkRelabels((prev) => {
+                const next = { ...prev };
+                delete next[activeTurnId!];
+                return next;
+              });
+            });
+        } else {
+          // Cancel bulk relabel
+          appendAssistantContent(activeTurnId, intl.formatMessage({ id: "bulkRelabel.optionCancel" }));
+          finishTurn(activeTurnId);
+          setActiveTurnId(null);
+          setPendingBulkRelabels((prev) => {
+            const next = { ...prev };
+            delete next[activeTurnId!];
+            return next;
+          });
+        }
+        return;
+      }
+
       const pending = pendingIssues[activeTurnId];
       if (!pending) return;
 
@@ -800,7 +1018,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         });
       }
     },
-    [activeTurnId, answerQuestion, pendingIssues, pendingEdits, pendingLabelOffers, infraService, configService, intl, appendAssistantContent, finishTurn, addTurn, accessMode],
+    [activeTurnId, answerQuestion, pendingIssues, pendingEdits, pendingLabelOffers, pendingBulkRelabels, infraService, configService, intl, appendAssistantContent, finishTurn, addTurn, accessMode],
   );
 
   const handleAccessModeChange = useCallback(

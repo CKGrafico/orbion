@@ -112,7 +112,7 @@ function makeOpenCodeEndpointValidator(): Validator {
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
 const SESSION_SCOPES = ["read-only", "operate", "admin"] as const;
 const API_METHODS = ["GET", "POST", "PATCH", "DELETE"] as const;
-const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-platform", "list-issues", "add-label", "edit-issue"] as const;
+const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-platform", "list-issues", "add-label", "edit-issue", "bulk-relabel"] as const;
 
 // Compile-time exhaustiveness check: if a new InfraAction is added to the
 // shared type but omitted from INFRA_ACTIONS, this assignment will fail.
@@ -515,6 +515,32 @@ const validators: Record<string, Validator> = {
     if (a.action === "edit-issue") {
       if (!isNumber(params.issueNumber))
         issues.push("params.issueNumber must be a number for edit-issue");
+    }
+
+    if (a.action === "bulk-relabel") {
+      if (!Array.isArray(params.issueNumbers)) {
+        issues.push("params.issueNumbers must be an array for bulk-relabel");
+      } else {
+        for (let i = 0; i < (params.issueNumbers as unknown[]).length; i++) {
+          if (!isNumber((params.issueNumbers as unknown[])[i])) {
+            issues.push(`params.issueNumbers[${i}] must be a number for bulk-relabel`);
+            break;
+          }
+        }
+      }
+      if (!Array.isArray(params.addLabels)) {
+        issues.push("params.addLabels must be an array for bulk-relabel");
+      } else {
+        for (let i = 0; i < (params.addLabels as unknown[]).length; i++) {
+          if (!isString((params.addLabels as unknown[])[i])) {
+            issues.push(`params.addLabels[${i}] must be a string for bulk-relabel`);
+            break;
+          }
+        }
+      }
+      if (params.removeLabels !== undefined && !Array.isArray(params.removeLabels)) {
+        issues.push("params.removeLabels must be an array if provided for bulk-relabel");
+      }
     }
 
     return issues;
