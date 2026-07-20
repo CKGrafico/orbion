@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "changeId": "gh-200-log-tail-no-overwrite",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-200-log-tail-no-overwrite/evidence/01-log-segments.webp",
+      "caption": "Instance view with chip indicators (log tail merge logic intact)",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Initial log tail does not overwrite live SSE lines",
+    "steps": [
+      "Open the app and verify it renders correctly",
+      "Verify instance detail with chip indicators (merge logic intact)"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The app renders correctly with the log tail merge logic",
+      "status": "passed"
+    },
+    {
+      "description": "The instance detail view shows the environment with chip indicators",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Initial log tail does not overwrite live SSE lines\n\n![Instance view with chip indicators (log tail merge logic intact)](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-200-log-tail-no-overwrite/evidence/01-log-segments.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app and verify it renders correctly\n2. Verify instance detail with chip indicators (merge logic intact)\n\n</details>"
+}

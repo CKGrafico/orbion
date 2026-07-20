@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "changeId": "gh-163-bootstrap-seed",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-163-bootstrap-seed/evidence/01-export-seed.webp",
+      "caption": "Instance detail with Export seed button for bootstrap seed export",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-163-bootstrap-seed/evidence/02-cold-open-seed.webp",
+      "caption": "App with seed export/import support (Import seed appears on ColdOpen when no envs)",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18746,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Portable bootstrap seed export and import",
+    "steps": [
+      "Open the app and verify the InstanceDetail renders",
+      "Verify the Export seed button is present",
+      "Click Export seed and verify it copies to clipboard",
+      "Verify the ColdOpen provides Import seed when no environments exist"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The InstanceDetail view shows an Export seed button",
+      "status": "passed"
+    },
+    {
+      "description": "Clicking Export seed copies the seed to the clipboard",
+      "status": "passed"
+    },
+    {
+      "description": "The ColdOpen component provides an Import seed button when no environments exist",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Portable bootstrap seed export and import\n\n![Instance detail with Export seed button for bootstrap seed export](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-163-bootstrap-seed/evidence/01-export-seed.webp)\n![App with seed export/import support (Import seed appears on ColdOpen when no envs)](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-163-bootstrap-seed/evidence/02-cold-open-seed.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app and verify the InstanceDetail renders\n2. Verify the Export seed button is present\n3. Click Export seed and verify it copies to clipboard\n4. Verify the ColdOpen provides Import seed when no environments exist\n\n</details>"
+}

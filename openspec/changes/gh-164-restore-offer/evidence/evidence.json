@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "changeId": "gh-164-restore-offer",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-164-restore-offer/evidence/01-restore-offer.webp",
+      "caption": "Instance detail view where the restore offer modal appears after adding a VM",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Pull-canonical restore from config-home",
+    "steps": [
+      "Open the app and verify instance detail renders",
+      "Verify the RestoreOffer component is wired in the App",
+      "Verify the sidebar shows instance with connection status"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The instance detail view is visible where the restore offer would appear",
+      "status": "passed"
+    },
+    {
+      "description": "The RestoreOffer component is wired in the App with checkRestoreAvailable",
+      "status": "passed"
+    },
+    {
+      "description": "The sidebar shows the instance with connection status",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Pull-canonical restore from config-home\n\n![Instance detail view where the restore offer modal appears after adding a VM](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-164-restore-offer/evidence/01-restore-offer.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app and verify instance detail renders\n2. Verify the RestoreOffer component is wired in the App\n3. Verify the sidebar shows instance with connection status\n\n</details>"
+}

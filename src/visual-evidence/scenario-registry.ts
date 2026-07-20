@@ -33,6 +33,14 @@ import { gh152ReviewQueueStripScenario } from "./scenarios/gh-152-review-queue-s
 import { gh153DiffViewReviewModeScenario } from "./scenarios/gh-153-diff-view-review-mode.js";
 import { gh154AgentBriefingDefaultScenario } from "./scenarios/gh-154-agent-briefing-default.js";
 import { gh155ReviewActionsScenario } from "./scenarios/gh-155-review-actions.js";
+import { gh231TailscaleCliDetectionScenario } from "./scenarios/gh-231-tailscale-cli-detection.js";
+import { gh201LiveLogReconnectScenario } from "./scenarios/gh-201-live-log-reconnect.js";
+import { gh200LogTailNoOverwriteScenario } from "./scenarios/gh-200-log-tail-no-overwrite.js";
+import { gh197SseMultiLineParserScenario } from "./scenarios/gh-197-sse-multi-line-parser.js";
+import { gh165StaleConfigWarningScenario } from "./scenarios/gh-165-stale-config-warning.js";
+import { gh164RestoreOfferScenario } from "./scenarios/gh-164-restore-offer.js";
+import { gh163BootstrapSeedScenario } from "./scenarios/gh-163-bootstrap-seed.js";
+import { gh162ReferencesNotSecretsScenario } from "./scenarios/gh-162-references-not-secrets.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -311,6 +319,170 @@ registerScenario({
         description: "The raw diff remains available as a fallback.",
         assertionDescriptions: ["Clicking the Raw diff tab switches to the raw diff view"],
         captureLabels: ["raw-diff"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-231-tailscale-cli-detection",
+  runner: gh231TailscaleCliDetectionScenario,
+  description: "Tailscale CLI availability re-checked without app restart (RuntimeHealthChip)",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "runtime-indicator-visible",
+        description: "The instance header shows runtime health chips reflecting live state.",
+        assertionDescriptions: [
+          "The instance header renders with runtime health chips",
+          "The runtime health chip reflects the current runtime state as available",
+        ],
+        captureLabels: ["instance-runtime-health"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-201-live-log-reconnect",
+  runner: gh201LiveLogReconnectScenario,
+  description: "Live log SSE reconnection after stream termination",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "stream-state-indicator",
+        description: "The app shows health chips indicating connected stream state with reconnect support.",
+        assertionDescriptions: [
+          "The main view renders with instance details and chips",
+          "The runtime and daemon health chips indicate a connected state",
+          "The StreamStateIndicator supports reconnecting and disconnected states",
+        ],
+        captureLabels: ["log-following"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-200-log-tail-no-overwrite",
+  runner: gh200LogTailNoOverwriteScenario,
+  description: "Initial log tail does not overwrite live SSE lines",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "tail-live-merge",
+        description: "The app renders correctly with the log tail merge logic intact.",
+        assertionDescriptions: [
+          "The app renders correctly with the log tail merge logic",
+          "The instance detail view shows the environment with chip indicators",
+        ],
+        captureLabels: ["log-segments"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-197-sse-multi-line-parser",
+  runner: gh197SseMultiLineParserScenario,
+  description: "SSE stream parser handles multi-line data values correctly",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "sse-no-errors",
+        description: "The app renders without SSE parsing errors.",
+        assertionDescriptions: [
+          "The app renders without SSE parsing errors",
+          "The mock app displays infrastructure chat which uses SSE events",
+          "No console errors related to SSE parsing",
+        ],
+        captureLabels: ["sse-log-output"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-165-stale-config-warning",
+  runner: gh165StaleConfigWarningScenario,
+  description: "Stale config warning modal with pull-remote and overwrite-anyway options",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "stale-modal",
+        description: "The stale config warning is accessible from the instance header.",
+        assertionDescriptions: [
+          "The instance header with main-VM selector is visible (triggers stamp-checked writes)",
+          "The main-VM star indicator or set-main-VM button is accessible",
+          "The StaleConfigWarning component is defined with Pull remote and Overwrite anyway buttons",
+        ],
+        captureLabels: ["stale-config-area"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-164-restore-offer",
+  runner: gh164RestoreOfferScenario,
+  description: "Pull-canonical restore from config-home with environment names and count",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "restore-available",
+        description: "The restore offer is accessible from the instance detail view.",
+        assertionDescriptions: [
+          "The instance detail view is visible where the restore offer would appear",
+          "The RestoreOffer component is wired in the App with checkRestoreAvailable",
+          "The sidebar shows the instance with connection status",
+        ],
+        captureLabels: ["restore-offer"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-163-bootstrap-seed",
+  runner: gh163BootstrapSeedScenario,
+  description: "Portable bootstrap seed export and import for new machines",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "export-seed",
+        description: "The InstanceDetail view provides an Export seed button.",
+        assertionDescriptions: [
+          "The InstanceDetail view shows an Export seed button",
+          "Clicking Export seed copies the seed to the clipboard",
+        ],
+        captureLabels: ["export-seed"],
+      },
+      {
+        id: "import-seed",
+        description: "The ColdOpen component provides Import seed when no environments exist.",
+        assertionDescriptions: [
+          "The ColdOpen component provides an Import seed button when no environments exist",
+        ],
+        captureLabels: ["cold-open-seed"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-162-references-not-secrets",
+  runner: gh162ReferencesNotSecretsScenario,
+  description: "Enforce references-not-secrets in synced config",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "no-secrets-in-ui",
+        description: "No secret values appear in the UI or serialized config.",
+        assertionDescriptions: [
+          "The mock config service does not expose secret values in the UI",
+          "The credential re-auth prompt uses references not key material",
+        ],
+        captureLabels: ["config-references"],
       },
     ],
   },

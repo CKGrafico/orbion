@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "changeId": "gh-197-sse-multi-line-parser",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-197-sse-multi-line-parser/evidence/01-sse-log-output.webp",
+      "caption": "Infrastructure panel using SSE events with fixed multi-line parser",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "SSE stream parser handles multi-line data values correctly",
+    "steps": [
+      "Open the app and verify no SSE parsing errors",
+      "Verify the infrastructure panel renders (uses SSE events)",
+      "Verify no console errors related to SSE parsing"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The app renders without SSE parsing errors",
+      "status": "passed"
+    },
+    {
+      "description": "The mock app displays infrastructure chat which uses SSE events",
+      "status": "passed"
+    },
+    {
+      "description": "No console errors related to SSE parsing",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### SSE stream parser handles multi-line data values correctly\n\n![Infrastructure panel using SSE events with fixed multi-line parser](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-197-sse-multi-line-parser/evidence/01-sse-log-output.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app and verify no SSE parsing errors\n2. Verify the infrastructure panel renders (uses SSE events)\n3. Verify no console errors related to SSE parsing\n\n</details>"
+}

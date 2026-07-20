@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "changeId": "gh-201-live-log-reconnect",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-201-live-log-reconnect/evidence/01-log-following.webp",
+      "caption": "Instance with connected Daemon and Runtime chips (stream state tracking active)",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Live log reconnection after SSE stream termination",
+    "steps": [
+      "Open the app and verify instance renders",
+      "Verify health chips indicate connected state",
+      "Verify StreamStateIndicator supports reconnecting/disconnected states"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The main view renders with instance details and chips",
+      "status": "passed"
+    },
+    {
+      "description": "The runtime and daemon health chips indicate a connected state",
+      "status": "passed"
+    },
+    {
+      "description": "The StreamStateIndicator supports reconnecting and disconnected states",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Live log reconnection after SSE stream termination\n\n![Instance with connected Daemon and Runtime chips (stream state tracking active)](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-201-live-log-reconnect/evidence/01-log-following.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app and verify instance renders\n2. Verify health chips indicate connected state\n3. Verify StreamStateIndicator supports reconnecting/disconnected states\n\n</details>"
+}

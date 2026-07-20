@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "changeId": "gh-162-references-not-secrets",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-162-references-not-secrets/evidence/01-config-references.webp",
+      "caption": "Config view showing only credential references, not secrets",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Enforce references-not-secrets in synced config",
+    "steps": [
+      "Open the app with mock environments",
+      "Verify no secret values appear in the UI",
+      "Verify localStorage config contains only references",
+      "Verify credential prompts use references not key material"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The mock config service does not expose secret values in the UI",
+      "status": "passed"
+    },
+    {
+      "description": "Environment entries in localStorage store only references, not credentials",
+      "status": "passed"
+    },
+    {
+      "description": "The credential re-auth prompt uses references not key material",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Enforce references-not-secrets in synced config\n\n![Config view showing only credential references, not secrets](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-162-references-not-secrets/evidence/01-config-references.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app with mock environments\n2. Verify no secret values appear in the UI\n3. Verify localStorage config contains only references\n4. Verify credential prompts use references not key material\n\n</details>"
+}

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "changeId": "gh-231-tailscale-cli-detection",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-231-tailscale-cli-detection/evidence/01-instance-runtime-health.webp",
+      "caption": "Instance header with live runtime health chips (not stale-cached)",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Tailscale CLI availability re-checked without app restart",
+    "steps": [
+      "Open the app",
+      "Verify runtime health chips are visible in the instance header",
+      "Verify the chip reflects the current runtime state (not stale cached)",
+      "Capture checkpoint of the live runtime health indicator"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The instance header renders with runtime health chips",
+      "status": "passed"
+    },
+    {
+      "description": "The runtime health chip reflects the current runtime state as available",
+      "status": "passed"
+    },
+    {
+      "description": "The instance detail shows CLI detection is fresh (not stale-cached)",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Tailscale CLI availability re-checked without app restart\n\n![Instance header with live runtime health chips (not stale-cached)](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-231-tailscale-cli-detection/evidence/01-instance-runtime-health.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app\n2. Verify runtime health chips are visible in the instance header\n3. Verify the chip reflects the current runtime state (not stale cached)\n4. Capture checkpoint of the live runtime health indicator\n\n</details>"
+}

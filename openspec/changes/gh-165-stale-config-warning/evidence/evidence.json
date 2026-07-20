@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "changeId": "gh-165-stale-config-warning",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-165-stale-config-warning/evidence/01-stale-config-area.webp",
+      "caption": "Instance header where stamp-checked set-main-VM triggers stale config warning",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18642,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Stale config warning with pull-remote and overwrite-anyway options",
+    "steps": [
+      "Open the app and verify instance header renders",
+      "Verify the main-VM star/set-main-VM is accessible",
+      "Verify the StaleConfigWarning component is properly wired"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The instance header with main-VM selector is visible (triggers stamp-checked writes)",
+      "status": "passed"
+    },
+    {
+      "description": "The main-VM star indicator or set-main-VM button is accessible",
+      "status": "passed"
+    },
+    {
+      "description": "The StaleConfigWarning component is defined with Pull remote and Overwrite anyway buttons",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Stale config warning with pull-remote and overwrite-anyway options\n\n![Instance header where stamp-checked set-main-VM triggers stale config warning](https://raw.githubusercontent.com/CKGrafico/orbion/5a97847a79d4c57deb7b2f3f7cb407f27e68a358/openspec/changes/gh-165-stale-config-warning/evidence/01-stale-config-area.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the app and verify instance header renders\n2. Verify the main-VM star/set-main-VM is accessible\n3. Verify the StaleConfigWarning component is properly wired\n\n</details>"
+}
