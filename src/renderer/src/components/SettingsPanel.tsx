@@ -103,20 +103,16 @@ export function SettingsPanel({
                 {intl.formatMessage({ id: "settings.themeDark" })}
               </button>
               <button
-                className="segment disabled"
-                title={intl.formatMessage({ id: "settings.themeComingSoon" })}
-                style={{ pointerEvents: "none", opacity: 0.4 }}
+                className={`segment${settings.theme === "light" ? " active" : ""}`}
+                onClick={() => handleThemeChange("light")}
               >
                 {intl.formatMessage({ id: "settings.themeLight" })}
-                <span className="settings-soon-badge">{intl.formatMessage({ id: "settings.soon" })}</span>
               </button>
               <button
-                className="segment disabled"
-                title={intl.formatMessage({ id: "settings.themeComingSoon" })}
-                style={{ pointerEvents: "none", opacity: 0.4 }}
+                className={`segment${settings.theme === "system" ? " active" : ""}`}
+                onClick={() => handleThemeChange("system")}
               >
                 {intl.formatMessage({ id: "settings.themeSystem" })}
-                <span className="settings-soon-badge">{intl.formatMessage({ id: "settings.soon" })}</span>
               </button>
             </div>
           </div>
