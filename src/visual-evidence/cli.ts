@@ -27,6 +27,7 @@ import { validateInput, runVisualEvidence } from "./run.js";
 import { resolveConfig, findRepoRoot } from "./config.js";
 import { writeManifest } from "./manifest.js";
 import { generatePrMarkdown } from "./pr-markdown.js";
+import { clearEvidenceDir } from "./store.js";
 import type { RepoCoordinates } from "./types.js";
 
 /** Tracks the changeId currently being processed so the unhandled-rejection
@@ -159,8 +160,7 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  // For skipped/blocked: write a manifest so the run is auditable.
-  if (result.status === "skipped" || result.status === "blocked") {
+  if (result.status === "skipped") {
     try {
       writeManifest(repoRoot, input.changeId, config, {
         changeId: result.changeId,
@@ -174,24 +174,14 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  if (result.status === "blocked") {
+    clearEvidenceDir(repoRoot, input.changeId, config);
+    console.error(`Visual evidence BLOCKED: ${result.reason}`);
+    return 2;
+  }
+
   if (result.status === "failed") {
-    try {
-      writeManifest(repoRoot, input.changeId, config, {
-        changeId: result.changeId,
-        required: result.required,
-        status: result.status,
-      }, {
-        repo,
-        sha,
-        scenario: result.scenario,
-        assertions: result.assertions,
-        temporaryArtifacts: result.temporaryArtifacts,
-        failedStep: result.failedStep,
-        error: result.error,
-      });
-    } catch {
-      // best-effort
-    }
+    clearEvidenceDir(repoRoot, input.changeId, config);
     console.error(`Visual evidence FAILED — step "${result.failedStep}": ${result.error}`);
     return 1;
   }

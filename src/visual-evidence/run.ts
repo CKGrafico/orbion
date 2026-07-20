@@ -332,7 +332,7 @@ function blockedResult(changeId: string, reason: string): BlockedEvidenceResult 
   return {
     version: 1,
     changeId,
-    required: false,
+    required: true,
     status: "blocked",
     reason,
     assets: [],
