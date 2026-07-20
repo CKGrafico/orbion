@@ -699,7 +699,15 @@
     "viewTitle": "Chat Session",
     "viewDescription": "Start a conversation with the agent by typing below.",
     "ephemeralMarker": "scratch — won't be kept",
-    "persistAction": "Keep this chat"
+    "persistAction": "Keep this chat",
+    "persistedMarker": "kept",
+    "unpersistAction": "Make ephemeral again",
+    "unpersistTitle": "Make session ephemeral?",
+    "unpersistConfirm": "This session will no longer appear in the sidebar. The transcript is not deleted, but you'll need to persist it again to find it easily.",
+    "unpersistCancel": "Cancel",
+    "unpersistConfirmBtn": "Make ephemeral",
+    "autoPersistNotice": "kept — this became a session",
+    "autoPersistDecline": "Undo"
   },
   "modelSelector": {
     "selectModel": "Select model",

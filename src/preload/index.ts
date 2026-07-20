@@ -103,7 +103,7 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:addChatSession", session) as Promise<ChatSession>,
     removeChatSession: (sessionId: string) =>
       ipcRenderer.invoke("config:removeChatSession", sessionId) as Promise<void>,
-    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted">>) =>
+    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>) =>
       ipcRenderer.invoke("config:updateChatSession", sessionId, updates) as Promise<void>,
     getExpandedProjects: () =>
       ipcRenderer.invoke("config:getExpandedProjects") as Promise<string[]>,
