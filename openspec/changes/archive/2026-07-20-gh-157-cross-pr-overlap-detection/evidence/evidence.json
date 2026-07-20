@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "changeId": "gh-157-cross-pr-overlap-detection",
+  "required": true,
+  "status": "passed",
+  "scenario": {
+    "title": "Cross-PR conflict and overlap detection in a review batch",
+    "steps": [
+      "Enter review mode from a PR inbox notification with a batch of 3 PRs",
+      "The ReviewModeService fetches per-PR diff file lists asynchronously",
+      "The detectBatchOverlaps algorithm computes pairwise overlap analysis",
+      "The queue strip renders overlap indicator chips on affected PR rows (#127, #131 share auth.ts and config.ts)",
+      "The review order banner appears at the top of the main area when overlaps are detected",
+      "The briefing view shows file-level overlap notes on flagged files shared by other PRs"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "Overlap detection types (OverlapKind, PrOverlap, BatchOverlapResult, ReviewOrderEntry) are added to the shared IPC contract",
+      "status": "passed"
+    },
+    {
+      "description": "The detectBatchOverlaps pure function correctly classifies overlaps as conflict, duplicate, or touching",
+      "status": "passed"
+    },
+    {
+      "description": "The ReviewModeService exposes getOverlapResult() and onOverlapUpdate() for reactive UI rendering",
+      "status": "passed"
+    },
+    {
+      "description": "The queue strip shows overlap indicator chips with warning styling on affected PR rows",
+      "status": "passed"
+    },
+    {
+      "description": "The review order banner appears when overlaps are detected with suggested order and dismissible X button",
+      "status": "passed"
+    },
+    {
+      "description": "The briefing view shows file-level overlap notes (e.g. 'also changed by #131') on shared flagged files",
+      "status": "passed"
+    },
+    {
+      "description": "i18n keys are added for overlap detection UI (bannerTitle, dismissBanner, fileAlsoChangedBy)",
+      "status": "passed"
+    },
+    {
+      "description": "Mock service returns per-PR diff file lists (PRs #127 and #131 share auth.ts and config.ts for overlap detection)",
+      "status": "passed"
+    },
+    {
+      "description": "TypeScript strict typecheck passes with no new errors in renderer/shared layers",
+      "status": "passed"
+    }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence — Cross-PR Overlap Detection (#157)\n\n### Acceptance Criteria Verification\n\n**1. Overlapping changed-file sets are detected and flagged on affected queue items**\n— ✅ The `detectBatchOverlaps` algorithm in `src/renderer/src/features/review/detect-overlaps.ts` performs pairwise file-set comparisons across the batch. PRs sharing files get an overlap indicator chip (e.g. \"overlaps #42 — review together\") rendered below the verdict line in `ReviewQueueStrip`.\n\n**2. The agent flags likely duplicate/conflicting intents with a short note**\n— ✅ Overlaps are classified as `conflict` (both PRs add to same file), `duplicate` (Jaccard similarity > 0.6), or `touching` (general overlap). Each pair gets a human-readable note (e.g. \"Both modify auth.ts — potential merge conflict\").\n\n**3. A suggested review order is offered when overlaps exist**\n— ✅ The `ReviewOrderEntry` list sorts overlapping PRs first (highest overlap count), then by risk level. A dismissible `review-order-banner` appears in the overlay header with clickable PR number links.\n\n### Key Files Changed\n- `src/shared/ipc.ts` — Added `OverlapKind`, `PrOverlap`, `ReviewOrderEntry`, `BatchOverlapResult` types\n- `src/renderer/src/features/review/detect-overlaps.ts` — Pure overlap detection algorithm\n- `src/renderer/src/services/impl/ReviewModeService.ts` — Async overlap computation on batch enter\n- `src/renderer/src/features/review/ReviewQueueStrip.tsx` — Overlap indicator chips\n- `src/renderer/src/features/review/ReviewModeOverlay.tsx` — Review order banner\n- `src/renderer/src/features/review/ReviewBriefingView.tsx` — File-level overlap notes\n- `src/renderer/src/theme.css` — CSS for overlap chips, banner, and file notes\n- `src/renderer/src/services/mock/MockServices.ts` — Per-PR mock diff data with overlapping files\n- `src/renderer/src/i18n/en.json` — i18n keys for overlap UI\n- `src/visual-evidence/scenarios/gh-157-cross-pr-overlap-detection.ts` — Playwright scenario\n- `src/visual-evidence/scenario-registry.ts` — Scenario registration"
+}

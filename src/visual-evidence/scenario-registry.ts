@@ -42,6 +42,7 @@ import { gh164RestoreOfferScenario } from "./scenarios/gh-164-restore-offer.js";
 import { gh163BootstrapSeedScenario } from "./scenarios/gh-163-bootstrap-seed.js";
 import { gh162ReferencesNotSecretsScenario } from "./scenarios/gh-162-references-not-secrets.js";
 import { gh156ChatInfraBugClusterScenario } from "./scenarios/gh-156-chat-infra-bug-cluster.js";
+import { gh157CrossPrOverlapDetectionScenario } from "./scenarios/gh-157-cross-pr-overlap-detection.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -518,6 +519,40 @@ registerScenario({
           "The log viewer renders segment data without flickering (stable callback identity)",
         ],
         captureLabels: ["log-viewer-stable"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-157-cross-pr-overlap-detection",
+  runner: gh157CrossPrOverlapDetectionScenario,
+  description: "Cross-PR conflict and overlap detection in a review batch",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "overlap-chips",
+        description: "Overlapping PRs in the queue strip display overlap indicator chips.",
+        assertionDescriptions: [
+          "The queue strip shows overlap indicator chips on affected PRs",
+        ],
+        captureLabels: ["overlap-chips"],
+      },
+      {
+        id: "review-order-banner",
+        description: "A review order banner appears when overlaps are detected.",
+        assertionDescriptions: [
+          "The review order banner appears when overlaps are detected",
+        ],
+        captureLabels: ["review-order-banner"],
+      },
+      {
+        id: "file-level-overlap-notes",
+        description: "The briefing view shows file-level overlap notes on shared files.",
+        assertionDescriptions: [
+          "The briefing view shows file-level overlap notes on shared files",
+        ],
+        captureLabels: ["file-overlap-notes"],
       },
     ],
   },

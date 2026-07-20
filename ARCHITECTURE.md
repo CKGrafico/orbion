@@ -77,7 +77,8 @@ orbion/
 │           │       ├── ReviewModeOverlay.tsx  # Full-screen PR review overlay (header with Briefing/Raw diff toggle + body with queue strip)
 │           │       ├── ReviewBriefingView.tsx # Agent briefing as default view (flagged hunks inline, boilerplate collapsed)
 │           │       ├── ReviewDiffView.tsx     # Raw unified diff viewer (file list + per-file diff with on-demand loading)
-│           │       ├── ReviewQueueStrip.tsx   # Left strip listing PR batch with risk verdicts + disposed indicators
+│       │       ├── ReviewQueueStrip.tsx   # Left strip listing PR batch with risk verdicts + overlap indicators + disposed indicators
+│       │       ├── detect-overlaps.ts     # Pure pairwise overlap detection algorithm (conflict/duplicate/touching classification)
 │           │       └── parse-diff.ts          # Pure diff parsing utilities (DiffLine, file entries, briefing helpers)
 │           └── components/
 │               ├── Sidebar.tsx           # Instance list + health dots
@@ -268,6 +269,7 @@ actions: `machine-status`, `clone-repo`, `create-issue`,
   `InboxItem` (with `availableActions` and `projectId` fields),
   `ResolvedInboxItem`, `InboxItemResolutionReason`, `InboxQueryResult`,
   `PrAwaitingReviewItem`, `PrRiskLevel`, `PrVerdict`, `ReviewModeItem`,
+  `OverlapKind` (`conflict`, `duplicate`, `touching`), `PrOverlap`, `ReviewOrderEntry`, `BatchOverlapResult`,
   `BudgetWatch`, `BudgetBreach`, `ConditionWatch`, `WatchCondition`,
   `WatchTarget`, `WatchConditionKind`, `OutageEscalation`,
   `AgentSendPromptArgs`, `AgentSendPromptResult`, `AgentStreamEvent`,
@@ -334,6 +336,17 @@ renders a left queue strip (`ReviewQueueStrip`) listing every PR in the batch,
 each showing its number, title, risk chip, and one-line verdict; disposed PRs
 (approved/changes-requested) are ticked off with a checkmark and muted style.
 Selecting a row in the strip switches the active PR in the main area.
+
+**Cross-PR overlap detection:** when a batch is entered, the `ReviewModeService`
+asynchronously fetches per-PR diff file lists (via `get-pr-diff`) and runs the
+`detectBatchOverlaps` algorithm — a pure pairwise comparison that classifies
+overlapping file sets as `conflict` (both PRs add to the same file), `duplicate`
+(near-identical change sets, Jaccard > 0.6), or `touching` (shared files). The
+queue strip renders an overlap indicator chip on affected rows (e.g. "overlaps
+#42 — review together") using the `warning` color. A dismissible review order
+banner at the top of the main area suggests a review order (most-overlapping PRs
+first, then by risk level). The briefing view enriches flagged file rows with
+file-level overlap notes when a file is also changed by another PR in the batch.
 
 The default main area shows the **agent briefing** view (`ReviewBriefingView`):
 flagged (risky) files with inline diff hunks and risk-level chips, plus
