@@ -52,7 +52,7 @@ import type {
   SubmitPrReviewResult,
   OpenPrInBrowserParams,
 } from "../shared/ipc.js";
-import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
+import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -112,6 +112,8 @@ import {
   stampCheckedSetMainVm,
   forceSetMainVm,
   sweepEphemeralSessions,
+  getGlobalSettings,
+  updateGlobalSettings,
 } from "./config-store.js";
 import {
   getMessages as transcriptGetMessages,
@@ -2217,6 +2219,16 @@ app.whenReady().then(() => {
   safeHandle("siblingDecline:recordDecline", (_event, ...rawArgs): void => {
     const [record] = validateIpc<[{ environmentId: string; loopId: string; fingerprint: string }]>("siblingDecline:recordDecline", rawArgs);
     recordSiblingDecline(record.environmentId, record.loopId, record.fingerprint);
+  });
+
+  // ── Global settings ──
+  safeHandle("settings:get", (): GlobalSettings => {
+    return getGlobalSettings();
+  });
+
+  safeHandle("settings:update", async (_event, ...rawArgs): Promise<void> => {
+    const [updates] = validateIpc<[Partial<GlobalSettings>]>("settings:update", rawArgs);
+    await updateGlobalSettings(updates);
   });
 
   // Prune old breaches on startup

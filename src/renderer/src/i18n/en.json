@@ -1022,5 +1022,27 @@
     "applyToSelected": "Apply to {count} selected",
     "applying": "Applying\u2026",
     "cancel": "Cancel"
+  },
+  "settings": {
+    "title": "Settings",
+    "close": "Close",
+    "theme": "Theme",
+    "themeDesc": "Color scheme for the interface. Only dark mode is available in this version.",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeSystem": "System",
+    "themeComingSoon": "Coming soon",
+    "soon": "soon",
+    "defaultAgent": "Default Agent",
+    "defaultAgentDesc": "Default runtime for new VM wizard sessions.",
+    "configHome": "Config-home VM",
+    "configHomeDesc": "The VM that holds the canonical configuration file. Changed environments are synced here.",
+    "configHomeNone": "None",
+    "configHomeCurrent": "current",
+    "notifications": "Notifications",
+    "notificationsDesc": "Mute all OS notifications from Orbion.",
+    "ephemeralThreshold": "Ephemeral chat threshold",
+    "ephemeralThresholdDesc": "Idle hours before an unsaved (scratch) chat is automatically discarded.",
+    "hours": "hours"
   }
 }

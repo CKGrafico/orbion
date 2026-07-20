@@ -4,7 +4,7 @@ import type { ChatSession, ConnectionStatus, ReachabilityState } from "../../../
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
-import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox, MessageSquare } from "lucide-react";
+import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox, MessageSquare, Settings } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
 import { FleetHealthFooter } from "./FleetHealthFooter";
@@ -141,13 +141,15 @@ export function Sidebar(props: {
   sessions?: ChatSession[];
   /** Move a chat session to a different project (re-files it in the sidebar). */
   onMoveSessionToProject?: (sessionId: string, targetProjectName: string) => void;
+  /** Open the global settings panel. */
+  onOpenSettings?: () => void;
 }): React.ReactNode {
   const {
     environments, selectedId, health, connectionStatus,
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
-    reachability, mainVmId,     onNavigateToSession, activeSessionId, onOpenProjectChat, sessions: propSessions, onMoveSessionToProject,
+    reachability, mainVmId,     onNavigateToSession, activeSessionId, onOpenProjectChat, sessions: propSessions, onMoveSessionToProject, onOpenSettings,
   } = props;
   const intl = useIntl();
   const [configService] = useInject<IConfigService>(cid.IConfigService);
@@ -668,6 +670,13 @@ export function Sidebar(props: {
           />
         ) : null}
         <span style={{ flex: 1 }} />
+        <button
+          className="sidebar-toolbar-btn"
+          title={intl.formatMessage({ id: "settings.title" })}
+          onClick={onOpenSettings}
+        >
+          <Settings size={14} />
+        </button>
         <OrbionMark size={24} />
         <span>{intl.formatMessage({ id: "sidebar.orbion" })}</span>
       </div>

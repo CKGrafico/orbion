@@ -1295,6 +1295,25 @@ export interface LoopShapeCacheBridge {
   onUpdate: (cb: (shapes: LoopShape[]) => void) => () => void;
 }
 
+// ── Global settings (app-wide preferences) ──────────────────────────
+
+/** App-wide settings persisted to config. No instance-specific options. */
+export interface GlobalSettings {
+  /** UI color theme. v1 only supports "dark"; "light" / "system" are persisted for future use. */
+  theme: "dark" | "light" | "system";
+  /** Default agent runtime for new VM wizard sessions. */
+  defaultAgentRuntime: AgentRuntime;
+  /** Config-home environment ID (same as main-VM designate). Null means no config-home. */
+  configHomeVmId: string | null;
+  /** Ephemeral chat inactivity threshold in hours. Controls the inactivity sweep. */
+  ephemeralThresholdHours: number;
+}
+
+export interface SettingsBridge {
+  getSettings: () => Promise<GlobalSettings>;
+  updateSettings: (updates: Partial<GlobalSettings>) => Promise<void>;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -1341,4 +1360,5 @@ export interface LoopTaskBridge {
   agent: AgentBridge;
   loopShapeCache: LoopShapeCacheBridge;
   siblingDecline: SiblingDeclineBridge;
+  settings: SettingsBridge;
 }
