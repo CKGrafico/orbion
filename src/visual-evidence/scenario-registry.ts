@@ -154,6 +154,28 @@ registerScenario({
   changeId: "gh-142-bulk-relabel",
   runner: gh142BulkRelabelScenario,
   description: "Bulk relabel issues using a sentence (InfraChatPanel flow)",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "resolve-issue-set",
+        description: "Resolve the referenced issue set from the prior stack.",
+        assertionDescriptions: ["The requested issue stack is listed with every issue title"],
+        captureLabels: ["confirmation"],
+      },
+      {
+        id: "confirm-all-items",
+        description: "Name every affected issue and intended label before applying.",
+        assertionDescriptions: ["The confirmation names every issue and the to-refine label"],
+        captureLabels: ["confirmation"],
+      },
+      {
+        id: "per-item-results",
+        description: "Report success or failure for every issue after one approval.",
+        assertionDescriptions: ["Applying once reports a result for every issue including partial failure"],
+        captureLabels: ["result"],
+      },
+    ],
+  },
 });
 
 registerScenario({

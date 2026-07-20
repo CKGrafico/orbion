@@ -637,13 +637,16 @@ export class MockInfraService implements IInfraService {
     if (args.action === "bulk-relabel") {
       const params = args.params as { issueNumbers?: number[]; addLabels?: string[]; removeLabels?: string[] } | undefined;
       const issueNumbers = params?.issueNumbers ?? [42, 38, 31];
-      const items = issueNumbers.map((n) => ({ issueNumber: n, ok: true }));
+      const items = issueNumbers.map((issueNumber) => issueNumber === 38
+        ? { issueNumber, ok: false as const, error: "Label is protected" }
+        : { issueNumber, ok: true as const });
+      const failed = items.filter((item) => !item.ok).length;
       return {
         ok: true,
         data: {
           items,
-          succeeded: items.length,
-          failed: 0,
+          succeeded: items.length - failed,
+          failed,
         },
       };
     }

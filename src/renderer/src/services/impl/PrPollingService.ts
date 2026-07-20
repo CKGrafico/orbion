@@ -13,11 +13,11 @@ export class PrPollingService implements IPrPollingService {
   private isPolling = false;
 
   private getConfigService(): IConfigService {
-    return container.resolve<IConfigService>(cid.IConfigService as unknown as string);
+    return container.get<IConfigService>(cid.IConfigService as unknown as string);
   }
 
   private getInfraService(): IInfraService {
-    return container.resolve<IInfraService>(cid.IInfraService as unknown as string);
+    return container.get<IInfraService>(cid.IInfraService as unknown as string);
   }
 
   startPolling(): void {

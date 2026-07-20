@@ -1033,7 +1033,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
 
   const handleDraftChange = useCallback(
     (turnId: string | null, text: string) => {
-      const key = turnId ?? "__infra-new";
+      const key = turnId ?? "__new";
       setDrafts((prev) => ({ ...prev, [key]: text }));
     },
     [],

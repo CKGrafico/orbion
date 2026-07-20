@@ -6,11 +6,11 @@ import { cid, container } from "inversify-hooks";
 @injectable()
 export class BudgetService implements IBudgetService {
   private getConfigService(): IConfigService {
-    return container.resolve<IConfigService>(cid.IConfigService as unknown as string);
+    return container.get<IConfigService>(cid.IConfigService as unknown as string);
   }
 
   private getApiService(): IApiService {
-    return container.resolve<IApiService>(cid.IApiService as unknown as string);
+    return container.get<IApiService>(cid.IApiService as unknown as string);
   }
 
   private resolveBaseUrl(environmentId: string): Promise<string> {
