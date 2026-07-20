@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-175-maps-leak-removed-envs",
+  "required": false,
+  "status": "skipped",
+  "reason": "Internal main-process memory leak fix with no user-visible behavior.",
+  "assets": [],
+  "prMarkdown": ""
+}

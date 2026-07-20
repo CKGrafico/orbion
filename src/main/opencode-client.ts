@@ -12,6 +12,7 @@ import { decryptValue } from "./config-store.js";
 const OPENCODE_MIN_VERSION = "1.0.0";
 
 const STATUS_CACHE_MS = 30_000;
+const STATUS_CACHE_EVICTION_MS = 300_000;
 const PROBE_TIMEOUT_MS = 10_000;
 
 const statusCache = new Map<string, { status: OpenCodeConnectionStatus; at: number }>();
@@ -184,6 +185,8 @@ export async function refreshOpenCodeStatus(
   const status = await probeWithClient(client);
   statusCache.set(environmentId, { status, at: Date.now() });
 
+  evictExpiredStatusCache();
+
   const win = getMainWindow();
   if (win) {
     win.webContents.send("opencode:status", { environmentId, status });
@@ -194,4 +197,17 @@ export async function refreshOpenCodeStatus(
 
 export function clearOpenCodeStatus(environmentId: string): void {
   statusCache.delete(environmentId);
+}
+
+export function destroyAllOpenCodeStatus(): void {
+  statusCache.clear();
+}
+
+function evictExpiredStatusCache(): void {
+  const cutoff = Date.now() - STATUS_CACHE_EVICTION_MS;
+  for (const [id, entry] of statusCache) {
+    if (entry.at < cutoff) {
+      statusCache.delete(id);
+    }
+  }
 }
