@@ -245,3 +245,10 @@ export interface ILoopShapeCacheService {
   /** Subscribe to cache updates pushed from the main process. */
   onUpdate(cb: (shapes: LoopShape[]) => void): () => void;
 }
+
+export interface ISiblingOfferService {
+  /** Check whether a specific (environmentId, loopId, fingerprint) combination has been declined. */
+  isDeclined(environmentId: string, loopId: string, fingerprint: string): Promise<boolean>;
+  /** Record a decline. */
+  recordDecline(environmentId: string, loopId: string, fingerprint: string): Promise<void>;
+}

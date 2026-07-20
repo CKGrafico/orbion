@@ -1056,6 +1056,13 @@ export interface OpenCodeBridge {
   onStatusChange: (cb: (environmentId: string, status: OpenCodeConnectionStatus) => void) => () => void;
 }
 
+export interface SiblingDeclineBridge {
+  /** Check whether a specific (environmentId, loopId, fingerprint) combination has been declined. */
+  isDeclined: (environmentId: string, loopId: string, fingerprint: string) => Promise<boolean>;
+  /** Record a decline. */
+  recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) => Promise<void>;
+}
+
 export interface LoopTaskBridge {
   request: <T = unknown>(args: ApiRequestArgs) => Promise<ApiResponse<T>>;
   subscribeStream: (args: StreamSubscribeArgs) => Promise<void>;
@@ -1077,4 +1084,5 @@ export interface LoopTaskBridge {
   mcp: McpBridge;
   agent: AgentBridge;
   loopShapeCache: LoopShapeCacheBridge;
+  siblingDecline: SiblingDeclineBridge;
 }

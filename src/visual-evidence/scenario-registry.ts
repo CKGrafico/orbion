@@ -20,6 +20,7 @@ import type { AssertionResult, Scenario } from "./types.js";
 import { AssertionFailure } from "./assertions.js";
 import { gh142BulkRelabelScenario } from "./scenarios/gh-142-bulk-relabel.js";
 import { gh146FleetShapedLoopsScenario } from "./scenarios/gh-146-fleet-shaped-loops.js";
+import { gh147SiblingStructuralOffersScenario } from "./scenarios/gh-147-sibling-structural-offers.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -86,4 +87,10 @@ registerScenario({
   changeId: "gh-146-fleet-shaped-loops",
   runner: gh146FleetShapedLoopsScenario,
   description: "Fleet-shaped loop proposals with provenance and platform adaptation",
+});
+
+registerScenario({
+  changeId: "gh-147-sibling-structural-offers",
+  runner: gh147SiblingStructuralOffersScenario,
+  description: "Offer structural chain improvements to sibling loops after chain edit",
 });

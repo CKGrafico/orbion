@@ -73,6 +73,7 @@ import type {
   IMcpService,
   IAgentService,
   ILoopShapeCacheService,
+  ISiblingOfferService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -1430,5 +1431,18 @@ export class MockLoopShapeCacheService implements ILoopShapeCacheService {
 
   onUpdate(): () => void {
     return () => {};
+  }
+}
+
+@injectable()
+export class MockSiblingOfferService implements ISiblingOfferService {
+  private declined = new Set<string>();
+
+  async isDeclined(environmentId: string, loopId: string, fingerprint: string): Promise<boolean> {
+    return this.declined.has(`${environmentId}:${loopId}:${fingerprint}`);
+  }
+
+  async recordDecline(environmentId: string, loopId: string, fingerprint: string): Promise<void> {
+    this.declined.add(`${environmentId}:${loopId}:${fingerprint}`);
   }
 }

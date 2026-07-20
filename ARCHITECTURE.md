@@ -42,6 +42,7 @@ orbion/
 │   │   ├── http-utils.ts       # Shared fetch + envelope unwrapping (fetchAndUnwrap)
 │   │   ├── config-store.ts     # electron-store config + safeStorage wrapper
 │   │   ├── credential-vault.ts # Dedicated safeStorage-encrypted credential records
+│   │   ├── sibling-decline-store.ts # Persistent decline memory for sibling structural offers
 │   │   ├── connection-supervisor.ts  # Periodic health probes + SSE reconnect
 │   │   ├── reachability-tracker.ts   # Instance reachability as its own health layer (connected/reconnecting/unreachable)
 │   │   ├── opencode-client.ts  # OpenCode server status + version checks
@@ -80,6 +81,8 @@ orbion/
 │               ├── LoopDetail.tsx        # Single-loop metadata + logs
 │               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row, log tail, action buttons: pause/resume/stop/trigger with confirmation)
 │               ├── LoopProposalCard.tsx  # Proposal card for chat-driven loop creation (command, interval, project, max-runs suggestion for agent commands, approve/reject)
+│               ├── ChainEditProposalCard.tsx  # Proposal card for chat-driven chain edits (shared-task warning, fork decision, approve/reject)
+│               ├── SiblingOfferCard.tsx  # Structural change offer card for sibling loops (per-instance approval, decline memory)
 │               ├── LogViewer.tsx         # Tail + live SSE log follow
 │               ├── TasksView.tsx         # Task definitions list
 │               └── ProjectsView.tsx      # Projects list
@@ -146,14 +149,27 @@ flowchart LR
   endpoints directly via `apiRequest`; destructive actions show an inline
   confirmation overlay before executing.
 - The chat transcript rows include a `loop-proposal` kind that renders a
-  `<LoopProposalCard>` component. When the agent (via MCP tools) proposes creating
-  a loop, a proposal card appears in the stream showing command, interval, project,
+  `<LoopProposalCard>` component. When the agent (via MCP tools) proposes creating a
+  loop, a proposal card appears in the stream showing command, interval, project,
   and options (run-immediately toggle, max-runs input). If the proposed command
   invokes an agent runtime (`opencode`, `claude-code`, `claude`, `codex`) and no
   max-runs is set, the card shows a suggested cap badge. On approval, Orbion calls
   `POST /api/loops` on the session's home instance and inserts a live `LoopCard`
   row. On rejection, nothing is created. Proposal state is persisted as special
   transcript messages (id starting with `loop-proposal-`) so it survives reloads.
+- The chat transcript rows include a `chain-edit-proposal` kind that renders a
+  `<ChainEditProposalCard>` component. When the agent proposes modifying a loop's
+  task chain, a proposal card shows the proposed chain preview, operation summaries,
+  and a shared-task warning if the edit affects a task used by other loops. On approval,
+  the chain edit is applied via the MCP service.
+- The chat transcript rows include a `sibling-offer` kind that renders a
+  `<SiblingOfferCard>` component. After a structural chain edit is applied, Orbion
+  identifies sibling loops on other reachable instances that share the same chain
+  topology (same cached LoopShape) and offers the same structural change per sibling.
+  Each offer requires its own explicit approval. Changes that only affect slot values
+  (command text, command arguments, prompt wording) never trigger sibling offers.
+  Declined offers are persisted in `sibling-decline-store.ts` (electron-store, 90-day
+  retention) so the same structural offer is not shown again.
 - **Inputs:** data from `api.ts`; persisted instances from `store.ts` via IPC.
 - **Outputs:** IPC calls via `window.api`.
 
@@ -220,7 +236,7 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
 `budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
 `inbox:queryFleet`, `inbox:resolveItem`, `inbox:getResolvedItems`,
-`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`, `config:getConfigStamp`, `config:stampCheckedSetMainVm`, `config:forceSetMainVm`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The `config:getConfigStamp`, `config:stampCheckedSetMainVm`, and `config:forceSetMainVm` handlers implement versioned config writes with stale-overwrite detection: the stamp-checked variant compares the caller's last-known stamp against the on-disk stamp and returns a conflict result on mismatch, while the force variant writes regardless of staleness (last-write-wins with explicit consent). The inbox service also performs inline
+`inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`, `config:getConfigStamp`, `config:stampCheckedSetMainVm`, `config:forceSetMainVm`, `siblingDecline:isDeclined`, `siblingDecline:recordDecline`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The `config:getConfigStamp`, `config:stampCheckedSetMainVm`, and `config:forceSetMainVm` handlers implement versioned config writes with stale-overwrite detection: the stamp-checked variant compares the caller's last-known stamp against the on-disk stamp and returns a conflict result on mismatch, while the force variant writes regardless of staleness (last-write-wins with explicit consent). The inbox service also performs inline
 actions (`run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`)
 via its `executeInboxAction` method, which calls the same loop-task API
 endpoints as the loop card (`POST /api/loops/:id/trigger`,

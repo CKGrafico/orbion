@@ -1,14 +1,16 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus, SharedTaskWarning } from "../chat/types";
+import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus, SharedTaskWarning, SiblingOfferStatus } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
-import type { IAgentService, IMcpService, ITranscriptService, IConfigService, IInfraService, ILoopShapeCacheService } from "../services/interfaces";
+import type { IAgentService, IMcpService, ITranscriptService, IConfigService, IInfraService, ILoopShapeCacheService, ISiblingOfferService } from "../services/interfaces";
 import type { LoopMeta, Environment, LoopWithOrigin, FleetLoopRollup } from "../types";
+import type { StructuralOp } from "../../../shared/sibling-offer-types";
 import { useTranscript } from "../chat/useTranscript";
 import { diagnoseFailure } from "../chat/diagnoseFailure";
 import { computeSimilarLoops } from "../fleet-similarity";
 import { matchShapeToFleetIntent, adaptShapeForPlatform, buildProvenance } from "../fleet-shape-adapt";
+import { detectStructuralChanges, findSiblingLoops, computeStructuralDiff, extractTopology } from "../fleet-structural-diff";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { usePipelineCounts } from "./usePipelineCounts";
@@ -16,6 +18,7 @@ import { LoopCard } from "./LoopCard";
 import { LoopProposalCard } from "./LoopProposalCard";
 import { FleetShapedProposalCard } from "./FleetShapedProposalCard";
 import { ChainEditProposalCard } from "./ChainEditProposalCard";
+import { SiblingOfferCard } from "./SiblingOfferCard";
 import { FailureDiagnosisPanel } from "./FailureDiagnosisPanel";
 import { WifiOff } from "lucide-react";
 import { fetchLogs } from "../api";
@@ -167,6 +170,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
   const [loopShapeCacheService] = useInject<ILoopShapeCacheService>(cid.ILoopShapeCacheService);
+  const [siblingOfferService] = useInject<ISiblingOfferService>(cid.ISiblingOfferService);
   const {
     turns,
     rows,
@@ -185,6 +189,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     insertChainEditProposal,
     updateChainEditProposalStatus,
     updateChainEditProposalForkDecision,
+    insertSiblingOffer,
+    updateSiblingOfferStatus,
   } = useTranscript(sessionId);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("full");
@@ -747,6 +753,80 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           updateChainEditProposalStatus(proposalId, "applied");
           // Invalidate chain cache so the LoopCard re-fetches tasks on next expand
           setChainVersion((prev) => prev + 1);
+
+          // ── Detect structural changes and offer to sibling loops ──
+          if (chainEditRow) {
+            const structuralOps = detectStructuralChanges(
+              chainEditRow.operationSummaries,
+              chainEditRow.proposedSteps,
+            );
+            if (structuralOps && structuralOps.length > 0) {
+              // Extract pre-edit topology from the proposed steps
+              // (the proposedSteps represent the POST-edit state; we need
+              // the pre-edit topology from the shape cache)
+              void (async () => {
+                try {
+                  const allShapes = await loopShapeCacheService.getAll();
+                  // Find the pre-edit shape for this loop
+                  const preEditShape = allShapes.find(
+                    (s) => s.loopId === loopId && s.environmentId === envId,
+                  );
+                  if (!preEditShape) return;
+
+                  const preEditTopology = {
+                    steps: preEditShape.chainSteps.map((s) => ({
+                      taskName: s.taskName,
+                      onSuccessTaskId: s.onSuccessTaskId,
+                      onFailureTaskId: s.onFailureTaskId,
+                    })),
+                  };
+
+                  // Post-edit topology from the applied proposal's steps
+                  const postEditTopology = extractTopology(chainEditRow.proposedSteps);
+
+                  const structuralDiff = computeStructuralDiff(
+                    loopId,
+                    envId,
+                    structuralOps,
+                    postEditTopology,
+                  );
+
+                  // Find sibling loops with matching pre-edit topology
+                  const siblings = findSiblingLoops({
+                    preEditTopology,
+                    sourceEnvironmentId: envId,
+                    allShapes,
+                    reachability: fleetReachability ?? {},
+                    environments,
+                    perEnvProjects,
+                  });
+
+                  // Filter out siblings that have already declined this fingerprint
+                  for (const sibling of siblings) {
+                    const alreadyDeclined = await siblingOfferService.isDeclined(
+                      sibling.environmentId,
+                      sibling.loopId,
+                      structuralDiff.fingerprint,
+                    );
+                    if (alreadyDeclined) continue;
+
+                    insertSiblingOffer({
+                      offerId: `so-${Date.now()}-${sibling.loopId}`,
+                      siblingLoopId: sibling.loopId,
+                      siblingEnvironmentId: sibling.environmentId,
+                      siblingEnvironmentName: sibling.environmentName,
+                      siblingLoopDescription: sibling.loopDescription,
+                      structuralDiff,
+                      status: "pending",
+                      error: null,
+                    });
+                  }
+                } catch {
+                  // Sibling discovery is best-effort; failures should not disrupt the user
+                }
+              })();
+            }
+          }
         } else {
           const errorMsg = typeof result.error === "string"
             ? result.error
@@ -759,7 +839,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         });
       });
     },
-    [mcpService, updateChainEditProposalStatus, intl, rows],
+    [mcpService, updateChainEditProposalStatus, intl, rows, loopShapeCacheService, fleetReachability, environments, perEnvProjects, siblingOfferService, insertSiblingOffer],
   );
 
   const handleChainEditRejected = useCallback(
@@ -781,6 +861,65 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       updateChainEditProposalForkDecision(proposalId, decision);
     },
     [updateChainEditProposalForkDecision],
+  );
+
+  // ── Sibling offer callbacks ──────────────────────────────────────────
+
+  const handleSiblingOfferApproved = useCallback(
+    (offerId: string, siblingLoopId: string, siblingEnvId: string) => {
+      updateSiblingOfferStatus(offerId, "applying");
+
+      // Find the offer row to extract the structural diff
+      const offerRow = rows.find(
+        (r): r is import("../chat/types").SiblingOfferRow =>
+          r.kind === "sibling-offer" && r.offerId === offerId,
+      );
+      if (!offerRow) {
+        updateSiblingOfferStatus(offerId, "error", {
+          error: intl.formatMessage({ id: "siblingOffer.applyError" }),
+        });
+        return;
+      }
+
+      // Apply the structural diff on the sibling instance via MCP
+      void mcpService.callTool(siblingEnvId, "apply_structural_diff", {
+        loopId: siblingLoopId,
+        structuralDiff: {
+          operations: offerRow.structuralDiff.operations,
+          postEditTopology: offerRow.structuralDiff.postEditTopology,
+        },
+      }).then((result) => {
+        if (result.ok) {
+          updateSiblingOfferStatus(offerId, "applied");
+        } else {
+          const errorMsg = typeof result.error === "string"
+            ? result.error
+            : intl.formatMessage({ id: "siblingOffer.applyError" });
+          updateSiblingOfferStatus(offerId, "error", { error: errorMsg });
+        }
+      }).catch(() => {
+        updateSiblingOfferStatus(offerId, "error", {
+          error: intl.formatMessage({ id: "siblingOffer.applyError" }),
+        });
+      });
+    },
+    [mcpService, updateSiblingOfferStatus, intl, rows],
+  );
+
+  const handleSiblingOfferDeclined = useCallback(
+    (offerId: string, siblingLoopId: string, siblingEnvId: string, fingerprint: string) => {
+      // Persist the decline so it's not offered again
+      void siblingOfferService.recordDecline(siblingEnvId, siblingLoopId, fingerprint);
+      updateSiblingOfferStatus(offerId, "declined");
+    },
+    [siblingOfferService, updateSiblingOfferStatus],
+  );
+
+  const handleSiblingOfferStatusChange = useCallback(
+    (offerId: string, status: SiblingOfferStatus, error?: string) => {
+      updateSiblingOfferStatus(offerId, status, error ? { error } : undefined);
+    },
+    [updateSiblingOfferStatus],
   );
 
   return (
@@ -954,6 +1093,19 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onRejected={handleChainEditRejected}
                       onStatusChange={handleChainEditStatusChange}
                       onForkDecision={handleChainEditForkDecision}
+                    />
+                  </div>
+                );
+              }
+              case "sibling-offer": {
+                return (
+                  <div key={row.id} className="transcript-sibling-offer">
+                    <SiblingOfferCard
+                      row={row}
+                      instance={instance}
+                      onApproved={handleSiblingOfferApproved}
+                      onDeclined={handleSiblingOfferDeclined}
+                      onStatusChange={handleSiblingOfferStatusChange}
                     />
                   </div>
                 );
