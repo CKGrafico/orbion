@@ -196,34 +196,6 @@ async function main(): Promise<number> {
     console.error(`  - ${path.join(repoRoot, asset.path)} (${asset.bytes} bytes, ${asset.format})`);
   }
 
-  // Commit + push the evidence files so the raw.githubusercontent.com URLs
-  // in the PR markdown resolve immediately on GitHub. The evidence folder
-  // lives under openspec/changes/<id>/evidence/ which is tracked by git.
-  try {
-    const evidenceGlob = path.join("openspec", "changes", input.changeId, "evidence");
-    execFileSync("git", ["add", evidenceGlob], { cwd: repoRoot, stdio: "ignore" });
-    // Only commit if there are staged changes
-    const diff = execFileSync("git", ["diff", "--cached", "--quiet"], { cwd: repoRoot }).toString();
-    void diff; // empty string means no changes; non-zero exit means changes exist
-  } catch {
-    // diff --cached --quiet exits 1 when there are staged changes — that's expected
-    try {
-      execFileSync(
-        "git",
-        ["commit", "-m", `docs(visual-evidence): ${input.changeId} evidence (final.webp + evidence.json)`],
-        { cwd: repoRoot, stdio: "ignore" },
-      );
-      execFileSync("git", ["push", "origin", branch ?? "main"], {
-        cwd: repoRoot,
-        stdio: "ignore",
-      });
-      console.error(`Evidence committed and pushed to origin/${branch ?? "main"}.`);
-    } catch (commitErr) {
-      console.error(`Warning: could not commit/push evidence: ${(commitErr as Error).message}`);
-      console.error(`The evidence files are on disk but not pushed — raw URLs will not resolve until you commit and push manually.`);
-    }
-  }
-
   return 0;
 }
 
