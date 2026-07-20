@@ -126,6 +126,18 @@ openspec/changes/<change-id>/
 The CLI also prints the `prMarkdown` fragment to stdout so the Loop
 Engineering workflow can capture it.
 
+Capture and publication are separate operations. The capture command never
+stages, commits, or pushes files. After the evidence directory is committed
+and pushed on the feature branch, publish it with:
+
+```
+pnpm visual-evidence:publish --change <change-id> --pr <pr-number>
+```
+
+The publisher resolves the commit containing each asset, verifies the asset
+through `gh api`, and then creates or updates one marked comment on both the
+source issue and pull request. A publishing failure blocks shipping.
+
 ## Decision rules
 
 Evidence is **required** when changed files include renderer components,
@@ -138,6 +150,9 @@ main/backend-only with no user-visible component.
 
 On `skipped` the skill returns immediately with `status: "skipped"` and no
 assets — exit code 0.
+
+Required evidence that cannot run returns `status: "blocked"` and exit code 2.
+It must never be treated as a successful skip.
 
 When the decision is uncertain (mixed paths), the skill defaults to
 `required` to be safe.
@@ -162,6 +177,11 @@ Concrete Playwright runners are registered per change-id in
 enough — that produces a `blocked` result. Add a runner for the change-id
 when implementing a new feature; the registry is the only place that knows
 selectors.
+
+Every registered runner must define an evidence contract mapping each
+acceptance criterion to concrete assertions and named capture checkpoints.
+Missing criteria, assertions, or checkpoints fail the run. Application-shell
+checks such as a nonempty page are not feature evidence.
 
 ## Screenshot rules
 
@@ -275,12 +295,13 @@ These are gitignored (`.tmp/` is in `.gitignore`) and never committed.
 
 Permanent (inside the OpenSpec change):
 
-- `openspec/changes/<change-id>/evidence/final.webp` or `final.png`
+- `openspec/changes/<change-id>/evidence/01-<checkpoint>.webp` or `.png`
+- `openspec/changes/<change-id>/evidence/02-<checkpoint>.webp` or `.png`
 - `openspec/changes/<change-id>/evidence/flow.gif`
 - `openspec/changes/<change-id>/evidence/evidence.json`
 
-Nothing else is permitted in that folder (the store module enforces an
-allow-list: `final.webp`, `final.png`, `flow.gif`, `evidence.json`).
+Nothing else is permitted in that folder. The store module permits ordered,
+slug-named checkpoint images plus `flow.gif` and `evidence.json`.
 
 ## Example invocations
 
@@ -369,16 +390,13 @@ xvfb-run -a pnpm visual-evidence --change gh-142-bulk-relabel
 
 ## How another agent should consume prMarkdown
 
-The `prMarkdown` field is a ready-to-paste Markdown fragment. The external
-Loop Engineering workflow should embed it as-is in the PR body (or as a
-comment) when creating/updating the pull request. Image URLs are anchored to
-the head commit SHA when available (preferred over the branch name so they
-survive rebases). They use `raw.githubusercontent.com` so they render inline
-on GitHub.
+The manifest records paths and validation results. Publication Markdown must
+be generated after the assets are committed and pushed by running
+`pnpm visual-evidence:publish`. Do not reuse a pre-commit SHA from capture
+output. The publisher verifies every remote asset before posting comments.
 
-The skill **does not** create the pull request itself. Producing valid
-`prMarkdown` is the skill's responsibility; emitting the PR is the Loop
-Engineering workflow's responsibility.
+The skill does not create the pull request. The shipping workflow creates the
+PR, then runs the publisher before the PR can be merged or the issue closed.
 
 ## How the evidence follows the OpenSpec change during archive
 
