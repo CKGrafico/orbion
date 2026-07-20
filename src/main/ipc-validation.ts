@@ -112,7 +112,7 @@ function makeOpenCodeEndpointValidator(): Validator {
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
 const SESSION_SCOPES = ["read-only", "operate", "admin"] as const;
 const API_METHODS = ["GET", "POST", "PATCH", "DELETE"] as const;
-const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-platform", "list-issues", "add-label", "edit-issue", "bulk-relabel", "list-prs-awaiting-review", "get-pr-verdict"] as const;
+const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-platform", "list-issues", "add-label", "edit-issue", "bulk-relabel", "list-prs-awaiting-review", "get-pr-verdict", "get-pr-diff", "get-pr-briefing", "submit-pr-review", "open-pr-in-browser"] as const;
 
 // Compile-time exhaustiveness check: if a new InfraAction is added to the
 // shared type but omitted from INFRA_ACTIONS, this assignment will fail.

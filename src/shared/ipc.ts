@@ -240,7 +240,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff" | "get-pr-briefing";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff" | "get-pr-briefing" | "submit-pr-review" | "open-pr-in-browser";
 
 export interface CreateIssueParams {
   title: string;
@@ -509,6 +509,41 @@ export interface ListPrsAwaitingReviewResult {
   prs: PrAwaitingReviewItem[];
   total: number;
   truncated: boolean;
+}
+
+// ── PR review submission ────────────────────────────────────────────
+
+/** The type of review to submit on a PR. */
+export type PrReviewEvent = "APPROVE" | "REQUEST_CHANGES";
+
+/** Parameters for submitting a PR review. */
+export interface SubmitPrReviewParams {
+  /** Repository in "owner/repo" format. */
+  repo: string;
+  /** PR number. */
+  number: number;
+  /** The review event type. */
+  event: PrReviewEvent;
+  /** Optional review comment body. Required for REQUEST_CHANGES on some platforms. */
+  body?: string;
+}
+
+/** Result of submitting a PR review. */
+export interface SubmitPrReviewResult {
+  /** The platform that processed the review. */
+  platform: "github" | "ado";
+  /** The PR number that was reviewed. */
+  number: number;
+  /** The review event that was submitted. */
+  event: PrReviewEvent;
+}
+
+// ── Open PR in system browser ────────────────────────────────────────
+
+/** Parameters for opening a PR URL in the system browser. */
+export interface OpenPrInBrowserParams {
+  /** The PR URL to open. */
+  url: string;
 }
 
 export interface InfraActionArgs {

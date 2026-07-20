@@ -8,7 +8,7 @@ import type { LoopMeta, EnvironmentHealth, Environment, Project } from "../../ty
 import {
   Inbox, AlertTriangle, CheckCircle2, XCircle, WifiOff,
   Play, Pause, RotateCw, MessageSquare, X, Search, ArrowUp, ChevronRight,
-  ChevronDown, Layers, GitPullRequest,
+  ChevronDown, Layers, GitPullRequest, ExternalLink,
 } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
@@ -650,7 +650,7 @@ function InboxViewItemRow({
           {timestamp ? ` · ${timestamp}` : ""}
         </span>
       </div>
-      {inlineActions.length > 0 || item.availableActions.includes("dismiss") ? (
+      {inlineActions.length > 0 || item.availableActions.includes("dismiss") || item.prUrl ? (
         <div className="inbox-view-item-actions">
           {inlineActions.map((action) => (
             <button
@@ -679,6 +679,18 @@ function InboxViewItemRow({
               disabled={executingAction !== null}
             >
               <X size={11} />
+            </button>
+          ) : null}
+          {item.prUrl ? (
+            <button
+              className="icon-btn inbox-item-open-web"
+              title={intl.formatMessage({ id: "inbox.action.openOnWeb" })}
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(item.prUrl, "_blank");
+              }}
+            >
+              <ExternalLink size={11} />
             </button>
           ) : null}
         </div>

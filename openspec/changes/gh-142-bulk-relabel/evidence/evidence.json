@@ -7,30 +7,36 @@
     {
       "type": "screenshot",
       "path": "openspec/changes/gh-142-bulk-relabel/evidence/final.webp",
-      "caption": "Bulk relabel issues using a sentence",
+      "caption": "Bulk relabel issues using a sentence (InfraChatPanel surface)",
       "width": 1280,
       "height": 720,
-      "bytes": 10650,
+      "bytes": 15166,
       "format": "webp"
     }
   ],
   "scenario": {
-    "title": "Bulk relabel issues using a sentence",
+    "title": "Bulk relabel issues using a sentence (InfraChatPanel surface)",
     "steps": [
-      "Launch the Orbion app",
-      "Verify the sidebar brand and main panel render",
-      "Confirm the InfraChatPanel surface is reachable"
+      "Launch the Orbion app in mock mode",
+      "Verify the sidebar shows the mock VM",
+      "Verify the InfraChatPanel is visible with the composer",
+      "Type 'mark these as to-refine' in the composer",
+      "Screenshot captures the InfraChatPanel surface"
     ]
   },
   "assertions": [
     {
-      "description": "The Orbion brand text is visible in the sidebar",
+      "description": "The Orbion brand is visible",
       "status": "passed"
     },
     {
-      "description": "The main panel renders content (not a blank screen)",
+      "description": "The InfraChatPanel surface is visible",
+      "status": "passed"
+    },
+    {
+      "description": "The chat composer is present and interactive",
       "status": "passed"
     }
   ],
-  "prMarkdown": "## Visual Evidence\n### Bulk relabel issues using a sentence\n\n![Bulk relabel issues using a sentence](https://raw.githubusercontent.com/CKGrafico/orbion/2c5157d6af6f15213cc38a780956406232882558/openspec/changes/gh-142-bulk-relabel/evidence/final.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Launch the Orbion app\n2. Verify the sidebar brand and main panel render\n3. Confirm the InfraChatPanel surface is reachable\n\n</details>"
+  "prMarkdown": "## Visual Evidence\n### Bulk relabel issues using a sentence (InfraChatPanel surface)\n\n![Bulk relabel issues using a sentence (InfraChatPanel surface)](https://raw.githubusercontent.com/CKGrafico/orbion/48424589f4ba24aeaf761cb989291af0403bc24c/openspec/changes/gh-142-bulk-relabel/evidence/final.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Launch the Orbion app in mock mode\n2. Verify the sidebar shows the mock VM\n3. Verify the InfraChatPanel is visible with the composer\n4. Type 'mark these as to-refine' in the composer\n5. Screenshot captures the InfraChatPanel surface\n\n</details>"
 }

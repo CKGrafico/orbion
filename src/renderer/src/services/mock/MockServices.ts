@@ -58,6 +58,8 @@ import type {
   GetPrDiffResult,
   BriefingSection,
   GetPrBriefingResult,
+  SubmitPrReviewResult,
+  OpenPrInBrowserParams,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -250,9 +252,11 @@ function loadMockEnvironments(): Environment[] {
       name: "Mock VM",
       agentRuntime: "opencode",
       runtimeState: "available",
+      role: "main-vm" as const,
       endpoints: [{ id: "ep1", kind: "direct" as EndpointKind, url: "http://localhost:8845", lastError: null, failureCount: 0 }],
       activeEndpointId: "ep1",
     }];
+    mockSelectedId = "mock-env";
   }
   mockSelectedId = mockSelectedId ?? localStorage.getItem("orbion.selected.mock");
   return mockEnvironments;
@@ -630,6 +634,19 @@ export class MockInfraService implements IInfraService {
         },
       };
     }
+    if (args.action === "bulk-relabel") {
+      const params = args.params as { issueNumbers?: number[]; addLabels?: string[]; removeLabels?: string[] } | undefined;
+      const issueNumbers = params?.issueNumbers ?? [42, 38, 31];
+      const items = issueNumbers.map((n) => ({ issueNumber: n, ok: true }));
+      return {
+        ok: true,
+        data: {
+          items,
+          succeeded: items.length,
+          failed: 0,
+        },
+      };
+    }
     if (args.action === "edit-issue") {
       const params = args.params as { issueNumber?: number; title?: string; body?: string; addLabels?: string[]; removeLabels?: string[] } | undefined;
       const changes: Record<string, unknown> = {};
@@ -842,6 +859,25 @@ index 1111111..2222222 100644
         totalBoilerplate: 1,
       };
       return { ok: true, data: result };
+    }
+    if (args.action === "submit-pr-review") {
+      const params = args.params as { repo?: string; number?: number; event?: string; body?: string } | undefined;
+      return {
+        ok: true,
+        data: {
+          platform: "github" as const,
+          number: params?.number ?? 127,
+          event: params?.event ?? "APPROVE",
+        },
+      };
+    }
+    if (args.action === "open-pr-in-browser") {
+      // In browser dev mode, we can still open a new tab
+      const params = args.params as { url?: string } | undefined;
+      if (params?.url) {
+        window.open(params.url, "_blank");
+      }
+      return { ok: true, data: undefined };
     }
     return { ok: false, error: "mock" };
   }
@@ -1908,6 +1944,15 @@ export class MockReviewModeService implements IReviewModeService {
 
   getDisposedPrs(): Set<string> {
     return new Set(this.disposedPrs);
+  }
+
+  async submitReview(params: { repo: string; number: number; event: "APPROVE" | "REQUEST_CHANGES"; body?: string }): Promise<{ ok: boolean; error?: string }> {
+    this.markDisposed(params.repo, params.number);
+    return { ok: true };
+  }
+
+  openOnWeb(url: string): void {
+    window.open(url, "_blank");
   }
 
   onStateChange(cb: (item: ReviewModeItem | null) => void): () => void {

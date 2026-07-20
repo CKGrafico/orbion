@@ -303,6 +303,10 @@ export interface IReviewModeService {
   markDisposed(repo: string, number: number): void;
   /** Get the set of disposed PR keys ("repo:number") in the current review session. */
   getDisposedPrs(): Set<string>;
+  /** Submit a review (approve or request-changes) for a PR. On success, marks the PR as disposed and resolves the inbox item. */
+  submitReview(params: { repo: string; number: number; event: "APPROVE" | "REQUEST_CHANGES"; body?: string }): Promise<{ ok: boolean; error?: string }>;
+  /** Open a PR URL in the system browser. */
+  openOnWeb(url: string): void;
   /** Subscribe to review mode state changes (enter/exit/selection/disposed). */
   onStateChange(cb: (item: ReviewModeItem | null) => void): () => void;
 }

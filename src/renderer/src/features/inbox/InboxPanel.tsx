@@ -5,7 +5,7 @@ import type { IInboxService, InboxBuildParams } from "../../services/interfaces"
 import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem, PrVerdict, PrRiskLevel } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
-import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare, ChevronRight, ChevronDown, Layers, GitPullRequest } from "lucide-react";
+import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare, ChevronRight, ChevronDown, Layers, GitPullRequest, ExternalLink } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
 import { timeAgo } from "../../format";
@@ -512,7 +512,7 @@ function InboxItemRow({
         </span>
       </div>
       {/* Inline action buttons */}
-      {inlineActions.length > 0 || item.availableActions.includes("dismiss") ? (
+      {inlineActions.length > 0 || item.availableActions.includes("dismiss") || item.prUrl ? (
         <div className="inbox-item-actions">
           {inlineActions.map((action) => (
             <button
@@ -541,6 +541,18 @@ function InboxItemRow({
               disabled={executingAction !== null}
             >
               <X size={11} />
+            </button>
+          ) : null}
+          {item.prUrl ? (
+            <button
+              className="icon-btn inbox-item-open-web"
+              title={intl.formatMessage({ id: "inbox.action.openOnWeb" })}
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(item.prUrl, "_blank");
+              }}
+            >
+              <ExternalLink size={11} />
             </button>
           ) : null}
         </div>

@@ -3,7 +3,7 @@ import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
 import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
-import { GitPullRequest, X, ExternalLink } from "lucide-react";
+import { GitPullRequest, X, ExternalLink, CheckCircle2, MessageCircleWarning, Loader2 } from "lucide-react";
 import { ReviewQueueStrip } from "./ReviewQueueStrip";
 import { ReviewDiffView } from "./ReviewDiffView";
 import { ReviewBriefingView } from "./ReviewBriefingView";
@@ -56,7 +56,62 @@ function ReviewModeContent({
   onExit: () => void;
 }): React.ReactNode {
   const intl = useIntl();
+  const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
   const [activeTab, setActiveTab] = useState<ReviewTab>("briefing");
+  const [submitting, setSubmitting] = useState<"APPROVE" | "REQUEST_CHANGES" | null>(null);
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const disposedPrs = reviewModeService.getDisposedPrs();
+  const isDisposed = disposedPrs.has(`${item.repo}:${item.number}`);
+
+  const handleApprove = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting("APPROVE");
+    setSubmitError(null);
+
+    const result = await reviewModeService.submitReview({
+      repo: item.repo,
+      number: item.number,
+      event: "APPROVE",
+    });
+
+    if (!result.ok) {
+      setSubmitError(result.error ?? "Failed to approve");
+    }
+    setSubmitting(null);
+  }, [submitting, reviewModeService, item.repo, item.number]);
+
+  const handleRequestChanges = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting("REQUEST_CHANGES");
+    setSubmitError(null);
+
+    const result = await reviewModeService.submitReview({
+      repo: item.repo,
+      number: item.number,
+      event: "REQUEST_CHANGES",
+      body: commentText.trim() || undefined,
+    });
+
+    if (!result.ok) {
+      setSubmitError(result.error ?? "Failed to request changes");
+    } else {
+      setShowCommentInput(false);
+      setCommentText("");
+    }
+    setSubmitting(null);
+  }, [submitting, reviewModeService, item.repo, item.number, commentText]);
+
+  const handleOpenOnWeb = useCallback(() => {
+    reviewModeService.openOnWeb(item.url);
+  }, [reviewModeService, item.url]);
+
+  const toggleCommentInput = useCallback(() => {
+    setShowCommentInput((prev) => !prev);
+    setSubmitError(null);
+  }, []);
 
   return (
     <div className="review-mode-overlay" role="dialog" aria-label={intl.formatMessage({ id: "reviewMode.dialogLabel" })}>
@@ -84,6 +139,12 @@ function ReviewModeContent({
                 {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
               </span>
             )}
+            {isDisposed && (
+              <span className="review-mode-disposed-badge">
+                <CheckCircle2 size={12} />
+                {intl.formatMessage({ id: "reviewMode.disposed" })}
+              </span>
+            )}
           </div>
           <div className="review-mode-header-right">
             <div className="review-mode-actions">
@@ -102,13 +163,42 @@ function ReviewModeContent({
                   {intl.formatMessage({ id: "reviewMode.briefing.rawDiffTab" })}
                 </button>
               </div>
+
+              {/* Review action buttons (hidden when already disposed) */}
+              {!isDisposed && (
+                <>
+                  <button
+                    className="review-mode-action-btn review-mode-action-approve"
+                    title={intl.formatMessage({ id: "reviewMode.approve" })}
+                    onClick={handleApprove}
+                    disabled={submitting !== null}
+                  >
+                    {submitting === "APPROVE" ? (
+                      <Loader2 size={12} className="spin" />
+                    ) : (
+                      <CheckCircle2 size={12} />
+                    )}
+                    <span>{intl.formatMessage({ id: "reviewMode.approve" })}</span>
+                  </button>
+                  <button
+                    className="review-mode-action-btn review-mode-action-request-changes"
+                    title={intl.formatMessage({ id: "reviewMode.requestChanges" })}
+                    onClick={toggleCommentInput}
+                    disabled={submitting !== null}
+                  >
+                    <MessageCircleWarning size={12} />
+                    <span>{intl.formatMessage({ id: "reviewMode.requestChanges" })}</span>
+                  </button>
+                </>
+              )}
+
               <button
                 className="review-mode-action-btn review-mode-action-open"
-                title={intl.formatMessage({ id: "reviewMode.openOnPlatform" })}
-                onClick={() => { window.open(item.url, "_blank"); }}
+                title={intl.formatMessage({ id: "reviewMode.openOnWeb" })}
+                onClick={handleOpenOnWeb}
               >
                 <ExternalLink size={12} />
-                <span>{intl.formatMessage({ id: "reviewMode.openOnPlatform" })}</span>
+                <span>{intl.formatMessage({ id: "reviewMode.openOnWeb" })}</span>
               </button>
             </div>
             <button
@@ -120,6 +210,46 @@ function ReviewModeContent({
             </button>
           </div>
         </div>
+
+        {/* Comment input for request-changes */}
+        {showCommentInput && !isDisposed && (
+          <div className="review-mode-comment-bar">
+            <textarea
+              className="review-mode-comment-input"
+              placeholder={intl.formatMessage({ id: "reviewMode.commentPlaceholder" })}
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              rows={2}
+              autoFocus
+            />
+            <div className="review-mode-comment-actions">
+              <button
+                className="review-mode-comment-submit"
+                onClick={handleRequestChanges}
+                disabled={submitting !== null}
+              >
+                {submitting === "REQUEST_CHANGES" ? (
+                  <Loader2 size={14} className="spin" />
+                ) : null}
+                {intl.formatMessage({ id: "reviewMode.submitRequestChanges" })}
+              </button>
+              <button
+                className="review-mode-comment-cancel"
+                onClick={() => { setShowCommentInput(false); setCommentText(""); setSubmitError(null); }}
+                disabled={submitting !== null}
+              >
+                {intl.formatMessage({ id: "reviewMode.cancelComment" })}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Submit error */}
+        {submitError && (
+          <div className="review-mode-submit-error">
+            {submitError}
+          </div>
+        )}
 
         {/* Body: two-column layout with queue strip */}
         <div className="review-mode-body">

@@ -604,6 +604,7 @@
     "action.restart": "Restart",
     "action.dismiss": "Dismiss",
     "action.open-in-chat": "Chat",
+    "action.openOnWeb": "Open on web",
     "prVerdict.analyzing": "Analyzing\u2026",
     "prRisk.low": "low",
     "prRisk.medium": "medium",
@@ -950,7 +951,14 @@
     "dialogLabel": "PR Review",
     "byAuthor": "by {author}",
     "openOnPlatform": "Open on GitHub",
+    "openOnWeb": "Open on web",
     "close": "Close review (Esc)",
+    "approve": "Approve",
+    "requestChanges": "Request changes",
+    "disposed": "Reviewed",
+    "commentPlaceholder": "Describe the changes you are requesting\u2026",
+    "submitRequestChanges": "Submit",
+    "cancelComment": "Cancel",
     "placeholderTitle": "PR Review Mode",
     "placeholderDescription": "The agent briefing, diff viewer, and review actions will appear here in a future update.",
     "queueLabel": "PR review queue",
@@ -976,5 +984,13 @@
       "loading": "Analyzing PR\u2026",
       "loadError": "Failed to analyze PR"
     }
+  },
+  "review": {
+    "submitMissingParams": "Repository, PR number, and review event are required",
+    "submitInvalidEvent": "Invalid review event",
+    "submitFailed": "Failed to submit review: {detail}",
+    "unsupportedPlatform": "PR review is not supported on this platform",
+    "openOnWebMissingUrl": "URL is required",
+    "openOnWebInvalidUrl": "Only http: and https: URLs can be opened"
   }
 }

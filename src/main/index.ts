@@ -48,6 +48,9 @@ import type {
   DiffFileEntry,
   GetPrBriefingParams,
   GetPrBriefingResult,
+  SubmitPrReviewParams,
+  SubmitPrReviewResult,
+  OpenPrInBrowserParams,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -1199,7 +1202,7 @@ app.whenReady().then(() => {
             ghArgs.push("--repo", repo);
           }
           return new Promise<InfraActionResult>((resolve) => {
-            execFile("gh", ghArgs, (err, stdout, stderr) => {
+          execFile("gh", ghArgs, (err, _stdout, stderr) => {
               if (err) {
                 resolve({ ok: false, error: msg("issues.createFailed", { detail: stderr || err.message }) });
                 return;
@@ -1484,6 +1487,12 @@ app.whenReady().then(() => {
       }
       case "get-pr-briefing": {
         return handleGetPrBriefing(args);
+      }
+      case "submit-pr-review": {
+        return handleSubmitPrReview(args);
+      }
+      case "open-pr-in-browser": {
+        return handleOpenPrInBrowser(args);
       }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
@@ -1850,6 +1859,131 @@ app.whenReady().then(() => {
         });
       });
     });
+  }
+
+  function handleSubmitPrReview(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as SubmitPrReviewParams | undefined;
+    const repo = params?.repo;
+    const prNumber = params?.number;
+    const event = params?.event;
+    const body = params?.body;
+
+    if (!repo || !prNumber || !event) {
+      return Promise.resolve({ ok: false, error: msg("review.submitMissingParams") });
+    }
+
+    if (event !== "APPROVE" && event !== "REQUEST_CHANGES") {
+      return Promise.resolve({ ok: false, error: msg("review.submitInvalidEvent") });
+    }
+
+    return resolvePlatformCli(null, "issues").then((cliResolved) => {
+      if ("error" in cliResolved) {
+        return { ok: false, error: cliResolved.error } as InfraActionResult;
+      }
+
+      // GitHub: gh pr review <number> --approve|--request-changes [--body <comment>]
+      if (cliResolved.cli === "gh") {
+        try {
+          validateCliInputs({ repo });
+        } catch (validationErr) {
+          return { ok: false, error: (validationErr as Error).message } as InfraActionResult;
+        }
+
+        const ghArgs: string[] = [
+          "pr", "review",
+          String(prNumber),
+          "--repo", repo,
+          event === "APPROVE" ? "--approve" : "--request-changes",
+        ];
+        if (body) {
+          ghArgs.push("--body", body);
+        }
+
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("gh", ghArgs, (err, _stdout, stderr) => {
+            if (err) {
+              const code = (err as NodeJS.ErrnoException).code;
+              if (code === "ENOENT") {
+                resolve({ ok: false, error: msg("issues.noPlatformCli") });
+                return;
+              }
+              resolve({ ok: false, error: msg("review.submitFailed", { detail: stderr || err.message }) });
+              return;
+            }
+
+            const result: SubmitPrReviewResult = {
+              platform: "github",
+              number: prNumber,
+              event,
+            };
+            resolve({ ok: true, data: result });
+          });
+        });
+      }
+
+      // ADO (az repos pr set-vote)
+      if (cliResolved.cli === "az") {
+        const vote = event === "APPROVE" ? "approve" : "wait-for-author";
+        const azArgs: string[] = [
+          "repos", "pr", "set-vote",
+          "--id", String(prNumber),
+          "--vote", vote,
+        ];
+        if (repo) {
+          azArgs.push("--org", repo);
+        }
+        if (body) {
+          azArgs.push("--comment", body);
+        }
+
+        return new Promise<InfraActionResult>((resolve) => {
+          execFile("az", azArgs, (err, _stdout, stderr) => {
+            if (err) {
+              const code = (err as NodeJS.ErrnoException).code;
+              if (code === "ENOENT") {
+                resolve({ ok: false, error: msg("issues.noPlatformCli") });
+                return;
+              }
+              resolve({ ok: false, error: msg("review.submitFailed", { detail: stderr || err.message }) });
+              return;
+            }
+
+            const result: SubmitPrReviewResult = {
+              platform: "ado",
+              number: prNumber,
+              event,
+            };
+            resolve({ ok: true, data: result });
+          });
+        });
+      }
+
+      return { ok: false, error: msg("review.unsupportedPlatform") } as InfraActionResult;
+    });
+  }
+
+  function handleOpenPrInBrowser(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as OpenPrInBrowserParams | undefined;
+    const url = params?.url;
+
+    if (!url) {
+      return Promise.resolve({ ok: false, error: msg("review.openOnWebMissingUrl") });
+    }
+
+    // Only allow http: and https: URLs (reuse existing security check)
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return Promise.resolve({ ok: false, error: msg("review.openOnWebInvalidUrl") });
+    }
+
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return Promise.resolve({ ok: false, error: msg("review.openOnWebInvalidUrl") });
+    }
+
+    void shell.openExternal(url);
+    return Promise.resolve({ ok: true, data: undefined });
   }
 
   safeHandle("infra:getStatus", () => {
