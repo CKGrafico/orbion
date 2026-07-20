@@ -780,7 +780,19 @@
     "resultResumed": "Resumed",
     "resultStopped": "Stopped",
     "resultTriggered": "Triggered",
-    "resultError": "Action failed"
+    "resultError": "Action failed",
+    "tasks": "Tasks",
+    "expandChain": "Show task chain",
+    "chainLoading": "Loading…"
+  },
+  "taskChain": {
+    "label": "TASK CHAIN",
+    "stepCount": "{count, plural, one {# step} other {# steps}}",
+    "noTasks": "No tasks in this chain",
+    "onSuccess": "on success",
+    "onFailure": "on failure",
+    "showCommand": "Show command",
+    "hideCommand": "Hide command"
   },
   "loopProposal": {
     "title": "Loop proposal",
