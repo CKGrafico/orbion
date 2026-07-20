@@ -16,7 +16,11 @@
 import type { Page, ElectronApplication } from "playwright";
 import type { VisualEvidenceConfig } from "./config.js";
 import type { TempPaths } from "./launch/deterministic-env.js";
-import type { AssertionResult, Scenario } from "./types.js";
+import type {
+  AssertionResult,
+  Scenario,
+  ScenarioEvidenceContract,
+} from "./types.js";
 import { AssertionFailure } from "./assertions.js";
 import { gh142BulkRelabelScenario } from "./scenarios/gh-142-bulk-relabel.js";
 import { gh146FleetShapedLoopsScenario } from "./scenarios/gh-146-fleet-shaped-loops.js";
@@ -48,6 +52,7 @@ export interface ScenarioDefinition {
   readonly changeId: string;
   readonly runner: ScenarioRunner;
   readonly description?: string;
+  readonly evidenceContract?: ScenarioEvidenceContract;
 }
 
 const REGISTRY = new Map<string, ScenarioDefinition>();
@@ -62,6 +67,59 @@ export function getScenario(changeId: string): ScenarioDefinition | null {
 
 export function listRegisteredScenarios(): readonly string[] {
   return Array.from(REGISTRY.keys()).sort();
+}
+
+export interface ContractValidationResult {
+  readonly valid: boolean;
+  readonly errors: readonly string[];
+}
+
+export function validateEvidenceContract(
+  definition: ScenarioDefinition,
+  assertions: readonly AssertionResult[],
+  capturedLabels: ReadonlySet<string>,
+): ContractValidationResult {
+  const contract = definition.evidenceContract;
+  if (!contract || contract.criteria.length === 0) {
+    return {
+      valid: false,
+      errors: [`Scenario "${definition.changeId}" has no evidence contract.`],
+    };
+  }
+
+  const errors: string[] = [];
+  const assertionByDescription = new Map(assertions.map((assertion) => [assertion.description, assertion]));
+  const criterionIds = new Set<string>();
+
+  for (const criterion of contract.criteria) {
+    if (!criterion.id.trim() || criterionIds.has(criterion.id)) {
+      errors.push(`Criterion id "${criterion.id}" is empty or duplicated.`);
+    }
+    criterionIds.add(criterion.id);
+
+    if (criterion.assertionDescriptions.length === 0) {
+      errors.push(`Criterion "${criterion.id}" has no assertions.`);
+    }
+    for (const description of criterion.assertionDescriptions) {
+      const assertion = assertionByDescription.get(description);
+      if (!assertion) {
+        errors.push(`Criterion "${criterion.id}" references missing assertion "${description}".`);
+      } else if (assertion.status !== "passed") {
+        errors.push(`Criterion "${criterion.id}" assertion did not pass: "${description}".`);
+      }
+    }
+
+    if (criterion.captureLabels.length === 0) {
+      errors.push(`Criterion "${criterion.id}" has no capture checkpoint.`);
+    }
+    for (const label of criterion.captureLabels) {
+      if (!capturedLabels.has(label)) {
+        errors.push(`Criterion "${criterion.id}" is missing capture checkpoint "${label}".`);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }
 
 /** Wrapper that converts thrown AssertionFailures into structured failed assertions. */
