@@ -115,6 +115,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Map from issue number to URL, used for issue:// link click-through */
   const issueUrlMap = useRef<Map<number, string>>(new Map());
+  /** Active streaming interval reference, cleaned up on unmount */
+  const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Intercept clicks on issue:// links in the chat scroll area
   useEffect(() => {
@@ -139,6 +141,16 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
 
     el.addEventListener("click", handleClick);
     return () => el.removeEventListener("click", handleClick);
+  }, []);
+
+  // Clean up streaming interval on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      if (streamIntervalRef.current) {
+        clearInterval(streamIntervalRef.current);
+        streamIntervalRef.current = null;
+      }
+    };
   }, []);
 
   const handleSendPrompt = useCallback(
@@ -677,10 +689,12 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           appendAssistantContent(turnId, chunk);
           if (idx >= fallback.length) {
             clearInterval(interval);
+            streamIntervalRef.current = null;
             finishTurn(turnId);
             setActiveTurnId(null);
           }
         }, 30);
+        streamIntervalRef.current = interval;
       }
     },
     [intl, accessMode, addTurn, appendAssistantContent, finishTurn, infraService, configService],
@@ -688,6 +702,10 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
 
   const handleInterrupt = useCallback(
     (turnId: string) => {
+      if (streamIntervalRef.current) {
+        clearInterval(streamIntervalRef.current);
+        streamIntervalRef.current = null;
+      }
       interruptTurn(turnId);
       setActiveTurnId(null);
     },
@@ -695,10 +713,18 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
   );
 
   const handleResolveApproval = useCallback(
-    (_approvalId: string, _decision: ApprovalDecision) => {
+    (approvalId: string, decision: ApprovalDecision) => {
       if (!activeTurnId) return;
+
+      // Find the turn that owns this approval so we can resolve + finish it
+      const turn = turns.find((t) => t.approval?.id === approvalId);
+      const turnId = turn?.id ?? activeTurnId;
+
+      resolveApproval(turnId, decision);
+      finishTurn(turnId);
+      setActiveTurnId(null);
     },
-    [activeTurnId],
+    [activeTurnId, turns, resolveApproval, finishTurn],
   );
 
   const handleAnswerQuestion = useCallback(

@@ -22,8 +22,8 @@ export interface ChatMessage {
   content: string;
   toolCalls?: ToolCall[];
   startedAt: number;
-  /** Timestamp when the message finished streaming, or true if finished. Undefined if still streaming. */
-  finishedAt?: number | boolean;
+  /** Timestamp (ms since epoch) when the message finished streaming. Undefined if still streaming. */
+  finishedAt?: number;
   /** The environment (instance) that produced this message. */
   environmentId?: string;
 }

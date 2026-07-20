@@ -21,6 +21,8 @@ export function useLogRows() {
   let rowIdCounter = useRef(0);
   const tailPendingRef = useRef(true);
   const liveRowsBeforeTailRef = useRef<LogRow[]>([]);
+  /** Tracks which run numbers are expanded, synced from segments state changes. */
+  const expandedRunsRef = useRef<Set<number>>(new Set());
 
   const nextId = useCallback(() => {
     rowIdCounter.current += 1;
@@ -32,11 +34,11 @@ export function useLogRows() {
     let currentRows: LogRow[] = [];
     let currentRun = 0;
 
-    // Track which segments were previously expanded
-    const expandedRuns = new Set<number>();
-    for (const seg of segments) {
-      if (seg.expanded) expandedRuns.add(seg.runNumber);
-    }
+    // Use the ref to read which segments were previously expanded,
+    // avoiding a dependency on the `segments` state that would cause
+    // rebuildSegments (and all downstream callbacks) to change identity
+    // on every log line append.
+    const expandedRuns = expandedRunsRef.current;
 
     for (const row of rows) {
       if (row.kind === "run-header") {
@@ -73,7 +75,7 @@ export function useLogRows() {
     }
 
     return segs;
-  }, [segments]);
+  }, []);
 
   const appendLines = useCallback((incoming: string[]) => {
     const newRows: LogRow[] = [];
@@ -111,7 +113,16 @@ export function useLogRows() {
       liveRowsBeforeTailRef.current = [...liveRowsBeforeTailRef.current, ...newRows];
     }
 
-    setSegments(rebuildSegments(rowsRef.current));
+    setSegments((prev) => {
+      const newSegs = rebuildSegments(rowsRef.current);
+      // Keep the ref in sync with new segments
+      const newExpanded = new Set<number>();
+      for (const seg of newSegs) {
+        if (seg.expanded) newExpanded.add(seg.runNumber);
+      }
+      expandedRunsRef.current = newExpanded;
+      return newSegs;
+    });
   }, [nextId, rebuildSegments]);
 
   const appendEvent = useCallback((parsed: unknown) => {
@@ -152,7 +163,16 @@ export function useLogRows() {
       liveRowsBeforeTailRef.current = [...liveRowsBeforeTailRef.current, newRow];
     }
 
-    setSegments(rebuildSegments(rowsRef.current));
+    setSegments((prev) => {
+      const newSegs = rebuildSegments(rowsRef.current);
+      // Keep the ref in sync with new segments
+      const newExpanded = new Set<number>();
+      for (const seg of newSegs) {
+        if (seg.expanded) newExpanded.add(seg.runNumber);
+      }
+      expandedRunsRef.current = newExpanded;
+      return newSegs;
+    });
   }, [nextId, rebuildSegments]);
 
   /**
@@ -217,10 +237,8 @@ export function useLogRows() {
 
     // Reset segments for fresh rebuild
     setSegments((prev) => {
-      const expandedRuns = new Set<number>();
-      for (const seg of prev) {
-        if (seg.expanded) expandedRuns.add(seg.runNumber);
-      }
+      // Use the ref for expanded runs tracking instead of reading from prev
+      const expandedRuns = expandedRunsRef.current;
       const segs: RunSegment[] = [];
       let currentRows: LogRow[] = [];
       let currentRun = 0;
@@ -257,16 +275,30 @@ export function useLogRows() {
         });
       }
 
+      // Keep the ref in sync
+      const newExpanded = new Set<number>();
+      for (const seg of segs) {
+        if (seg.expanded) newExpanded.add(seg.runNumber);
+      }
+      expandedRunsRef.current = newExpanded;
+
       return segs;
     });
   }, [nextId, rowDedupeKey]);
 
   const toggleSegment = useCallback((runNumber: number) => {
-    setSegments((prev) =>
-      prev.map((seg) =>
+    setSegments((prev) => {
+      const next = prev.map((seg) =>
         seg.runNumber === runNumber ? { ...seg, expanded: !seg.expanded } : seg,
-      ),
-    );
+      );
+      // Keep the ref in sync
+      const expanded = new Set<number>();
+      for (const seg of next) {
+        if (seg.expanded) expanded.add(seg.runNumber);
+      }
+      expandedRunsRef.current = expanded;
+      return next;
+    });
   }, []);
 
   const reset = useCallback(() => {
@@ -274,6 +306,7 @@ export function useLogRows() {
     rowIdCounter.current = 0;
     tailPendingRef.current = true;
     liveRowsBeforeTailRef.current = [];
+    expandedRunsRef.current = new Set();
     setSegments([]);
   }, []);
 

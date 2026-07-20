@@ -8,12 +8,12 @@ import type { FailureCategory } from "./diagnoseFailure";
 const TOOL_CALLS_THRESHOLD = 3;
 
 /** A chat message is streaming if finishedAt is not set at all (undefined). */
-function isStreaming(finishedAt: number | boolean | undefined): boolean {
+function isStreaming(finishedAt: number | undefined): boolean {
   return finishedAt === undefined;
 }
 
-/** A chat message is finished if finishedAt is a number or boolean true. */
-function isFinished(finishedAt: number | boolean | undefined): boolean {
+/** A chat message is finished if finishedAt is set (a number). */
+function isFinished(finishedAt: number | undefined): boolean {
   return finishedAt !== undefined;
 }
 
@@ -69,7 +69,7 @@ function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
     content: tm.content,
     toolCalls: tm.toolCalls?.map(recordToToolCall),
     startedAt: tm.startedAt,
-    finishedAt: tm.finishedAt != null ? tm.finishedAt : (tm.content ? true : undefined),
+    finishedAt: tm.finishedAt != null ? tm.finishedAt : (tm.content ? tm.startedAt : undefined),
     environmentId: tm.environmentId,
   };
 }
