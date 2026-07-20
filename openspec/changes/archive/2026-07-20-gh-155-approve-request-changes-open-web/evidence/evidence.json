@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "changeId": "gh-155-approve-request-changes-open-web",
+  "required": true,
+  "status": "passed",
+  "scenario": {
+    "title": "Approve or request changes on a PR from review mode, plus open on web",
+    "steps": [
+      "Open the inbox and observe PR-awaiting-review items with an 'Open on web' button",
+      "Click a PR item to enter review mode",
+      "Verify Approve and Request Changes buttons are visible in the header",
+      "Click Approve to submit an approving review",
+      "Verify the PR shows a 'Reviewed' badge in the queue strip after approval",
+      "Click Request Changes to open a comment input",
+      "Enter a comment and submit the request",
+      "Click 'Open on web' to launch the PR URL in the system browser"
+    ]
+  },
+  "assertions": [
+    { "description": "PR items in inbox show an 'Open on web' (ExternalLink) button", "status": "passed" },
+    { "description": "Review mode header shows Approve and Request Changes action buttons", "status": "passed" },
+    { "description": "Approve button calls submit-pr-review with event APPROVE via infra service", "status": "passed" },
+    { "description": "Request Changes opens an inline comment textarea before submitting", "status": "passed" },
+    { "description": "After successful review, the PR row in the queue strip shows disposed (check) state", "status": "passed" },
+    { "description": "Open on web button in review mode calls open-pr-in-browser infra action (shell.openExternal)", "status": "passed" },
+    { "description": "Unsupported platform operations are hidden rather than faked", "status": "passed" },
+    { "description": "Mock adapter works for browser-only dev mode (pnpm dev:web)", "status": "passed" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence: Approve / request changes from review mode + open on web\n\n### Acceptance Criteria Met\n\n1. **Approve submits an approving review via the platform CLI** - The `submit-pr-review` infra action runs `gh pr review --approve` (GitHub) or `az repos pr set-vote --vote approve` (ADO). On success, the PR is marked disposed in the review queue and the inbox item is resolved.\n\n2. **Request changes prompts for a comment and submits it** - The Request Changes button toggles an inline comment textarea. Submitting calls `submit-pr-review` with `event: REQUEST_CHANGES` and optional body.\n\n3. **Results reflect on the queue strip and resolve the inbox item** - After successful submission, `markDisposed()` updates the queue strip (check icon), and the inbox item is resolved with reason `pr-resolved`.\n\n4. **Platform differences handled by the platform adapter** - GitHub uses `gh pr review`, ADO uses `az repos pr set-vote`. The main process resolves the platform CLI dynamically.\n\n5. **Unsupported operations are hidden, not faked** - If no supported platform CLI is found, the handler returns an error. The UI shows the error; no fake success is emitted.\n\n6. **Open on web launches the PR URL in the default browser** - Both the review mode header and inbox PR items have an 'Open on web' button. The review mode uses `open-pr-in-browser` (which calls `shell.openExternal` with URL validation). Inbox items use `window.open` directly.\n\n### Changed Files\n- `src/shared/ipc.ts` - Added `submit-pr-review` and `open-pr-in-browser` to InfraAction, added SubmitPrReviewParams, SubmitPrReviewResult, OpenPrInBrowserParams types\n- `src/main/index.ts` - Main process handlers for submit-pr-review (gh/az) and open-pr-in-browser (shell.openExternal)\n- `src/main/ipc-validation.ts` - Updated INFRA_ACTIONS array\n- `src/renderer/src/services/interfaces.ts` - Added submitReview() and openOnWeb() to IReviewModeService\n- `src/renderer/src/services/impl/ReviewModeService.ts` - Full implementation with submitReview, openOnWeb, inbox resolution\n- `src/renderer/src/features/review/ReviewModeOverlay.tsx` - Approve/Request Changes buttons, comment input, disposed badge\n- `src/renderer/src/features/inbox/InboxView.tsx` - Open on web button on PR items\n- `src/renderer/src/features/inbox/InboxPanel.tsx` - Open on web button on PR items\n- `src/renderer/src/i18n/en.json` - i18n keys for review actions, open on web, error messages\n- `src/renderer/src/services/mock/MockServices.ts` - Mock handlers and submitReview/openOnWeb in MockReviewModeService\n- `src/renderer/src/theme.css` - Styles for approve/request-changes buttons, comment bar, disposed badge, submit error\n"
+}
