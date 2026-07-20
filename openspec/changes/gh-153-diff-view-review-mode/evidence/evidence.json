@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "changeId": "gh-153-diff-view-review-mode",
+  "required": true,
+  "status": "failed",
+  "assets": [],
+  "temporaryArtifacts": {
+    "screenshot": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/failure.png",
+    "video": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/video.webm",
+    "trace": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/trace.zip"
+  },
+  "failedStep": "run",
+  "error": "page.waitForTimeout: Target page, context or browser has been closed",
+  "prMarkdown": "## Visual Evidence\n\n⚠️ **Automated visual evidence failed.**\n\nFailed step: run\n\nError:\n```\npage.waitForTimeout: Target page, context or browser has been closed\n```\n\nTemporary artifacts (not committed):\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/failure.png\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/video.webm\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/trace.zip"
+}

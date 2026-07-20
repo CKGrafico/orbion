@@ -54,6 +54,8 @@ import type {
   PrAwaitingReviewItem,
   PrVerdict,
   ReviewModeItem,
+  DiffFileEntry,
+  GetPrDiffResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -641,6 +643,168 @@ export class MockInfraService implements IInfraService {
           changes,
         },
       };
+    }
+    if (args.action === "list-prs-awaiting-review") {
+      const prs: PrAwaitingReviewItem[] = [
+        {
+          number: 127,
+          title: "Add authentication middleware",
+          repo: "mock-org/orbion",
+          author: "alice",
+          url: "https://github.com/mock-org/orbion/pull/127",
+          createdAt: new Date(now - 86400000 * 2).toISOString(),
+          updatedAt: new Date(now - 86400000).toISOString(),
+          headSha: "abc123def456",
+        },
+        {
+          number: 131,
+          title: "Fix timeout handling in SSE client",
+          repo: "mock-org/orbion",
+          author: "bob",
+          url: "https://github.com/mock-org/orbion/pull/131",
+          createdAt: new Date(now - 86400000).toISOString(),
+          updatedAt: new Date(now - 3600000).toISOString(),
+          headSha: "def789ghi012",
+        },
+        {
+          number: 135,
+          title: "Update dependencies and fix audit",
+          repo: "mock-org/utils",
+          author: "carol",
+          url: "https://github.com/mock-org/utils/pull/135",
+          createdAt: new Date(now - 86400000 * 3).toISOString(),
+          updatedAt: new Date(now - 7200000).toISOString(),
+          headSha: "ghi345jkl678",
+        },
+      ];
+      const listResult: import("../../../../shared/ipc").ListPrsAwaitingReviewResult = {
+        platform: "github",
+        prs,
+        total: prs.length,
+        truncated: false,
+      };
+      return { ok: true, data: listResult };
+    }
+    if (args.action === "get-pr-verdict") {
+      const params = args.params as { repo?: string; number?: number } | undefined;
+      const prNumber = params?.number ?? 127;
+      const verdicts: Record<number, import("../../../../shared/ipc").PrVerdict> = {
+        127: { verdict: "Touches security-sensitive files (src/middleware/auth.ts)", riskLevel: "high" },
+        131: { verdict: "Small change (23 lines in 2 files)", riskLevel: "low" },
+        135: { verdict: "changes to config files (package.json, pnpm-lock.yaml)", riskLevel: "medium" },
+      };
+      const verdict = verdicts[prNumber] ?? { verdict: "Small change (10 lines in 1 file)", riskLevel: "low" };
+      return { ok: true, data: { verdict } };
+    }
+    if (args.action === "get-pr-diff") {
+      const MOCK_DIFF = `diff --git a/src/middleware/auth.ts b/src/middleware/auth.ts
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/src/middleware/auth.ts
+@@ -0,0 +1,42 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyToken } from './jwt';
++
++interface AuthResult {
++  authenticated: boolean;
++  userId?: string;
++}
++
++export function authenticate(request: NextRequest): AuthResult {
++  const token = request.headers.get('authorization')?.replace('Bearer ', '');
++
++  if (!token) {
++    return { authenticated: false };
++  }
++
++  try {
++    const payload = verifyToken(token);
++    return { authenticated: true, userId: payload.sub };
++  } catch {
++    return { authenticated: false };
++  }
++}
++
++export function authMiddleware(request: NextRequest): NextResponse {
++  const result = authenticate(request);
++
++  if (!result.authenticated) {
++    return NextResponse.json(
++      { error: 'Unauthorized' },
++      { status: 401 }
++    );
++  }
++
++  return NextResponse.next();
++}
++
++export function requireAuth(handler: Function) {
++  return async (request: NextRequest) => {
++    const result = authenticate(request);
++    if (!result.authenticated) {
++      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
++    }
++    return handler(request, result.userId);
++  };
++}
+diff --git a/src/routes/api.ts b/src/routes/api.ts
+index def5678..abc9012 100644
+--- a/src/routes/api.ts
++++ b/src/routes/api.ts
+@@ -1,6 +1,7 @@
+ import { Router } from 'express';
+ import { healthRouter } from './health';
++import { authMiddleware } from '../middleware/auth';
+ 
+ const router = Router();
+ 
+@@ -10,6 +11,8 @@ router.use('/health', healthRouter);
+ // Protected routes
+-const protectedRouter = Router();
++const protectedRouter = Router();
++protectedRouter.use(authMiddleware);
+ 
+ protectedRouter.get('/profile', getProfile);
+ protectedRouter.post('/settings', updateSettings);
+diff --git a/assets/logo.png b/assets/logo.png
+Binary files /dev/null and b/assets/logo.png differ
+diff --git a/src/config.ts b/src/config.ts
+index 1111111..2222222 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -5,7 +5,7 @@ export const config = {
+   port: 3000,
+-  debug: true,
++  debug: false,
+   logLevel: 'info',
+-  jwtSecret: 'hardcoded-secret',
++  jwtSecret: process.env.JWT_SECRET || '',
+ };
+`;
+      const params = args.params as { repo?: string; number?: number; path?: string } | undefined;
+      const filePath = params?.path;
+
+      // If a specific file is requested, return only that file's section
+      let diffText = MOCK_DIFF;
+      if (filePath) {
+        const sections = diffText.split(/(?=^diff --git )/m);
+        const matching = sections.find((s) => {
+          const match = /^diff --git a\/(.+?) b\/(.+)$/m.exec(s);
+          return match && (match[2] === filePath || match[1] === filePath);
+        });
+        diffText = matching ?? "";
+      }
+
+      const files: DiffFileEntry[] = [
+        { path: "src/middleware/auth.ts", additions: 42, deletions: 0, isBinary: false },
+        { path: "src/routes/api.ts", additions: 3, deletions: 1, isBinary: false },
+        { path: "assets/logo.png", additions: 0, deletions: 0, isBinary: true },
+        { path: "src/config.ts", additions: 2, deletions: 2, isBinary: false },
+      ];
+
+      const result: GetPrDiffResult = { diff: diffText, files, truncated: false };
+      return { ok: true, data: result };
     }
     return { ok: false, error: "mock" };
   }

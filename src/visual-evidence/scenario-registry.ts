@@ -25,6 +25,7 @@ import { gh149AgentRiskVerdictScenario } from "./scenarios/gh-149-agent-risk-ver
 import { gh150OvernightPrDigestScenario } from "./scenarios/gh-150-overnight-pr-digest.js";
 import { gh151ReviewModeFromNotificationScenario } from "./scenarios/gh-151-review-mode-from-notification.js";
 import { gh152ReviewQueueStripScenario } from "./scenarios/gh-152-review-queue-strip.js";
+import { gh153DiffViewReviewModeScenario } from "./scenarios/gh-153-diff-view-review-mode.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -121,4 +122,10 @@ registerScenario({
   changeId: "gh-152-review-queue-strip",
   runner: gh152ReviewQueueStripScenario,
   description: "Review queue strip showing PR batch with verdict chips and selection",
+});
+
+registerScenario({
+  changeId: "gh-153-diff-view-review-mode",
+  runner: gh153DiffViewReviewModeScenario,
+  description: "Diff viewer in review mode with file list, unified diff, and binary file labels",
 });

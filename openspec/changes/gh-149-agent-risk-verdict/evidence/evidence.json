@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-149-agent-risk-verdict",
+  "required": false,
+  "status": "blocked",
+  "assets": [],
+  "reason": "Failed to resolve OpenSpec change: Change \"gh-149-agent-risk-verdict\" is already archived (openspec/changes/archive/2026-07-20-gh-149-agent-risk-verdict). Only active changes accept evidence.",
+  "prMarkdown": "## Visual Evidence\n\n⚠️ **Automated visual evidence was blocked.**\n\nFailed to resolve OpenSpec change: Change \"gh-149-agent-risk-verdict\" is already archived (openspec/changes/archive/2026-07-20-gh-149-agent-risk-verdict). Only active changes accept evidence."
+}

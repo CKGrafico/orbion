@@ -5,6 +5,7 @@ import type { IReviewModeService } from "../../services/interfaces";
 import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
 import { GitPullRequest, X, ExternalLink } from "lucide-react";
 import { ReviewQueueStrip } from "./ReviewQueueStrip";
+import { ReviewDiffView } from "./ReviewDiffView";
 
 /** Color class for PR risk level chip (shared with InboxView) */
 function riskChipClass(riskLevel: PrRiskLevel): string {
@@ -105,11 +106,7 @@ function ReviewModeContent({
         <div className="review-mode-body">
           <ReviewQueueStrip />
           <div className="review-mode-main-area">
-            <div className="review-mode-placeholder">
-              <GitPullRequest size={32} strokeWidth={1.2} />
-              <h3>{intl.formatMessage({ id: "reviewMode.placeholderTitle" })}</h3>
-              <p>{intl.formatMessage({ id: "reviewMode.placeholderDescription" })}</p>
-            </div>
+            <ReviewDiffView />
           </div>
         </div>
       </div>

@@ -48,6 +48,7 @@ import { enableVideo, enableTracing, stopTracing } from "./capture/video.js";
 import { chooseFinalAssets } from "./size-limits.js";
 import { clearEvidenceDir, writeFinalAssets, permanentEvidenceDir } from "./store.js";
 import { writeManifest } from "./manifest.js";
+import { generatePrMarkdown } from "./pr-markdown.js";
 
 const EvidenceInputSchema = z.object({
   changeId: z.string().min(1),
@@ -157,6 +158,32 @@ export async function runVisualEvidence(
     // 5. Run the scenario
     const scenarioResult = await runScenario(scenarioDef, scenarioCtx);
 
+    // Check assertions: if any failed, the run fails. We still capture a
+    // screenshot for debugging, but do NOT promote to permanent evidence.
+    const failedAssertions = scenarioResult.assertions.filter((a) => a.status === "failed");
+    if (failedAssertions.length > 0) {
+      // Capture a failure screenshot for debugging (temp only)
+      try {
+        const { captureFailureScreenshot } = await import("./capture/screenshot.js");
+        await captureFailureScreenshot(launched.window, temp.failureScreenshot);
+      } catch {
+        // best-effort
+      }
+      const failedDescriptions = failedAssertions
+        .map((a) => `  - ${a.description}${a.error ? ` (${a.error})` : ""}`)
+        .join("\n");
+      return failedResult(
+        input.changeId,
+        `${failedAssertions.length} assertion(s) failed:\n${failedDescriptions}`,
+        "assertions",
+        {
+          screenshot: temp.failureScreenshot,
+          video: temp.video,
+          trace: temp.trace,
+        },
+      );
+    }
+
     // 6. Capture final screenshot
     const screenshot = await captureScreenshot(launched.window, config, {
       caption: scenarioResult.scenario.title,
@@ -236,6 +263,24 @@ export async function runVisualEvidence(
       assets,
     });
 
+    // Populate prMarkdown on the returned result so the CLI can emit it
+    // without regenerating from a manifest. Using the same builder keeps
+    // URLs consistent.
+    const prMarkdown = generatePrMarkdown(
+      {
+        version: 1,
+        changeId: input.changeId,
+        required: true,
+        status: "passed" as const,
+        scenario: scenarioResult.scenario,
+        assertions: scenarioResult.assertions,
+        assets,
+        prMarkdown: "",
+      } as import("./types.js").PassedEvidenceResult,
+      repo,
+      sha,
+    );
+
     return {
       version: 1,
       changeId: input.changeId,
@@ -244,7 +289,7 @@ export async function runVisualEvidence(
       scenario: scenarioResult.scenario,
       assertions: scenarioResult.assertions,
       assets,
-      prMarkdown: "", // populated by caller via manifest
+      prMarkdown,
     } as PassedEvidenceResult;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

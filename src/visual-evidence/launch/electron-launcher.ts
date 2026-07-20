@@ -143,5 +143,29 @@ export async function launchElectronApp(
     // Best-effort — ignore if headless/unsupported
   }
 
+  // Wait for the React renderer to actually mount content. firstWindow()
+  // returns as soon as the native window exists — but the page is still dark
+  // navy (the BrowserWindow backgroundColor) until React renders the app.
+  // We wait for the #root element to have non-empty children, plus actual
+  // text content (which is present in every state: cold-open headline,
+  // sidebar brand, etc.).
+  try {
+    await window.waitForSelector("#root", { state: "attached", timeout: 15_000 });
+    // Wait for real content inside #root (not just the empty div). The
+    // function body is a string evaluated in the page context, so no DOM
+    // types are needed in this file.
+    await window.waitForFunction(
+      () => {
+        const root = document.getElementById("root");
+        if (!root) return false;
+        return root.children.length > 0 && (root.textContent ?? "").trim().length > 0;
+      },
+      { timeout: 20_000 },
+    );
+  } catch {
+    // Best-effort: if the React app didn't mount in time, we still capture
+    // what's on screen (the scenario assertions will then report failure).
+  }
+
   return { app, window };
 }

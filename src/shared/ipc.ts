@@ -240,7 +240,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff";
 
 export interface CreateIssueParams {
   title: string;
@@ -419,6 +419,38 @@ export interface GetPrVerdictParams {
 export interface GetPrVerdictResult {
   /** The computed verdict. */
   verdict: PrVerdict;
+}
+
+// ── PR diff (GH CLI) ──────────────────────────────────────────────────
+
+/** A single changed file entry parsed from a PR diff. */
+export interface DiffFileEntry {
+  /** File path (the "b/" side from the diff header). */
+  path: string;
+  /** Number of added lines in this file. */
+  additions: number;
+  /** Number of removed lines in this file. */
+  deletions: number;
+  /** Whether this file is a binary file. */
+  isBinary: boolean;
+}
+
+export interface GetPrDiffParams {
+  /** Repository in "owner/repo" format. */
+  repo: string;
+  /** PR number. */
+  number: number;
+  /** Optional file path to fetch a single file's diff (on-demand loading). */
+  path?: string;
+}
+
+export interface GetPrDiffResult {
+  /** The raw unified diff text. */
+  diff: string;
+  /** Parsed file entries with stats. */
+  files: DiffFileEntry[];
+  /** Whether the diff was truncated due to size limits. */
+  truncated: boolean;
 }
 
 export interface ListPrsAwaitingReviewParams {

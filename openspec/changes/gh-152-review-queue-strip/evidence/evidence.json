@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-152-review-queue-strip",
+  "required": false,
+  "status": "blocked",
+  "assets": [],
+  "reason": "Failed to resolve OpenSpec change: OpenSpec change \"gh-152-review-queue-strip\" has no proposal.md, tasks.md, or archive.md at /home/azureuser/projects/orbion/openspec/changes/gh-152-review-queue-strip.",
+  "prMarkdown": "## Visual Evidence\n\n⚠️ **Automated visual evidence was blocked.**\n\nFailed to resolve OpenSpec change: OpenSpec change \"gh-152-review-queue-strip\" has no proposal.md, tasks.md, or archive.md at /home/azureuser/projects/orbion/openspec/changes/gh-152-review-queue-strip."
+}

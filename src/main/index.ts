@@ -43,6 +43,9 @@ import type {
   PrAwaitingReviewItem,
   GetPrVerdictParams,
   GetPrVerdictResult,
+  GetPrDiffParams,
+  GetPrDiffResult,
+  DiffFileEntry,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -1474,6 +1477,9 @@ app.whenReady().then(() => {
       case "get-pr-verdict": {
         return handleGetPrVerdict(args);
       }
+      case "get-pr-diff": {
+        return handleGetPrDiff(args);
+      }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
@@ -1673,6 +1679,112 @@ app.whenReady().then(() => {
           const verdict = analyzeDiff(repo, prNumber, stdout);
 
           const result: GetPrVerdictResult = { verdict };
+          resolve({ ok: true, data: result });
+        });
+      });
+    });
+  }
+
+  /** Parse a unified diff string into file entries with add/remove counts. */
+  function parseDiffFiles(diff: string): DiffFileEntry[] {
+    const files: DiffFileEntry[] = [];
+    if (!diff || diff.trim().length === 0) return files;
+
+    const lines = diff.split("\n");
+    let currentPath = "";
+    let additions = 0;
+    let deletions = 0;
+    let isBinary = false;
+    const seenPaths = new Set<string>();
+
+    const flushFile = (): void => {
+      if (currentPath && !seenPaths.has(currentPath)) {
+        seenPaths.add(currentPath);
+        files.push({ path: currentPath, additions, deletions, isBinary });
+      }
+    };
+
+    for (const line of lines) {
+      const gitMatch = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
+      if (gitMatch) {
+        flushFile();
+        currentPath = gitMatch[2];
+        additions = 0;
+        deletions = 0;
+        isBinary = false;
+        continue;
+      }
+
+      if (line.startsWith("Binary files") || line.startsWith("GIT binary patch")) {
+        isBinary = true;
+        continue;
+      }
+
+      if (line.startsWith("+") && !line.startsWith("+++")) {
+        additions++;
+        continue;
+      }
+
+      if (line.startsWith("-") && !line.startsWith("---")) {
+        deletions++;
+      }
+    }
+    flushFile();
+
+    return files;
+  }
+
+  function handleGetPrDiff(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as GetPrDiffParams | undefined;
+    const repo = params?.repo;
+    const prNumber = params?.number;
+    const filePath = params?.path;
+
+    if (!repo || !prNumber) {
+      return Promise.resolve({ ok: false, error: msg("issues.listFailed", { detail: "repo and number are required" }) });
+    }
+
+    return resolvePlatformCli(null, "issues").then((cliResolved) => {
+      if ("error" in cliResolved) {
+        return { ok: false, error: cliResolved.error } as InfraActionResult;
+      }
+      if (cliResolved.cli !== "gh") {
+        return { ok: false, error: msg("issues.ghRequiredForLabels") } as InfraActionResult;
+      }
+
+      try {
+        validateCliInputs({ repo });
+      } catch (validationErr) {
+        return { ok: false, error: (validationErr as Error).message } as InfraActionResult;
+      }
+
+      const ghArgs: string[] = [
+        "pr", "diff",
+        String(prNumber),
+        "--repo", repo,
+      ];
+      if (filePath) {
+        ghArgs.push("--", filePath);
+      }
+
+      const MAX_DIFF_BYTES = 2 * 1024 * 1024; // 2MB limit
+
+      return new Promise<InfraActionResult>((resolve) => {
+        execFile("gh", ghArgs, { maxBuffer: MAX_DIFF_BYTES }, (err, stdout, stderr) => {
+          if (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            if (code === "ENOENT") {
+              resolve({ ok: false, error: msg("issues.noPlatformCli") });
+              return;
+            }
+            resolve({ ok: false, error: msg("issues.listFailed", { detail: stderr || err.message }) });
+            return;
+          }
+
+          const files = parseDiffFiles(stdout);
+          const truncated = Buffer.byteLength(stdout, "utf8") >= MAX_DIFF_BYTES * 0.95;
+
+          const result: GetPrDiffResult = { diff: stdout, files, truncated };
           resolve({ ok: true, data: result });
         });
       });
