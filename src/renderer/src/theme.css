@@ -1673,6 +1673,209 @@ input {
   padding: 4px 18px;
 }
 
+/* ── Loop card task chain expand toggle ─────────────────────────── */
+
+.loop-card-chain-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: color 0.15s ease;
+}
+
+.loop-card-chain-toggle:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.loop-card-chain-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loop-card-chain-toggle--expanded {
+  color: var(--accent);
+}
+
+.loop-card-chain-toggle-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.loop-card-chain-toggle-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Task chain (expandable read-only chain inside loop card) ─── */
+
+.task-chain {
+  margin-top: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.task-chain--empty {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+}
+
+.task-chain-empty-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.task-chain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 10px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.task-chain-header-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.task-chain-header-count {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.task-chain-steps {
+  padding: 6px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Task chain step ────────────────────────────────────────────── */
+
+.task-chain-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-chain-step--branched {
+  margin-top: 2px;
+}
+
+.task-chain-connector {
+  width: 1px;
+  height: 6px;
+  background: var(--border-subtle);
+  margin-left: 9px;
+}
+
+.task-chain-connector--branch {
+  background: var(--danger);
+  opacity: 0.5;
+}
+
+.task-chain-branch-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--danger);
+  opacity: 0.7;
+  padding: 1px 0 2px 20px;
+}
+
+.task-chain-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.task-chain-step-number {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.task-chain-step-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.task-chain-step-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-chain-step-toggle-cmd {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.task-chain-step-toggle-cmd:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.task-chain-step-command {
+  margin: 2px 0 4px 26px;
+  padding: 4px 8px;
+  background: var(--bg-active);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.task-chain-step-command code {
+  font-family: inherit;
+}
+
+.transcript-loop-proposal {
+  padding: 4px 18px;
+}
+
 /* ── Transcript failure-diagnosis row ────────────────────────────── */
 
 .transcript-failure-diagnosis {

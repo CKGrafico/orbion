@@ -85,7 +85,7 @@ function mockLoop(partial: Partial<LoopMeta> & Pick<LoopMeta, "id" | "status" | 
 }
 
 const MOCK_LOOPS: LoopMeta[] = [
-  mockLoop({ id: "loop-1", status: "running", command: "npm run build", intervalHuman: "5m", runCount: 142, lastExitCode: 0, lastRunAt: iso(-300000), nextRunAt: iso(300000), pid: 12345, runHistory: [
+  mockLoop({ id: "loop-1", status: "running", command: "npm run build", intervalHuman: "5m", runCount: 142, lastExitCode: 0, lastRunAt: iso(-300000), nextRunAt: iso(300000), pid: 12345, taskId: "task-1", runHistory: [
     { runNumber: 142, startedAt: iso(-300000), exitCode: 0, duration: 4500, logSize: 1024, status: "completed", logOffset: 0 },
     { runNumber: 141, startedAt: iso(-600000), exitCode: 0, duration: 4200, logSize: 980, status: "completed", logOffset: 0 },
     { runNumber: 140, startedAt: iso(-900000), exitCode: 1, duration: 1200, logSize: 512, status: "completed", logOffset: 0 },
@@ -101,7 +101,7 @@ const MOCK_LOOPS: LoopMeta[] = [
   mockLoop({ id: "loop-3", status: "stopped", command: "docker compose up", intervalHuman: "1h", runCount: 12, lastExitCode: 1, lastRunAt: iso(-7200000), runHistory: [
     { runNumber: 12, startedAt: iso(-7200000), exitCode: 1, duration: 5400, logSize: 2048, status: "completed", logOffset: 0 },
   ] }),
-  mockLoop({ id: "loop-3b", status: "paused", command: "k6 run load-test.js", description: "Load test", intervalHuman: "1h", runCount: 8, lastExitCode: 0, lastRunAt: iso(-5400000), projectId: "etl", runHistory: [
+  mockLoop({ id: "loop-3b", status: "paused", command: "k6 run load-test.js", description: "Load test", intervalHuman: "1h", runCount: 8, lastExitCode: 0, lastRunAt: iso(-5400000), projectId: "etl", taskId: "task-4", runHistory: [
     { runNumber: 8, startedAt: iso(-5400000), exitCode: 0, duration: 3000, logSize: 800, status: "completed", logOffset: 0 },
   ] }),
   mockLoop({ id: "loop-4", status: "running", command: "opencode agent run", description: "AI code review agent", intervalHuman: "15m", runCount: 67, lastExitCode: 0, lastRunAt: iso(-180000), nextRunAt: iso(720000), pid: 23456, projectId: "agents", runHistory: [
@@ -113,7 +113,7 @@ const MOCK_LOOPS: LoopMeta[] = [
     { runNumber: 23, startedAt: iso(-600000), exitCode: 0, duration: 12000, logSize: 2560, status: "completed", logOffset: 0 },
     { runNumber: 22, startedAt: iso(-2400000), exitCode: 0, duration: 11500, logSize: 2400, status: "completed", logOffset: 0 },
   ] }),
-  mockLoop({ id: "loop-6", status: "failed", command: "python etl_pipeline.py", description: "ETL nightly run", intervalHuman: "1d", runCount: 45, lastExitCode: 1, lastRunAt: iso(-3600000), projectId: "etl", runHistory: [
+  mockLoop({ id: "loop-6", status: "failed", command: "python etl_pipeline.py", description: "ETL nightly run", intervalHuman: "1d", runCount: 45, lastExitCode: 1, lastRunAt: iso(-3600000), projectId: "etl", taskId: "task-6", runHistory: [
     { runNumber: 45, startedAt: iso(-3600000), exitCode: 1, duration: 15000, logSize: 3200, status: "completed", logOffset: 0 },
   ] }),
   mockLoop({ id: "loop-7", status: "finished", command: "node seed-data.js", description: "Database seed", intervalHuman: "1w", maxRuns: 3, runCount: 3, lastExitCode: 0, lastRunAt: iso(-86400000), projectId: "etl", runHistory: [
@@ -122,8 +122,12 @@ const MOCK_LOOPS: LoopMeta[] = [
 ];
 
 const MOCK_TASKS: TaskDefinition[] = [
-  { id: "task-1", name: "Build", command: "npm", commandArgs: ["run", "build"], commandRaw: "npm run build", onSuccessTaskId: null, onFailureTaskId: null, createdAt: iso(-86400000) },
-  { id: "task-2", name: "Test", command: "pnpm", commandArgs: ["test"], commandRaw: "pnpm test", onSuccessTaskId: null, onFailureTaskId: null, createdAt: iso(-86400000) },
+  { id: "task-1", name: "Build", command: "npm", commandArgs: ["run", "build"], commandRaw: "npm run build", onSuccessTaskId: "task-2", onFailureTaskId: "task-3", createdAt: iso(-86400000) },
+  { id: "task-2", name: "Test", command: "pnpm", commandArgs: ["test"], commandRaw: "pnpm test", onSuccessTaskId: null, onFailureTaskId: "task-3", createdAt: iso(-86400000) },
+  { id: "task-3", name: "Notify failure", command: "slack-cli", commandArgs: ["send", "#ci", "Build or test failed"], commandRaw: "slack-cli send #ci 'Build or test failed'", onSuccessTaskId: null, onFailureTaskId: null, createdAt: iso(-86400000) },
+  { id: "task-4", name: "Lint", command: "eslint", commandArgs: ["src/", "--fix"], commandRaw: "eslint src/ --fix", onSuccessTaskId: "task-5", onFailureTaskId: null, createdAt: iso(-86400000) },
+  { id: "task-5", name: "Format check", command: "prettier", commandArgs: ["--check", "src/"], commandRaw: "prettier --check src/", onSuccessTaskId: null, onFailureTaskId: null, createdAt: iso(-86400000) },
+  { id: "task-6", name: "Deploy", command: "terraform", commandArgs: ["apply", "-auto-approve"], commandRaw: "terraform apply -auto-approve", onSuccessTaskId: null, onFailureTaskId: "task-3", createdAt: iso(-86400000) },
 ];
 
 const MOCK_CHAT_SESSIONS: ChatSession[] = [

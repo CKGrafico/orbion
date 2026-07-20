@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { Environment, LoopMeta, LoopStatus } from "../types";
+import type { Environment, LoopMeta, LoopStatus, TaskDefinition } from "../types";
 import { STATUS_COLORS, commandLine, timeUntil } from "../format";
-import { fetchLogs, pauseLoop, resumeLoop, stopLoop, subscribeLogs, triggerLoop } from "../api";
+import { fetchLogs, fetchTasks, pauseLoop, resumeLoop, stopLoop, subscribeLogs, triggerLoop } from "../api";
 import { classifyLogLine } from "./log-types";
 import { useNextRunCountdown } from "./useNextRunCountdown";
 import type { StreamState } from "./useLiveLog";
+import { resolveTaskChain, TaskChainView } from "./TaskChainView";
 
 interface LoopCardProps {
   /** The loop to display. Updated live from the loop store. */
@@ -244,6 +245,49 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef }: L
   // Available actions for this loop
   const availableActions = isReachable && instance ? getAvailableActions(loop.status) : [];
 
+  // ── Task chain expansion ─────────────────────────────────────────────
+  const [chainExpanded, setChainExpanded] = useState(false);
+  const [chainTasks, setChainTasks] = useState<TaskDefinition[] | null>(null);
+  const [chainLoading, setChainLoading] = useState(false);
+
+  const chainSteps = useMemo(
+    () => resolveTaskChain(loop.taskId, chainTasks ?? []),
+    [loop.taskId, chainTasks],
+  );
+
+  const handleToggleChain = useCallback((): void => {
+    if (chainExpanded) {
+      setChainExpanded(false);
+      return;
+    }
+
+    if (chainTasks !== null) {
+      // Already fetched — just toggle
+      setChainExpanded(true);
+      return;
+    }
+
+    if (!instance || !isReachable) return;
+
+    setChainLoading(true);
+    void fetchTasks(instance).then((res) => {
+      if (res.ok && res.data) {
+        setChainTasks(res.data);
+      } else {
+        setChainTasks([]);
+      }
+      setChainExpanded(true);
+      setChainLoading(false);
+    }).catch(() => {
+      setChainTasks([]);
+      setChainExpanded(true);
+      setChainLoading(false);
+    });
+  }, [chainExpanded, chainTasks, instance, isReachable, loop.taskId]);
+
+  // Whether the loop has a taskId (prerequisite for showing the expand affordance)
+  const hasTaskChain = loop.taskId != null && loop.taskId !== "";
+
   // ── Live log streaming ─────────────────────────────────────────────────
   const [logLines, setLogLines] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
@@ -449,7 +493,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef }: L
             </span>
           </div>
 
-          {/* Meta row: interval · runs · last exit · next run */}
+          {/* Meta row: interval · runs · last exit · next run · expand chain */}
           <div className="loop-card-meta">
             <span className="loop-card-meta-item">
               <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.interval" })}</span>
@@ -474,7 +518,31 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef }: L
               <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.nextRun" })}</span>
               <span className="loop-card-meta-value loop-card-meta-value--mono">{isRunning ? intl.formatMessage({ id: "loopCard.runningNow" }) : nextRunLabel}</span>
             </span>
+            {hasTaskChain && instance && isReachable && (
+              <>
+                <span className="loop-card-meta-sep" />
+                <button
+                  className={`loop-card-chain-toggle${chainExpanded ? " loop-card-chain-toggle--expanded" : ""}`}
+                  onClick={handleToggleChain}
+                  disabled={chainLoading}
+                  title={intl.formatMessage({ id: "loopCard.expandChain" })}
+                  type="button"
+                >
+                  <span className="loop-card-chain-toggle-icon">{chainExpanded ? "▾" : "▸"}</span>
+                  <span className="loop-card-chain-toggle-label">
+                    {chainLoading
+                      ? intl.formatMessage({ id: "loopCard.chainLoading" })
+                      : intl.formatMessage({ id: "loopCard.tasks" })}
+                  </span>
+                </button>
+              </>
+            )}
           </div>
+
+          {/* Task chain expansion */}
+          {chainExpanded && chainTasks !== null && (
+            <TaskChainView steps={chainSteps} />
+          )}
 
           {/* Log tail: compact monospace output with copy affordance */}
           {showLogTail && (
