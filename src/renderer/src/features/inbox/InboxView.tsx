@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
-import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem } from "../../../../shared/ipc";
+import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment, Project } from "../../types";
 import {
   Inbox, AlertTriangle, CheckCircle2, XCircle, WifiOff,
   Play, Pause, RotateCw, MessageSquare, X, Search, ArrowUp, ChevronRight,
-  Layers,
+  Layers, GitPullRequest,
 } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
@@ -21,6 +21,9 @@ interface InboxViewProps {
   perEnvProjects: Record<string, Project[]>;
   breaches: BudgetBreach[];
   escalatedOutages: Map<string, OutageEscalation>;
+  prAwaitingReview: PrAwaitingReviewItem[];
+  mainVmEnvironmentId: string | null;
+  mainVmEnvironmentName: string;
   onClickItem: (item: InboxItem) => void;
   onDismissItem: (itemId: string) => void;
   onOpenInChat: (item: InboxItem) => void;
@@ -44,6 +47,8 @@ function KindIcon({ kind, notificationType }: { kind: InboxItem["kind"]; notific
     case "instance-offline":
     case "prolonged-offline":
       return <WifiOff size={16} strokeWidth={1.8} />;
+    case "pr-awaiting-review":
+      return <GitPullRequest size={16} strokeWidth={1.8} />;
     case "digest":
       return <Layers size={16} strokeWidth={1.8} />;
     default:
@@ -73,6 +78,8 @@ function kindColor(kind: InboxItem["kind"], notificationType: InboxItem["notific
     case "instance-offline":
     case "prolonged-offline":
       return "var(--accent-blue)";
+    case "pr-awaiting-review":
+      return "var(--accent-blue)";
     case "digest":
       return "var(--accent-infra)";
     default:
@@ -97,6 +104,9 @@ export function InboxView({
   perEnvProjects,
   breaches,
   escalatedOutages,
+  prAwaitingReview,
+  mainVmEnvironmentId,
+  mainVmEnvironmentName,
   onClickItem,
   onDismissItem,
   onOpenInChat,
@@ -140,7 +150,10 @@ export function InboxView({
     breaches,
     dismissedIds,
     escalatedOutages,
-  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages]);
+    prAwaitingReview,
+    mainVmEnvironmentId,
+    mainVmEnvironmentName,
+  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName]);
 
   const items = useMemo(() => inboxService.buildItems(buildParams), [inboxService, buildParams]);
 

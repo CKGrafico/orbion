@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
-import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem } from "../../../../shared/ipc";
+import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
 import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare } from "lucide-react";
@@ -16,6 +16,9 @@ interface InboxPanelProps {
   environments: Environment[];
   breaches: BudgetBreach[];
   escalatedOutages: Map<string, OutageEscalation>;
+  prAwaitingReview: PrAwaitingReviewItem[];
+  mainVmEnvironmentId: string | null;
+  mainVmEnvironmentName: string;
   onClickItem: (item: InboxItem) => void;
   onDismissItem: (itemId: string) => void;
   /** Called when the user triggers "Open in chat" on an inbox item. */
@@ -34,6 +37,9 @@ export function InboxPanel({
   environments,
   breaches,
   escalatedOutages,
+  prAwaitingReview,
+  mainVmEnvironmentId,
+  mainVmEnvironmentName,
   onClickItem,
   onDismissItem,
   onOpenInChat,
@@ -77,7 +83,10 @@ export function InboxPanel({
     breaches,
     dismissedIds,
     escalatedOutages,
-  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages]);
+    prAwaitingReview,
+    mainVmEnvironmentId,
+    mainVmEnvironmentName,
+  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName]);
 
   const items = useMemo(() => inboxService.buildItems(buildParams), [inboxService, buildParams]);
 

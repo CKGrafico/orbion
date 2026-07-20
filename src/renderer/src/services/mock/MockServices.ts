@@ -51,6 +51,7 @@ import type {
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
   LoopShape,
+  PrAwaitingReviewItem,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -74,6 +75,7 @@ import type {
   IAgentService,
   ILoopShapeCacheService,
   ISiblingOfferService,
+  IPrPollingService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -752,7 +754,7 @@ export class MockInboxService implements IInboxService {
   async getDismissedIds(): Promise<string[]> { return [...mockDismissedIds]; }
   async dismissItem(itemId: string): Promise<void> { mockDismissedIds.add(itemId); }
   buildItems(params: InboxBuildParams): InboxItem[] {
-    const { perEnvLoops, perEnvHealth, environments, breaches } = params;
+    const { perEnvLoops, perEnvHealth, environments, breaches, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName } = params;
     const items: InboxItem[] = [];
 
     for (const breach of breaches) {
@@ -856,6 +858,30 @@ export class MockInboxService implements IInboxService {
       }
     }
 
+    // PRs awaiting review
+    if (mainVmEnvironmentId && prAwaitingReview.length > 0) {
+      for (const pr of prAwaitingReview) {
+        const itemId = `pr-awaiting-review:${pr.repo}:${pr.number}`;
+        if (mockDismissedIds.has(itemId)) continue;
+        items.push({
+          id: itemId,
+          kind: "pr-awaiting-review",
+          notificationType: kindToNotificationType("pr-awaiting-review"),
+          environmentId: mainVmEnvironmentId,
+          environmentName: mainVmEnvironmentName,
+          title: pr.title,
+          detail: `#${pr.number} in ${pr.repo} by @${pr.author}`,
+          occurredAt: pr.updatedAt,
+          dismissed: false,
+          availableActions: ["dismiss", "open-in-chat"],
+          prNumber: pr.number,
+          prRepo: pr.repo,
+          prAuthor: pr.author,
+          prUrl: pr.url,
+        });
+      }
+    }
+
     items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
     return items;
   }
@@ -919,6 +945,9 @@ export class MockInboxService implements IInboxService {
         case "awaiting-input":
         case "digest":
           reason = "watch-cleared";
+          break;
+        case "pr-awaiting-review":
+          reason = "pr-resolved";
           break;
         case "instance-offline":
           reason = "instance-online";
@@ -1444,5 +1473,68 @@ export class MockSiblingOfferService implements ISiblingOfferService {
 
   async recordDecline(environmentId: string, loopId: string, fingerprint: string): Promise<void> {
     this.declined.add(`${environmentId}:${loopId}:${fingerprint}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mock PR Polling Service (browser-only dev)
+// ---------------------------------------------------------------------------
+
+const MOCK_PRS_AWAITING_REVIEW: PrAwaitingReviewItem[] = [
+  {
+    number: 42,
+    title: "Add retry logic to SSH tunnel reconnection",
+    repo: "acme/orbion",
+    author: "loop-bot",
+    url: "https://github.com/acme/orbion/pull/42",
+    createdAt: new Date(Date.now() - 3600_000).toISOString(),
+    updatedAt: new Date(Date.now() - 1800_000).toISOString(),
+  },
+  {
+    number: 15,
+    title: "Fix budget breach auto-pause race condition",
+    repo: "acme/orbion",
+    author: "dependabot",
+    url: "https://github.com/acme/orbion/pull/15",
+    createdAt: new Date(Date.now() - 7200_000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600_000).toISOString(),
+  },
+  {
+    number: 7,
+    title: "Update MCP tool discovery to support dynamic schemas",
+    repo: "acme/loop-task",
+    author: "agent-ops",
+    url: "https://github.com/acme/loop-task/pull/7",
+    createdAt: new Date(Date.now() - 14400_000).toISOString(),
+    updatedAt: new Date(Date.now() - 7200_000).toISOString(),
+  },
+];
+
+@injectable()
+export class MockPrPollingService implements IPrPollingService {
+  private listeners: ((prs: PrAwaitingReviewItem[]) => void)[] = [];
+
+  startPolling(): void {
+    // Immediately provide mock data
+    for (const listener of this.listeners) {
+      listener(MOCK_PRS_AWAITING_REVIEW);
+    }
+  }
+
+  stopPolling(): void {
+    // No-op
+  }
+
+  getPrs(): PrAwaitingReviewItem[] {
+    return MOCK_PRS_AWAITING_REVIEW;
+  }
+
+  onPrsUpdate(cb: (prs: PrAwaitingReviewItem[]) => void): () => void {
+    this.listeners.push(cb);
+    // Immediately deliver current data
+    cb(MOCK_PRS_AWAITING_REVIEW);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb);
+    };
   }
 }

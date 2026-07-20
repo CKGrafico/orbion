@@ -51,6 +51,7 @@
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
   LoopShape,
+  PrAwaitingReviewItem,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -184,6 +185,12 @@ export interface InboxBuildParams {
   dismissedIds: Set<string>;
   /** Actively escalated prolonged outages, keyed by environmentId. */
   escalatedOutages: Map<string, OutageEscalation>;
+  /** PRs awaiting the user's review, polled from the main VM. */
+  prAwaitingReview: PrAwaitingReviewItem[];
+  /** The main VM environment ID (PRs originate from this instance). */
+  mainVmEnvironmentId: string | null;
+  /** The main VM environment name. */
+  mainVmEnvironmentName: string;
 }
 
 export interface IOutageService {
@@ -251,4 +258,15 @@ export interface ISiblingOfferService {
   isDeclined(environmentId: string, loopId: string, fingerprint: string): Promise<boolean>;
   /** Record a decline. */
   recordDecline(environmentId: string, loopId: string, fingerprint: string): Promise<void>;
+}
+
+export interface IPrPollingService {
+  /** Start polling for PRs on the main VM (60s interval). */
+  startPolling(): void;
+  /** Stop polling. */
+  stopPolling(): void;
+  /** Get currently polled PRs awaiting review. */
+  getPrs(): PrAwaitingReviewItem[];
+  /** Subscribe to PR list updates. */
+  onPrsUpdate(cb: (prs: PrAwaitingReviewItem[]) => void): () => void;
 }

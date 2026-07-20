@@ -240,7 +240,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review";
 
 export interface CreateIssueParams {
   title: string;
@@ -356,6 +356,40 @@ export interface BulkRelabelResult {
   succeeded: number;
   /** Number of items that failed. */
   failed: number;
+}
+
+// ── PRs awaiting review (GH CLI) ──────────────────────────────────────
+
+/** A single PR that is awaiting the user's review. */
+export interface PrAwaitingReviewItem {
+  /** PR number. */
+  number: number;
+  /** PR title. */
+  title: string;
+  /** Repository in "owner/repo" format. */
+  repo: string;
+  /** PR author login. */
+  author: string;
+  /** PR URL. */
+  url: string;
+  /** ISO timestamp of PR creation. */
+  createdAt: string;
+  /** ISO timestamp of last PR update. */
+  updatedAt: string;
+}
+
+export interface ListPrsAwaitingReviewParams {
+  /** GitHub repo in "owner/repo" format. Omit for all repos the CLI can see. */
+  repo?: string;
+  /** Maximum number of PRs to return (default 30). */
+  limit?: number;
+}
+
+export interface ListPrsAwaitingReviewResult {
+  platform: "github";
+  prs: PrAwaitingReviewItem[];
+  total: number;
+  truncated: boolean;
 }
 
 export interface InfraActionArgs {
@@ -571,6 +605,7 @@ export type InboxItemKind =
   | "awaiting-input"
   | "instance-offline"
   | "prolonged-offline"
+  | "pr-awaiting-review"
   | "digest";
 
 /** Broad notification category that groups item kinds for visual treatment. */
@@ -588,6 +623,7 @@ export function kindToNotificationType(kind: InboxItemKind): NotificationType {
     case "breach":
     case "pending-approval":
     case "awaiting-input":
+    case "pr-awaiting-review":
       return "watch";
     case "digest":
       return "digest";
@@ -626,6 +662,14 @@ export interface InboxItem {
   availableActions: InboxAction[];
   /** Project ID for the item's loop (used to scope "Open in chat"). */
   projectId?: string;
+  /** PR number for pr-awaiting-review items. */
+  prNumber?: number;
+  /** Repository in "owner/repo" format for pr-awaiting-review items. */
+  prRepo?: string;
+  /** PR author login for pr-awaiting-review items. */
+  prAuthor?: string;
+  /** PR URL for pr-awaiting-review items. */
+  prUrl?: string;
 }
 
 export type InboxItemResolutionReason =
@@ -633,7 +677,8 @@ export type InboxItemResolutionReason =
   | "breach-cleared"
   | "instance-online"
   | "outage-resolved"
-  | "watch-cleared";
+  | "watch-cleared"
+  | "pr-resolved";
 
 export interface ResolvedInboxItem {
   /** The original inbox item data at the time of resolution. */

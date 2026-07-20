@@ -20,6 +20,8 @@ function getResolutionReasonForItem(item: InboxItem): InboxItemResolutionReason 
       return "instance-online";
     case "prolonged-offline":
       return "outage-resolved";
+    case "pr-awaiting-review":
+      return "pr-resolved";
     case "digest":
       return "watch-cleared";
     default:
@@ -63,6 +65,8 @@ function getAvailableActions(kind: InboxItem["kind"], _loopStatus?: LoopStatus):
     case "pending-approval":
     case "awaiting-input":
       return ["open-in-chat"];
+    case "pr-awaiting-review":
+      return ["dismiss", "open-in-chat"];
     default:
       return ["dismiss"];
   }
@@ -82,7 +86,7 @@ function getAvailableActions(kind: InboxItem["kind"], _loopStatus?: LoopStatus):
  * threshold (~10 min) never create an inbox item.
  */
 function deriveItems(params: InboxBuildParams): InboxItem[] {
-  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages } = params;
+  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName } = params;
   const items: InboxItem[] = [];
 
   // 1. Budget breaches
@@ -104,7 +108,32 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
     });
   }
 
-  // 2. Loop-derived items across reachable instances
+  // 2. PRs awaiting review (from the main VM's platform CLI)
+  if (mainVmEnvironmentId && prAwaitingReview.length > 0) {
+    for (const pr of prAwaitingReview) {
+      const itemId = `pr-awaiting-review:${pr.repo}:${pr.number}`;
+      if (dismissedIds.has(itemId)) continue;
+
+      items.push({
+        id: itemId,
+        kind: "pr-awaiting-review",
+        notificationType: kindToNotificationType("pr-awaiting-review"),
+        environmentId: mainVmEnvironmentId,
+        environmentName: mainVmEnvironmentName,
+        title: pr.title,
+        detail: `#${pr.number} in ${pr.repo} by @${pr.author}`,
+        occurredAt: pr.updatedAt,
+        dismissed: false,
+        availableActions: getAvailableActions("pr-awaiting-review"),
+        prNumber: pr.number,
+        prRepo: pr.repo,
+        prAuthor: pr.author,
+        prUrl: pr.url,
+      });
+    }
+  }
+
+  // 3. Loop-derived items across reachable instances
   for (const env of environments) {
     const health = perEnvHealth[env.id];
 
@@ -258,6 +287,8 @@ function answerFleetQuery(
         ? "approval needed"
         : item.kind === "awaiting-input"
         ? "input needed"
+        : item.kind === "pr-awaiting-review"
+        ? "PR awaiting review"
         : item.kind;
 
       if (item.loopId) {
@@ -372,6 +403,26 @@ function answerFleetQuery(
       references.push(item);
       const link = `[${item.title}](inbox://${item.id})`;
       lines.push(`- ${link} on **${item.environmentName}**${item.detail ? ` (${item.detail})` : ""}`);
+    }
+    return { answer: lines.join("\n"), references };
+  }
+
+  // "PR" / "pull request" / "review" / "reviews"
+  const isPrQuery =
+    q.includes("pr") ||
+    q.includes("pull request") ||
+    q.includes("review");
+
+  if (isPrQuery) {
+    const prItems = items.filter((i) => i.kind === "pr-awaiting-review");
+    if (prItems.length === 0) {
+      return { answer: "No PRs awaiting your review right now.", references: [] };
+    }
+    const lines: string[] = [`**${prItems.length} PR${prItems.length !== 1 ? "s" : ""} awaiting your review:**\n`];
+    for (const item of prItems.slice(0, 10)) {
+      references.push(item);
+      const link = `[${item.title}](inbox://${item.id})`;
+      lines.push(`- ${link}${item.detail ? ` (${item.detail})` : ""}`);
     }
     return { answer: lines.join("\n"), references };
   }

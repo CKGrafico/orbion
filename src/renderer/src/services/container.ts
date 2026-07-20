@@ -1,5 +1,5 @@
 import { cid, container } from "inversify-hooks";
-import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IOutageService, IReachabilityService, ITranscriptService, IMcpService, IAgentService, ILoopShapeCacheService, ISiblingOfferService } from "./interfaces";
+import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IOutageService, IReachabilityService, ITranscriptService, IMcpService, IAgentService, ILoopShapeCacheService, ISiblingOfferService, IPrPollingService } from "./interfaces";
 import { ConfigService } from "./impl/ConfigService";
 import { ConnectionService } from "./impl/ConnectionService";
 import { OpenCodeService } from "./impl/OpenCodeService";
@@ -16,6 +16,7 @@ import { McpService } from "./impl/McpService";
 import { AgentService } from "./impl/AgentService";
 import { LoopShapeCacheService } from "./impl/LoopShapeCacheService";
 import { SiblingOfferService } from "./impl/SiblingOfferService";
+import { PrPollingService } from "./impl/PrPollingService";
 import {
   MockConfigService,
   MockConnectionService,
@@ -35,6 +36,7 @@ import {
   MockAgentService,
   MockLoopShapeCacheService,
   MockSiblingOfferService,
+  MockPrPollingService,
 } from "./mock/MockServices";
 
 let built = false;
@@ -64,6 +66,7 @@ export function buildContainer(): void {
     container.addSingleton<IAgentService>(AgentService, cid.IAgentService);
     container.addSingleton<ILoopShapeCacheService>(LoopShapeCacheService, cid.ILoopShapeCacheService);
     container.addSingleton<ISiblingOfferService>(SiblingOfferService, cid.ISiblingOfferService);
+    container.addSingleton<IPrPollingService>(PrPollingService, cid.IPrPollingService);
   } else {
     container.addSingleton<IConfigService>(MockConfigService, cid.IConfigService);
     container.addSingleton<IConnectionService>(MockConnectionService, cid.IConnectionService);
@@ -83,5 +86,6 @@ export function buildContainer(): void {
     container.addSingleton<IAgentService>(MockAgentService, cid.IAgentService);
     container.addSingleton<ILoopShapeCacheService>(MockLoopShapeCacheService, cid.ILoopShapeCacheService);
     container.addSingleton<ISiblingOfferService>(MockSiblingOfferService, cid.ISiblingOfferService);
+    container.addSingleton<IPrPollingService>(MockPrPollingService, cid.IPrPollingService);
   }
 }

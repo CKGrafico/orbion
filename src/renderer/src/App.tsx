@@ -30,7 +30,7 @@ import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
@@ -94,6 +94,7 @@ function AppInner(): React.ReactNode {
   const [outageService] = useInject<IOutageService>(cid.IOutageService);
   const [reachabilityService] = useInject<IReachabilityService>(cid.IReachabilityService);
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
+  const [prPollingService] = useInject<IPrPollingService>(cid.IPrPollingService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
@@ -117,6 +118,7 @@ function AppInner(): React.ReactNode {
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
+  const [prAwaitingReview, setPrAwaitingReview] = useState<import("../../../shared/ipc").PrAwaitingReviewItem[]>([]);
   /** Restore offer: availability from the config-home VM */
   const [restoreAvailability, setRestoreAvailability] = useState<RestoreAvailability | null>(null);
   /** Whether the restore offer is showing */
@@ -433,6 +435,18 @@ function AppInner(): React.ReactNode {
     return () => { cancelled = true; };
   }, [environments, reachabilityService]);
 
+  // Start PR polling and subscribe to PR list updates
+  useEffect(() => {
+    prPollingService.startPolling();
+    const unsub = prPollingService.onPrsUpdate((prs) => {
+      setPrAwaitingReview(prs);
+    });
+    return () => {
+      prPollingService.stopPolling();
+      unsub();
+    };
+  }, [prPollingService]);
+
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -581,7 +595,10 @@ function AppInner(): React.ReactNode {
     breaches: budgetWatch.breaches,
     dismissedIds: inboxDismissedIds,
     escalatedOutages,
-  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages]);
+    prAwaitingReview,
+    mainVmEnvironmentId: mainVm?.id ?? null,
+    mainVmEnvironmentName: mainVm?.name ?? "",
+  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages, prAwaitingReview, mainVm]);
 
   const inboxItemCount = useMemo(() => inboxService.buildItems(inboxBuildParams).length, [inboxService, inboxBuildParams]);
 
@@ -1115,6 +1132,9 @@ function AppInner(): React.ReactNode {
           perEnvProjects={perEnvProjects}
           breaches={budgetWatch.breaches}
           escalatedOutages={escalatedOutages}
+          prAwaitingReview={prAwaitingReview}
+          mainVmEnvironmentId={mainVm?.id ?? null}
+          mainVmEnvironmentName={mainVm?.name ?? ""}
           onClickItem={(item) => {
             select(item.environmentId);
             if (item.loopId) {

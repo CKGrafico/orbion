@@ -38,6 +38,9 @@ import type {
   McpConnectionStatus,
   McpToolCallResult,
   LoopShape,
+  ListPrsAwaitingReviewParams,
+  ListPrsAwaitingReviewResult,
+  PrAwaitingReviewItem,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
@@ -1462,6 +1465,9 @@ app.whenReady().then(() => {
         const result: BulkRelabelResult = { items, succeeded, failed };
         return { ok: true, data: result };
       }
+      case "list-prs-awaiting-review": {
+        return handleListPrsAwaitingReview(args);
+      }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
@@ -1523,6 +1529,93 @@ app.whenReady().then(() => {
         };
 
         resolve({ ok: true, data: result });
+      });
+    });
+  }
+
+  // gh pr list JSON field names for PRs awaiting review
+  interface GhPrJson {
+    number: number;
+    title: string;
+    author: { login: string } | null;
+    url: string;
+    createdAt: string;
+    updatedAt: string;
+    headRepository: { nameWithOwner: string } | null;
+  }
+
+  function handleListPrsAwaitingReview(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as ListPrsAwaitingReviewParams | undefined;
+    const repo = params?.repo;
+    const limit = Math.min(params?.limit ?? 30, 100);
+
+    // PR review listing requires the gh CLI; az doesn't support review-required search
+    return resolvePlatformCli(null, "issues").then((cliResolved) => {
+      if ("error" in cliResolved) {
+        return { ok: false, error: cliResolved.error } as InfraActionResult;
+      }
+      if (cliResolved.cli !== "gh") {
+        return { ok: false, error: msg("issues.ghRequiredForLabels") } as InfraActionResult;
+      }
+
+      // Validate repo format if provided
+      if (repo) {
+        try {
+          validateCliInputs({ repo });
+        } catch (validationErr) {
+          return { ok: false, error: (validationErr as Error).message } as InfraActionResult;
+        }
+      }
+
+      const ghArgs: string[] = [
+        "pr", "list",
+        "--search", "review-required",
+        "--json", "number,title,author,url,createdAt,updatedAt,headRepository",
+        "--limit", String(limit),
+      ];
+      if (repo) {
+        ghArgs.push("--repo", repo);
+      }
+
+      return new Promise<InfraActionResult>((resolve) => {
+        execFile("gh", ghArgs, (err, stdout, stderr) => {
+          if (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            if (code === "ENOENT") {
+              resolve({ ok: false, error: msg("issues.noPlatformCli") });
+              return;
+            }
+            resolve({ ok: false, error: msg("issues.listFailed", { detail: stderr || err.message }) });
+            return;
+          }
+
+          let parsed: GhPrJson[];
+          try {
+            parsed = JSON.parse(stdout) as GhPrJson[];
+          } catch {
+            resolve({ ok: false, error: msg("issues.listFailed", { detail: "Invalid output from gh CLI" }) });
+            return;
+          }
+
+          const prs: PrAwaitingReviewItem[] = parsed.map((item) => ({
+            number: item.number,
+            title: item.title,
+            repo: item.headRepository?.nameWithOwner ?? repo ?? "unknown",
+            author: item.author?.login ?? "unknown",
+            url: item.url,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+          }));
+
+          const result: ListPrsAwaitingReviewResult = {
+            platform: "github",
+            prs,
+            total: prs.length,
+            truncated: prs.length >= limit,
+          };
+
+          resolve({ ok: true, data: result });
+        });
       });
     });
   }
