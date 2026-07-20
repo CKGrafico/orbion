@@ -1,6 +1,9 @@
 import Store from "electron-store";
 import { safeStorage } from "electron";
 import { execFile } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult, ConfigStamp, StaleConfigResult, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
 import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
@@ -507,6 +510,7 @@ function currentStamp(): ConfigStamp {
 function bumpStamp(): void {
   const prev = currentStamp();
   store.set("configStamp", { timestamp: Date.now(), revision: prev.revision + 1 });
+  scheduleConfigSyncToMainVm();
 }
 
 /** Get the current config stamp (read-only, synchronous). */
@@ -549,6 +553,112 @@ export function stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigS
 
 export function forceSetMainVm(environmentId: string): Promise<ConfigStamp> {
   return serialize(() => _forceSetMainVm(environmentId));
+}
+
+// ---------------------------------------------------------------------------
+// Config sync to main-VM (debounced write to ~/.orbion/config.json)
+// ---------------------------------------------------------------------------
+
+/** Debounce timer for config sync to main-VM. */
+let configSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce interval in milliseconds. */
+const CONFIG_SYNC_DEBOUNCE_MS = 2_000;
+
+/**
+ * Schedule a debounced config sync to the main-VM.
+ * Called from bumpStamp() on every config mutation.
+ * Resets the timer on each call, so rapid mutations are coalesced.
+ */
+function scheduleConfigSyncToMainVm(): void {
+  if (configSyncTimer !== null) {
+    clearTimeout(configSyncTimer);
+  }
+  configSyncTimer = setTimeout(() => {
+    configSyncTimer = null;
+    syncConfigToMainVm().catch((err) => {
+      console.error("[config-store] config sync to main-VM failed:", err);
+    });
+  }, CONFIG_SYNC_DEBOUNCE_MS);
+}
+
+/**
+ * Write the sanitized config to the main-VM's ~/.orbion/config.json.
+ * Skips if no main-VM is designated. Uses SSH for remote VMs,
+ * local filesystem for direct endpoints.
+ */
+async function syncConfigToMainVm(): Promise<void> {
+  const mainVm = getMainVm();
+  if (!mainVm) return;
+
+  const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
+  if (!activeEndpoint) return;
+
+  // Build the sanitized payload — same allowlist as IPC renderer output
+  const environments = getEnvironmentsForRenderer();
+  const payload = JSON.stringify(
+    { environments, configStamp: currentStamp() },
+    null,
+    2,
+  );
+
+  if (activeEndpoint.kind === "ssh" && activeEndpoint.sshTarget) {
+    await sshOnMainVmWrite(payload);
+  } else if (activeEndpoint.kind === "direct") {
+    localConfigWrite(payload);
+  }
+  // Tailscale and other kinds: not supported for config-home write yet
+}
+
+/**
+ * Write config to the main-VM over SSH by piping the JSON payload via stdin.
+ * The remote command creates the directory, writes the file, and sets permissions.
+ */
+async function sshOnMainVmWrite(payload: string): Promise<void> {
+  const mainVm = getMainVm();
+  if (!mainVm) return;
+
+  const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
+  if (!activeEndpoint || activeEndpoint.kind !== "ssh" || !activeEndpoint.sshTarget) return;
+
+  const sshHost = parseTarget(activeEndpoint.sshTarget);
+  if (!sshHost) return;
+
+  // Remote command: ensure directory exists, write from stdin, set permissions
+  const remoteCommand = `mkdir -p ~/.orbion && cat > ~/.orbion/config.json && chmod 600 ~/.orbion/config.json`;
+  const args = buildSshArgs(sshHost, remoteCommand);
+
+  return new Promise((resolve) => {
+    const proc = execFile("ssh", args, { timeout: 15_000 }, (err) => {
+      if (err) {
+        console.error("[config-store] SSH write to main-VM failed:", err.message);
+        // Non-blocking: just log and continue
+      }
+      resolve();
+    });
+    // Pipe the JSON payload via stdin
+    proc.stdin?.end(payload, "utf8");
+  });
+}
+
+/**
+ * Write config to the local filesystem for direct endpoints.
+ * The "VM" is the local machine in this scenario.
+ */
+function localConfigWrite(payload: string): void {
+  try {
+    const configDir = path.join(os.homedir(), ".orbion");
+    const configPath = path.join(configDir, "config.json");
+
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+    }
+
+    fs.writeFileSync(configPath, payload, { encoding: "utf8", mode: 0o600 });
+  } catch (err) {
+    console.error("[config-store] local config write failed:", err);
+    // Non-blocking: just log and continue
+  }
 }
 
 // ---------------------------------------------------------------------------
