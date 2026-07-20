@@ -6899,6 +6899,256 @@ input {
   margin: 0 auto;
 }
 
+/* ── Fleet Plan Card ──────────────────────────────────────────── */
+
+.fleet-plan-card {
+  background: var(--bg_elevated);
+  border: 1px solid var(--border_subtle);
+  border-radius: var(--radius_lg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fleet-plan-card--terminal {
+  opacity: 0.85;
+}
+
+.fleet-plan-card--partial {
+  border-color: var(--warning);
+}
+
+.fleet-plan-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fleet-plan-icon {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.fleet-plan-title {
+  font-size: var(--title_main_size);
+  font-weight: var(--title_main_weight);
+  color: var(--text_primary);
+}
+
+.fleet-plan-status {
+  font-size: var(--label_upper_size);
+  text-transform: uppercase;
+  letter-spacing: var(--label_upper_letter_spacing);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.fleet-plan-status--applied {
+  color: var(--success);
+}
+
+.fleet-plan-status--partial {
+  color: var(--warning);
+}
+
+.fleet-plan-status--cancelled {
+  color: var(--text_muted);
+}
+
+.fleet-plan-description {
+  font-size: var(--body_size);
+  color: var(--text_secondary);
+  padding-left: 2px;
+}
+
+.fleet-plan-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--border_subtle);
+  padding-top: 8px;
+}
+
+.fleet-plan-targets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0 6px;
+}
+
+.fleet-plan-toggle-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--meta_size);
+  color: var(--text_muted);
+}
+
+.fleet-plan-toggle-all-label {
+  user-select: none;
+}
+
+.fleet-plan-target-count {
+  font-size: var(--meta_size);
+  color: var(--text_muted);
+}
+
+.fleet-plan-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fleet-plan-target {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 4px;
+  border-radius: var(--radius_sm);
+  transition: background 0.12s;
+}
+
+.fleet-plan-target:hover {
+  background: var(--bg_hover);
+}
+
+.fleet-plan-target--skipped {
+  opacity: 0.5;
+}
+
+.fleet-plan-target--ok {
+  opacity: 0.85;
+}
+
+.fleet-plan-target--failed {
+  opacity: 0.9;
+}
+
+.fleet-plan-target--running {
+  opacity: 0.85;
+}
+
+.fleet-plan-target-status-icon {
+  font-size: 14px;
+  font-weight: 700;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+
+.fleet-plan-target-status-icon--ok {
+  color: var(--success);
+}
+
+.fleet-plan-target-status-icon--failed {
+  color: var(--danger);
+}
+
+.fleet-plan-target-status-icon--skipped {
+  color: var(--text_muted);
+}
+
+.fleet-plan-target-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.fleet-plan-target-attribution {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--meta_size);
+  color: var(--text_secondary);
+}
+
+.fleet-plan-target-instance {
+  font-weight: 600;
+  color: var(--text_primary);
+}
+
+.fleet-plan-target-sep {
+  color: var(--text_muted);
+}
+
+.fleet-plan-target-project {
+  color: var(--text_secondary);
+}
+
+.fleet-plan-target-operation {
+  font-size: var(--body_size);
+  color: var(--text_muted);
+  font-family: var(--mono_font, monospace);
+  font-size: var(--code_size);
+}
+
+.fleet-plan-target-error {
+  font-size: var(--body_size);
+  color: var(--danger);
+  padding: 4px 0 0;
+  width: 100%;
+}
+
+.fleet-plan-error {
+  font-size: var(--body_size);
+  color: var(--danger);
+  padding: 6px 0;
+}
+
+.fleet-plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.fleet-plan-btn {
+  border: none;
+  border-radius: var(--radius_sm);
+  padding: 6px 14px;
+  font-size: var(--body_size);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fleet-plan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fleet-plan-btn--cancel {
+  background: var(--bg_active);
+  color: var(--text_secondary);
+}
+
+.fleet-plan-btn--cancel:hover:not(:disabled) {
+  background: var(--bg_hover);
+  color: var(--text_primary);
+}
+
+.fleet-plan-btn--apply {
+  background: var(--accent);
+  color: var(--accent_ink);
+}
+
+.fleet-plan-btn--apply:hover:not(:disabled) {
+  background: var(--accent_hover);
+}
+
+.transcript-fleet-plan {
+  padding: 0 18px 6px;
+  max-width: var(--panel-content-max-width, 920px);
+  margin: 0 auto;
+}
+
 /* ── PR Review Mode Overlay ──────────────────────────────────────────── */
 
 .review-mode-overlay {

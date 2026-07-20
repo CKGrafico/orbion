@@ -1011,5 +1011,16 @@
     "loopCardLabel": "{project} on {instance} — outside this chat's instance",
     "resultOnInstance": "{result} on {instance}",
     "assistantAttribution": "on {instance} — outside this chat's instance"
+  },
+  "fleetPlan": {
+    "title": "Fleet Plan",
+    "statusApplied": "Applied",
+    "statusPartial": "{ok} ok, {failed} failed",
+    "statusCancelled": "Cancelled",
+    "selectAll": "Select all",
+    "targetCount": "{count, plural, one {# target} other {# targets}}",
+    "applyToSelected": "Apply to {count} selected",
+    "applying": "Applying\u2026",
+    "cancel": "Cancel"
   }
 }
