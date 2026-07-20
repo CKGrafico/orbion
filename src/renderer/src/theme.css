@@ -1783,9 +1783,33 @@ input {
   margin-left: 9px;
 }
 
-.task-chain-connector--branch {
+.task-chain-connector--ok {
+  position: relative;
+  background: var(--success);
+  opacity: 0.6;
+  width: 1px;
+}
+
+.task-chain-connector-ok {
+  position: absolute;
+  left: 4px;
+  top: -1px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--success);
+  line-height: 1;
+}
+
+.task-chain-connector--fail {
   background: var(--danger);
-  opacity: 0.5;
+  opacity: 0.6;
+}
+
+.task-chain--branched .task-chain-connector {
+  /* In branched mode, default connectors also use subtle ok coloring */
+  background: var(--border-subtle);
 }
 
 .task-chain-branch-label {
@@ -1793,9 +1817,17 @@ input {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  padding: 1px 0 2px 20px;
+}
+
+.task-chain-branch-label--fail {
   color: var(--danger);
   opacity: 0.7;
-  padding: 1px 0 2px 20px;
+}
+
+.task-chain-branch-label--success {
+  color: var(--success);
+  opacity: 0.7;
 }
 
 .task-chain-step-row {

@@ -791,6 +791,7 @@
     "noTasks": "No tasks in this chain",
     "onSuccess": "on success",
     "onFailure": "on failure",
+    "ok": "ok",
     "showCommand": "Show command",
     "hideCommand": "Hide command"
   },
