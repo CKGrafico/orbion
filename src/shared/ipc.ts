@@ -1302,7 +1302,7 @@ export interface LoopShapeCacheBridge {
 
 /** App-wide settings persisted to config. No instance-specific options. */
 export interface GlobalSettings {
-  /** UI color theme. v1 only supports "dark"; "light" / "system" are persisted for future use. */
+  /** UI color theme. */
   theme: "dark" | "light" | "system";
   /** Default agent runtime for new VM wizard sessions. */
   defaultAgentRuntime: AgentRuntime;

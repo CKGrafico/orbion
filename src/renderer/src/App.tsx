@@ -189,6 +189,28 @@ function AppInner(): React.ReactNode {
     });
   }, []);
 
+  // Apply theme to document root
+  useEffect(() => {
+    const apply = (theme: GlobalSettings["theme"]) => {
+      const resolved =
+        theme === "system"
+          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+          : theme;
+      document.documentElement.setAttribute("data-theme", resolved);
+    };
+
+    apply(globalSettings.theme);
+
+    if (globalSettings.theme !== "system") return;
+
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => apply("system");
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [globalSettings.theme]);
+
   // Load models for the active session's environment
   useEffect(() => {
     if (!activeSessionId) return;
