@@ -86,7 +86,7 @@ function getAvailableActions(kind: InboxItem["kind"], _loopStatus?: LoopStatus):
  * threshold (~10 min) never create an inbox item.
  */
 function deriveItems(params: InboxBuildParams): InboxItem[] {
-  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName } = params;
+  const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName, prVerdicts } = params;
   const items: InboxItem[] = [];
 
   // 1. Budget breaches
@@ -114,6 +114,9 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
       const itemId = `pr-awaiting-review:${pr.repo}:${pr.number}`;
       if (dismissedIds.has(itemId)) continue;
 
+      const verdictKey = `${pr.repo}:${pr.number}`;
+      const verdict = prVerdicts.get(verdictKey);
+
       items.push({
         id: itemId,
         kind: "pr-awaiting-review",
@@ -129,6 +132,7 @@ function deriveItems(params: InboxBuildParams): InboxItem[] {
         prRepo: pr.repo,
         prAuthor: pr.author,
         prUrl: pr.url,
+        prVerdict: verdict,
       });
     }
   }

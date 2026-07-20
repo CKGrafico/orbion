@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
-import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem } from "../../../../shared/ipc";
+import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem, PrVerdict, PrRiskLevel } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
 import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare } from "lucide-react";
@@ -19,6 +19,7 @@ interface InboxPanelProps {
   prAwaitingReview: PrAwaitingReviewItem[];
   mainVmEnvironmentId: string | null;
   mainVmEnvironmentName: string;
+  prVerdicts: Map<string, PrVerdict>;
   onClickItem: (item: InboxItem) => void;
   onDismissItem: (itemId: string) => void;
   /** Called when the user triggers "Open in chat" on an inbox item. */
@@ -31,6 +32,40 @@ interface QueryTurn {
   result: InboxQueryResult;
 }
 
+/** Color class for PR risk level chip */
+function riskChipClass(riskLevel: PrRiskLevel): string {
+  switch (riskLevel) {
+    case "low": return "pr-risk-chip pr-risk-chip-low";
+    case "medium": return "pr-risk-chip pr-risk-chip-medium";
+    case "high": return "pr-risk-chip pr-risk-chip-high";
+    case "uncertain": return "pr-risk-chip pr-risk-chip-uncertain";
+  }
+}
+
+/** Render the verdict and risk chip for a PR inbox item */
+function PrVerdictDisplayPanel({ verdict }: { verdict?: PrVerdict }): React.ReactNode {
+  const intl = useIntl();
+
+  if (!verdict) {
+    return (
+      <span className="inbox-item-verdict">
+        <span className="pr-risk-chip pr-risk-chip-pending">
+          {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inbox-item-verdict">
+      <span className={riskChipClass(verdict.riskLevel)}>
+        {intl.formatMessage({ id: `inbox.prRisk.${verdict.riskLevel}` })}
+      </span>
+      <span className="inbox-item-verdict-text">{verdict.verdict}</span>
+    </span>
+  );
+}
+
 export function InboxPanel({
   perEnvLoops,
   perEnvHealth,
@@ -40,6 +75,7 @@ export function InboxPanel({
   prAwaitingReview,
   mainVmEnvironmentId,
   mainVmEnvironmentName,
+  prVerdicts,
   onClickItem,
   onDismissItem,
   onOpenInChat,
@@ -86,7 +122,8 @@ export function InboxPanel({
     prAwaitingReview,
     mainVmEnvironmentId,
     mainVmEnvironmentName,
-  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName]);
+    prVerdicts,
+  }), [perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName, prVerdicts]);
 
   const items = useMemo(() => inboxService.buildItems(buildParams), [inboxService, buildParams]);
 
@@ -351,6 +388,9 @@ function InboxItemRow({
       <span className={`inbox-item-dot ${typeClass}`}>{typeIcon}</span>
       <div className="inbox-item-info">
         <span className="inbox-item-title">{item.title}</span>
+        {item.kind === "pr-awaiting-review" ? (
+          <PrVerdictDisplayPanel verdict={item.prVerdict} />
+        ) : null}
         <span className="inbox-item-meta">
           {item.environmentName}
           {item.detail ? ` · ${item.detail}` : ""}

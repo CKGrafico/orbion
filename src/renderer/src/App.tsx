@@ -30,7 +30,7 @@ import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService, IPrVerdictService } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
@@ -95,6 +95,7 @@ function AppInner(): React.ReactNode {
   const [reachabilityService] = useInject<IReachabilityService>(cid.IReachabilityService);
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [prPollingService] = useInject<IPrPollingService>(cid.IPrPollingService);
+  const [prVerdictService] = useInject<IPrVerdictService>(cid.IPrVerdictService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
@@ -119,6 +120,7 @@ function AppInner(): React.ReactNode {
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
   const [prAwaitingReview, setPrAwaitingReview] = useState<import("../../../shared/ipc").PrAwaitingReviewItem[]>([]);
+  const [prVerdicts, setPrVerdicts] = useState<Map<string, import("../../../shared/ipc").PrVerdict>>(new Map());
   /** Restore offer: availability from the config-home VM */
   const [restoreAvailability, setRestoreAvailability] = useState<RestoreAvailability | null>(null);
   /** Whether the restore offer is showing */
@@ -440,12 +442,31 @@ function AppInner(): React.ReactNode {
     prPollingService.startPolling();
     const unsub = prPollingService.onPrsUpdate((prs) => {
       setPrAwaitingReview(prs);
+      // Trigger verdict sync for any PRs missing verdicts or with changed headSha
+      prVerdictService.syncVerdicts(prs);
+    });
+    const unsubVerdicts = prVerdictService.onVerdictsUpdate(() => {
+      // Rebuild the verdict map from the service cache
+      setPrVerdicts((prev) => {
+        const next = new Map(prev);
+        let changed = false;
+        for (const pr of prPollingService.getPrs()) {
+          const key = `${pr.repo}:${pr.number}`;
+          const v = prVerdictService.getVerdict(pr.repo, pr.number);
+          if (v && (!next.has(key) || next.get(key) !== v)) {
+            next.set(key, v);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     });
     return () => {
       prPollingService.stopPolling();
       unsub();
+      unsubVerdicts();
     };
-  }, [prPollingService]);
+  }, [prPollingService, prVerdictService]);
 
   const selected: Environment | null = environments.find((e) => e.id === selectedId) ?? null;
 
@@ -598,7 +619,8 @@ function AppInner(): React.ReactNode {
     prAwaitingReview,
     mainVmEnvironmentId: mainVm?.id ?? null,
     mainVmEnvironmentName: mainVm?.name ?? "",
-  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages, prAwaitingReview, mainVm]);
+    prVerdicts,
+  }), [perEnvLoops, health, environments, budgetWatch.breaches, inboxDismissedIds, escalatedOutages, prAwaitingReview, mainVm, prVerdicts]);
 
   const inboxItemCount = useMemo(() => inboxService.buildItems(inboxBuildParams).length, [inboxService, inboxBuildParams]);
 
@@ -1135,6 +1157,7 @@ function AppInner(): React.ReactNode {
           prAwaitingReview={prAwaitingReview}
           mainVmEnvironmentId={mainVm?.id ?? null}
           mainVmEnvironmentName={mainVm?.name ?? ""}
+          prVerdicts={prVerdicts}
           onClickItem={(item) => {
             select(item.environmentId);
             if (item.loopId) {

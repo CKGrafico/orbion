@@ -240,7 +240,7 @@ export interface PlatformDetectionResult {
 
 // ── Infra assistant ──────────────────────────────────────────────────
 
-export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review";
+export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict";
 
 export interface CreateIssueParams {
   title: string;
@@ -376,6 +376,31 @@ export interface PrAwaitingReviewItem {
   createdAt: string;
   /** ISO timestamp of last PR update. */
   updatedAt: string;
+  /** The HEAD SHA of the PR branch (used for verdict cache invalidation). */
+  headSha: string;
+}
+
+/** Risk level assigned by the local heuristic diff analysis engine. */
+export type PrRiskLevel = "low" | "medium" | "high" | "uncertain";
+
+/** A verdict produced by analyzing a PR diff. */
+export interface PrVerdict {
+  /** Human-readable one-line verdict. */
+  verdict: string;
+  /** Risk level derived from the diff analysis. */
+  riskLevel: PrRiskLevel;
+}
+
+export interface GetPrVerdictParams {
+  /** Repository in "owner/repo" format. */
+  repo: string;
+  /** PR number. */
+  number: number;
+}
+
+export interface GetPrVerdictResult {
+  /** The computed verdict. */
+  verdict: PrVerdict;
 }
 
 export interface ListPrsAwaitingReviewParams {
@@ -670,6 +695,8 @@ export interface InboxItem {
   prAuthor?: string;
   /** PR URL for pr-awaiting-review items. */
   prUrl?: string;
+  /** Agent risk verdict for pr-awaiting-review items. */
+  prVerdict?: PrVerdict;
 }
 
 export type InboxItemResolutionReason =

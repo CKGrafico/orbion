@@ -41,11 +41,14 @@ import type {
   ListPrsAwaitingReviewParams,
   ListPrsAwaitingReviewResult,
   PrAwaitingReviewItem,
+  GetPrVerdictParams,
+  GetPrVerdictResult,
 } from "../shared/ipc.js";
 import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
+import { analyzeDiff } from "./diff-analyzer.js";
 import { classifyPlatform, parseGitRemoteOutput } from "./platform-classifier.js";
 import {
   getEnvironments,
@@ -1468,6 +1471,9 @@ app.whenReady().then(() => {
       case "list-prs-awaiting-review": {
         return handleListPrsAwaitingReview(args);
       }
+      case "get-pr-verdict": {
+        return handleGetPrVerdict(args);
+      }
       default:
         return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
     }
@@ -1542,6 +1548,7 @@ app.whenReady().then(() => {
     createdAt: string;
     updatedAt: string;
     headRepository: { nameWithOwner: string } | null;
+    headRefOid: string;
   }
 
   function handleListPrsAwaitingReview(args: InfraActionArgs): Promise<InfraActionResult> {
@@ -1570,7 +1577,7 @@ app.whenReady().then(() => {
       const ghArgs: string[] = [
         "pr", "list",
         "--search", "review-required",
-        "--json", "number,title,author,url,createdAt,updatedAt,headRepository",
+        "--json", "number,title,author,url,createdAt,updatedAt,headRepository,headRefOid",
         "--limit", String(limit),
       ];
       if (repo) {
@@ -1605,6 +1612,7 @@ app.whenReady().then(() => {
             url: item.url,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
+            headSha: item.headRefOid ?? "",
           }));
 
           const result: ListPrsAwaitingReviewResult = {
@@ -1614,6 +1622,57 @@ app.whenReady().then(() => {
             truncated: prs.length >= limit,
           };
 
+          resolve({ ok: true, data: result });
+        });
+      });
+    });
+  }
+
+  function handleGetPrVerdict(args: InfraActionArgs): Promise<InfraActionResult> {
+    const params = args.params as GetPrVerdictParams | undefined;
+    const repo = params?.repo;
+    const prNumber = params?.number;
+
+    if (!repo || !prNumber) {
+      return Promise.resolve({ ok: false, error: msg("issues.listFailed", { detail: "repo and number are required" }) });
+    }
+
+    // PR verdict requires the gh CLI
+    return resolvePlatformCli(null, "issues").then((cliResolved) => {
+      if ("error" in cliResolved) {
+        return { ok: false, error: cliResolved.error } as InfraActionResult;
+      }
+      if (cliResolved.cli !== "gh") {
+        return { ok: false, error: msg("issues.ghRequiredForLabels") } as InfraActionResult;
+      }
+
+      try {
+        validateCliInputs({ repo });
+      } catch (validationErr) {
+        return { ok: false, error: (validationErr as Error).message } as InfraActionResult;
+      }
+
+      const ghArgs: string[] = [
+        "pr", "diff",
+        String(prNumber),
+        "--repo", repo,
+      ];
+
+      return new Promise<InfraActionResult>((resolve) => {
+        execFile("gh", ghArgs, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+          if (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            if (code === "ENOENT") {
+              resolve({ ok: false, error: msg("issues.noPlatformCli") });
+              return;
+            }
+            resolve({ ok: false, error: msg("issues.listFailed", { detail: stderr || err.message }) });
+            return;
+          }
+
+          const verdict = analyzeDiff(repo, prNumber, stdout);
+
+          const result: GetPrVerdictResult = { verdict };
           resolve({ ok: true, data: result });
         });
       });

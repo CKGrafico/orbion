@@ -52,6 +52,7 @@
   SweepEphemeralSessionsResult,
   LoopShape,
   PrAwaitingReviewItem,
+  PrVerdict,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -191,6 +192,8 @@ export interface InboxBuildParams {
   mainVmEnvironmentId: string | null;
   /** The main VM environment name. */
   mainVmEnvironmentName: string;
+  /** Cached PR verdicts, keyed by "repo:number". */
+  prVerdicts: Map<string, PrVerdict>;
 }
 
 export interface IOutageService {
@@ -269,4 +272,15 @@ export interface IPrPollingService {
   getPrs(): PrAwaitingReviewItem[];
   /** Subscribe to PR list updates. */
   onPrsUpdate(cb: (prs: PrAwaitingReviewItem[]) => void): () => void;
+}
+
+export interface IPrVerdictService {
+  /** Get the cached verdict for a PR, or undefined if not yet computed. */
+  getVerdict(repo: string, number: number): PrVerdict | undefined;
+  /** Fetch and cache the verdict for a PR (calls the main process infra action). */
+  fetchVerdict(repo: string, number: number): Promise<PrVerdict | undefined>;
+  /** Ensure verdicts are fetched for all PRs that lack one or have a changed headSha. */
+  syncVerdicts(prs: PrAwaitingReviewItem[]): void;
+  /** Subscribe to verdict cache updates. */
+  onVerdictsUpdate(cb: () => void): () => void;
 }

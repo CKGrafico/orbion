@@ -52,6 +52,7 @@ import type {
   SweepEphemeralSessionsResult,
   LoopShape,
   PrAwaitingReviewItem,
+  PrVerdict,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -76,6 +77,7 @@ import type {
   ILoopShapeCacheService,
   ISiblingOfferService,
   IPrPollingService,
+  IPrVerdictService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -754,7 +756,7 @@ export class MockInboxService implements IInboxService {
   async getDismissedIds(): Promise<string[]> { return [...mockDismissedIds]; }
   async dismissItem(itemId: string): Promise<void> { mockDismissedIds.add(itemId); }
   buildItems(params: InboxBuildParams): InboxItem[] {
-    const { perEnvLoops, perEnvHealth, environments, breaches, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName } = params;
+    const { perEnvLoops, perEnvHealth, environments, breaches, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName, prVerdicts } = params;
     const items: InboxItem[] = [];
 
     for (const breach of breaches) {
@@ -863,6 +865,8 @@ export class MockInboxService implements IInboxService {
       for (const pr of prAwaitingReview) {
         const itemId = `pr-awaiting-review:${pr.repo}:${pr.number}`;
         if (mockDismissedIds.has(itemId)) continue;
+        const verdictKey = `${pr.repo}:${pr.number}`;
+        const verdict = prVerdicts.get(verdictKey);
         items.push({
           id: itemId,
           kind: "pr-awaiting-review",
@@ -878,6 +882,7 @@ export class MockInboxService implements IInboxService {
           prRepo: pr.repo,
           prAuthor: pr.author,
           prUrl: pr.url,
+          prVerdict: verdict,
         });
       }
     }
@@ -1489,6 +1494,7 @@ const MOCK_PRS_AWAITING_REVIEW: PrAwaitingReviewItem[] = [
     url: "https://github.com/acme/orbion/pull/42",
     createdAt: new Date(Date.now() - 3600_000).toISOString(),
     updatedAt: new Date(Date.now() - 1800_000).toISOString(),
+    headSha: "abc1234def5678",
   },
   {
     number: 15,
@@ -1498,6 +1504,7 @@ const MOCK_PRS_AWAITING_REVIEW: PrAwaitingReviewItem[] = [
     url: "https://github.com/acme/orbion/pull/15",
     createdAt: new Date(Date.now() - 7200_000).toISOString(),
     updatedAt: new Date(Date.now() - 3600_000).toISOString(),
+    headSha: "fed9876cba5432",
   },
   {
     number: 7,
@@ -1507,6 +1514,7 @@ const MOCK_PRS_AWAITING_REVIEW: PrAwaitingReviewItem[] = [
     url: "https://github.com/acme/loop-task/pull/7",
     createdAt: new Date(Date.now() - 14400_000).toISOString(),
     updatedAt: new Date(Date.now() - 7200_000).toISOString(),
+    headSha: "1a2b3c4d5e6f78",
   },
 ];
 
@@ -1533,6 +1541,40 @@ export class MockPrPollingService implements IPrPollingService {
     this.listeners.push(cb);
     // Immediately deliver current data
     cb(MOCK_PRS_AWAITING_REVIEW);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb);
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mock PR Verdict Service (browser-only dev)
+// ---------------------------------------------------------------------------
+
+const MOCK_VERDICTS: Map<string, PrVerdict> = new Map([
+  ["acme/orbion:42", { verdict: "Touches security-sensitive files (src/auth/tokens.ts)", riskLevel: "high" }],
+  ["acme/orbion:15", { verdict: "Small change (12 lines in 1 file)", riskLevel: "low" }],
+  ["acme/loop-task:7", { verdict: "87 lines across 3 files, some config changes", riskLevel: "medium" }],
+]);
+
+@injectable()
+export class MockPrVerdictService implements IPrVerdictService {
+  private listeners: Array<() => void> = [];
+
+  getVerdict(repo: string, number: number): PrVerdict | undefined {
+    return MOCK_VERDICTS.get(`${repo}:${number}`);
+  }
+
+  async fetchVerdict(repo: string, number: number): Promise<PrVerdict | undefined> {
+    return this.getVerdict(repo, number);
+  }
+
+  syncVerdicts(_prs: PrAwaitingReviewItem[]): void {
+    // No-op for mock; verdicts are pre-populated
+  }
+
+  onVerdictsUpdate(cb: () => void): () => void {
+    this.listeners.push(cb);
     return () => {
       this.listeners = this.listeners.filter((l) => l !== cb);
     };
