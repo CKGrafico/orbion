@@ -18,7 +18,7 @@ export class PrVerdictService implements IPrVerdictService {
   private isFetching = false;
 
   private getInfraService(): IInfraService {
-    return container.resolve<IInfraService>(cid.IInfraService as unknown as string);
+    return container.get<IInfraService>(cid.IInfraService as unknown as string);
   }
 
   private static cacheKey(repo: string, number: number): string {

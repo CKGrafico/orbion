@@ -32,7 +32,7 @@ export function usePipelineCounts(
     fetchingRef.current = true;
 
     try {
-      const infraService = container.resolve<IInfraService>(cid.IInfraService as unknown as string);
+      const infraService = container.get<IInfraService>(cid.IInfraService as unknown as string);
       const newCounts: PipelineCounts = {};
       let anySuccess = false;
 

@@ -12,11 +12,11 @@ export class ReviewModeService implements IReviewModeService {
   private listeners = new Set<(item: ReviewModeItem | null) => void>();
 
   private getInfraService(): IInfraService {
-    return container.resolve<IInfraService>(cid.IInfraService as unknown as string);
+    return container.get<IInfraService>(cid.IInfraService as unknown as string);
   }
 
   private getInboxService(): IInboxService {
-    return container.resolve<IInboxService>(cid.IInboxService as unknown as string);
+    return container.get<IInboxService>(cid.IInboxService as unknown as string);
   }
 
   enter(item: ReviewModeItem): void {

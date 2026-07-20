@@ -14,7 +14,6 @@
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
-  expectVisibleText,
   runAssertions,
 } from "../assertions.js";
 
@@ -22,6 +21,10 @@ type AssertionSpec = {
   description: string;
   run: (p: Page) => Promise<void>;
 };
+
+function prItem(page: Page) {
+  return page.locator(".digest-child-item, .inbox-view-item").filter({ hasText: /#/ }).first();
+}
 
 export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
@@ -36,26 +39,37 @@ export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Pro
     await page.waitForTimeout(1000);
   }
 
+  const digestHeader = page.locator(".digest-view-item-header").first();
+  if ((await digestHeader.count()) > 0) {
+    await digestHeader.click();
+  }
+
   const assertions: AssertionSpec[] = [
     {
       description: "A PR awaiting review item is visible in the inbox",
       run: async (p) => {
-        await expectVisibleText(p, "#");
+        if ((await prItem(p).count()) === 0) throw new Error("No PR item is visible in the inbox");
       },
     },
     {
       description: "Clicking a PR item opens review mode with diff viewer",
       run: async (p) => {
-        const prItem = p.locator(".inbox-view-item").filter({ hasText: /#/ }).first();
-        if ((await prItem.count()) === 0) {
+        const item = prItem(p);
+        if ((await item.count()) === 0) {
           throw new Error("No PR inbox item found to click");
         }
-        await prItem.click();
+        await item.click();
         await page.waitForTimeout(2000);
         const overlay = p.locator(".review-mode-overlay");
         if ((await overlay.count()) === 0) {
           throw new Error("Review mode overlay did not appear after clicking PR item");
         }
+        const rawDiffTab = p.locator(".review-mode-tab-btn").filter({ hasText: /raw diff/i });
+        if ((await rawDiffTab.count()) === 0) {
+          throw new Error("Raw diff tab is not available in review mode");
+        }
+        await rawDiffTab.click();
+        await page.waitForTimeout(1500);
         const diffView = p.locator(".review-diff-view");
         if ((await diffView.count()) === 0) {
           throw new Error("Diff viewer did not appear in review mode");
@@ -114,6 +128,10 @@ export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Pro
         if ((await addLines.count()) === 0) {
           throw new Error("No addition lines visible in the diff");
         }
+        await ctx.captureCheckpoint(
+          "unified-diff",
+          "Review mode showing file list, stats, and unified diff",
+        );
       },
     },
     {
@@ -121,16 +139,19 @@ export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Pro
       run: async (p) => {
         // Find the binary file item in the file list and click it
         const binaryItems = p.locator(".review-diff-file-item").filter({ hasText: "binary" });
-        if ((await binaryItems.count()) > 0) {
-          await binaryItems.first().click();
-          await page.waitForTimeout(500);
-          // Check for binary label in the content pane
-          const binaryLabel = p.locator(".review-diff-binary-label");
-          if ((await binaryLabel.count()) === 0) {
-            throw new Error("Binary file label not visible after selecting binary file");
-          }
+        if ((await binaryItems.count()) === 0) {
+          throw new Error("No binary file entry is available for validation");
         }
-        // If no binary items, this assertion is vacuously true
+        await binaryItems.first().click();
+        await page.waitForTimeout(500);
+        const binaryLabel = p.locator(".review-diff-binary-label");
+        if ((await binaryLabel.count()) === 0) {
+          throw new Error("Binary file label not visible after selecting binary file");
+        }
+        await ctx.captureCheckpoint(
+          "binary-file",
+          "Review mode showing the binary file fallback",
+        );
       },
     },
     {

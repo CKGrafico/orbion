@@ -21,7 +21,7 @@ export interface VideoController {
  * `paths.video` when stopped.
  */
 export function enableVideo(
-  context: import("playwright").BrowserContext,
+  page: import("playwright").Page,
   paths: TempPaths,
   _config: VisualEvidenceConfig,
 ): VideoController {
@@ -34,7 +34,7 @@ export function enableVideo(
   return {
     async stop(): Promise<string | null> {
       try {
-        const video = (context as unknown as { video?: () => { path(): Promise<string> } | null }).video?.();
+        const video = page.video();
         if (!video) return null;
         const p = await video.path();
         const dest = paths.video;

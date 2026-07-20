@@ -24,11 +24,13 @@ describe("archive compatibility", () => {
   it("writeFinalAssets writes only allowed filenames", () => {
     const root = fakeRepoRoot();
     writeFinalAssets(root, "gh-x", DEFAULT_CONFIG, [
+      { filename: "01-confirmation.webp", buffer: Buffer.from("checkpoint") },
       { filename: "final.webp", buffer: Buffer.from("webp") },
       { filename: "flow.gif", buffer: Buffer.from("gif") },
       { filename: "evidence.json", buffer: Buffer.from("{}") },
     ]);
     const dir = permanentEvidenceDir(root, "gh-x", DEFAULT_CONFIG);
+    expect(fs.existsSync(path.join(dir, "01-confirmation.webp"))).toBe(true);
     expect(fs.existsSync(path.join(dir, "final.webp"))).toBe(true);
     expect(fs.existsSync(path.join(dir, "flow.gif"))).toBe(true);
     expect(fs.existsSync(path.join(dir, "evidence.json"))).toBe(true);

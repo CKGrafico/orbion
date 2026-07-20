@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "changeId": "gh-155-approve-request-changes-open-web",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-155-approve-request-changes-open-web/evidence/01-review-actions.webp",
+      "caption": "PR review mode with approve, request changes, and open on web actions",
+      "width": 1280,
+      "height": 720,
+      "bytes": 43188,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-155-approve-request-changes-open-web/evidence/02-request-changes.webp",
+      "caption": "Request changes comment ready to submit",
+      "width": 1280,
+      "height": 720,
+      "bytes": 39980,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-155-approve-request-changes-open-web/evidence/03-approved.webp",
+      "caption": "Approved PR marked reviewed in the queue",
+      "width": 1280,
+      "height": 720,
+      "bytes": 42340,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Approve, request changes, and open a PR on the web",
+    "steps": [
+      "Open a PR from the inbox",
+      "Verify all review actions are available",
+      "Open the PR URL on the web",
+      "Request changes with a comment and verify the reviewed state",
+      "Approve another queued PR and verify the reviewed state"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "Review mode exposes Approve, Request changes, and Open on web actions",
+      "status": "passed"
+    },
+    {
+      "description": "Open on web launches the selected pull request URL",
+      "status": "passed"
+    },
+    {
+      "description": "Request changes requires a comment and marks the PR reviewed",
+      "status": "passed"
+    },
+    {
+      "description": "Approve marks another queued PR reviewed",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Approve, request changes, and open a PR on the web\n\n![PR review mode with approve, request changes, and open on web actions](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-155-approve-request-changes-open-web/evidence/01-review-actions.webp)\n![Request changes comment ready to submit](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-155-approve-request-changes-open-web/evidence/02-request-changes.webp)\n![Approved PR marked reviewed in the queue](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-155-approve-request-changes-open-web/evidence/03-approved.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open a PR from the inbox\n2. Verify all review actions are available\n3. Open the PR URL on the web\n4. Request changes with a comment and verify the reviewed state\n5. Approve another queued PR and verify the reviewed state\n\n</details>"
+}

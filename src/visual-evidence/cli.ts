@@ -27,6 +27,8 @@ import { validateInput, runVisualEvidence } from "./run.js";
 import { resolveConfig, findRepoRoot } from "./config.js";
 import { writeManifest } from "./manifest.js";
 import { generatePrMarkdown } from "./pr-markdown.js";
+import { clearEvidenceDir } from "./store.js";
+import { evidenceExitCode } from "./exit-code.js";
 import type { RepoCoordinates } from "./types.js";
 
 /** Tracks the changeId currently being processed so the unhandled-rejection
@@ -36,6 +38,7 @@ let pendingChangeId: string | null = null;
 interface ParsedArgs {
   change?: string;
   input?: string;
+  allowArchived?: boolean;
 }
 
 function parseCliArgs(argv: readonly string[]): ParsedArgs {
@@ -44,11 +47,12 @@ function parseCliArgs(argv: readonly string[]): ParsedArgs {
     options: {
       change: { type: "string" },
       input: { type: "string" },
+      "allow-archived": { type: "boolean" },
     },
     strict: true,
     allowPositionals: false,
   });
-  return { change: values.change, input: values.input };
+  return { change: values.change, input: values.input, allowArchived: values["allow-archived"] };
 }
 
 function readInputFile(p: string): unknown {
@@ -153,14 +157,19 @@ async function main(): Promise<number> {
 
   let result;
   try {
-    result = await runVisualEvidence(input, { config, repo, sha, skipBuild: process.env.ORBION_VISUAL_EVIDENCE_SKIP_BUILD === "1" });
+    result = await runVisualEvidence(input, {
+      config,
+      repo,
+      sha,
+      skipBuild: process.env.ORBION_VISUAL_EVIDENCE_SKIP_BUILD === "1",
+      allowArchived: parsed.allowArchived,
+    });
   } catch (err) {
     console.error(`Visual-evidence run failed unexpectedly: ${(err as Error).message}`);
     return 1;
   }
 
-  // For skipped/blocked: write a manifest so the run is auditable.
-  if (result.status === "skipped" || result.status === "blocked") {
+  if (result.status === "skipped") {
     try {
       writeManifest(repoRoot, input.changeId, config, {
         changeId: result.changeId,
@@ -174,26 +183,16 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  if (result.status === "blocked") {
+    clearEvidenceDir(repoRoot, input.changeId, config);
+    console.error(`Visual evidence BLOCKED: ${result.reason}`);
+    return evidenceExitCode(result);
+  }
+
   if (result.status === "failed") {
-    try {
-      writeManifest(repoRoot, input.changeId, config, {
-        changeId: result.changeId,
-        required: result.required,
-        status: result.status,
-      }, {
-        repo,
-        sha,
-        scenario: result.scenario,
-        assertions: result.assertions,
-        temporaryArtifacts: result.temporaryArtifacts,
-        failedStep: result.failedStep,
-        error: result.error,
-      });
-    } catch {
-      // best-effort
-    }
+    clearEvidenceDir(repoRoot, input.changeId, config);
     console.error(`Visual evidence FAILED — step "${result.failedStep}": ${result.error}`);
-    return 1;
+    return evidenceExitCode(result);
   }
 
   // passed — re-generate prMarkdown anchored to the head SHA and emit stdout
@@ -204,34 +203,6 @@ async function main(): Promise<number> {
   console.error(`Assets:`);
   for (const asset of result.assets) {
     console.error(`  - ${path.join(repoRoot, asset.path)} (${asset.bytes} bytes, ${asset.format})`);
-  }
-
-  // Commit + push the evidence files so the raw.githubusercontent.com URLs
-  // in the PR markdown resolve immediately on GitHub. The evidence folder
-  // lives under openspec/changes/<id>/evidence/ which is tracked by git.
-  try {
-    const evidenceGlob = path.join("openspec", "changes", input.changeId, "evidence");
-    execFileSync("git", ["add", evidenceGlob], { cwd: repoRoot, stdio: "ignore" });
-    // Only commit if there are staged changes
-    const diff = execFileSync("git", ["diff", "--cached", "--quiet"], { cwd: repoRoot }).toString();
-    void diff; // empty string means no changes; non-zero exit means changes exist
-  } catch {
-    // diff --cached --quiet exits 1 when there are staged changes — that's expected
-    try {
-      execFileSync(
-        "git",
-        ["commit", "-m", `docs(visual-evidence): ${input.changeId} evidence (final.webp + evidence.json)`],
-        { cwd: repoRoot, stdio: "ignore" },
-      );
-      execFileSync("git", ["push", "origin", branch ?? "main"], {
-        cwd: repoRoot,
-        stdio: "ignore",
-      });
-      console.error(`Evidence committed and pushed to origin/${branch ?? "main"}.`);
-    } catch (commitErr) {
-      console.error(`Warning: could not commit/push evidence: ${(commitErr as Error).message}`);
-      console.error(`The evidence files are on disk but not pushed — raw URLs will not resolve until you commit and push manually.`);
-    }
   }
 
   return 0;

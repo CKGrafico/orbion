@@ -179,7 +179,7 @@ export async function launchElectronApp(
 
 async function launchWebMode(
   repoRoot: string,
-  _paths: TempPaths,
+  paths: TempPaths,
   config: VisualEvidenceConfig,
 ): Promise<LaunchedApp> {
   const port = 5183;
@@ -191,6 +191,10 @@ async function launchWebMode(
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
       viewport: { width: config.window.width, height: config.window.height },
+      recordVideo: {
+        dir: paths.root,
+        size: { width: config.window.width, height: config.window.height },
+      },
     });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });

@@ -30,6 +30,18 @@ export function changeRoot(repoRoot: string, changeId: string): string {
   return path.join(changesDir(repoRoot), changeId);
 }
 
+export function archivedChangeRoot(repoRoot: string, changeId: string): string | null {
+  const archived = path.join(changesDir(repoRoot), "archive");
+  if (!fs.existsSync(archived)) return null;
+  const match = fs.readdirSync(archived, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => name === changeId || name.endsWith(`-${changeId}`))
+    .sort()
+    .reverse()[0];
+  return match ? path.join(archived, match) : null;
+}
+
 /** List active (non-archived) change IDs from `openspec/changes/`. */
 export function listActiveChanges(repoRoot: string): string[] {
   const dir = changesDir(repoRoot);
@@ -172,8 +184,21 @@ function parseAffectedFiles(proposal: string | undefined, archive: string | unde
   return [];
 }
 
-export function readChangeContext(repoRoot: string, changeId: string): ChangeContext {
-  const dir = resolveActiveChange(repoRoot, changeId);
+export function readChangeContext(
+  repoRoot: string,
+  changeId: string,
+  opts: { allowArchived?: boolean } = {},
+): ChangeContext {
+  let active = true;
+  let dir: string;
+  try {
+    dir = resolveActiveChange(repoRoot, changeId);
+  } catch (error) {
+    const archived = opts.allowArchived ? archivedChangeRoot(repoRoot, changeId) : null;
+    if (!archived) throw error;
+    dir = archived;
+    active = false;
+  }
   const proposal = readIfExists(path.join(dir, "proposal.md"));
   const tasks = readIfExists(path.join(dir, "tasks.md"));
   const archive = readIfExists(path.join(dir, "archive.md"));
@@ -192,11 +217,14 @@ export function readChangeContext(repoRoot: string, changeId: string): ChangeCon
     archive,
     acceptanceCriteria: parseAcceptanceCriteria(proposal, archive),
     affectedFiles: parseAffectedFiles(proposal, archive),
-    active: true,
+    active,
   };
 }
 
-/** Compute the path of the evidence folder inside an active change. */
+/** Compute the path of the evidence folder inside an active or archived change. */
 export function evidenceDir(repoRoot: string, changeId: string, evidenceDirectoryName: string): string {
-  return path.join(changeRoot(repoRoot, changeId), evidenceDirectoryName);
+  const active = changeRoot(repoRoot, changeId);
+  const root = fs.existsSync(active) ? active : archivedChangeRoot(repoRoot, changeId);
+  if (!root) throw new OpenSpecResolutionError(`OpenSpec change "${changeId}" was not found.`);
+  return path.join(root, evidenceDirectoryName);
 }

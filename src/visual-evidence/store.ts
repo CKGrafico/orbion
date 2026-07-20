@@ -20,6 +20,11 @@ import type { EvidenceAsset } from "./types.js";
 import { evidenceDir } from "./openspec-resolver.js";
 
 const ALLOWED_FILENAMES: ReadonlySet<string> = new Set(["final.webp", "final.png", "flow.gif", "evidence.json"]);
+const CHECKPOINT_FILENAME = /^\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.(?:webp|png)$/;
+
+function isAllowedFilename(filename: string): boolean {
+  return ALLOWED_FILENAMES.has(filename) || CHECKPOINT_FILENAME.test(filename);
+}
 
 export function permanentEvidenceDir(repoRoot: string, changeId: string, config: VisualEvidenceConfig): string {
   return evidenceDir(repoRoot, changeId, config.evidenceDirectoryName);
@@ -50,9 +55,9 @@ export function writeFinalAssets(
 
   const written: string[] = [];
   for (const a of assets) {
-    if (!ALLOWED_FILENAMES.has(a.filename)) {
+    if (!isAllowedFilename(a.filename)) {
       throw new Error(
-        `Refusing to write "${a.filename}" into the OpenSpec evidence folder — only final.webp, final.png, flow.gif, evidence.json are permitted.`,
+        `Refusing to write "${a.filename}" into the OpenSpec evidence folder.`,
       );
     }
     const target = path.join(permanentEvidenceDir(repoRoot, changeId, config), a.filename);
@@ -82,7 +87,7 @@ export function clearEvidenceDir(repoRoot: string, changeId: string, config: Vis
   const dir = permanentEvidenceDir(repoRoot, changeId, config);
   if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir)) {
-    if (ALLOWED_FILENAMES.has(entry)) {
+    if (isAllowedFilename(entry)) {
       fs.unlinkSync(path.join(dir, entry));
     }
   }

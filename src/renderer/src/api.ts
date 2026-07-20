@@ -20,11 +20,11 @@ export interface DaemonSettings {
 // ── Standalone functions (resolve from container — for use inside effects/callbacks) ──
 
 function getApiService(): IApiService {
-  return container.resolve<IApiService>(cid.IApiService as unknown as string);
+  return container.get<IApiService>(cid.IApiService as unknown as string);
 }
 
 function getStreamService(): IStreamService {
-  return container.resolve<IStreamService>(cid.IStreamService as unknown as string);
+  return container.get<IStreamService>(cid.IStreamService as unknown as string);
 }
 
 export function apiRequest<T = unknown>(

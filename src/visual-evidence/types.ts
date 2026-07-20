@@ -64,6 +64,17 @@ export interface AssertionResult {
   readonly error?: string;
 }
 
+export interface EvidenceCriterion {
+  readonly id: string;
+  readonly description: string;
+  readonly assertionDescriptions: readonly string[];
+  readonly captureLabels: readonly string[];
+}
+
+export interface ScenarioEvidenceContract {
+  readonly criteria: readonly EvidenceCriterion[];
+}
+
 // ── Assets ────────────────────────────────────────────────────────────
 
 export type AssetType = "screenshot" | "gif" | "video";

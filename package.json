@@ -13,7 +13,8 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "visual-evidence": "tsx src/visual-evidence/cli.ts"
+    "visual-evidence": "tsx src/visual-evidence/cli.ts",
+    "visual-evidence:publish": "tsx src/visual-evidence/publish-cli.ts"
   },
   "dependencies": {
     "@opencode-ai/sdk": "^1.17.18",

@@ -6,37 +6,46 @@
   "assets": [
     {
       "type": "screenshot",
-      "path": "openspec/changes/gh-142-bulk-relabel/evidence/final.webp",
-      "caption": "Bulk relabel issues using a sentence (InfraChatPanel surface)",
+      "path": "openspec/changes/gh-142-bulk-relabel/evidence/01-confirmation.webp",
+      "caption": "Bulk relabel confirmation naming every affected issue",
       "width": 1280,
       "height": 720,
-      "bytes": 15166,
+      "bytes": 22116,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-142-bulk-relabel/evidence/02-result.webp",
+      "caption": "Bulk relabel per-item results with success and failure",
+      "width": 1280,
+      "height": 720,
+      "bytes": 27464,
       "format": "webp"
     }
   ],
   "scenario": {
-    "title": "Bulk relabel issues using a sentence (InfraChatPanel surface)",
+    "title": "Bulk relabel issues using one sentence",
     "steps": [
-      "Launch the Orbion app in mock mode",
-      "Verify the sidebar shows the mock VM",
-      "Verify the InfraChatPanel is visible with the composer",
-      "Type 'mark these as to-refine' in the composer",
-      "Screenshot captures the InfraChatPanel surface"
+      "List issues labeled to-implement",
+      "Enter mark these as to-refine",
+      "Verify the confirmation names every affected issue",
+      "Apply once",
+      "Verify per-item success and failure results"
     ]
   },
   "assertions": [
     {
-      "description": "The Orbion brand is visible",
+      "description": "The requested issue stack is listed with every issue title",
       "status": "passed"
     },
     {
-      "description": "The InfraChatPanel surface is visible",
+      "description": "The confirmation names every issue and the to-refine label",
       "status": "passed"
     },
     {
-      "description": "The chat composer is present and interactive",
+      "description": "Applying once reports a result for every issue including partial failure",
       "status": "passed"
     }
   ],
-  "prMarkdown": "## Visual Evidence\n### Bulk relabel issues using a sentence (InfraChatPanel surface)\n\n![Bulk relabel issues using a sentence (InfraChatPanel surface)](https://raw.githubusercontent.com/CKGrafico/orbion/48424589f4ba24aeaf761cb989291af0403bc24c/openspec/changes/gh-142-bulk-relabel/evidence/final.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Launch the Orbion app in mock mode\n2. Verify the sidebar shows the mock VM\n3. Verify the InfraChatPanel is visible with the composer\n4. Type 'mark these as to-refine' in the composer\n5. Screenshot captures the InfraChatPanel surface\n\n</details>"
+  "prMarkdown": "## Visual Evidence\n### Bulk relabel issues using one sentence\n\n![Bulk relabel confirmation naming every affected issue](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-142-bulk-relabel/evidence/01-confirmation.webp)\n![Bulk relabel per-item results with success and failure](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-142-bulk-relabel/evidence/02-result.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. List issues labeled to-implement\n2. Enter mark these as to-refine\n3. Verify the confirmation names every affected issue\n4. Apply once\n5. Verify per-item success and failure results\n\n</details>"
 }

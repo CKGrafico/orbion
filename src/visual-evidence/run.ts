@@ -39,7 +39,13 @@ import { resolveConfig, findRepoRoot } from "./config.js";
 import { readChangeContext } from "./openspec-resolver.js";
 import { decideEvidenceRequired } from "./evidence-required.js";
 import { deriveScenario } from "./scenario-deriver.js";
-import { getScenario, runScenario, type ScenarioContext } from "./scenario-registry.js";
+import {
+  getScenario,
+  runScenario,
+  validateEvidenceContract,
+  type CapturedCheckpoint,
+  type ScenarioContext,
+} from "./scenario-registry.js";
 import { prepareTempDir } from "./launch/deterministic-env.js";
 import { launchElectronApp } from "./launch/electron-launcher.js";
 import { captureScreenshot } from "./capture/screenshot.js";
@@ -49,6 +55,7 @@ import { chooseFinalAssets } from "./size-limits.js";
 import { clearEvidenceDir, writeFinalAssets, permanentEvidenceDir } from "./store.js";
 import { writeManifest } from "./manifest.js";
 import { generatePrMarkdown } from "./pr-markdown.js";
+import { installRuntimeDiagnostics } from "./runtime-diagnostics.js";
 
 const EvidenceInputSchema = z.object({
   changeId: z.string().min(1),
@@ -84,6 +91,7 @@ export interface RunOptions {
   readonly repo?: RepoCoordinates;
   readonly sha?: string;
   readonly skipBuild?: boolean;
+  readonly allowArchived?: boolean;
 }
 
 export async function runVisualEvidence(
@@ -96,7 +104,7 @@ export async function runVisualEvidence(
   // 1. Resolve the OpenSpec change
   let ctx;
   try {
-    ctx = readChangeContext(repoRoot, input.changeId);
+    ctx = readChangeContext(repoRoot, input.changeId, { allowArchived: opts.allowArchived });
   } catch (err) {
     return blockedResult(input.changeId, `Failed to resolve OpenSpec change: ${(err as Error).message}`);
   }
@@ -143,8 +151,12 @@ export async function runVisualEvidence(
         `Failed to launch app: ${message}. Try ORBION_VISUAL_EVIDENCE_MODE=web (default) for headless Linux without GUI libraries.`,
       );
     }
-    videoController = enableVideo(launched.context, temp, config);
+    videoController = enableVideo(launched.window, temp, config);
     await enableTracing(launched.context, temp);
+    const diagnostics = installRuntimeDiagnostics(launched.window);
+
+    const checkpoints: CapturedCheckpoint[] = [];
+    const checkpointLabels = new Set<string>();
 
     const scenarioCtx: ScenarioContext = {
       repoRoot,
@@ -152,6 +164,17 @@ export async function runVisualEvidence(
       window: launched.window,
       temp,
       config,
+      captureCheckpoint: async (label, caption) => {
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(label)) {
+          throw new Error(`Invalid checkpoint label "${label}".`);
+        }
+        if (checkpointLabels.has(label)) {
+          throw new Error(`Duplicate checkpoint label "${label}".`);
+        }
+        const screenshot = await captureScreenshot(launched!.window, config, { caption });
+        checkpoints.push({ label, caption, screenshot });
+        checkpointLabels.add(label);
+      },
     };
 
     // 5. Run the scenario
@@ -183,10 +206,45 @@ export async function runVisualEvidence(
       );
     }
 
-    // 6. Capture final screenshot
-    const screenshot = await captureScreenshot(launched.window, config, {
-      caption: scenarioResult.scenario.title,
-    });
+    if (diagnostics.errors.length > 0) {
+      return failedResult(
+        input.changeId,
+        diagnostics.errors.join("\n"),
+        "runtime-diagnostics",
+        {
+          screenshot: temp.failureScreenshot,
+          video: temp.video,
+          trace: temp.trace,
+        },
+      );
+    }
+
+    const contractValidation = validateEvidenceContract(
+      scenarioDef,
+      scenarioResult.assertions,
+      checkpointLabels,
+    );
+    if (!contractValidation.valid) {
+      return failedResult(
+        input.changeId,
+        contractValidation.errors.join("\n"),
+        "evidence-contract",
+        {
+          screenshot: temp.failureScreenshot,
+          video: temp.video,
+          trace: temp.trace,
+        },
+      );
+    }
+
+    if (checkpoints.length === 0) {
+      throw new Error("The scenario completed without any evidence checkpoints.");
+    }
+
+    await stopTracing(launched.context, temp);
+    diagnostics.dispose();
+    await launched.close();
+    launched = null;
 
     // 7. Stop video + try GIF conversion if recording succeeded
     const webmPath = videoController ? await videoController.stop() : null;
@@ -196,17 +254,16 @@ export async function runVisualEvidence(
     }
 
     // 8. Size limits + final-asset selection
-    const candidates: CaptureCandidate[] = [
-      {
-        type: "screenshot",
-        buffer: screenshot.buffer,
-        width: screenshot.width,
-        height: screenshot.height,
-        bytes: screenshot.bytes,
-        format: screenshot.format,
-        caption: scenarioResult.scenario.title,
-      },
-    ];
+    const finalCheckpoint = checkpoints[checkpoints.length - 1];
+    const candidates: CaptureCandidate[] = [{
+      type: "screenshot",
+      buffer: finalCheckpoint.screenshot.buffer,
+      width: finalCheckpoint.screenshot.width,
+      height: finalCheckpoint.screenshot.height,
+      bytes: finalCheckpoint.screenshot.bytes,
+      format: finalCheckpoint.screenshot.format,
+      caption: finalCheckpoint.caption,
+    }];
     if (gifResult) {
       candidates.push({
         type: "gif",
@@ -223,21 +280,28 @@ export async function runVisualEvidence(
 
     const evidenceDir = permanentEvidenceDir(repoRoot, input.changeId, config);
     const relEvidenceDir = path.relative(repoRoot, evidenceDir);
-    const screenshotRel = `${relEvidenceDir}/final.${screenshot.format}`;
+    const screenshotRel = `${relEvidenceDir}/final.${finalCheckpoint.screenshot.format}`;
     const gifRel = `${relEvidenceDir}/flow.gif`;
 
     const selection = chooseFinalAssets(candidates, config, screenshotRel, gifRel);
-    const assets: EvidenceAsset[] = [];
-    if (selection.screenshot) assets.push(selection.screenshot);
+    const assets: EvidenceAsset[] = checkpoints.map((checkpoint, index) => ({
+      type: "screenshot",
+      path: `${relEvidenceDir}/${checkpointFilename(index, checkpoint.label, checkpoint.screenshot.format)}`,
+      caption: checkpoint.caption,
+      width: checkpoint.screenshot.width,
+      height: checkpoint.screenshot.height,
+      bytes: checkpoint.screenshot.bytes,
+      format: checkpoint.screenshot.format,
+    }));
     if (selection.gif) assets.push(selection.gif);
 
     // 9. Promote final assets + write manifest
     clearEvidenceDir(repoRoot, input.changeId, config);
     const assetsToWrite: { filename: string; buffer: Buffer }[] = [];
-    if (selection.screenshot) {
+    for (const [index, checkpoint] of checkpoints.entries()) {
       assetsToWrite.push({
-        filename: screenshot.format === "png" ? "final.png" : "final.webp",
-        buffer: screenshot.buffer,
+        filename: checkpointFilename(index, checkpoint.label, checkpoint.screenshot.format),
+        buffer: checkpoint.screenshot.buffer,
       });
     }
     if (selection.gif && gifResult) {
@@ -328,11 +392,15 @@ export async function runVisualEvidence(
   }
 }
 
+function checkpointFilename(index: number, label: string, format: "webp" | "png"): string {
+  return `${String(index + 1).padStart(2, "0")}-${label}.${format}`;
+}
+
 function blockedResult(changeId: string, reason: string): BlockedEvidenceResult {
   return {
     version: 1,
     changeId,
-    required: false,
+    required: true,
     status: "blocked",
     reason,
     assets: [],
