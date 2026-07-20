@@ -52,7 +52,7 @@ import type {
   SubmitPrReviewResult,
   OpenPrInBrowserParams,
 } from "../shared/ipc.js";
-import type { Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
+import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -62,6 +62,7 @@ import {
   getEnvironments,
   addEnvironment,
   removeEnvironment,
+  updateEnvironment,
   addEndpoint,
   removeEndpoint,
   setActiveEndpoint,
@@ -697,6 +698,10 @@ app.whenReady().then(() => {
     removeMcpSession(id);
     removeEnvironmentShapes(id);
     await removeEnvironment(id);
+  });
+  safeHandle("config:updateEnvironment", async (_event, ...rawArgs) => {
+    const [id, updates] = validateIpc<[string, { name?: string; agentRuntime?: AgentRuntime }]>("config:updateEnvironment", rawArgs);
+    await updateEnvironment(id, updates);
   });
   safeHandle("config:addEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, url, kind] = validateIpc<[string, string, string]>("config:addEndpoint", rawArgs);

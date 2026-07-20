@@ -212,6 +212,18 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
+  "config:updateEnvironment": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("id must be a non-empty string");
+    if (typeof args[1] !== "object" || args[1] === null) issues.push("updates must be an object");
+    if (typeof args[1] === "object" && args[1] !== null) {
+      const updates = args[1] as Record<string, unknown>;
+      if (updates.name !== undefined && !isNonEmptyString(updates.name)) issues.push("name must be a non-empty string when provided");
+      if (updates.agentRuntime !== undefined && !isEnum(updates.agentRuntime, ["opencode", "claude"])) issues.push("agentRuntime must be opencode or claude when provided");
+    }
+    return issues;
+  },
+
   "config:addEndpoint": (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");

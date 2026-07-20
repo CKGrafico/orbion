@@ -2,6 +2,7 @@ import { injectable } from "inversify-hooks";
 import type {
   Environment,
   AccessEndpoint,
+  AgentRuntime,
   EndpointKind,
   SessionScope,
   PairingCodeExchangeResponse,
@@ -33,6 +34,9 @@ export class ConfigService implements IConfigService {
   }
   async removeEnvironment(id: string): Promise<void> {
     return this.api.removeEnvironment(id);
+  }
+  async updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void> {
+    return this.api.updateEnvironment(id, updates);
   }
   async addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null> {
     return this.api.addEndpoint(environmentId, url, kind);

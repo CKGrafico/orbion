@@ -2,6 +2,7 @@ import { injectable } from "inversify-hooks";
 import type {
   Environment,
   AccessEndpoint,
+  AgentRuntime,
   EndpointKind,
   ApiResponse,
   ConnectionStatus,
@@ -290,6 +291,13 @@ export class MockConfigService implements IConfigService {
     mockEnvironments = mockEnvironments.filter((e) => e.id !== id);
     if (mockSelectedId === id) mockSelectedId = null;
     mockBumpStamp();
+    saveMockEnvironments();
+  }
+  async updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void> {
+    const env = mockEnvironments.find((e) => e.id === id);
+    if (!env) return;
+    if (updates.name !== undefined) env.name = updates.name;
+    if (updates.agentRuntime !== undefined) env.agentRuntime = updates.agentRuntime;
     saveMockEnvironments();
   }
   async addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null> {

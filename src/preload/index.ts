@@ -74,6 +74,8 @@ const bridge: LoopTaskBridge = {
     addEnvironment: (name: string, url: string, kind?: string) =>
       ipcRenderer.invoke("config:addEnvironment", name, url, kind),
     removeEnvironment: (id: string) => ipcRenderer.invoke("config:removeEnvironment", id),
+    updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: string }) =>
+      ipcRenderer.invoke("config:updateEnvironment", id, updates) as Promise<void>,
     addEndpoint: (environmentId: string, url: string, kind: string) =>
       ipcRenderer.invoke("config:addEndpoint", environmentId, url, kind),
     removeEndpoint: (environmentId: string, endpointId: string) =>

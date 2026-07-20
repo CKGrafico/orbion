@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import type { Environment, EnvironmentHealth, LoopMeta, Project, ReachabilityState } from "../types";
-import { Star } from "lucide-react";
+import { Star, Settings } from "lucide-react";
 
 /** One instance that hosts the current session's project. */
 interface InstanceOption {
@@ -40,6 +40,8 @@ interface InstanceSelectorProps {
   mainVmId: string | null;
   /** Called when the user picks a different instance. */
   onChange: (environmentId: string, workingDirectory: string | undefined) => void;
+  /** Called when the user clicks the gear icon to open instance settings. */
+  onOpenSettings?: (environmentId: string) => void;
 }
 
 export function InstanceSelector({
@@ -52,6 +54,7 @@ export function InstanceSelector({
   currentEnvironmentId,
   mainVmId,
   onChange,
+  onOpenSettings,
 }: InstanceSelectorProps): React.ReactNode {
   const intl = useIntl();
   const [open, setOpen] = useState(false);
@@ -189,6 +192,18 @@ export function InstanceSelector({
                     { count: option.loopCount },
                   )}
                 </span>
+                {onOpenSettings ? (
+                  <span
+                    className="instance-selector-gear"
+                    role="button"
+                    tabIndex={0}
+                    title={intl.formatMessage({ id: "instanceSelector.settingsTooltip" })}
+                    onClick={(e) => { e.stopPropagation(); onOpenSettings(option.env.id); setOpen(false); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onOpenSettings(option.env.id); setOpen(false); } }}
+                  >
+                    <Settings size={13} />
+                  </span>
+                ) : null}
               </button>
             );
           })}

@@ -39,6 +39,7 @@ import { SessionChatView } from "./components/SessionChatView";
 import { ModelSelector, getReasoningEffortsForModel } from "./components/ModelSelector";
 import { ReasoningEffortSelector } from "./components/ReasoningEffortSelector";
 import { InstanceSelector } from "./components/InstanceSelector";
+import { InstanceSettingsPanel } from "./components/InstanceSettingsPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ToastProvider, Toast, useToast } from "./components/Toast";
 import type { IAgentService } from "./services/interfaces";
@@ -89,7 +90,7 @@ export function App(): React.ReactNode {
 }
 
 function AppInner(): React.ReactNode {
-  const { environments, selectedId, mainVm, loaded, select, remove, setActiveEndpoint, setMainVm, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
+  const { environments, selectedId, mainVm, loaded, select, remove, update, addEndpoint, removeEndpoint, setActiveEndpoint, removeSessionToken, setMainVm, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
@@ -144,6 +145,8 @@ function AppInner(): React.ReactNode {
   const [envModels, setEnvModels] = useState<Record<string, ModelInfo[]>>({});
   /** Settings panel open state */
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  /** Instance settings panel: which environment is being edited */
+  const [instanceSettingsEnvId, setInstanceSettingsEnvId] = useState<string | null>(null);
   /** Global settings (loaded from config store) */
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     theme: "dark",
@@ -1548,6 +1551,7 @@ function AppInner(): React.ReactNode {
               currentEnvironmentId={session.environmentId}
               mainVmId={mainVm?.id ?? null}
               onChange={(envId, workDir) => handleInstanceSwitch(session.id, envId, workDir)}
+              onOpenSettings={(envId) => setInstanceSettingsEnvId(envId)}
             />
             <AgentRuntimeSwitcher
               value={session.activeRuntime}
@@ -2005,6 +2009,27 @@ function AppInner(): React.ReactNode {
         onToggleNotificationMute={handleToggleGlobalMute}
         onSetMainVm={(envId) => {
           void handleStampCheckedSetMainVm(envId);
+        }}
+      />
+
+      <InstanceSettingsPanel
+        open={instanceSettingsEnvId !== null}
+        onClose={() => setInstanceSettingsEnvId(null)}
+        environment={environments.find((e) => e.id === instanceSettingsEnvId) ?? null}
+        onUpdateEnvironment={(id, updates) => update(id, updates)}
+        onAddEndpoint={(envId, url, kind) => addEndpoint(envId, url, kind)}
+        onRemoveEndpoint={(envId, epId) => removeEndpoint(envId, epId)}
+        onSetActiveEndpoint={(envId, epId) => {
+          setActiveEndpoint(envId, epId);
+          void connectionService.retry(envId);
+        }}
+        onRemoveEnvironment={(id) => remove(id)}
+        onExchangePairingCode={async (baseUrl, code) => {
+          const result = await configService.exchangePairingCode(baseUrl, code);
+          return { ok: result.ok, error: result.ok ? undefined : result.error };
+        }}
+        onRemoveSessionToken={(envId) => {
+          removeSessionToken(envId);
         }}
       />
 

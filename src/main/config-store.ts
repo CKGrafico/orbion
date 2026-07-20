@@ -752,6 +752,13 @@ function _removeEndpoint(environmentId: string, endpointId: string): void {
   });
 }
 
+function _updateEnvironment(environmentId: string, updates: { name?: string; agentRuntime?: AgentRuntime }): void {
+  mutateEnvironment(environmentId, (env) => {
+    if (updates.name !== undefined) env.name = updates.name;
+    if (updates.agentRuntime !== undefined) env.agentRuntime = updates.agentRuntime;
+  });
+}
+
 function _setActiveEndpoint(environmentId: string, endpointId: string): void {
   mutateEnvironment(environmentId, (env) => {
     if (!env.endpoints.some((ep) => ep.id === endpointId)) return;
@@ -968,6 +975,10 @@ export function addEnvironment(
 
 export function removeEnvironment(id: string): Promise<void> {
   return serialize(() => _removeEnvironment(id));
+}
+
+export function updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void> {
+  return serialize(() => _updateEnvironment(id, updates));
 }
 
 export function addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null> {

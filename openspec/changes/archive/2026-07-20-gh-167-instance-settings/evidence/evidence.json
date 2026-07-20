@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "changeId": "gh-167-instance-settings",
+  "required": true,
+  "status": "blocked",
+  "scenario": {
+    "title": "Per-instance settings reached from the instance selector",
+    "steps": [
+      "Open the app with at least one instance configured",
+      "Open the chat header instance selector dropdown",
+      "Click the gear icon on an instance row",
+      "Verify the InstanceSettingsPanel drawer opens with Reach, Runtime, Credentials, and Remove sections",
+      "Edit the instance name and verify it persists",
+      "Add a new endpoint and verify it appears",
+      "Switch the active endpoint and verify reconnect",
+      "Re-pair with a pairing code",
+      "Clear credentials and verify auth state changes",
+      "Click Remove instance, confirm, and verify the instance is removed"
+    ]
+  },
+  "assertions": [
+    { "description": "Gear icon is visible on each instance row in the InstanceSelector dropdown", "status": "unverified" },
+    { "description": "Clicking the gear icon opens the InstanceSettingsPanel drawer", "status": "unverified" },
+    { "description": "The panel displays Reach, Runtime, Credentials, and Remove sections", "status": "unverified" },
+    { "description": "Editing the instance name updates the environment", "status": "unverified" },
+    { "description": "Switching agent runtime updates the environment", "status": "unverified" },
+    { "description": "Adding/removing endpoints works correctly", "status": "unverified" },
+    { "description": "Switching active endpoint triggers connection retry", "status": "unverified" },
+    { "description": "Re-pairing with a code updates auth state", "status": "unverified" },
+    { "description": "Clearing credentials changes authState to unauthenticated", "status": "unverified" },
+    { "description": "Removing instance with confirmation removes the environment", "status": "unverified" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence\n\nEvidence capture was **blocked** — browser automation is unavailable in this environment. Manual verification required:\n\n1. Gear icon on instance rows in the InstanceSelector\n2. InstanceSettingsPanel drawer with Reach, Runtime, Credentials, Remove sections\n3. Edit instance name, switch runtime, add/remove endpoints\n4. Re-pair, clear credentials, remove instance with confirmation\n"
+}

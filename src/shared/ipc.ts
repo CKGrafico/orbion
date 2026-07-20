@@ -180,6 +180,8 @@ export interface ConfigBridge {
   getEnvironments: () => Promise<Environment[]>;
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
   removeEnvironment: (id: string) => Promise<void>;
+  /** Update mutable fields on an existing environment (name, agentRuntime). */
+  updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime }) => Promise<void>;
   addEndpoint: (environmentId: string, url: string, kind: EndpointKind) => Promise<AccessEndpoint | null>;
   removeEndpoint: (environmentId: string, endpointId: string) => Promise<void>;
   setActiveEndpoint: (environmentId: string, endpointId: string) => Promise<void>;

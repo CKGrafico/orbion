@@ -32,6 +32,7 @@ export function useEnvironments(): {
   select: (id: string | null) => void;
   add: (name: string, baseUrl: string, kind?: EndpointKind) => Promise<Environment>;
   remove: (id: string) => void;
+  update: (id: string, updates: { name?: string; agentRuntime?: import("../../../shared/ipc").AgentRuntime }) => void;
   addEndpoint: (environmentId: string, url: string, kind: EndpointKind) => void;
   removeEndpoint: (environmentId: string, endpointId: string) => void;
   setActiveEndpoint: (environmentId: string, endpointId: string) => void;
@@ -94,6 +95,15 @@ export function useEnvironments(): {
         setEnvironments(await configService.getEnvironments());
         setSelectedId(await configService.getSelectedEnvironmentId());
       }).catch((err) => handleConfigError("removeEnvironment", err));
+    },
+    [configService],
+  );
+
+  const updateFn = useCallback(
+    (id: string, updates: { name?: string; agentRuntime?: import("../../../shared/ipc").AgentRuntime }) => {
+      void configService.updateEnvironment(id, updates).then(async () => {
+        setEnvironments(await configService.getEnvironments());
+      }).catch((err) => handleConfigError("updateEnvironment", err));
     },
     [configService],
   );
@@ -194,6 +204,7 @@ export function useEnvironments(): {
     select,
     add,
     remove,
+    update: updateFn,
     addEndpoint: addEndpointFn,
     removeEndpoint: removeEndpointFn,
     setActiveEndpoint: setActiveEndpointFn,

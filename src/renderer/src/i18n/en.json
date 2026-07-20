@@ -761,7 +761,8 @@
     "noInstance": "No instance",
     "loopCount": "{count, plural, one {1 loop} other {# loops}}",
     "switchedInstance": "Switched from {fromInstance} to {toInstance}",
-    "unreachable": "unreachable"
+    "unreachable": "unreachable",
+    "settingsTooltip": "Instance settings"
   },
   "instanceHandoff": {
     "label": "Switched from {fromInstance} to {toInstance}"
@@ -1044,5 +1045,43 @@
     "ephemeralThreshold": "Ephemeral chat threshold",
     "ephemeralThresholdDesc": "Idle hours before an unsaved (scratch) chat is automatically discarded.",
     "hours": "hours"
+  },
+  "instanceSettings": {
+    "title": "Instance Settings",
+    "reachSection": "Reach",
+    "reachSectionDesc": "How Orbion connects to this instance's loop-task daemon.",
+    "endpoints": "Endpoints",
+    "activeEndpoint": "active",
+    "addEndpoint": "Add endpoint",
+    "endpointUrl": "URL",
+    "endpointKind": "Kind",
+    "removeEndpoint": "Remove",
+    "removeEndpointConfirm": "Remove this endpoint? If it is the active endpoint, another will be selected automatically.",
+    "switchActive": "Set active",
+    "noEndpoints": "No endpoints configured",
+    "runtimeSection": "Runtime",
+    "runtimeSectionDesc": "The agent runtime used for this instance's chat sessions.",
+    "agentRuntime": "Agent runtime",
+    "runtimeState": "Runtime state",
+    "reprovisionRuntime": "Re-provision runtime",
+    "reprovisionRuntimeDesc": "Re-probe the VM and re-install the agent runtime if missing.",
+    "credentialsSection": "Credentials",
+    "credentialsSectionDesc": "Authentication credentials for this instance's loop-task daemon.",
+    "authState": "Auth state",
+    "authStateAuthenticated": "Authenticated",
+    "authStateUnauthenticated": "Unauthenticated",
+    "authStateBlocked": "Blocked",
+    "authStateUnknown": "Unknown",
+    "repairCode": "Pairing code",
+    "repairCodePlaceholder": "Enter pairing code",
+    "repairSubmit": "Re-pair",
+    "clearCredentials": "Clear credentials",
+    "clearCredentialsConfirm": "Clear the stored session token? You will need to re-pair to regain access.",
+    "removeSection": "Remove Instance",
+    "removeSectionDesc": "Permanently remove this instance and all its credentials from Orbion.",
+    "removeButton": "Remove instance",
+    "removeConfirm": "Remove {name}? This cannot be undone. All loops, logs, and credentials for this instance are lost.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Instance name"
   }
 }

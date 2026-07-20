@@ -86,6 +86,7 @@ orbion/
 │               ├── FleetActivityReadout.tsx # Agent-loop activity summary in sidebar footer
 │               ├── SegmentedTabs.tsx     # Loops/Tasks/Projects pill switcher
 │               ├── AddInstanceModal.tsx  # Register a new instance
+│               ├── InstanceSettingsPanel.tsx # Per-instance settings drawer (reach, runtime, credentials, remove)
 │               ├── LoopsView.tsx         # Loop list for the selected instance
 │               ├── LoopDetail.tsx        # Single-loop metadata + logs
 │               ├── LoopCard.tsx          # Compact live card for one loop rendered in the chat stream (status dot, name, meta row, log tail, action buttons: pause/resume/stop/trigger with confirmation)
@@ -262,7 +263,7 @@ There is no separate server; the **Electron main process is the backend**
 
 IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `stream:unsubscribe`, `config:getInstances`, `config:addInstance`,
-`config:removeInstance`, `config:getSelectedInstanceId`,
+`config:removeInstance`, `config:updateEnvironment`, `config:getSelectedInstanceId`,
 `config:setSelectedInstanceId`, `config:migrateFromLocalStorage`,
 `infra:executeAction`, `infra:getStatus`, `infra:getPlatform`,
 `budget:getWatches`, `budget:addWatch`, `budget:removeWatch`,
