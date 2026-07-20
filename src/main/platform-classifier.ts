@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import type { PlatformType } from "../shared/ipc.js";
 
 /**
@@ -62,4 +63,28 @@ export function parseGitRemoteOutput(output: string): string[] {
   }
 
   return [...urls];
+}
+
+/** Session-scoped cache: `${environmentId}:${projectId}` → detected platform. */
+export const platformCache = new Map<string, PlatformType>();
+
+export function platformCacheKey(environmentId: string, projectId: string): string {
+  return `${environmentId}:${projectId}`;
+}
+
+/**
+ * Detect the hosting platform by inspecting git remotes in a directory.
+ * Falls back to "unknown" when git is unavailable or no recognized remotes exist.
+ */
+export function detectPlatform(directory: string): Promise<PlatformType> {
+  return new Promise((resolve) => {
+    execFile("git", ["remote", "-v"], { cwd: directory, timeout: 10_000 }, (err, stdout) => {
+      if (err) {
+        resolve("unknown");
+        return;
+      }
+      const urls = parseGitRemoteOutput(stdout);
+      resolve(classifyPlatform(urls));
+    });
+  });
 }

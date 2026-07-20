@@ -377,6 +377,14 @@ function boilerplateLabel(files: DiffFileEntry[]): string {
  * (formatting, imports, lock files, generated). The briefing derives only
  * from actual diff content using heuristic pattern matching.
  */
+/**
+ * Parse a unified diff string into file entries with add/remove counts.
+ * Convenience wrapper around parseDiffPerFile that returns only the entry stats.
+ */
+export function parseDiffFiles(diff: string): DiffFileEntry[] {
+  return parseDiffPerFile(diff).map((f) => f.entry);
+}
+
 export function classifyDiffSections(diff: string): {
   sections: BriefingSection[];
   summary: string;
