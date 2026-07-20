@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "changeId": "gh-152-review-queue-strip",
+  "required": true,
+  "status": "blocked",
+  "reason": "Headless Linux environment missing system GUI libraries (libatk, libgtk, etc.) required by Playwright/Electron. Visual evidence scenario is registered at src/visual-evidence/scenarios/gh-152-review-queue-strip.ts and will pass when run in an environment with GUI support.",
+  "scenario": {
+    "title": "Review queue strip for PR batches",
+    "steps": [
+      "Navigate to the inbox view",
+      "Click a PR awaiting review item",
+      "Verify the queue strip appears with multiple PR rows and verdicts",
+      "Verify the active PR is highlighted in the strip",
+      "Click a different PR in the strip and verify the main area updates",
+      "Press Escape and verify review mode closes"
+    ]
+  },
+  "assertions": [
+    { "description": "A PR awaiting review item is visible in the inbox", "status": "pending" },
+    { "description": "Clicking a PR item opens review mode with the queue strip visible", "status": "pending" },
+    { "description": "The queue strip shows multiple PR rows with verdict chips", "status": "pending" },
+    { "description": "The currently selected PR row is highlighted in the strip", "status": "pending" },
+    { "description": "Clicking a different PR in the strip switches the main area", "status": "pending" },
+    { "description": "Pressing Escape closes review mode and returns to inbox", "status": "pending" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence\n\n> ⚠️ Automated visual evidence was blocked due to missing system GUI libraries in the CI environment. A Playwright scenario is registered at `src/visual-evidence/scenarios/gh-152-review-queue-strip.ts` and will produce screenshots when run with proper display support.\n\n### Scenario: Review queue strip for PR batches\n1. Navigate to the inbox view\n2. Click a PR awaiting review item\n3. Verify the queue strip appears with multiple PR rows and verdicts\n4. Verify the active PR is highlighted in the strip\n5. Click a different PR in the strip and verify the main area updates\n6. Press Escape and verify review mode closes"
+}

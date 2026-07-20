@@ -24,6 +24,7 @@ import { gh147SiblingStructuralOffersScenario } from "./scenarios/gh-147-sibling
 import { gh149AgentRiskVerdictScenario } from "./scenarios/gh-149-agent-risk-verdict.js";
 import { gh150OvernightPrDigestScenario } from "./scenarios/gh-150-overnight-pr-digest.js";
 import { gh151ReviewModeFromNotificationScenario } from "./scenarios/gh-151-review-mode-from-notification.js";
+import { gh152ReviewQueueStripScenario } from "./scenarios/gh-152-review-queue-strip.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -114,4 +115,10 @@ registerScenario({
   changeId: "gh-151-review-mode-from-notification",
   runner: gh151ReviewModeFromNotificationScenario,
   description: "Enter review mode from a PR inbox notification and exit with Esc",
+});
+
+registerScenario({
+  changeId: "gh-152-review-queue-strip",
+  runner: gh152ReviewQueueStripScenario,
+  description: "Review queue strip showing PR batch with verdict chips and selection",
 });

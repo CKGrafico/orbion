@@ -70,8 +70,12 @@ orbion/
 │           ├── theme.css        # Design tokens + all component styles
 │           ├── bridge.d.ts      # Ambient window.api typing for the renderer
 │           ├── features/
-│           │   └── inbox/
-│           │       └── InboxPanel.tsx  # Conversational inbox with fleet-scoped queries + inline actions
+│           │   ├── inbox/
+│           │   │   ├── InboxPanel.tsx  # Conversational inbox with fleet-scoped queries + inline actions
+│           │   │   └── InboxView.tsx   # Full-page inbox view (active items, Done archive, fleet queries)
+│           │   └── review/
+│           │       ├── ReviewModeOverlay.tsx  # Full-screen PR review overlay (header + body with queue strip)
+│           │       └── ReviewQueueStrip.tsx   # Left strip listing PR batch with risk verdicts + disposed indicators
 │           └── components/
 │               ├── Sidebar.tsx           # Instance list + health dots
 │               ├── FleetHealthFooter.tsx # Fleet health summary (instance count, failures, unreachable) in sidebar footer
@@ -256,10 +260,11 @@ actions: `machine-status`, `clone-repo`, `create-issue`,
   `IssueCard`, `ListIssuesResult`, `CreateIssueParams`, `CreateIssueResult`,
   `AddLabelParams`, `AddLabelResult`, `EditIssueParams`, `EditIssueResult`,
   `InboxItemKind` (including `failed-loop`, `finished-loop`, `breach`,
-  `instance-offline`, `prolonged-offline`), `InboxAction` (inline triage
+  `instance-offline`, `prolonged-offline`, `pr-awaiting-review`, `digest`), `InboxAction` (inline triage
   verbs: `run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`),
   `InboxItem` (with `availableActions` and `projectId` fields),
   `ResolvedInboxItem`, `InboxItemResolutionReason`, `InboxQueryResult`,
+  `PrAwaitingReviewItem`, `PrRiskLevel`, `PrVerdict`, `ReviewModeItem`,
   `BudgetWatch`, `BudgetBreach`, `ConditionWatch`, `WatchCondition`,
   `WatchTarget`, `WatchConditionKind`, `OutageEscalation`,
   `AgentSendPromptArgs`, `AgentSendPromptResult`, `AgentStreamEvent`,
@@ -317,6 +322,18 @@ renders text deltas incrementally and shows a Stop button during streaming.
 Pressing Stop triggers `agent:interrupt`, which aborts the SSE stream locally
 and sends an interrupt signal to the OpenCode runtime; partial output is kept
 in the transcript.
+
+**PR review mode (entered from inbox):** when the user clicks a PR inbox item,
+the renderer builds a `ReviewModeItem[]` batch from the polled `prAwaitingReview`
+list (each item enriched with its cached `PrVerdict`) and calls
+`IReviewModeService.enterBatch(items, selectedIndex)`. The review overlay
+renders a left queue strip (`ReviewQueueStrip`) listing every PR in the batch,
+each showing its number, title, risk chip, and one-line verdict; disposed PRs
+(approved/changes-requested) are ticked off with a checkmark and muted style.
+Selecting a row in the strip switches the active PR in the main area.
+`PrPollingService` polls the main VM every 60s via the `list-prs-awaiting-review`
+infra action; `PrVerdictService` fetches and caches verdicts via `get-pr-verdict`.
+PR items auto-resolve when they disappear from the polling results.
 
 ```mermaid
 sequenceDiagram
