@@ -1,3 +1,5 @@
+import type { FailureCategory } from "./diagnoseFailure";
+
 export type ToolCallStatus = "running" | "completed" | "error";
 
 export interface ToolCall {
@@ -74,7 +76,8 @@ export type RowKind =
   | "question-request"
   | "instance-handoff"
   | "loop-card"
-  | "loop-proposal";
+  | "loop-proposal"
+  | "failure-diagnosis";
 
 export interface BaseRow {
   id: string;
@@ -138,6 +141,22 @@ export interface LoopCardRow extends BaseRow {
   environmentId: string;
 }
 
+export interface FailureDiagnosisRow extends BaseRow {
+  kind: "failure-diagnosis";
+  /** The loop ID this diagnosis is for. */
+  loopId: string;
+  /** The environment (instance) that owns this loop. */
+  environmentId: string;
+  /** Broad failure category. */
+  category: FailureCategory;
+  /** Short diagnosis summary (i18n key or plain text). */
+  summary: string;
+  /** Recommended next step (i18n key or plain text). */
+  nextStep: string;
+  /** Confidence of the diagnosis. */
+  confidence: "high" | "medium" | "low";
+}
+
 export type LoopProposalStatus = "pending" | "approved" | "rejected" | "creating" | "created" | "error";
 
 export interface LoopProposalRow extends BaseRow {
@@ -180,4 +199,5 @@ export type TranscriptRow =
   | QuestionRow
   | InstanceHandoffRow
   | LoopCardRow
-  | LoopProposalRow;
+  | LoopProposalRow
+  | FailureDiagnosisRow;

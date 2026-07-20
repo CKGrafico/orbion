@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { TranscriptMessage, ToolCallRecord } from "../../../shared/ipc";
 import type { ITranscriptService } from "../services/interfaces";
-import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow, LoopProposalRow, LoopProposalStatus } from "./types";
+import type { AccessMode, ApprovalDecision, ChatTurn, ChatMessage, ToolCall, TranscriptRow, ToolCallRow, ToolCallsExpanderRow, TurnFoldRow, ApprovalRow, QuestionRow, InstanceHandoffRow, LoopCardRow, LoopProposalRow, LoopProposalStatus, FailureDiagnosisRow } from "./types";
+import type { FailureCategory } from "./diagnoseFailure";
 
 const TOOL_CALLS_THRESHOLD = 3;
 
@@ -78,7 +79,7 @@ function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
  * (e.g., instance switch, runtime switch, model switch).
  */
 function isSystemNoteMessage(msg: TranscriptMessage): boolean {
-  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-") || msg.id.startsWith("loop-summon-") || msg.id.startsWith("loop-proposal-");
+  return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-") || msg.id.startsWith("loop-summon-") || msg.id.startsWith("loop-proposal-") || msg.id.startsWith("failure-diagnosis-");
 }
 
 /**
@@ -159,6 +160,38 @@ function parseLoopProposalMessage(msg: TranscriptMessage): LoopProposalRow | nul
       status: parsed.status ?? "pending",
       createdLoopId: parsed.createdLoopId ?? null,
       error: parsed.error ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether a transcript message is a failure-diagnosis record.
+ * These use the convention: id starts with "failure-diagnosis-", role "user".
+ */
+function isFailureDiagnosisMessage(msg: TranscriptMessage): boolean {
+  return msg.id.startsWith("failure-diagnosis-");
+}
+
+/**
+ * Parse a failure-diagnosis transcript message into a FailureDiagnosisRow.
+ * Returns null if parsing fails.
+ */
+function parseFailureDiagnosisMessage(msg: TranscriptMessage): FailureDiagnosisRow | null {
+  try {
+    const parsed = JSON.parse(msg.content);
+    if (parsed.kind !== "failure-diagnosis") return null;
+    return {
+      id: msg.id,
+      kind: "failure-diagnosis",
+      turnId: msg.id,
+      loopId: parsed.loopId ?? "",
+      environmentId: parsed.environmentId ?? msg.environmentId ?? "",
+      category: parsed.category ?? "unknown",
+      summary: parsed.summary ?? "",
+      nextStep: parsed.nextStep ?? "",
+      confidence: parsed.confidence ?? "low",
     };
   } catch {
     return null;
@@ -247,7 +280,7 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
 // Row building
 // ---------------------------------------------------------------------------
 
-function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = [], loopSummonMessages: TranscriptMessage[] = [], loopProposalMessages: TranscriptMessage[] = []): TranscriptRow[] {
+function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = [], loopSummonMessages: TranscriptMessage[] = [], loopProposalMessages: TranscriptMessage[] = [], failureDiagnosisMessages: TranscriptMessage[] = []): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
 
   // Build handoff rows from system note messages
@@ -296,6 +329,17 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     const proposalRow = parseLoopProposalMessage(msg);
     if (proposalRow) {
       loopProposalRows.push({ row: proposalRow, timestamp: msg.startedAt });
+    }
+  }
+
+  // Build failure-diagnosis rows from failure-diagnosis messages
+  const failureDiagnosisRows: Array<{ row: FailureDiagnosisRow; timestamp: number }> = [];
+  for (const msg of failureDiagnosisMessages) {
+    const diagnosisRow = parseFailureDiagnosisMessage(msg);
+    if (diagnosisRow) {
+      // Place the diagnosis right after its associated loop card:
+      // use a timestamp 1ms after the loop-summon timestamp (encoded in the message ID)
+      failureDiagnosisRows.push({ row: diagnosisRow, timestamp: msg.startedAt + 1 });
     }
   }
 
@@ -384,13 +428,14 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     turnRows.push({ rows: turnRowsList, timestamp: turn.userMessage.startedAt });
   }
 
-  // Merge turn groups, handoff dividers, loop-card rows, and loop-proposal rows by timestamp
-  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number } | { kind: "loop-card"; row: LoopCardRow; timestamp: number } | { kind: "loop-proposal"; row: LoopProposalRow; timestamp: number };
+  // Merge turn groups, handoff dividers, loop-card rows, loop-proposal rows, and failure-diagnosis rows by timestamp
+  type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number } | { kind: "loop-card"; row: LoopCardRow; timestamp: number } | { kind: "loop-proposal"; row: LoopProposalRow; timestamp: number } | { kind: "failure-diagnosis"; row: FailureDiagnosisRow; timestamp: number };
   const merged: MergeItem[] = [
     ...turnRows.map((t) => ({ kind: "turn" as const, rows: t.rows, timestamp: t.timestamp })),
     ...handoffRows.map((h) => ({ kind: "handoff" as const, row: h.row, timestamp: h.timestamp })),
     ...loopCardRows.map((l) => ({ kind: "loop-card" as const, row: l.row, timestamp: l.timestamp })),
     ...loopProposalRows.map((l) => ({ kind: "loop-proposal" as const, row: l.row, timestamp: l.timestamp })),
+    ...failureDiagnosisRows.map((d) => ({ kind: "failure-diagnosis" as const, row: d.row, timestamp: d.timestamp })),
   ];
   merged.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -400,6 +445,8 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     } else if (item.kind === "loop-card") {
       rows.push(item.row);
     } else if (item.kind === "loop-proposal") {
+      rows.push(item.row);
+    } else if (item.kind === "failure-diagnosis") {
       rows.push(item.row);
     } else {
       rows.push(...item.rows);
@@ -418,6 +465,7 @@ export function useTranscript(sessionId: string | null) {
   const [handoffMessages, setHandoffMessages] = useState<TranscriptMessage[]>([]);
   const [loopSummonMessages, setLoopSummonMessages] = useState<TranscriptMessage[]>([]);
   const [loopProposalMessages, setLoopProposalMessages] = useState<TranscriptMessage[]>([]);
+  const [failureDiagnosisMessages, setFailureDiagnosisMessages] = useState<TranscriptMessage[]>([]);
   const [rows, setRows] = useState<TranscriptRow[]>([]);
   const expandedToolsRef = useRef<Set<string>>(new Set());
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -485,14 +533,16 @@ export function useTranscript(sessionId: string | null) {
       if (cancelled) return;
       const hydratedTurns = messagesToChatTurns(messages);
       const systemNotes = messages.filter(isSystemNoteMessage);
-      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m) && !isLoopProposalMessage(m));
+      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m) && !isLoopProposalMessage(m) && !isFailureDiagnosisMessage(m));
       const loopSummons = systemNotes.filter(isLoopSummonMessage);
       const loopProposals = systemNotes.filter(isLoopProposalMessage);
+      const failureDiagnoses = systemNotes.filter(isFailureDiagnosisMessage);
       setTurns(hydratedTurns);
       setHandoffMessages(handoffs);
       setLoopSummonMessages(loopSummons);
       setLoopProposalMessages(loopProposals);
-      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals));
+      setFailureDiagnosisMessages(failureDiagnoses);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals, failureDiagnoses));
       loadedSessionRef.current = sessionId;
       loadingRef.current = false;
     }).catch(() => {
@@ -511,16 +561,16 @@ export function useTranscript(sessionId: string | null) {
   turnsRef.current = turns;
 
   const rebuildRows = useCallback((newTurns: ChatTurn[]): TranscriptRow[] => {
-    const newRows = buildRowsFromTurns(newTurns, handoffMessages, loopSummonMessages, loopProposalMessages);
+    const newRows = buildRowsFromTurns(newTurns, handoffMessages, loopSummonMessages, loopProposalMessages, failureDiagnosisMessages);
     setRows(newRows);
     return newRows;
-  }, [handoffMessages, loopSummonMessages, loopProposalMessages]);
+  }, [handoffMessages, loopSummonMessages, loopProposalMessages, failureDiagnosisMessages]);
 
-  // Rebuild rows when handoffMessages, loopSummonMessages, or loopProposalMessages changes
+  // Rebuild rows when handoffMessages, loopSummonMessages, loopProposalMessages, or failureDiagnosisMessages changes
   useEffect(() => {
-    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages, loopSummonMessages, loopProposalMessages);
+    const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages, loopSummonMessages, loopProposalMessages, failureDiagnosisMessages);
     setRows(newRows);
-  }, [handoffMessages, loopSummonMessages, loopProposalMessages]);
+  }, [handoffMessages, loopSummonMessages, loopProposalMessages, failureDiagnosisMessages]);
 
   const setTurnsAndRebuild = useCallback(
     (updater: (prev: ChatTurn[]) => ChatTurn[]) => {
@@ -798,6 +848,54 @@ export function useTranscript(sessionId: string | null) {
   );
 
   /**
+   * Insert a failure diagnosis into the transcript. This creates a persisted
+   * "failure-diagnosis" system message (role "user", id starting with "failure-diagnosis-")
+   * whose content is JSON with the diagnosis fields.
+   * The timestamp is set to match the loop-summon timestamp so the diagnosis
+   * row appears right after the associated loop card (1ms later for ordering).
+   */
+  const insertFailureDiagnosis = useCallback(
+    (params: {
+      loopId: string;
+      environmentId: string;
+      category: FailureCategory;
+      summary: string;
+      nextStep: string;
+      confidence: "high" | "medium" | "low";
+      /** The timestamp of the parent loop-summon message, for ordering. */
+      summonTimestamp: number;
+    }) => {
+      if (!sessionId) return;
+
+      const messageId = `failure-diagnosis-${params.summonTimestamp}-${params.loopId}`;
+
+      const message: Omit<TranscriptMessage, "createdAt"> = {
+        id: messageId,
+        sessionId,
+        role: "user",
+        content: JSON.stringify({
+          kind: "failure-diagnosis",
+          loopId: params.loopId,
+          environmentId: params.environmentId,
+          category: params.category,
+          summary: params.summary,
+          nextStep: params.nextStep,
+          confidence: params.confidence,
+        }),
+        startedAt: params.summonTimestamp,
+        finishedAt: params.summonTimestamp,
+        environmentId: params.environmentId,
+      };
+
+      // Persist the diagnosis message
+      void transcriptService.appendMessage(message).then((persisted) => {
+        setFailureDiagnosisMessages((prev) => [...prev, persisted]);
+      });
+    },
+    [sessionId, transcriptService],
+  );
+
+  /**
    * Insert a loop proposal into the transcript. This creates a persisted
    * "loop-proposal" system message (role "user", id starting with "loop-proposal-")
    * whose content is JSON with the proposal fields.
@@ -885,14 +983,16 @@ export function useTranscript(sessionId: string | null) {
     transcriptService.getMessages(sessionId).then((messages) => {
       const hydratedTurns = messagesToChatTurns(messages);
       const systemNotes = messages.filter(isSystemNoteMessage);
-      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m) && !isLoopProposalMessage(m));
+      const handoffs = systemNotes.filter((m) => !isLoopSummonMessage(m) && !isLoopProposalMessage(m) && !isFailureDiagnosisMessage(m));
       const loopSummons = systemNotes.filter(isLoopSummonMessage);
       const loopProposals = systemNotes.filter(isLoopProposalMessage);
+      const failureDiagnoses = systemNotes.filter(isFailureDiagnosisMessage);
       setTurns(hydratedTurns);
       setHandoffMessages(handoffs);
       setLoopSummonMessages(loopSummons);
       setLoopProposalMessages(loopProposals);
-      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals));
+      setFailureDiagnosisMessages(failureDiagnoses);
+      setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals, failureDiagnoses));
       loadedSessionRef.current = sessionId;
     }).catch(() => {
       // Ignore errors
@@ -916,6 +1016,7 @@ export function useTranscript(sessionId: string | null) {
     setTurnAccessMode,
     addHandoffMessage,
     insertLoopCards,
+    insertFailureDiagnosis,
     insertLoopProposal,
     updateLoopProposalStatus,
     reloadTranscript,

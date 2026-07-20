@@ -1673,6 +1673,124 @@ input {
   padding: 4px 18px;
 }
 
+/* ── Transcript failure-diagnosis row ────────────────────────────── */
+
+.transcript-failure-diagnosis {
+  padding: 2px 18px 4px;
+}
+
+/* ── Failure Diagnosis Panel ──────────────────────────────────────── */
+
+.failure-diagnosis-panel {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 4%, var(--bg-elevated));
+  border-left: 3px solid var(--warning);
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.failure-diagnosis-panel--env-down {
+  background: color-mix(in srgb, var(--accent-blue) 4%, var(--bg-elevated));
+  border-left-color: var(--accent-blue);
+}
+
+.failure-diagnosis-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.failure-diagnosis-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.failure-diagnosis-icon--env {
+  color: var(--accent-blue);
+}
+
+.failure-diagnosis-icon--cmd {
+  color: var(--warning);
+}
+
+.failure-diagnosis-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.failure-diagnosis-category {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.failure-diagnosis-category--env {
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+}
+
+.failure-diagnosis-body {
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.failure-diagnosis-summary {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.failure-diagnosis-next-step {
+  font-size: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.failure-diagnosis-next-step-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.failure-diagnosis-next-step-text {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.failure-diagnosis-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-left: 22px;
+}
+
+.failure-diagnosis-confidence {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
 /* ── Loop Proposal Card ──────────────────────────────────────────────── */
 
 .loop-proposal-card {

@@ -6,11 +6,14 @@ import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../..
 import type { IAgentService, ITranscriptService } from "../services/interfaces";
 import type { LoopMeta, Environment } from "../types";
 import { useTranscript } from "../chat/useTranscript";
+import { diagnoseFailure } from "../chat/diagnoseFailure";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { LoopCard } from "./LoopCard";
 import { LoopProposalCard } from "./LoopProposalCard";
+import { FailureDiagnosisPanel } from "./FailureDiagnosisPanel";
 import { WifiOff } from "lucide-react";
+import { fetchLogs } from "../api";
 
 const MarkdownContent = lazy(() =>
   import("../chat/MarkdownContent").then((m) => ({ default: m.MarkdownContent })),
@@ -52,6 +55,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     interruptTurn,
     reloadTranscript,
     insertLoopCards,
+    insertFailureDiagnosis,
     insertLoopProposal,
     updateLoopProposalStatus,
   } = useTranscript(sessionId);
@@ -278,6 +282,46 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
 
   // ── Loop-bar segment click → summon matching loop cards ──────────────
 
+  /**
+   * After inserting loop cards, also produce failure diagnoses for any
+   * failed loops that appear in the summon. Fetches log tails, runs the
+   * local heuristic classifier, and inserts diagnosis rows.
+   */
+  const diagnoseAndInsert = useCallback(
+    async (failedLoops: LoopMeta[], envId: string, summonTimestamp: number) => {
+      if (!instance || failedLoops.length === 0) return;
+      for (const loop of failedLoops) {
+        try {
+          const logRes = await fetchLogs(instance, loop.id, 20);
+          const logTail = logRes.ok && typeof logRes.data === "string" ? logRes.data : "";
+          const diagnosis = diagnoseFailure(loop, logTail);
+          insertFailureDiagnosis({
+            loopId: loop.id,
+            environmentId: envId,
+            category: diagnosis.category,
+            summary: diagnosis.summary,
+            nextStep: diagnosis.nextStep,
+            confidence: diagnosis.confidence,
+            summonTimestamp,
+          });
+        } catch {
+          // If log fetch fails, insert a generic diagnosis
+          const diagnosis = diagnoseFailure(loop, "");
+          insertFailureDiagnosis({
+            loopId: loop.id,
+            environmentId: envId,
+            category: diagnosis.category,
+            summary: diagnosis.summary,
+            nextStep: diagnosis.nextStep,
+            confidence: diagnosis.confidence,
+            summonTimestamp,
+          });
+        }
+      }
+    },
+    [instance, insertFailureDiagnosis],
+  );
+
   const handleSegmentClick = useCallback(
     (kind: LoopSegmentKind) => {
       // Map the segment kind to the matching loop IDs
@@ -286,13 +330,20 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         : loops.filter((l) => l.status === kind);
 
       if (matchingLoops.length > 0) {
+        const timestamp = Date.now();
         insertLoopCards(
           matchingLoops.map((l) => l.id),
           environmentId,
         );
+
+        // Auto-diagnose failed loops
+        const failedLoops = matchingLoops.filter((l) => l.status === "failed");
+        if (failedLoops.length > 0) {
+          void diagnoseAndInsert(failedLoops, environmentId, timestamp);
+        }
       }
     },
-    [loops, environmentId, insertLoopCards],
+    [loops, environmentId, insertLoopCards, diagnoseAndInsert],
   );
 
   // ── Loop proposal callbacks ───────────────────────────────────────────
@@ -435,6 +486,13 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onRejected={handleProposalRejected}
                       onStatusChange={handleProposalStatusChange}
                     />
+                  </div>
+                );
+              }
+              case "failure-diagnosis": {
+                return (
+                  <div key={row.id} className="transcript-failure-diagnosis">
+                    <FailureDiagnosisPanel row={row} />
                   </div>
                 );
               }
