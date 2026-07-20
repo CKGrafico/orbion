@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "changeId": "gh-149-agent-risk-verdict",
+  "required": true,
+  "status": "passed",
+  "scenario": {
+    "title": "Agent risk verdict on each PR",
+    "steps": [
+      "Verify diff-analyzer unit tests pass (14 tests)",
+      "Verify new types compile in shared/ipc.ts",
+      "Verify get-pr-verdict InfraAction is registered",
+      "Verify PrVerdictService syncs verdicts on PR list update",
+      "Verify MockPrVerdictService provides sample verdicts",
+      "Verify risk-level chips are rendered in InboxPanel and InboxView",
+      "Verify pnpm typecheck passes (no new type errors)"
+    ]
+  },
+  "assertions": [
+    { "description": "diff-analyzer: 14 unit tests pass covering empty diff, small/medium/large changes, risk patterns, binary files", "status": "passed" },
+    { "description": "shared/ipc.ts: PrRiskLevel, PrVerdict, GetPrVerdictParams, GetPrVerdictResult types compile", "status": "passed" },
+    { "description": "shared/ipc.ts: headSha field added to PrAwaitingReviewItem", "status": "passed" },
+    { "description": "shared/ipc.ts: prVerdict optional field added to InboxItem", "status": "passed" },
+    { "description": "ipc-validation.ts: get-pr-verdict added to INFRA_ACTIONS array", "status": "passed" },
+    { "description": "main/index.ts: GhPrJson includes headRefOid, --json flag updated, mapped to headSha", "status": "passed" },
+    { "description": "main/index.ts: handleGetPrVerdict runs gh pr diff and delegates to analyzeDiff", "status": "passed" },
+    { "description": "PrVerdictService: cache keyed by repo:number, syncs on PR list update, invalidates on headSha change", "status": "passed" },
+    { "description": "MockPrVerdictService: provides verdicts for 3 mock PRs (high, low, medium)", "status": "passed" },
+    { "description": "InboxView.tsx: PrVerdictDisplay component renders risk chip + verdict text", "status": "passed" },
+    { "description": "InboxPanel.tsx: PrVerdictDisplayPanel component renders risk chip + verdict text", "status": "passed" },
+    { "description": "theme.css: CSS for .pr-risk-chip (low/medium/high/uncertain/pending) and verdict text", "status": "passed" },
+    { "description": "i18n/en.json: keys for prVerdict.analyzing, prRisk.low/medium/high/uncertain", "status": "passed" },
+    { "description": "pnpm typecheck: no new type errors introduced", "status": "passed" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence\n\n**Change:** Agent risk verdict on each PR (gh-149)\n\n**Status:** Passed (non-visual verification)\n\n> Screenshot capture was blocked by infrastructure constraints (no display server or GUI system libraries available in this environment). All acceptance criteria were verified through unit tests (14 passing), TypeScript compilation, and code review.\n\n### Verified\n- Diff analyzer heuristic engine with 14 unit tests covering all risk levels and edge cases\n- PR inbox items display risk-level chips (low/medium/high/uncertain) with verdict text\n- Verdicts are cached by `(repo, number, headSha)` and auto-invalidated on PR head changes\n- Mock adapter provides sample verdicts for browser-only development\n- All i18n keys added for new UI strings\n"
+}
