@@ -14,11 +14,23 @@
     ]
   },
   "assertions": [
-    { "description": "A digest item is visible with PR count summary (e.g., '3 PRs overnight')", "status": "passed" },
-    { "description": "Verdict count badges are visible (safe/needs you/conflict)", "status": "passed" },
-    { "description": "Expanding the digest reveals individual child PR items with verdicts", "status": "passed" },
-    { "description": "A risk-level chip is visible on an expanded child PR item", "status": "passed" }
+    {
+      "description": "A digest item is visible with PR count summary (e.g., '3 PRs overnight')",
+      "status": "passed"
+    },
+    {
+      "description": "Verdict count badges are visible (safe/needs you/conflict)",
+      "status": "passed"
+    },
+    {
+      "description": "Expanding the digest reveals individual child PR items with verdicts",
+      "status": "passed"
+    },
+    {
+      "description": "A risk-level chip is visible on an expanded child PR item",
+      "status": "passed"
+    }
   ],
   "assets": [],
-  "prMarkdown": "## Visual Evidence — Overnight PR digest notification\n\n### Feature: PR batch digest notification (Issue #150)\n\nWhen multiple PRs are awaiting review, they are grouped into a single digest inbox item with a verdict count summary instead of individual pings.\n\n**Acceptance criteria verified:**\n\n1. ✅ Multiple PR items arriving within a window group into a single digest summarizing counts by verdict (safe/needs you/conflict)\n2. ✅ Expanding the digest reveals the individual items with their verdicts\n3. ✅ The OS notification fires once for the digest (not once per PR)\n4. ✅ Verdict count badges show safe (low risk), needs you (medium/high risk), and conflict (uncertain) counts\n\n**Key changes:**\n\n- `src/shared/ipc.ts` — Added `DigestCounts` interface and `childItemIds`/`digestCounts` fields to `InboxItem`\n- `src/renderer/src/services/impl/InboxService.ts` — Added `groupPrsIntoDigest()` function with verdict bucketing, `deriveItemsUngrouped()`, and `getChildItems()` method\n- `src/renderer/src/features/inbox/InboxView.tsx` — Added `DigestViewItemRow` component with expand/collapse, child PR list, and verdict count badges\n- `src/renderer/src/features/inbox/InboxPanel.tsx` — Added `DigestItemRowPanel` component for sidebar panel\n- `src/renderer/src/App.tsx` — Added digest notification effect (single OS notification per digest)\n- `src/renderer/src/theme.css` — Added digest styles (expand/collapse, count badges, child items)\n- `src/renderer/src/i18n/en.json` — Added i18n keys for digest UI strings\n- `src/renderer/src/services/mock/MockServices.ts` — Added mock digest grouping and `getChildItems()`\n- `src/visual-evidence/scenarios/gh-150-overnight-pr-digest.ts` — Playwright scenario for automated visual evidence"
+  "prMarkdown": "## Visual Evidence , Overnight PR digest notification\n\n### Feature: PR batch digest notification (Issue #150)\n\nWhen multiple PRs are awaiting review, they are grouped into a single digest inbox item with a verdict count summary instead of individual pings.\n\n**Acceptance criteria verified:**\n\n1. ✅ Multiple PR items arriving within a window group into a single digest summarizing counts by verdict (safe/needs you/conflict)\n2. ✅ Expanding the digest reveals the individual items with their verdicts\n3. ✅ The OS notification fires once for the digest (not once per PR)\n4. ✅ Verdict count badges show safe (low risk), needs you (medium/high risk), and conflict (uncertain) counts\n\n**Key changes:**\n\n- `src/shared/ipc.ts` , Added `DigestCounts` interface and `childItemIds`/`digestCounts` fields to `InboxItem`\n- `src/renderer/src/services/impl/InboxService.ts` , Added `groupPrsIntoDigest()` function with verdict bucketing, `deriveItemsUngrouped()`, and `getChildItems()` method\n- `src/renderer/src/features/inbox/InboxView.tsx` , Added `DigestViewItemRow` component with expand/collapse, child PR list, and verdict count badges\n- `src/renderer/src/features/inbox/InboxPanel.tsx` , Added `DigestItemRowPanel` component for sidebar panel\n- `src/renderer/src/App.tsx` , Added digest notification effect (single OS notification per digest)\n- `src/renderer/src/theme.css` , Added digest styles (expand/collapse, count badges, child items)\n- `src/renderer/src/i18n/en.json` , Added i18n keys for digest UI strings\n- `src/renderer/src/services/mock/MockServices.ts` , Added mock digest grouping and `getChildItems()`\n- `src/visual-evidence/scenarios/gh-150-overnight-pr-digest.ts` , Playwright scenario for automated visual evidence"
 }
