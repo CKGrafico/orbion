@@ -96,6 +96,7 @@ orbion/
 │               ├── LogViewer.tsx         # Tail + live SSE log follow
 │               ├── TasksView.tsx         # Task definitions list
 │               └── ProjectsView.tsx      # Projects list
+│               ├── SettingsPanel.tsx       # Global settings drawer (theme, agent, config-home, mute, ephemeral)
 ├── electron.vite.config.ts     # electron-vite config (main/preload/renderer)
 ├── vite.web.config.ts          # Browser-only renderer dev server (mock mode)
 ├── tsconfig*.json              # Root + node (main/preload) + web (renderer) refs
@@ -251,6 +252,13 @@ There is no separate server; the **Electron main process is the backend**
   system browser via `setWindowOpenHandler`.
 - **Window-bounds persistence** — debounced save of size/position/maximized
   state to `window-bounds.json` in the Electron `userData` dir.
+- **Global settings** — a deliberately thin settings surface for app-wide
+  preferences (theme, default agent runtime, config-home VM, notification mute,
+  ephemeral chat threshold). Persisted in `electron-store` under the
+  `globalSettings` key alongside environments and sessions. Exposed to the
+  renderer via a `settings` sub-bridge (`settings:get`, `settings:update`
+  IPC channels). The settings panel is a right-side drawer opened from a gear
+  icon in the sidebar footer; it contains no instance-specific options.
 
 IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `stream:unsubscribe`, `config:getInstances`, `config:addInstance`,
@@ -261,7 +269,7 @@ IPC handlers registered on `app.whenReady`: `api:request`, `stream:subscribe`,
 `budget:updateWatch`, `budget:getBreaches`, `budget:addBreach`,
 `budget:dismissBreach`, `inbox:getItems`, `inbox:dismissItem`,
 `inbox:queryFleet`, `inbox:resolveItem`, `inbox:getResolvedItems`,
-  `inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`, `config:getConfigStamp`, `config:stampCheckedSetMainVm`, `config:forceSetMainVm`, `siblingDecline:isDeclined`, `siblingDecline:recordDecline`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The `config:getConfigStamp`, `config:stampCheckedSetMainVm`, and `config:forceSetMainVm` handlers implement versioned config writes with stale-overwrite detection: the stamp-checked variant compares the caller's last-known stamp against the on-disk stamp and returns a conflict result on mismatch, while the force variant writes regardless of staleness (last-write-wins with explicit consent). The inbox service also performs inline
+  `inbox:pruneResolvedItems`, `reachability:getStatus`, `reachability:getAll`, `transcript:getMessages`, `transcript:appendMessage`, `transcript:appendMessages`, `transcript:updateMessage`, `transcript:deleteSession`, `agent:sendPrompt`, `agent:interrupt`, `config:getConfigStamp`, `config:stampCheckedSetMainVm`, `config:forceSetMainVm`, `siblingDecline:isDeclined`, `siblingDecline:recordDecline`, `settings:get`, `settings:update`. The `agent:sendPrompt` handler initiates a streaming agent response via the OpenCode runtime (promptAsync + SSE events), while `agent:streamEvent` is a push channel that forwards streaming events (text-delta, tool-call-start, tool-call-output, turn-finished, turn-error, turn-interrupted) to the renderer. The `agent:interrupt` handler aborts an in-flight generation, preserving partial output. The `config:getConfigStamp`, `config:stampCheckedSetMainVm`, and `config:forceSetMainVm` handlers implement versioned config writes with stale-overwrite detection: the stamp-checked variant compares the caller's last-known stamp against the on-disk stamp and returns a conflict result on mismatch, while the force variant writes regardless of staleness (last-write-wins with explicit consent). The inbox service also performs inline
   actions (`run-now`, `pause`, `resume`, `restart`, `dismiss`, `open-in-chat`)
   via its `executeInboxAction` method, which calls the same loop-task API
   endpoints as the loop card (`POST /api/loops/:id/trigger`,

@@ -44,6 +44,7 @@ import { gh162ReferencesNotSecretsScenario } from "./scenarios/gh-162-references
 import { gh156ChatInfraBugClusterScenario } from "./scenarios/gh-156-chat-infra-bug-cluster.js";
 import { gh157CrossPrOverlapDetectionScenario } from "./scenarios/gh-157-cross-pr-overlap-detection.js";
 import { gh159CrossScopeBorderAnnouncementScenario } from "./scenarios/gh-159-cross-scope-border-announcement.js";
+import { gh166GlobalSettingsPanelScenario } from "./scenarios/gh-166-global-settings-panel.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -584,6 +585,43 @@ registerScenario({
           "The cross-scope i18n keys are registered (crossScope.badge resolves to a non-key string)",
         ],
         captureLabels: ["cross-scope-styles"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-166-global-settings-panel",
+  runner: gh166GlobalSettingsPanelScenario,
+  description: "Global settings panel with 5 app-wide options (theme, agent, config-home, mute, ephemeral)",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "settings-gear-in-sidebar",
+        description: "Settings opens from the sidebar gear icon.",
+        assertionDescriptions: [
+          "The sidebar footer contains a settings gear icon",
+          "Clicking the gear icon opens the settings drawer",
+        ],
+        captureLabels: ["settings-panel-open"],
+      },
+      {
+        id: "five-settings-rows",
+        description: "Contains exactly 5 app-wide options, each persisted to config.",
+        assertionDescriptions: [
+          "The settings panel contains all 5 settings rows",
+          "Theme setting shows Dark as the active segment",
+          "Notification mute toggle is present",
+        ],
+        captureLabels: ["settings-panel-open"],
+      },
+      {
+        id: "close-settings-drawer",
+        description: "Settings drawer can be closed.",
+        assertionDescriptions: [
+          "Closing the settings drawer hides it",
+        ],
+        captureLabels: ["settings-panel-open"],
       },
     ],
   },

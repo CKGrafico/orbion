@@ -47,6 +47,7 @@ import type {
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
   LoopShape,
+  GlobalSettings,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -428,6 +429,13 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("siblingDecline:isDeclined", environmentId, loopId, fingerprint) as Promise<boolean>,
     recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) =>
       ipcRenderer.invoke("siblingDecline:recordDecline", record) as Promise<void>,
+  },
+
+  settings: {
+    getSettings: () =>
+      ipcRenderer.invoke("settings:get") as Promise<GlobalSettings>,
+    updateSettings: (updates: Partial<GlobalSettings>) =>
+      ipcRenderer.invoke("settings:update", updates) as Promise<void>,
   },
 };
 

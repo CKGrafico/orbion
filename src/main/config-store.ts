@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult, ConfigStamp, StaleConfigResult, StampCheckedWriteResult } from "../shared/ipc.js";
+import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult, ConfigStamp, StaleConfigResult, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
 import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
 import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
@@ -54,7 +54,15 @@ interface ConfigSchema {
   chatSessions: ChatSession[];
   expandedProjects: string[];
   configStamp: ConfigStamp;
+  globalSettings: GlobalSettings;
 }
+
+const GLOBAL_SETTINGS_DEFAULTS: GlobalSettings = {
+  theme: "dark",
+  defaultAgentRuntime: "opencode",
+  configHomeVmId: null,
+  ephemeralThresholdHours: 4,
+};
 
 const store = new Store<ConfigSchema>({
   defaults: {
@@ -73,6 +81,7 @@ const store = new Store<ConfigSchema>({
     chatSessions: [],
     expandedProjects: [],
     configStamp: { timestamp: Date.now(), revision: 0 },
+    globalSettings: { ...GLOBAL_SETTINGS_DEFAULTS },
   },
 });
 
@@ -1389,6 +1398,24 @@ export function setExpandedProjects(expandedKeys: string[]): Promise<void> {
     store.set("expandedProjects", expandedKeys);
     bumpStamp();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Global settings — app-wide preferences (no instance-specific options)
+// ---------------------------------------------------------------------------
+
+export function getGlobalSettings(): GlobalSettings {
+  return store.get("globalSettings", { ...GLOBAL_SETTINGS_DEFAULTS });
+}
+
+function _updateGlobalSettings(updates: Partial<GlobalSettings>): void {
+  const current = getGlobalSettings();
+  store.set("globalSettings", { ...current, ...updates });
+  bumpStamp();
+}
+
+export function updateGlobalSettings(updates: Partial<GlobalSettings>): Promise<void> {
+  return serialize(() => _updateGlobalSettings(updates));
 }
 
 // ---------------------------------------------------------------------------

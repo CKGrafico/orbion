@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort, ReviewModeItem } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort, ReviewModeItem, GlobalSettings } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project, FleetLoopRollup, LoopWithOrigin } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -39,6 +39,7 @@ import { SessionChatView } from "./components/SessionChatView";
 import { ModelSelector, getReasoningEffortsForModel } from "./components/ModelSelector";
 import { ReasoningEffortSelector } from "./components/ReasoningEffortSelector";
 import { InstanceSelector } from "./components/InstanceSelector";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { ToastProvider, Toast, useToast } from "./components/Toast";
 import type { IAgentService } from "./services/interfaces";
 
@@ -141,6 +142,15 @@ function AppInner(): React.ReactNode {
   const [prevPersistedState, setPrevPersistedState] = useState<Record<string, boolean>>({});
   /** Models per environment (keyed by environmentId) */
   const [envModels, setEnvModels] = useState<Record<string, ModelInfo[]>>({});
+  /** Settings panel open state */
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  /** Global settings (loaded from config store) */
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
+    theme: "dark",
+    defaultAgentRuntime: "opencode",
+    configHomeVmId: null,
+    ephemeralThresholdHours: 4,
+  });
 
   // Load sessions on mount and when activeSessionId changes
   useEffect(() => {
@@ -156,6 +166,25 @@ function AppInner(): React.ReactNode {
       setSessions(s);
     });
   }, [configService, activeSessionId]);
+
+  // Load global settings on mount
+  useEffect(() => {
+    if (isMock) {
+      // In mock mode, read from localStorage or use defaults
+      try {
+        const stored = localStorage.getItem("orbion.globalSettings");
+        if (stored) {
+          setGlobalSettings(JSON.parse(stored) as GlobalSettings);
+        }
+      } catch {
+        // Ignore parse errors, use defaults
+      }
+      return;
+    }
+    void window.api.settings.getSettings().then((s) => {
+      setGlobalSettings(s);
+    });
+  }, []);
 
   // Load models for the active session's environment
   useEffect(() => {
@@ -243,7 +272,7 @@ function AppInner(): React.ReactNode {
   // Runs every 30 minutes. Removes ephemeral sessions whose lastActiveAt
   // exceeds 4 hours, but never the currently active session.
   const SWEEP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-  const SWEEP_INACTIVITY_HOURS = 4;
+  const SWEEP_INACTIVITY_HOURS = globalSettings.ephemeralThresholdHours;
 
   useEffect(() => {
     const sweep = async (): Promise<void> => {
@@ -1171,6 +1200,23 @@ function AppInner(): React.ReactNode {
     void configService.updateChatSession(sessionId, { declineAutoPersistUntil: declineUntil });
   }, [configService]);
 
+  /** Update global settings and persist to config store. */
+  const handleUpdateGlobalSettings = useCallback((updates: Partial<GlobalSettings>) => {
+    setGlobalSettings((prev) => {
+      const next = { ...prev, ...updates };
+      if (isMock) {
+        try {
+          localStorage.setItem("orbion.globalSettings", JSON.stringify(next));
+        } catch {
+          // Ignore localStorage errors in mock mode
+        }
+      } else {
+        void window.api.settings.updateSettings(updates);
+      }
+      return next;
+    });
+  }, []);
+
   /** Determine if auto-persist just happened for a session (was ephemeral, now persisted, not via user toggle). */
   const getAutoPersistedJustNow = useCallback((sessionId: string): boolean => {
     const session = sessions.find((s) => s.id === sessionId);
@@ -1766,6 +1812,7 @@ function AppInner(): React.ReactNode {
                     }
                   }, [sessions, configService, select, environments])}
                   onMoveSessionToProject={handleMoveSessionToProject}
+                  onOpenSettings={() => setSettingsPanelOpen(true)}
                 />
               </aside>
             ) : null}
@@ -1947,6 +1994,19 @@ function AppInner(): React.ReactNode {
           onClose={() => setBudgetPanelOpen(false)}
         />
       ) : null}
+
+      <SettingsPanel
+        open={settingsPanelOpen}
+        onClose={() => setSettingsPanelOpen(false)}
+        settings={globalSettings}
+        onUpdateSettings={handleUpdateGlobalSettings}
+        environments={environments}
+        notificationMuted={globalMuted}
+        onToggleNotificationMute={handleToggleGlobalMute}
+        onSetMainVm={(envId) => {
+          void handleStampCheckedSetMainVm(envId);
+        }}
+      />
 
       {/* Toast overlay for discard undo and other transient messages */}
       <Toast />
