@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort } from "../../shared/ipc";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort, ReviewModeItem } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project, FleetLoopRollup, LoopWithOrigin } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
@@ -26,11 +26,12 @@ import { PickMainVmModal } from "./components/PickMainVmModal";
 import { RestoreOffer } from "./components/RestoreOffer";
 import { StaleConfigWarning } from "./components/StaleConfigWarning";
 import { InboxView } from "./features/inbox/InboxView";
+import { ReviewModeOverlay } from "./features/review/ReviewModeOverlay";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
-import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService, IPrVerdictService } from "./services/interfaces";
+import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService, IPrVerdictService, IReviewModeService } from "./services/interfaces";
 import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
@@ -96,6 +97,7 @@ function AppInner(): React.ReactNode {
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [prPollingService] = useInject<IPrPollingService>(cid.IPrPollingService);
   const [prVerdictService] = useInject<IPrVerdictService>(cid.IPrVerdictService);
+  const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
@@ -121,6 +123,8 @@ function AppInner(): React.ReactNode {
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
   const [prAwaitingReview, setPrAwaitingReview] = useState<import("../../../shared/ipc").PrAwaitingReviewItem[]>([]);
   const [prVerdicts, setPrVerdicts] = useState<Map<string, import("../../../shared/ipc").PrVerdict>>(new Map());
+  /** Currently active PR review mode item, or null when not in review mode */
+  const [reviewModeItem, setReviewModeItem] = useState<ReviewModeItem | null>(null);
   /** Restore offer: availability from the config-home VM */
   const [restoreAvailability, setRestoreAvailability] = useState<RestoreAvailability | null>(null);
   /** Whether the restore offer is showing */
@@ -307,6 +311,14 @@ function AppInner(): React.ReactNode {
     });
     return () => { cancelled = true; };
   }, [inboxService]);
+
+  // Subscribe to review mode state changes
+  useEffect(() => {
+    const unsub = reviewModeService.onStateChange((item) => {
+      setReviewModeItem(item);
+    });
+    return unsub;
+  }, [reviewModeService]);
 
   const handleToggleGlobalMute = useCallback(() => {
     const next = !globalMuted;
@@ -1191,6 +1203,26 @@ function AppInner(): React.ReactNode {
           mainVmEnvironmentName={mainVm?.name ?? ""}
           prVerdicts={prVerdicts}
           onClickItem={(item) => {
+            if (item.kind === "pr-awaiting-review" && item.prRepo && item.prNumber) {
+              // Open review mode for PR items
+              const prData = prAwaitingReview.find(
+                (pr) => pr.repo === item.prRepo && pr.number === item.prNumber,
+              );
+              if (prData) {
+                const verdictKey = `${prData.repo}:${prData.number}`;
+                const verdict = prVerdicts.get(verdictKey);
+                reviewModeService.enter({
+                  repo: prData.repo,
+                  number: prData.number,
+                  title: prData.title,
+                  author: prData.author,
+                  url: prData.url,
+                  headSha: prData.headSha,
+                  verdict,
+                });
+                return;
+              }
+            }
             select(item.environmentId);
             if (item.loopId) {
               setView({ kind: "loop", loopId: item.loopId });
@@ -1686,7 +1718,7 @@ function AppInner(): React.ReactNode {
               </aside>
             ) : null}
 
-            <div className="panel main-panel">
+            <div className="panel main-panel" style={{ position: "relative" }}>
               {view.kind !== "inbox" ? renderInstanceHeader() : null}
               {view.kind !== "inbox" ? renderDetailHeader() : null}
 
@@ -1698,6 +1730,9 @@ function AppInner(): React.ReactNode {
               {view.kind !== "inbox" && selected && mainVm ? (
                 <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
               ) : null}
+
+              {/* PR review mode overlay */}
+              {reviewModeItem ? <ReviewModeOverlay /> : null}
             </div>
           </>
         )}

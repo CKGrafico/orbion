@@ -53,6 +53,7 @@ import type {
   LoopShape,
   PrAwaitingReviewItem,
   PrVerdict,
+  ReviewModeItem,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -78,6 +79,7 @@ import type {
   ISiblingOfferService,
   IPrPollingService,
   IPrVerdictService,
+  IReviewModeService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -1655,6 +1657,36 @@ export class MockPrVerdictService implements IPrVerdictService {
     this.listeners.push(cb);
     return () => {
       this.listeners = this.listeners.filter((l) => l !== cb);
+    };
+  }
+}
+
+export class MockReviewModeService implements IReviewModeService {
+  private activeItem: ReviewModeItem | null = null;
+  private listeners = new Set<(item: ReviewModeItem | null) => void>();
+
+  enter(item: ReviewModeItem): void {
+    this.activeItem = item;
+    for (const cb of this.listeners) {
+      cb(item);
+    }
+  }
+
+  exit(): void {
+    this.activeItem = null;
+    for (const cb of this.listeners) {
+      cb(null);
+    }
+  }
+
+  getActiveItem(): ReviewModeItem | null {
+    return this.activeItem;
+  }
+
+  onStateChange(cb: (item: ReviewModeItem | null) => void): () => void {
+    this.listeners.add(cb);
+    return () => {
+      this.listeners.delete(cb);
     };
   }
 }

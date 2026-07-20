@@ -53,6 +53,7 @@
   LoopShape,
   PrAwaitingReviewItem,
   PrVerdict,
+  ReviewModeItem,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -285,4 +286,15 @@ export interface IPrVerdictService {
   syncVerdicts(prs: PrAwaitingReviewItem[]): void;
   /** Subscribe to verdict cache updates. */
   onVerdictsUpdate(cb: () => void): () => void;
+}
+
+export interface IReviewModeService {
+  /** Enter review mode for the given PR item. */
+  enter(item: ReviewModeItem): void;
+  /** Exit review mode (return to previous view). */
+  exit(): void;
+  /** Get the currently active review item, or null if not in review mode. */
+  getActiveItem(): ReviewModeItem | null;
+  /** Subscribe to review mode state changes (enter/exit). */
+  onStateChange(cb: (item: ReviewModeItem | null) => void): () => void;
 }
