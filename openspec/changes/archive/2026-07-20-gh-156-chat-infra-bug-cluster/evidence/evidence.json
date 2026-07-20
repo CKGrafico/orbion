@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "changeId": "gh-156-chat-infra-bug-cluster",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-156-chat-infra-bug-cluster/evidence/01-infra-chat-response.webp",
+      "caption": "InfraChatPanel responds to a prompt with assistant message",
+      "width": 1280,
+      "height": 720,
+      "bytes": 16998,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-156-chat-infra-bug-cluster/evidence/02-question-panel.webp",
+      "caption": "QuestionPanel renders with File/Cancel options for issue creation",
+      "width": 1280,
+      "height": 720,
+      "bytes": 20324,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-156-chat-infra-bug-cluster/evidence/03-log-viewer-stable.webp",
+      "caption": "InfraChatPanel remains stable with no callback-induced re-renders",
+      "width": 1280,
+      "height": 720,
+      "bytes": 21610,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Chat/InfraChat bug cluster: finishedAt type, approval handlers, memory leak, log flicker",
+    "steps": [
+      "Open the InfraChatPanel",
+      "Submit a status prompt and verify assistant response",
+      "Create an issue to trigger the question flow",
+      "Verify question panel renders with File/Cancel options",
+      "Cancel the question and verify it resolves",
+      "Navigate to a loop detail view to verify log viewer stability"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The InfraChatPanel renders and responds to prompts",
+      "status": "passed"
+    },
+    {
+      "description": "The question flow renders and resolves correctly",
+      "status": "passed"
+    },
+    {
+      "description": "The log viewer renders segment data without flickering (stable callback identity)",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Chat/InfraChat bug cluster: finishedAt type, approval handlers, memory leak, log flicker\n\n![InfraChatPanel responds to a prompt with assistant message](https://raw.githubusercontent.com/CKGrafico/orbion/b02ecc7c25bd18a116ec77943d05f3cabca19c38/openspec/changes/gh-156-chat-infra-bug-cluster/evidence/01-infra-chat-response.webp)\n![QuestionPanel renders with File/Cancel options for issue creation](https://raw.githubusercontent.com/CKGrafico/orbion/b02ecc7c25bd18a116ec77943d05f3cabca19c38/openspec/changes/gh-156-chat-infra-bug-cluster/evidence/02-question-panel.webp)\n![InfraChatPanel remains stable with no callback-induced re-renders](https://raw.githubusercontent.com/CKGrafico/orbion/b02ecc7c25bd18a116ec77943d05f3cabca19c38/openspec/changes/gh-156-chat-infra-bug-cluster/evidence/03-log-viewer-stable.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Open the InfraChatPanel\n2. Submit a status prompt and verify assistant response\n3. Create an issue to trigger the question flow\n4. Verify question panel renders with File/Cancel options\n5. Cancel the question and verify it resolves\n6. Navigate to a loop detail view to verify log viewer stability\n\n</details>"
+}

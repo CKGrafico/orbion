@@ -41,6 +41,7 @@ import { gh165StaleConfigWarningScenario } from "./scenarios/gh-165-stale-config
 import { gh164RestoreOfferScenario } from "./scenarios/gh-164-restore-offer.js";
 import { gh163BootstrapSeedScenario } from "./scenarios/gh-163-bootstrap-seed.js";
 import { gh162ReferencesNotSecretsScenario } from "./scenarios/gh-162-references-not-secrets.js";
+import { gh156ChatInfraBugClusterScenario } from "./scenarios/gh-156-chat-infra-bug-cluster.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -483,6 +484,40 @@ registerScenario({
           "The credential re-auth prompt uses references not key material",
         ],
         captureLabels: ["config-references"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-156-chat-infra-bug-cluster",
+  runner: gh156ChatInfraBugClusterScenario,
+  description: "Chat/InfraChat bug cluster: finishedAt type, no-op approval, memory leak, log flicker",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "infra-chat-responds",
+        description: "The InfraChatPanel renders and responds to prompts.",
+        assertionDescriptions: [
+          "The InfraChatPanel renders and responds to prompts",
+        ],
+        captureLabels: ["infra-chat-response"],
+      },
+      {
+        id: "question-flow-works",
+        description: "The question flow renders and resolves correctly.",
+        assertionDescriptions: [
+          "The question flow renders and resolves correctly",
+        ],
+        captureLabels: ["question-panel"],
+      },
+      {
+        id: "log-viewer-stable",
+        description: "The log viewer renders segments without flickering (stable callback identities).",
+        assertionDescriptions: [
+          "The log viewer renders segment data without flickering (stable callback identity)",
+        ],
+        captureLabels: ["log-viewer-stable"],
       },
     ],
   },
