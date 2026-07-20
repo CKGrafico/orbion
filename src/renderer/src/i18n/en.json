@@ -920,5 +920,15 @@
     "nextStepDependencyMissing": "Install the missing dependency and retry the command.",
     "summaryCommandError": "The command exited with an error.",
     "nextStepCommandError": "Check the log output above for error details."
+  },
+  "siblingOffer": {
+    "title": "Apply to sibling loop?",
+    "attribution": "Same structure as your edited loop on {instance}: {loopName}",
+    "approve": "Apply",
+    "decline": "Skip",
+    "applying": "Applying…",
+    "statusApplied": "Applied",
+    "statusDeclined": "Skipped",
+    "applyError": "Failed to apply structural change to sibling loop"
   }
 }

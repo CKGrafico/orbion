@@ -422,6 +422,13 @@ const bridge: LoopTaskBridge = {
       };
     },
   },
+
+  siblingDecline: {
+    isDeclined: (environmentId: string, loopId: string, fingerprint: string) =>
+      ipcRenderer.invoke("siblingDecline:isDeclined", environmentId, loopId, fingerprint) as Promise<boolean>,
+    recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) =>
+      ipcRenderer.invoke("siblingDecline:recordDecline", record) as Promise<void>,
+  },
 };
 
 contextBridge.exposeInMainWorld("api", bridge);

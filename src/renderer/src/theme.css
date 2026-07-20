@@ -6401,3 +6401,154 @@ input {
 .toast-action:hover {
   color: var(--accent_hover);
 }
+
+/* ── Sibling offer card ─────────────────────────────────────────────── */
+
+.sibling-offer-card {
+  background: var(--bg_elevated);
+  border: 1px solid var(--border_subtle);
+  border-radius: var(--radius_lg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sibling-offer-card--terminal {
+  opacity: 0.7;
+}
+
+.sibling-offer-card--error {
+  border-color: var(--danger);
+}
+
+.sibling-offer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sibling-offer-icon {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.sibling-offer-title {
+  font-size: var(--title_main_size);
+  font-weight: var(--title_main_weight);
+  color: var(--text_primary);
+}
+
+.sibling-offer-status {
+  font-size: var(--label_upper_size);
+  text-transform: uppercase;
+  letter-spacing: var(--label_upper_letter_spacing);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.sibling-offer-status--applied {
+  color: var(--success);
+}
+
+.sibling-offer-status--declined {
+  color: var(--text_muted);
+}
+
+.sibling-offer-attribution {
+  font-size: var(--meta_size);
+  color: var(--text_secondary);
+  padding-left: 2px;
+}
+
+.sibling-offer-operations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sibling-offer-op {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--body_size);
+  color: var(--text_secondary);
+}
+
+.sibling-offer-op-icon {
+  font-size: 13px;
+  font-weight: 700;
+  width: 16px;
+  text-align: center;
+}
+
+.sibling-offer-op--add-step .sibling-offer-op-icon,
+.sibling-offer-op--add-branch .sibling-offer-op-icon {
+  color: var(--success);
+}
+
+.sibling-offer-op--remove-step .sibling-offer-op-icon,
+.sibling-offer-op--remove-branch .sibling-offer-op-icon {
+  color: var(--danger);
+}
+
+.sibling-offer-op--reorder-step .sibling-offer-op-icon {
+  color: var(--warning);
+}
+
+.sibling-offer-op-text {
+  flex: 1;
+}
+
+.sibling-offer-error {
+  font-size: var(--body_size);
+  color: var(--danger);
+  padding: 6px 0;
+}
+
+.sibling-offer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sibling-offer-btn {
+  border: none;
+  border-radius: var(--radius_sm);
+  padding: 6px 14px;
+  font-size: var(--body_size);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sibling-offer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sibling-offer-btn--decline {
+  background: var(--bg_active);
+  color: var(--text_secondary);
+}
+
+.sibling-offer-btn--decline:hover:not(:disabled) {
+  background: var(--bg_hover);
+  color: var(--text_primary);
+}
+
+.sibling-offer-btn--approve {
+  background: var(--accent);
+  color: var(--accent_ink);
+}
+
+.sibling-offer-btn--approve:hover:not(:disabled) {
+  background: var(--accent_hover);
+}
+
+.transcript-sibling-offer {
+  padding: 0 18px 6px;
+  max-width: var(--panel-content-max-width, 920px);
+  margin: 0 auto;
+}

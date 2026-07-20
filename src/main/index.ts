@@ -151,6 +151,7 @@ import {
   removeEnvironmentShapes,
   onCacheUpdate as onLoopShapeCacheUpdate,
 } from "./loop-shape-cache.js";
+import { isDeclined as isSiblingDeclined, recordDecline as recordSiblingDecline } from "./sibling-decline-store.js";
 
 const streams = new Map<string, AbortController>();
 
@@ -1746,6 +1747,17 @@ app.whenReady().then(() => {
   safeHandle("loopShapeCache:refresh", async (_event, ...rawArgs): Promise<LoopShape[]> => {
     const [environmentId] = validateIpc<[string]>("loopShapeCache:refresh", rawArgs);
     return refreshLoopShapesForEnvironment(environmentId);
+  });
+
+  // ── Sibling decline store ──────────────────────────────────────────
+  safeHandle("siblingDecline:isDeclined", (_event, ...rawArgs): boolean => {
+    const [environmentId, loopId, fingerprint] = validateIpc<[string, string, string]>("siblingDecline:isDeclined", rawArgs);
+    return isSiblingDeclined(environmentId, loopId, fingerprint);
+  });
+
+  safeHandle("siblingDecline:recordDecline", (_event, ...rawArgs): void => {
+    const [record] = validateIpc<[{ environmentId: string; loopId: string; fingerprint: string }]>("siblingDecline:recordDecline", rawArgs);
+    recordSiblingDecline(record.environmentId, record.loopId, record.fingerprint);
   });
 
   // Prune old breaches on startup

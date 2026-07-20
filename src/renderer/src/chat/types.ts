@@ -1,6 +1,7 @@
 import type { ChainStep } from "../components/TaskChainView";
 import type { SimilarLoopMatch } from "../fleet-similarity";
 import type { ShapeAdaptation } from "../fleet-shape-adapt";
+import type { StructuralDiff, SiblingCandidate, SiblingOfferStatus } from "../../../shared/sibling-offer-types";
 import type { FailureCategory } from "./diagnoseFailure";
 
 export type ToolCallStatus = "running" | "completed" | "error";
@@ -81,6 +82,7 @@ export type RowKind =
   | "loop-card"
   | "loop-proposal"
   | "chain-edit-proposal"
+  | "sibling-offer"
   | "failure-diagnosis";
 
 export interface BaseRow {
@@ -241,6 +243,27 @@ export interface ChainEditProposalRow extends BaseRow {
   sharedTaskWarning?: SharedTaskWarning;
 }
 
+/** A row representing a structural change offer for a sibling loop. */
+export interface SiblingOfferRow extends BaseRow {
+  kind: "sibling-offer";
+  /** Unique offer identifier. */
+  offerId: string;
+  /** The loop ID of the sibling that the structural change is offered for. */
+  siblingLoopId: string;
+  /** The environment (instance) that hosts the sibling loop. */
+  siblingEnvironmentId: string;
+  /** Human-readable environment name for attribution. */
+  siblingEnvironmentName: string;
+  /** The sibling loop's description/name. */
+  siblingLoopDescription: string;
+  /** The structural diff to apply. */
+  structuralDiff: StructuralDiff;
+  /** Current status of the offer. */
+  status: SiblingOfferStatus;
+  /** Populated on apply error. */
+  error: string | null;
+}
+
 export type TranscriptRow =
   | UserMessageRow
   | AssistantMessageRow
@@ -253,4 +276,5 @@ export type TranscriptRow =
   | LoopCardRow
   | LoopProposalRow
   | ChainEditProposalRow
+  | SiblingOfferRow
   | FailureDiagnosisRow;
