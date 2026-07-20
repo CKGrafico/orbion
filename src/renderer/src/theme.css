@@ -2287,6 +2287,171 @@ input {
   background: var(--accent-hover);
 }
 
+/* ── Chain edit proposal card ──────────────────────────────────────────── */
+
+.chain-edit-proposal-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.chain-edit-proposal-card--terminal {
+  opacity: 0.85;
+}
+
+.chain-edit-proposal-card--error {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border-subtle));
+  border-left: 3px solid var(--danger);
+}
+
+.chain-edit-proposal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chain-edit-proposal-icon {
+  font-size: 14px;
+  color: var(--accent_task);
+}
+
+.chain-edit-proposal-title {
+  font-size: var(--font-label-upper-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--font-label-upper-spacing);
+  color: var(--text-secondary);
+}
+
+.chain-edit-proposal-status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+.chain-edit-proposal-status--applied {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.chain-edit-proposal-status--rejected {
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  color: var(--text-muted);
+}
+
+.chain-edit-proposal-operations {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chain-edit-proposal-op {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--font-meta-size);
+  color: var(--text-secondary);
+}
+
+.chain-edit-proposal-op-icon {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.chain-edit-proposal-op--create-task .chain-edit-proposal-op-icon {
+  color: var(--success);
+}
+
+.chain-edit-proposal-op--update-task .chain-edit-proposal-op-icon {
+  color: var(--warning);
+}
+
+.chain-edit-proposal-op--delete-task .chain-edit-proposal-op-icon {
+  color: var(--danger);
+}
+
+.chain-edit-proposal-op-text {
+  min-width: 0;
+}
+
+.chain-edit-proposal-chain-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chain-edit-proposal-chain-label {
+  font-size: var(--font-label-upper-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--font-label-upper-spacing);
+  color: var(--text-muted);
+}
+
+.chain-edit-proposal-error {
+  font-size: 12px;
+  color: var(--danger);
+  padding: 4px 0;
+}
+
+.chain-edit-proposal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.chain-edit-proposal-btn {
+  padding: 4px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s;
+}
+
+.chain-edit-proposal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chain-edit-proposal-btn--reject {
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.chain-edit-proposal-btn--reject:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.chain-edit-proposal-btn--approve {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chain-edit-proposal-btn--approve:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.transcript-chain-edit-proposal {
+  margin: 4px 0 4px 42px;
+  max-width: 480px;
+}
+
 
 /* Muted composer state when instance is unreachable */
 .composer-textarea:disabled {

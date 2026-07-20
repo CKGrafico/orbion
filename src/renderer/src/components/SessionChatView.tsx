@@ -1,9 +1,9 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
-import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, LoopProposalRow } from "../chat/types";
+import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, LoopProposalRow, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
-import type { IAgentService, ITranscriptService } from "../services/interfaces";
+import type { IAgentService, IMcpService, ITranscriptService } from "../services/interfaces";
 import type { LoopMeta, Environment } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { diagnoseFailure } from "../chat/diagnoseFailure";
@@ -11,6 +11,7 @@ import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { LoopCard } from "./LoopCard";
 import { LoopProposalCard } from "./LoopProposalCard";
+import { ChainEditProposalCard } from "./ChainEditProposalCard";
 import { FailureDiagnosisPanel } from "./FailureDiagnosisPanel";
 import { WifiOff } from "lucide-react";
 import { fetchLogs } from "../api";
@@ -42,6 +43,7 @@ interface SessionChatViewProps {
 export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, instance }: SessionChatViewProps): React.ReactNode {
   const intl = useIntl();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
+  const [mcpService] = useInject<IMcpService>(cid.IMcpService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const {
     turns,
@@ -58,12 +60,15 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     insertFailureDiagnosis,
     insertLoopProposal,
     updateLoopProposalStatus,
+    insertChainEditProposal,
+    updateChainEditProposalStatus,
   } = useTranscript(sessionId);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("full");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [opencodeSessionId, setOpenCodeSessionId] = useState<string | undefined>(undefined);
+  const [chainVersion, setChainVersion] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialEnvRef = useRef<string | null>(null);
 
@@ -151,6 +156,29 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 finishedAt: tc.finishedAt,
               })),
             });
+
+            // ── Intercept chain-edit-proposal payloads from MCP tool output ──
+            // When the agent's MCP tool call returns a payload with
+            // `chainEditProposal: true`, parse it and insert a
+            // chain-edit-proposal row into the transcript for user approval.
+            if (event.status === "completed" && event.output) {
+              try {
+                const parsed = JSON.parse(event.output);
+                if (parsed && parsed.chainEditProposal === true) {
+                  insertChainEditProposal({
+                    proposalId: parsed.proposalId ?? `cep-${Date.now()}`,
+                    loopId: parsed.loopId ?? "",
+                    environmentId: parsed.environmentId ?? environmentId,
+                    proposedSteps: Array.isArray(parsed.proposedSteps) ? parsed.proposedSteps : [],
+                    operationSummaries: Array.isArray(parsed.operationSummaries) ? parsed.operationSummaries as ChainEditOperationSummary[] : [],
+                    status: "pending",
+                    error: null,
+                  });
+                }
+              } catch {
+                // Output is not JSON or doesn't contain a chain-edit proposal, ignore
+              }
+            }
           }
           break;
         }
@@ -365,10 +393,51 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
   );
 
   const handleProposalStatusChange = useCallback(
-    (proposalId: string, status: "creating" | "error", error?: string) => {
-      updateLoopProposalStatus(proposalId, status as "creating" | "error", error ? { error } : undefined);
+    (proposalId: string, status: LoopProposalStatus, error?: string) => {
+      updateLoopProposalStatus(proposalId, status, error ? { error } : undefined);
     },
     [updateLoopProposalStatus],
+  );
+
+  // ── Chain edit proposal callbacks ───────────────────────────────────────
+
+  const handleChainEditApproved = useCallback(
+    (proposalId: string, loopId: string, envId: string) => {
+      // Apply the chain edit by calling the MCP service with an apply flag.
+      // The MCP tool that produced the proposal will re-execute with the
+      // apply flag set, actually creating/updating the tasks on the daemon.
+      void mcpService.callTool(envId, "apply_chain_edit", { proposalId, loopId }).then((result) => {
+        if (result.ok) {
+          updateChainEditProposalStatus(proposalId, "applied");
+          // Invalidate chain cache so the LoopCard re-fetches tasks on next expand
+          setChainVersion((prev) => prev + 1);
+        } else {
+          const errorMsg = typeof result.error === "string"
+            ? result.error
+            : intl.formatMessage({ id: "chainEditProposal.applyError" });
+          updateChainEditProposalStatus(proposalId, "error", { error: errorMsg });
+        }
+      }).catch(() => {
+        updateChainEditProposalStatus(proposalId, "error", {
+          error: intl.formatMessage({ id: "chainEditProposal.applyError" }),
+        });
+      });
+    },
+    [mcpService, updateChainEditProposalStatus, intl],
+  );
+
+  const handleChainEditRejected = useCallback(
+    (proposalId: string) => {
+      updateChainEditProposalStatus(proposalId, "rejected");
+    },
+    [updateChainEditProposalStatus],
+  );
+
+  const handleChainEditStatusChange = useCallback(
+    (proposalId: string, status: ChainEditProposalStatus, error?: string) => {
+      updateChainEditProposalStatus(proposalId, status, error ? { error } : undefined);
+    },
+    [updateChainEditProposalStatus],
   );
 
   return (
@@ -472,7 +541,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 if (!loop) return null;
                 return (
                   <div key={row.id} className="transcript-loop-card">
-                    <LoopCard loop={loop} reachability={reachability} instance={instance} scrollContainerRef={scrollRef} />
+                    <LoopCard loop={loop} reachability={reachability} instance={instance} scrollContainerRef={scrollRef} chainVersion={chainVersion} />
                   </div>
                 );
               }
@@ -485,6 +554,19 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onApproved={handleProposalApproved}
                       onRejected={handleProposalRejected}
                       onStatusChange={handleProposalStatusChange}
+                    />
+                  </div>
+                );
+              }
+              case "chain-edit-proposal": {
+                return (
+                  <div key={row.id} className="transcript-chain-edit-proposal">
+                    <ChainEditProposalCard
+                      row={row}
+                      instance={instance}
+                      onApproved={handleChainEditApproved}
+                      onRejected={handleChainEditRejected}
+                      onStatusChange={handleChainEditStatusChange}
                     />
                   </div>
                 );

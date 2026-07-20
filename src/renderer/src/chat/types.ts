@@ -1,3 +1,4 @@
+import type { ChainStep } from "../components/TaskChainView";
 import type { FailureCategory } from "./diagnoseFailure";
 
 export type ToolCallStatus = "running" | "completed" | "error";
@@ -77,6 +78,7 @@ export type RowKind =
   | "instance-handoff"
   | "loop-card"
   | "loop-proposal"
+  | "chain-edit-proposal"
   | "failure-diagnosis";
 
 export interface BaseRow {
@@ -189,6 +191,36 @@ export interface LoopProposalRow extends BaseRow {
   error: string | null;
 }
 
+/** Status lifecycle for a chain-edit proposal. */
+export type ChainEditProposalStatus = "pending" | "applying" | "applied" | "rejected" | "error";
+
+/** Summary of a single operation within a chain edit proposal. */
+export interface ChainEditOperationSummary {
+  /** Human-readable description of the operation (e.g., "Add step: Run tests after Build"). */
+  description: string;
+  /** The type of operation. */
+  kind: "create-task" | "update-task" | "delete-task";
+}
+
+/** A row representing a proposed chain edit, rendered as a preview card. */
+export interface ChainEditProposalRow extends BaseRow {
+  kind: "chain-edit-proposal";
+  /** Unique proposal identifier. */
+  proposalId: string;
+  /** The loop ID whose chain is being edited. */
+  loopId: string;
+  /** The environment (instance) that owns this loop. */
+  environmentId: string;
+  /** The proposed task chain steps for preview (resolved from proposed operations). */
+  proposedSteps: ChainStep[];
+  /** Human-readable summaries of the operations being proposed. */
+  operationSummaries: ChainEditOperationSummary[];
+  /** Current status of the proposal. */
+  status: ChainEditProposalStatus;
+  /** Populated on apply error. */
+  error: string | null;
+}
+
 export type TranscriptRow =
   | UserMessageRow
   | AssistantMessageRow
@@ -200,4 +232,5 @@ export type TranscriptRow =
   | InstanceHandoffRow
   | LoopCardRow
   | LoopProposalRow
+  | ChainEditProposalRow
   | FailureDiagnosisRow;

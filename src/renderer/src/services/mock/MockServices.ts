@@ -1051,6 +1051,9 @@ const MOCK_MCP_TOOLS = [
   { name: "stop_loop", description: "Stop a loop" },
   { name: "trigger_loop", description: "Trigger an immediate loop run" },
   { name: "list_tasks", description: "List all task definitions" },
+  { name: "create_task", description: "Create a new task definition" },
+  { name: "update_task", description: "Update an existing task definition" },
+  { name: "apply_chain_edit", description: "Apply a previously proposed chain edit" },
   { name: "list_projects", description: "List all projects" },
 ];
 
@@ -1110,7 +1113,60 @@ export class MockMcpService implements IMcpService {
       };
     }
 
+    // Mock: create_task / update_task returns a chain-edit-proposal payload
+    // for the UI to render as a ChainEditProposalCard
+    if (toolName === "create_task" || toolName === "update_task") {
+      const taskId = toolName === "create_task"
+        ? `task-${Date.now()}`
+        : (args.taskId as string ?? "task-1");
+      const loopId = (args.loopId as string) ?? "loop-1";
+
+      // Build a mock proposed chain
+      const proposedSteps = [
+        { task: { id: "task-1", name: "Build", command: "npm", commandArgs: ["run", "build"], commandRaw: "npm run build", onSuccessTaskId: "task-2", onFailureTaskId: "task-3", createdAt: new Date().toISOString() }, stepNumber: 1, branchType: null, parentHasBranch: true, depth: 0 },
+        { task: { id: "task-2", name: "Test", command: "pnpm", commandArgs: ["test"], commandRaw: "pnpm test", onSuccessTaskId: taskId, onFailureTaskId: "task-3", createdAt: new Date().toISOString() }, stepNumber: 2, branchType: "success", parentHasBranch: true, depth: 0 },
+        { task: { id: taskId, name: (args.name as string) ?? "New step", command: (args.command as string) ?? "echo done", commandArgs: [], commandRaw: (args.command as string) ?? "echo done", onSuccessTaskId: null, onFailureTaskId: null, createdAt: new Date().toISOString() }, stepNumber: 3, branchType: null, parentHasBranch: false, depth: 0 },
+        { task: { id: "task-3", name: "Notify failure", command: "slack-cli", commandArgs: ["send", "#ci", "Failed"], commandRaw: "slack-cli send #ci 'Failed'", onSuccessTaskId: null, onFailureTaskId: null, createdAt: new Date().toISOString() }, stepNumber: 4, branchType: "failure", parentHasBranch: true, depth: 1 },
+      ];
+
+      return {
+        ok: true,
+        data: {
+          chainEditProposal: true,
+          proposalId: `cep-${Date.now()}`,
+          loopId,
+          environmentId,
+          proposedSteps,
+          operationSummaries: [
+            {
+              description: toolName === "create_task"
+                ? `Add step: ${(args.name as string) ?? "New step"} after Test`
+                : `Update step: ${(args.name as string) ?? "Task"}`,
+              kind: toolName === "create_task" ? "create-task" as const : "update-task" as const,
+            },
+          ],
+        },
+      };
+    }
+
     // Mock: return a generic success response
+    // Mock: apply_chain_edit simulates applying a chain edit proposal
+    if (toolName === "apply_chain_edit") {
+      // Simulate applying by adding a new task to MOCK_TASKS
+      const newTask: TaskDefinition = {
+        id: `task-${Date.now()}`,
+        name: "New step",
+        command: "echo done",
+        commandArgs: [],
+        commandRaw: "echo done",
+        onSuccessTaskId: null,
+        onFailureTaskId: null,
+        createdAt: new Date().toISOString(),
+      };
+      MOCK_TASKS.push(newTask);
+      return { ok: true, data: { applied: true, taskId: newTask.id } };
+    }
+
     return { ok: true, data: { message: `Mock result for ${toolName}` } };
   }
 

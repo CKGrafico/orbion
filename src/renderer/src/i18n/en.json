@@ -811,6 +811,16 @@
     "statusRejected": "Rejected",
     "createError": "Failed to create loop"
   },
+  "chainEditProposal": {
+    "title": "Chain edit proposal",
+    "previewLabel": "PROPOSED CHAIN",
+    "approve": "Approve",
+    "reject": "Reject",
+    "applying": "Applying…",
+    "statusApplied": "Applied",
+    "statusRejected": "Rejected",
+    "applyError": "Failed to apply chain edit"
+  },
   "diagnosis": {
     "title": "Diagnosis",
     "nextStepLabel": "Next →",

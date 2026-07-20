@@ -17,6 +17,8 @@ interface LoopCardProps {
   instance?: Environment;
   /** The scroll container element for IntersectionObserver rooting (enables auto-collapse when scrolled past). */
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
+  /** Monotonically increasing version counter. When incremented, the task chain cache is invalidated. */
+  chainVersion?: number;
 }
 
 /** Pulse animation for running status dots. */
@@ -123,7 +125,7 @@ function confirmDescriptionKey(action: LoopAction): string {
   }
 }
 
-export function LoopCard({ loop, reachability, instance, scrollContainerRef }: LoopCardProps): React.ReactNode {
+export function LoopCard({ loop, reachability, instance, scrollContainerRef, chainVersion }: LoopCardProps): React.ReactNode {
   const intl = useIntl();
 
   const isReachable = reachability === "connected" || reachability === undefined;
@@ -287,6 +289,30 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef }: L
 
   // Whether the loop has a taskId (prerequisite for showing the expand affordance)
   const hasTaskChain = loop.taskId != null && loop.taskId !== "";
+
+  // ── Chain version invalidation ─────────────────────────────────────────
+  // When chainVersion changes (e.g., after a chain-edit proposal is applied),
+  // clear the cached chain tasks so the next expand fetches fresh data.
+  useEffect(() => {
+    if (chainVersion !== undefined && chainVersion > 0) {
+      setChainTasks(null);
+      // If the chain is currently expanded, re-fetch immediately
+      if (chainExpanded && instance && isReachable) {
+        setChainLoading(true);
+        void fetchTasks(instance).then((res) => {
+          if (res.ok && res.data) {
+            setChainTasks(res.data);
+          } else {
+            setChainTasks([]);
+          }
+          setChainLoading(false);
+        }).catch(() => {
+          setChainTasks([]);
+          setChainLoading(false);
+        });
+      }
+    }
+  }, [chainVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Live log streaming ─────────────────────────────────────────────────
   const [logLines, setLogLines] = useState<string[]>([]);
