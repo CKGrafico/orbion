@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-174-ssh-tunnel-process-leak",
+  "required": false,
+  "status": "skipped",
+  "reason": "The change only modifies main-process shutdown logic (SIGKILL fallback, before-quit handler, process.on(exit) handler) and adds unit tests. No renderer components, no user-visible UI behavior, no navigation or interaction changes. Visual evidence is not applicable.",
+  "assets": [],
+  "prMarkdown": ""
+}
