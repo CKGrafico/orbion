@@ -3,16 +3,18 @@ import { useIntl } from "react-intl";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus, SharedTaskWarning } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
-import type { IAgentService, IMcpService, ITranscriptService, IConfigService, IInfraService } from "../services/interfaces";
+import type { IAgentService, IMcpService, ITranscriptService, IConfigService, IInfraService, ILoopShapeCacheService } from "../services/interfaces";
 import type { LoopMeta, Environment, LoopWithOrigin, FleetLoopRollup } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { diagnoseFailure } from "../chat/diagnoseFailure";
 import { computeSimilarLoops } from "../fleet-similarity";
+import { matchShapeToFleetIntent, adaptShapeForPlatform, buildProvenance } from "../fleet-shape-adapt";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { usePipelineCounts } from "./usePipelineCounts";
 import { LoopCard } from "./LoopCard";
 import { LoopProposalCard } from "./LoopProposalCard";
+import { FleetShapedProposalCard } from "./FleetShapedProposalCard";
 import { ChainEditProposalCard } from "./ChainEditProposalCard";
 import { FailureDiagnosisPanel } from "./FailureDiagnosisPanel";
 import { WifiOff } from "lucide-react";
@@ -164,6 +166,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
+  const [loopShapeCacheService] = useInject<ILoopShapeCacheService>(cid.ILoopShapeCacheService);
   const {
     turns,
     rows,
@@ -926,13 +929,17 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                   : undefined;
                 return (
                   <div key={row.id} className="transcript-loop-proposal">
-                    <LoopProposalCard
+                    <FleetShapedProposalCard
                       row={row}
                       instance={instance}
                       onApproved={handleProposalApproved}
                       onRejected={handleProposalRejected}
                       onStatusChange={handleProposalStatusChange}
                       similarLoops={similar}
+                      environments={environments}
+                      environmentId={environmentId}
+                      loopShapeCacheService={loopShapeCacheService}
+                      infraService={infraService}
                     />
                   </div>
                 );

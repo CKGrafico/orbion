@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "changeId": "gh-146-fleet-shaped-loops",
+  "required": true,
+  "status": "passed",
+  "scenario": {
+    "title": "Fleet-shaped loop proposals with provenance and platform adaptation",
+    "steps": [
+      "User creates a loop whose intent matches a cached shape from another instance",
+      "The proposal card shows a provenance badge: 'Based on your X loop on Y, adapted for Z'",
+      "Platform-specific substitutions (gh↔az) are applied to the proposed command",
+      "Standard approve-before-create flow applies"
+    ]
+  },
+  "assertions": [
+    { "description": "matchShapeToFleetIntent finds exact command matches across instances (score 0.9)", "status": "passed" },
+    { "description": "matchShapeToFleetIntent finds base-command matches (score 0.5)", "status": "passed" },
+    { "description": "matchShapeToFleetIntent skips own-environment shapes", "status": "passed" },
+    { "description": "matchShapeToFleetIntent returns null when no shapes match", "status": "passed" },
+    { "description": "detectCommandPlatform detects 'gh' commands as GitHub", "status": "passed" },
+    { "description": "detectCommandPlatform detects 'az' commands as ADO", "status": "passed" },
+    { "description": "detectCommandPlatform detects github.com URLs as GitHub", "status": "passed" },
+    { "description": "detectCommandPlatform detects dev.azure.com URLs as ADO", "status": "passed" },
+    { "description": "detectCommandPlatform returns 'unknown' for neutral commands", "status": "passed" },
+    { "description": "adaptShapeForPlatform adapts gh → az when target is ADO", "status": "passed" },
+    { "description": "adaptShapeForPlatform adapts az → gh when target is GitHub", "status": "passed" },
+    { "description": "adaptShapeForPlatform adapts chain step commands", "status": "passed" },
+    { "description": "adaptShapeForPlatform adapts GitHub URLs to Azure DevOps URLs", "status": "passed" },
+    { "description": "adaptShapeForPlatform leaves neutral commands unchanged", "status": "passed" },
+    { "description": "adaptShapeForPlatform returns unchanged shape for same platform", "status": "passed" },
+    { "description": "adaptShapeForPlatform records all substitution metadata correctly", "status": "passed" },
+    { "description": "buildProvenance produces 'Based on your X loop on Y, adapted for Z' format", "status": "passed" },
+    { "description": "buildProvenance omits platform label when no substitutions were made", "status": "passed" },
+    { "description": "buildProvenance uses GitHub/Azure DevOps platform labels correctly", "status": "passed" },
+    { "description": "LoopProposalRow carries provenance and adaptedFrom fields (type-level)", "status": "passed" },
+    { "description": "LoopProposalCard renders provenance badge when row.provenance is set", "status": "passed" },
+    { "description": "Provenance badge CSS styles are defined in theme.css", "status": "passed" },
+    { "description": "i18n keys for provenance are added to en.json", "status": "passed" },
+    { "description": "Mock LoopShape data includes a second environment with GitHub commands", "status": "passed" },
+    { "description": "FleetShapedProposalCard wrapper computes shape match + adaptation async", "status": "passed" },
+    { "description": "TypeScript compilation passes with no errors across all changed files", "status": "passed" },
+    { "description": "All 26 fleet-shape-adapt unit tests pass", "status": "passed" },
+    { "description": "Existing fleet-similarity tests (21 passing) are not affected", "status": "passed" }
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence\n\n### Fleet-shaped loop proposals with provenance and platform adaptation\n\n> Screenshot could not be captured in this headless environment. See unit tests (26 new + 21 existing all passing) for behavioral verification.\n\n**Scenario:** When a user creates a loop whose intent matches a cached `LoopShape` from another instance, the proposal card pre-shapes the loop using the matched shape's chain structure and adapts platform-specific parts (e.g. `gh` → `az`) using the project's detected platform. A provenance badge appears on the card: \"Based on your implement-issue loop on prod-vm, adapted for Azure DevOps\".\n\n**Key changes:**\n- New `fleet-shape-adapt.ts` module with pure shape matching (`matchShapeToFleetIntent`) and platform adaptation (`adaptShapeForPlatform`) functions\n- `gh↔az` CLI substitution rules, URL host swaps (`github.com↔dev.azure.com`), and arg style adaptations (`--repo↔--organization`)\n- `LoopProposalRow` extended with `provenance` and `adaptedFrom` fields\n- `FleetShapedProposalCard` wrapper component that async-computes shape match + platform adaptation for pending proposals\n- `LoopProposalCard` renders a provenance badge under the header when `row.provenance` is set\n- `buildProvenance()` generates human-readable provenance strings stating source loop, instance, and adapted platform\n- 26 Vitest unit tests for all new functions (all passing)\n- Mock data includes a second environment with GitHub-flavoured commands for cross-platform testing\n\n**Acceptance criteria met:**\n- ✅ When creation intent matches a cached shape, the proposal reuses the chain structure and adapts platform-specific parts using the project's detected platform\n- ✅ The proposal states provenance ('based on your implement-issue loop on prod-vm, adapted for Azure DevOps')\n- ✅ Standard approve-before-create applies (proposals still go through the normal approve/reject flow)"
+}

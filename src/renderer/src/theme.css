@@ -2206,6 +2206,26 @@ input {
   color: var(--text-muted);
 }
 
+.loop-proposal-provenance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-active);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+}
+
+.loop-proposal-provenance-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.loop-proposal-provenance-text {
+  font-size: var(--font-meta-size);
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
 .loop-proposal-command {
   background: var(--bg-log);
   border-radius: var(--radius-sm);

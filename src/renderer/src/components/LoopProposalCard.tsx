@@ -124,6 +124,14 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
         )}
       </div>
 
+      {/* Provenance badge (fleet-shaped adaptation) */}
+      {row.provenance && isPending && (
+        <div className="loop-proposal-provenance">
+          <span className="loop-proposal-provenance-icon">⚡</span>
+          <span className="loop-proposal-provenance-text">{row.provenance}</span>
+        </div>
+      )}
+
       {/* Command block */}
       <div className="loop-proposal-command">
         <div className="loop-proposal-command-content" onClick={isLongCommand ? () => setCommandExpanded(!commandExpanded) : undefined}>

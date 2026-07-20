@@ -143,6 +143,16 @@ function parseLoopProposalMessage(msg: TranscriptMessage): LoopProposalRow | nul
   try {
     const parsed = JSON.parse(msg.content);
     if (parsed.kind !== "loop-proposal") return null;
+    const adaptedFrom = parsed.adaptedFrom
+      ? {
+          loopId: parsed.adaptedFrom.loopId ?? "",
+          environmentId: parsed.adaptedFrom.environmentId ?? "",
+          environmentName: parsed.adaptedFrom.environmentName ?? "",
+          loopDescription: parsed.adaptedFrom.loopDescription ?? "",
+          chainSteps: Array.isArray(parsed.adaptedFrom.chainSteps) ? parsed.adaptedFrom.chainSteps : [],
+          substitutions: Array.isArray(parsed.adaptedFrom.substitutions) ? parsed.adaptedFrom.substitutions : [],
+        }
+      : null;
     return {
       id: msg.id,
       kind: "loop-proposal",
@@ -160,6 +170,8 @@ function parseLoopProposalMessage(msg: TranscriptMessage): LoopProposalRow | nul
       status: parsed.status ?? "pending",
       createdLoopId: parsed.createdLoopId ?? null,
       error: parsed.error ?? null,
+      provenance: parsed.provenance ?? null,
+      adaptedFrom,
     };
   } catch {
     return null;
@@ -985,6 +997,8 @@ export function useTranscript(sessionId: string | null) {
           status: proposal.status ?? "pending",
           createdLoopId: proposal.createdLoopId,
           error: proposal.error,
+          provenance: proposal.provenance ?? null,
+          adaptedFrom: proposal.adaptedFrom ?? null,
         }),
         startedAt: timestamp,
         finishedAt: timestamp,

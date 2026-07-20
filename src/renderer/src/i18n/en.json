@@ -856,7 +856,9 @@
     "creating": "Creating…",
     "statusCreated": "Created",
     "statusRejected": "Rejected",
-    "createError": "Failed to create loop"
+    "createError": "Failed to create loop",
+    "provenance": "Based on your {loopName} loop on {instanceName}, adapted for {platform}",
+    "provenanceSamePlatform": "Based on your {loopName} loop on {instanceName}"
   },
   "similarLoops": {
     "titleWithCount": "{count, plural, one {# similar loop} other {# similar loops}} on other instances",

@@ -1,5 +1,6 @@
 import type { ChainStep } from "../components/TaskChainView";
 import type { SimilarLoopMatch } from "../fleet-similarity";
+import type { ShapeAdaptation } from "../fleet-shape-adapt";
 import type { FailureCategory } from "./diagnoseFailure";
 
 export type ToolCallStatus = "running" | "completed" | "error";
@@ -192,6 +193,10 @@ export interface LoopProposalRow extends BaseRow {
   error: string | null;
   /** Similar loops from other reachable instances, computed transiently. */
   similarLoops?: SimilarLoopMatch[];
+  /** Provenance string, e.g. "Based on your implement-issue loop on prod-vm, adapted for Azure DevOps". Null if no shape match. */
+  provenance: string | null;
+  /** Source shape metadata when the proposal was pre-shaped from a fleet match. */
+  adaptedFrom?: ShapeAdaptation | null;
 }
 
 /** Status lifecycle for a chain-edit proposal. */

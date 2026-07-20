@@ -19,6 +19,7 @@ import type { TempPaths } from "./launch/deterministic-env.js";
 import type { AssertionResult, Scenario } from "./types.js";
 import { AssertionFailure } from "./assertions.js";
 import { gh142BulkRelabelScenario } from "./scenarios/gh-142-bulk-relabel.js";
+import { gh146FleetShapedLoopsScenario } from "./scenarios/gh-146-fleet-shaped-loops.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -79,4 +80,10 @@ registerScenario({
   changeId: "gh-142-bulk-relabel",
   runner: gh142BulkRelabelScenario,
   description: "Bulk relabel issues using a sentence (InfraChatPanel flow)",
+});
+
+registerScenario({
+  changeId: "gh-146-fleet-shaped-loops",
+  runner: gh146FleetShapedLoopsScenario,
+  description: "Fleet-shaped loop proposals with provenance and platform adaptation",
 });

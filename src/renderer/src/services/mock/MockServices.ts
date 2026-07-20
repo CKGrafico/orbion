@@ -638,7 +638,7 @@ export class MockInfraService implements IInfraService {
     return { ok: false, error: "mock" };
   }
   async getStatus(): Promise<{ mainVmId: string | null; connected: boolean }> { return { mainVmId: null, connected: false }; }
-  async getPlatform(): Promise<PlatformType> { return "github"; }
+  async getPlatform(_environmentId: string, _projectId: string): Promise<PlatformType> { return "github"; }
 }
 
 @injectable()
@@ -1379,6 +1379,41 @@ const MOCK_LOOP_SHAPES: LoopShape[] = MOCK_LOOPS.map((loop) => ({
   cachedAt: Date.now(),
 }));
 
+// Second mock environment with GitHub-flavoured commands (for cross-platform shape matching)
+const MOCK_LOOP_SHAPES_REMOTE: LoopShape[] = [
+  {
+    loopId: "remote-build-lint",
+    environmentId: "mock-remote-env",
+    command: "gh run list --limit 5",
+    commandArgs: [],
+    intervalHuman: "5m",
+    projectId: "default",
+    taskId: null,
+    chainSteps: [],
+    cachedAt: Date.now(),
+  },
+  {
+    loopId: "remote-issue-sweep",
+    environmentId: "mock-remote-env",
+    command: "gh issue list --repo owner/repo --state open",
+    commandArgs: ["--limit", "20"],
+    intervalHuman: "30s",
+    projectId: "default",
+    taskId: "remote-task-sweep",
+    chainSteps: [
+      {
+        taskId: "remote-task-sweep",
+        taskName: "Sweep open issues",
+        command: "gh issue list --repo owner/repo --state open",
+        commandArgs: ["--limit", "20"],
+        onSuccessTaskId: null,
+        onFailureTaskId: null,
+      },
+    ],
+    cachedAt: Date.now(),
+  },
+];
+
 @injectable()
 export class MockLoopShapeCacheService implements ILoopShapeCacheService {
   async getCached(environmentId: string): Promise<LoopShape[]> {
@@ -1386,7 +1421,7 @@ export class MockLoopShapeCacheService implements ILoopShapeCacheService {
   }
 
   async getAll(): Promise<LoopShape[]> {
-    return MOCK_LOOP_SHAPES;
+    return [...MOCK_LOOP_SHAPES, ...MOCK_LOOP_SHAPES_REMOTE];
   }
 
   async refresh(environmentId: string): Promise<LoopShape[]> {
