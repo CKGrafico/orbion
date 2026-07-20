@@ -874,7 +874,8 @@
     "statusRejected": "Rejected",
     "createError": "Failed to create loop",
     "provenance": "Based on your {loopName} loop on {instanceName}, adapted for {platform}",
-    "provenanceSamePlatform": "Based on your {loopName} loop on {instanceName}"
+    "provenanceSamePlatform": "Based on your {loopName} loop on {instanceName}",
+    "crossScopeBadge": "on {instance} — outside this chat's instance"
   },
   "similarLoops": {
     "titleWithCount": "{count, plural, one {# similar loop} other {# similar loops}} on other instances",
@@ -903,7 +904,8 @@
       "forkCopyBadge": "Forking a copy"
     },
     "approveFork": "Approve (fork)",
-    "approveChangeAll": "Approve (change all)"
+    "approveChangeAll": "Approve (change all)",
+    "crossScopeBanner": "Editing loop on {instance} — outside this chat's instance"
   },
   "diagnosis": {
     "title": "Diagnosis",
@@ -940,6 +942,7 @@
   "siblingOffer": {
     "title": "Apply to sibling loop?",
     "attribution": "Same structure as your edited loop on {instance}: {loopName}",
+    "crossScopeAttribution": "Same structure as your edited loop on {instance}: {loopName} — outside this chat's instance",
     "approve": "Apply",
     "decline": "Skip",
     "applying": "Applying…",
@@ -1002,5 +1005,11 @@
   "prReferenceCard": {
     "openOnPlatform": "Open on GitHub",
     "noVerdict": "Analyzing\u2026"
+  },
+  "crossScope": {
+    "badge": "on {instance} — outside this chat's instance",
+    "loopCardLabel": "{project} on {instance} — outside this chat's instance",
+    "resultOnInstance": "{result} on {instance}",
+    "assistantAttribution": "on {instance} — outside this chat's instance"
   }
 }

@@ -1341,6 +1341,10 @@ input {
   letter-spacing: 0.02em;
 }
 
+.loop-card-origin-label--cross-scope {
+  color: var(--warning);
+}
+
 .loop-summary-segment--clickable:active {
   background: var(--bg-active);
 }
@@ -4330,6 +4334,34 @@ input {
   font-weight: 500;
   margin-top: 4px;
   letter-spacing: 0.02em;
+}
+
+.transcript-instance-attribution--cross-scope {
+  color: var(--warning);
+}
+
+.cross-scope-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  color: var(--warning);
+  background: var(--bg-elevated);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+.chain-edit-proposal-cross-scope-banner {
+  font-size: 10.5px;
+  color: var(--warning);
+  background: var(--bg-elevated);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  margin: 6px 0;
+}
+
+.sibling-offer-attribution--cross-scope {
+  color: var(--warning);
 }
 
 /* ── Code blocks ──────────────────────────────────────────────────── */

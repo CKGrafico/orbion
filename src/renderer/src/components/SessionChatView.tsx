@@ -973,6 +973,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 const envName = row.environmentId
                   ? environments.find((e) => e.id === row.environmentId)?.name
                   : undefined;
+                const isAssistantCrossScope = row.environmentId != null && row.environmentId !== environmentId;
                 return (
                   <div key={row.id} className="transcript-assistant-msg">
                     <div className="transcript-avatar session-assistant-avatar">{activeRuntime === "claude" ? "CC" : "OC"}</div>
@@ -981,8 +982,11 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                         <MarkdownContent content={row.content} streaming={row.streaming} />
                       </Suspense>
                       {envName ? (
-                        <span className="transcript-instance-attribution">
-                          {intl.formatMessage({ id: "instanceAttribution.label" }, { instance: envName })}
+                        <span className={`transcript-instance-attribution${isAssistantCrossScope ? " transcript-instance-attribution--cross-scope" : ""}`}>
+                          {isAssistantCrossScope
+                            ? intl.formatMessage({ id: "crossScope.assistantAttribution" }, { instance: envName })
+                            : intl.formatMessage({ id: "instanceAttribution.label" }, { instance: envName })
+                          }
                         </span>
                       ) : null}
                     </div>
@@ -1044,14 +1048,21 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 const originEnv = origin
                   ? environments.find((e) => e.id === origin.environmentId)
                   : undefined;
+                const isLoopCardCrossScope = row.environmentId !== environmentId;
                 return (
                   <div key={row.id} className="transcript-loop-card">
                     {origin ? (
-                      <span className="loop-card-origin-label">
-                        {intl.formatMessage(
-                          { id: "loopCard.originLabel" },
-                          { project: origin.projectName, instance: originEnv?.name ?? origin.environmentName },
-                        )}
+                      <span className={`loop-card-origin-label${isLoopCardCrossScope ? " loop-card-origin-label--cross-scope" : ""}`}>
+                        {isLoopCardCrossScope
+                          ? intl.formatMessage(
+                              { id: "crossScope.loopCardLabel" },
+                              { project: origin.projectName, instance: originEnv?.name ?? origin.environmentName },
+                            )
+                          : intl.formatMessage(
+                              { id: "loopCard.originLabel" },
+                              { project: origin.projectName, instance: originEnv?.name ?? origin.environmentName },
+                            )
+                        }
                       </span>
                     ) : null}
                     <LoopCard loop={loop} reachability={reachability} instance={originEnv ?? instance} scrollContainerRef={scrollRef} chainVersion={chainVersion} />
@@ -1080,6 +1091,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       environmentId={environmentId}
                       loopShapeCacheService={loopShapeCacheService}
                       infraService={infraService}
+                      homeEnvironmentId={environmentId}
                     />
                   </div>
                 );
@@ -1094,6 +1106,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onRejected={handleChainEditRejected}
                       onStatusChange={handleChainEditStatusChange}
                       onForkDecision={handleChainEditForkDecision}
+                      homeEnvironmentId={environmentId}
+                      environments={environments}
                     />
                   </div>
                 );
@@ -1107,6 +1121,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       onApproved={handleSiblingOfferApproved}
                       onDeclined={handleSiblingOfferDeclined}
                       onStatusChange={handleSiblingOfferStatusChange}
+                      homeEnvironmentId={environmentId}
                     />
                   </div>
                 );
