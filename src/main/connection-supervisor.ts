@@ -1,8 +1,11 @@
 import type { AccessEndpoint, EndpointHealth, I18nMessage } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { getSessionToken, setEnvironmentAuthState, removeSessionToken } from "./config-store.js";
+import { createLogger } from "./logger.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { msg } from "./i18n.js";
+
+const logger = createLogger("connection-supervisor");
 
 export type ConnectionPhase =
   | "offline"
@@ -178,7 +181,7 @@ export class ConnectionSupervisor {
       .catch((err: unknown) => {
         if (this.destroyed) return;
         this.probeInFlight = false;
-        console.error("[connection-supervisor] probe threw unexpectedly:", err);
+        logger.error("probe threw unexpectedly:", err);
         this.handleProbeResult({
           ok: false,
           status: 0,

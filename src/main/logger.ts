@@ -4,7 +4,8 @@ import path from "node:path";
 
 log.transports.file.level = "info";
 log.transports.file.maxSize = 5 * 1024 * 1024; // 5MB per file
-log.transports.file.resolvePathFn = () => path.join(app.getPath("userData"), "logs", "main.log");
+log.transports.file.resolvePathFn = () =>
+  path.join(app?.getPath?.("userData") ?? process.cwd(), "logs", "main.log");
 log.transports.file.format = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
 
 if (process.env.NODE_ENV === "development") {

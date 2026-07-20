@@ -16,8 +16,11 @@
  */
 
 import type { SshHost, AccessEndpoint } from "../shared/ipc.js";
+import { createLogger } from "./logger.js";
 import { openTunnel, closeTunnel, closeAllTunnels, getTunnelId, findExistingTunnel, onTunnelExit, isTunnelAlive, type TunnelExitEvent } from "./ssh-tunnel.js";
 import { parseTarget, listSshHosts, validateSshHost } from "./ssh-config.js";
+
+const logger = createLogger("tunnel-registry");
 
 /** Port range for auto-assigned local tunnel ports. */
 const TUNNEL_PORT_MIN = 19000;
@@ -193,8 +196,8 @@ export async function openTunnelForEndpoint(
   const result = await openTunnel(target.host, localPort, target.remotePort);
 
   if (!result.forwarded || !result.localPort) {
-    console.error(
-      `[tunnel-registry] Failed to open tunnel for ${endpoint.sshTarget}:`,
+    logger.error(
+      `Failed to open tunnel for ${endpoint.sshTarget}:`,
       result.errorDetail,
     );
     return null;
@@ -210,8 +213,8 @@ export async function openTunnelForEndpoint(
   };
   registry.set(key, entry);
 
-  console.info(
-    `[tunnel-registry] Tunnel open: ${endpoint.sshTarget} → 127.0.0.1:${entry.localPort} (remote :${target.remotePort})`,
+  logger.info(
+    `Tunnel open: ${endpoint.sshTarget} to 127.0.0.1:${entry.localPort} (remote :${target.remotePort})`,
   );
 
   return entry.localPort;
@@ -235,8 +238,8 @@ export function closeTunnelForEndpoint(environmentId: string, endpointId: string
   closeTunnel(entry.tunnelId);
   registry.delete(key);
 
-  console.info(
-    `[tunnel-registry] Tunnel closed: ${entry.tunnelId} (local :${entry.localPort})`,
+  logger.info(
+    `Tunnel closed: ${entry.tunnelId} (local :${entry.localPort})`,
   );
 }
 
@@ -350,8 +353,8 @@ function handleUnexpectedTunnelExit(event: TunnelExitEvent): void {
     return;
   }
 
-  console.warn(
-    `[tunnel-registry] Tunnel exited unexpectedly: ${event.tunnelId} (exit code ${event.exitCode ?? "unknown"}). Starting reconnect with backoff.`,
+  logger.warn(
+    `Tunnel exited unexpectedly: ${event.tunnelId} (exit code ${event.exitCode ?? "unknown"}). Starting reconnect with backoff.`,
   );
 
   // Start reconnect cycle
@@ -427,8 +430,8 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
           }
           freshEntry.reconnect = null;
         }
-        console.info(
-          `[tunnel-registry] Tunnel reconnected: ${freshEntry?.tunnelId ?? entry.tunnelId} → 127.0.0.1:${result}`,
+        logger.info(
+          `Tunnel reconnected: ${freshEntry?.tunnelId ?? entry.tunnelId} to 127.0.0.1:${result}`,
         );
 
         // Notify listeners that reconnect is complete
@@ -452,8 +455,8 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
         }
 
         const logTunnelId = freshEntry?.tunnelId ?? entry.tunnelId;
-        console.warn(
-          `[tunnel-registry] Tunnel reconnect failed for ${logTunnelId}. Next retry in ${backoffMs}ms (attempt ${currentFailureCount}).`,
+        logger.warn(
+          `Tunnel reconnect failed for ${logTunnelId}. Next retry in ${backoffMs}ms (attempt ${currentFailureCount}).`,
         );
 
         scheduleTunnelReconnect(key, freshEntry ?? entry);

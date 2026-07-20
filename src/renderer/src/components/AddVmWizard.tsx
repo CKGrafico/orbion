@@ -5,7 +5,7 @@ import type { AgentRuntime, ReachMethod, SshHost, VmWizardProgress, VmWizardServ
 import { TOOL_DEFINITIONS, type ToolDefinition } from "../../../shared/tool-definitions";
 import { ShieldCheck, X, Check, Loader, SkipForward, Lock, Globe, Terminal } from "lucide-react";
 import { translateMessage } from "../i18n";
-import type { IVmWizardService, IConfigService } from "../services/interfaces";
+import type { IVmWizardService, IConfigService, ILogService } from "../services/interfaces";
 
 const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   idle: "",
@@ -60,6 +60,7 @@ export function AddVmWizard(props: {
   const intl = useIntl();
   const [vmWizardService] = useInject<IVmWizardService>(cid.IVmWizardService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
+  const [logService] = useInject<ILogService>(cid.ILogService);
 
   const [target, setTarget] = useState(initialSeed?.kind === "ssh" ? initialSeed.target : "");
   const [envName, setEnvName] = useState(initialSeed?.name ?? "");
@@ -95,7 +96,7 @@ export function AddVmWizard(props: {
 
   useEffect(() => {
     const unsub = vmWizardService.onProgress((p: VmWizardProgress) => {
-      console.log("[AddVmWizard] progress:", p.step, p.message);
+      logService.debug("VM wizard progress", { step: p.step, message: p.message });
       setProgress(p);
       if (p.serviceSelection) setServiceSelection(p.serviceSelection);
       if (p.step === "done" || p.step === "error") {
@@ -103,7 +104,7 @@ export function AddVmWizard(props: {
       }
     });
     return unsub;
-  }, [vmWizardService]);
+  }, [logService, vmWizardService]);
 
   const startWizard = async (): Promise<void> => {
     if (reachMethod === "local") {

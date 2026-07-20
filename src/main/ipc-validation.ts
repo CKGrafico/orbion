@@ -11,6 +11,9 @@
 import { ipcMain } from "electron";
 import { isAllowedApiOperation, isAllowedStreamPath } from "../shared/daemon-allowlist.js";
 import type { InfraAction } from "../shared/ipc.js";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("ipc-validation");
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -768,8 +771,10 @@ export function safeHandle(
       return await handler(event, ...rawArgs);
     } catch (err) {
       if (err instanceof IpcValidationError) {
+        logger.warn(`Rejected invalid IPC request on ${channel}: ${err.message}`);
         return { ok: false, error: err.message } satisfies IpcErrorResult;
       }
+      logger.error(`Unhandled IPC error on ${channel}:`, err);
       throw err; // re-throw unexpected errors
     }
   });

@@ -3,7 +3,7 @@ import { cid, useInject } from "inversify-hooks";
 import type { Environment, OpenCodeEndpoint } from "./types";
 import type { EndpointKind } from "../../shared/ipc";
 import { trimTrailingSlash } from "../../shared/utils";
-import type { IConfigService } from "./services/interfaces";
+import type { IConfigService, ILogService } from "./services/interfaces";
 
 /**
  * Shared error handler for config CRUD operations.
@@ -11,8 +11,10 @@ import type { IConfigService } from "./services/interfaces";
  * visible in the developer console, and dispatches a custom event so
  * the UI can surface the failure to the user (e.g. via a toast/alert).
  */
-function handleConfigError(operation: string, error: unknown): void {
-  console.error(`[ConfigService] ${operation} failed:`, error);
+function handleConfigError(logService: ILogService, operation: string, error: unknown): void {
+  logService.error(`Config service ${operation} failed`, {
+    error: error instanceof Error ? error.message : String(error),
+  });
   try {
     window.dispatchEvent(
       new CustomEvent("orbion:config-error", {
@@ -45,6 +47,7 @@ export function useEnvironments(): {
   reload: () => Promise<void>;
 } {
   const [configService] = useInject<IConfigService>(cid.IConfigService);
+  const [logService] = useInject<ILogService>(cid.ILogService);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -76,9 +79,9 @@ export function useEnvironments(): {
   const select = useCallback(
     (id: string | null) => {
       setSelectedId(id);
-      void configService.setSelectedEnvironmentId(id).catch((err) => handleConfigError("setSelectedEnvironmentId", err));
+      void configService.setSelectedEnvironmentId(id).catch((err) => handleConfigError(logService, "setSelectedEnvironmentId", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const add = useCallback(async (name: string, baseUrl: string, kind?: EndpointKind): Promise<Environment> => {
@@ -93,45 +96,45 @@ export function useEnvironments(): {
       void configService.removeEnvironment(id).then(async () => {
         setEnvironments(await configService.getEnvironments());
         setSelectedId(await configService.getSelectedEnvironmentId());
-      }).catch((err) => handleConfigError("removeEnvironment", err));
+      }).catch((err) => handleConfigError(logService, "removeEnvironment", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const addEndpointFn = useCallback(
     (environmentId: string, url: string, kind: EndpointKind) => {
       void configService.addEndpoint(environmentId, url, kind).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch((err) => handleConfigError("addEndpoint", err));
+      }).catch((err) => handleConfigError(logService, "addEndpoint", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const removeEndpointFn = useCallback(
     (environmentId: string, endpointId: string) => {
       void configService.removeEndpoint(environmentId, endpointId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch((err) => handleConfigError("removeEndpoint", err));
+      }).catch((err) => handleConfigError(logService, "removeEndpoint", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const setActiveEndpointFn = useCallback(
     (environmentId: string, endpointId: string) => {
       void configService.setActiveEndpoint(environmentId, endpointId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch((err) => handleConfigError("setActiveEndpoint", err));
+      }).catch((err) => handleConfigError(logService, "setActiveEndpoint", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const removeSessionTokenFn = useCallback(
     (environmentId: string) => {
       void configService.removeSessionToken(environmentId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch((err) => handleConfigError("removeSessionToken", err));
+      }).catch((err) => handleConfigError(logService, "removeSessionToken", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const setOpenCodeEndpointFn = useCallback(
@@ -141,20 +144,20 @@ export function useEnvironments(): {
         if (result.ok) {
           setEnvironments(await configService.getEnvironments());
         } else {
-          handleConfigError("setOpenCodeEndpoint", `operation rejected: ${result.reason}`);
+          handleConfigError(logService, "setOpenCodeEndpoint", `operation rejected: ${result.reason}`);
         }
-      }).catch((err) => handleConfigError("setOpenCodeEndpoint", err));
+      }).catch((err) => handleConfigError(logService, "setOpenCodeEndpoint", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const setMainVmFn = useCallback(
     (environmentId: string) => {
       void configService.setMainVm(environmentId).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch((err) => handleConfigError("setMainVm", err));
+      }).catch((err) => handleConfigError(logService, "setMainVm", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const stampCheckedSetMainVmFn = useCallback(

@@ -1,5 +1,8 @@
 import { safeStorage } from "electron";
 import Store from "electron-store";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("credential-vault");
 
 interface CredentialRecord {
   encryptedValue: string;
@@ -65,10 +68,7 @@ export function pruneOrphanCredentials(activeReferences: ReadonlySet<string>): n
 
   if (orphans.length === 0) return 0;
 
-  console.warn(
-    `[credential-vault] Pruning ${orphans.length} orphaned credential(s):`,
-    orphans,
-  );
+  logger.warn(`Pruning ${orphans.length} orphaned credential(s):`, orphans);
 
   for (const key of orphans) {
     delete credentials[key];

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
@@ -503,11 +503,11 @@ function loadBounds(): WindowBounds {
     const raw = fs.readFileSync(boundsFile(), "utf8");
     const parsed = JSON.parse(raw) as WindowBounds;
     if (typeof parsed.width === "number" && typeof parsed.height === "number") return parsed;
-    console.warn("[bounds] Invalid bounds file content, using defaults");
+    logger.warn("[bounds] Invalid bounds file content, using defaults");
   } catch (err) {
     // first launch or corrupt file, use defaults
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn("[bounds] Failed to load bounds file, using defaults:", err);
+      logger.warn("[bounds] Failed to load bounds file, using defaults:", err);
     }
   }
   return { width: 1440, height: 900 };
@@ -518,7 +518,7 @@ function saveBounds(win: BrowserWindow): void {
     const bounds: WindowBounds = { ...win.getNormalBounds(), maximized: win.isMaximized() };
     fs.writeFileSync(boundsFile(), JSON.stringify(bounds));
   } catch (err) {
-    console.warn("[bounds] Failed to save window bounds:", err);
+    logger.warn("[bounds] Failed to save window bounds:", err);
   }
 }
 
@@ -623,10 +623,29 @@ app.on("second-instance", () => {
 app.setName("Orbion");
 
 app.whenReady().then(() => {
-  ipcMain.handle("log:write", (_event, entry: LogEntry) => {
-    const scopedLogger = entry.module ? createLogger(entry.module) : logger;
-    const ctx = entry.context ? ` ${JSON.stringify(entry.context)}` : "";
-    scopedLogger[entry.level](`${entry.message}${ctx}`);
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: "Help",
+      submenu: [
+        {
+          label: "Show Logs",
+          click: () => {
+            void shell.openPath(path.join(app.getPath("userData"), "logs")).then((error) => {
+              if (error) logger.warn(`Failed to open logs directory: ${error}`);
+            });
+          },
+        },
+      ],
+    },
+  ]));
+
+  ipcMain.handle("log:write", (_event, rawEntry: unknown) => {
+    if (!isLogEntry(rawEntry)) {
+      logger.warn("Rejected invalid renderer log entry");
+      return;
+    }
+    const scopedLogger = rawEntry.module ? createLogger(rawEntry.module.slice(0, 100)) : logger;
+    scopedLogger[rawEntry.level](`${rawEntry.message.slice(0, 10_000)}${formatLogContext(rawEntry.context)}`);
   });
 
   safeHandle("api:request", (_event, ...rawArgs) => {
@@ -801,7 +820,7 @@ app.whenReady().then(() => {
       setOsOffline(!online);
     } catch (err) {
       if (err instanceof IpcValidationError) {
-        console.error(`[IPC] ${err.message}`);
+        logger.error(`[IPC] ${err.message}`);
         return;
       }
       throw err;
@@ -2266,3 +2285,26 @@ app.on("window-all-closed", () => {
   closeAllRegistryTunnels();
   if (process.platform !== "darwin") app.quit();
 });
+const LOG_LEVELS = new Set<LogEntry["level"]>(["debug", "info", "warn", "error"]);
+const SENSITIVE_LOG_CONTEXT_KEY = /password|secret|token|credential|authorization|cookie/i;
+
+function isLogEntry(value: unknown): value is LogEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  return LOG_LEVELS.has(entry.level as LogEntry["level"])
+    && typeof entry.message === "string"
+    && (entry.module === undefined || typeof entry.module === "string")
+    && (entry.context === undefined || (typeof entry.context === "object" && entry.context !== null && !Array.isArray(entry.context)));
+}
+
+function formatLogContext(context: Record<string, unknown> | undefined): string {
+  if (!context) return "";
+  try {
+    const serialized = JSON.stringify(context, (key, value: unknown) =>
+      SENSITIVE_LOG_CONTEXT_KEY.test(key) ? "[REDACTED]" : value,
+    );
+    return serialized ? ` ${serialized.slice(0, 10_000)}` : "";
+  } catch {
+    return " [Unserializable context]";
+  }
+}
