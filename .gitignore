@@ -6,5 +6,7 @@ dist/
 .vite/
 .codegraph/
 .claude/
+# Visual evidence temporary artifacts (raw PNG, webm, traces, frames, logs)
+.tmp/
 # Private notes
 SECRET_INSPIRATION.md
