@@ -273,3 +273,43 @@ describe("validateIpc infra:executeAction", () => {
     expect(() => validateIpc("infra:executeAction", args)).toThrow(IpcValidationError);
   });
 });
+
+// ── Blocklisted host validation (SSRF protection) ──────────────────────
+
+describe("blocklisted host validation", () => {
+  it("allows config:addEnvironment with a normal URL", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://192.168.1.50:8845", undefined])).not.toThrow();
+  });
+
+  it("allows config:addEnvironment with localhost URL", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://localhost:8845", undefined])).not.toThrow();
+  });
+
+  it("rejects config:addEnvironment with AWS metadata URL", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://169.254.169.254/api/projects", undefined])).toThrow(IpcValidationError);
+  });
+
+  it("rejects config:addEnvironment with GCP metadata URL", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://169.254.169.253/api/projects", undefined])).toThrow(IpcValidationError);
+  });
+
+  it("rejects config:addEnvironment with arbitrary link-local URL", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://169.254.100.50:8845", undefined])).toThrow(IpcValidationError);
+  });
+
+  it("allows config:addEndpoint with a normal URL", () => {
+    expect(() => validateIpc("config:addEndpoint", ["env-1", "http://192.168.1.50:8845", "direct"])).not.toThrow();
+  });
+
+  it("allows config:addEndpoint with localhost URL", () => {
+    expect(() => validateIpc("config:addEndpoint", ["env-1", "http://localhost:8845", "direct"])).not.toThrow();
+  });
+
+  it("rejects config:addEndpoint with AWS metadata URL", () => {
+    expect(() => validateIpc("config:addEndpoint", ["env-1", "http://169.254.169.254:8845", "ssh"])).toThrow(IpcValidationError);
+  });
+
+  it("rejects config:addEndpoint with arbitrary link-local URL", () => {
+    expect(() => validateIpc("config:addEndpoint", ["env-1", "http://169.254.0.1:8845", "ssh"])).toThrow(IpcValidationError);
+  });
+});

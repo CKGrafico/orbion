@@ -276,7 +276,8 @@
     "trustHost": "Trust this host",
     "mainHostKeyFetching": "Fetching host key for {label}…",
     "mainHostKeyConfirm": "Confirm host key for {label}",
-    "mainHostKeyRejected": "Host key verification rejected. The wizard cannot proceed without trusting the host key."
+    "mainHostKeyRejected": "Host key verification rejected. The wizard cannot proceed without trusting the host key.",
+    "mainHostBlocked": "Host {host} is not allowed. Cloud metadata and link-local addresses are blocked."
   },
   "tasks": {
     "noTasks": "No tasks",

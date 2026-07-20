@@ -47,6 +47,20 @@ function isValidHttpUrl(v: unknown): v is string {
   }
 }
 
+function isBlocklistedHost(v: unknown): boolean {
+  if (!isString(v)) return false;
+  try {
+    const url = new URL(v);
+    const host = url.hostname.toLowerCase();
+    if (host === "169.254.169.254" || host === "169.254.169.253") return true;
+    if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    if (host === "[fd00:ec2::254]") return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function isAllowedPath(v: unknown): v is string {
   if (!isString(v)) return false;
   // Must start with /api/ — only API paths are valid targets
@@ -189,6 +203,7 @@ const validators: Record<string, Validator> = {
     if (!isNonEmptyString(args[0]) || (args[0] as string).length > 256)
       issues.push("name must be a non-empty string (max 256 chars)");
     if (!isValidHttpUrl(args[1])) issues.push("url must be a valid http/https URL");
+    else if (isBlocklistedHost(args[1])) issues.push("url host is a blocked metadata or link-local address");
     if (args[2] !== undefined && !isEnum(args[2], ENDPOINT_KINDS))
       issues.push("kind must be one of direct, ssh, tailscale");
     return issues;
@@ -231,6 +246,7 @@ const validators: Record<string, Validator> = {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isValidHttpUrl(args[1])) issues.push("url must be a valid http/https URL");
+    else if (isBlocklistedHost(args[1])) issues.push("url host is a blocked metadata or link-local address");
     if (!isEnum(args[2], ENDPOINT_KINDS))
       issues.push("kind must be one of direct, ssh, tailscale");
     return issues;
