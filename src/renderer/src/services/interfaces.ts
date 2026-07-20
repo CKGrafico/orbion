@@ -318,3 +318,10 @@ export interface IReviewModeService {
   /** Subscribe to overlap result updates. */
   onOverlapUpdate(cb: (result: BatchOverlapResult | null) => void): () => void;
 }
+
+export interface ILogService {
+  debug(message: string, context?: Record<string, unknown>): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+}

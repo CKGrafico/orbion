@@ -87,6 +87,7 @@ import type {
   IPrPollingService,
   IPrVerdictService,
   IReviewModeService,
+  ILogService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -2059,5 +2060,21 @@ export class MockReviewModeService implements IReviewModeService {
     return () => {
       this.listeners.delete(cb);
     };
+  }
+}
+
+@injectable()
+export class MockLogService implements ILogService {
+  debug(message: string, context?: Record<string, unknown>): void {
+    console.debug("[mock]", message, context ?? "");
+  }
+  info(message: string, context?: Record<string, unknown>): void {
+    console.log("[mock]", message, context ?? "");
+  }
+  warn(message: string, context?: Record<string, unknown>): void {
+    console.warn("[mock]", message, context ?? "");
+  }
+  error(message: string, context?: Record<string, unknown>): void {
+    console.error("[mock]", message, context ?? "");
   }
 }

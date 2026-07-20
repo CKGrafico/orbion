@@ -6,10 +6,13 @@ import os from "node:os";
 import path from "node:path";
 import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult, ConfigStamp, StaleConfigResult, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
 import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
+import { createLogger } from "./logger.js";
 import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseTarget, buildSshArgs } from "./ssh-config.js";
 import { msg } from "./i18n.js";
+
+const logger = createLogger("config-store");
 
 interface LegacyInstance {
   id: string;
@@ -95,7 +98,7 @@ function serialize<T>(fn: () => T): Promise<T> {
   const next = writeChain.then(() => fn());
   writeChain = next.then(
     () => undefined,
-    (err) => { console.error("[config-store] serialized write failed:", err); },
+    (err) => { logger.error("serialized write failed:", err); },
   );
   return next;
 }
@@ -484,7 +487,7 @@ function migrateLegacySessionToken(environmentId: string, token: SessionToken): 
   try {
     reference = storeCredential(JSON.stringify(token));
   } catch (error) {
-    console.error("[config-store] legacy session token vault migration failed:", error);
+    logger.error("legacy session token vault migration failed:", error);
     return;
   }
   if (!reference) return;
@@ -494,7 +497,7 @@ function migrateLegacySessionToken(environmentId: string, token: SessionToken): 
     store.set("environments", envs);
   } catch (error) {
     removeCredential(reference);
-    console.error("[config-store] legacy session token reference attachment failed:", error);
+    logger.error("legacy session token reference attachment failed:", error);
     return;
   }
   cleanupLegacySessionToken(environmentId);
@@ -504,7 +507,7 @@ function cleanupLegacySessionToken(environmentId: string): void {
   try {
     mutateSessionTokens((tokens) => { delete tokens[environmentId]; });
   } catch (error) {
-    console.error("[config-store] legacy session token cleanup failed:", error);
+    logger.error("legacy session token cleanup failed:", error);
   }
 }
 
@@ -586,7 +589,7 @@ function scheduleConfigSyncToMainVm(): void {
   configSyncTimer = setTimeout(() => {
     configSyncTimer = null;
     syncConfigToMainVm().catch((err) => {
-      console.error("[config-store] config sync to main-VM failed:", err);
+      logger.error("config sync to main-VM failed:", err);
     });
   }, CONFIG_SYNC_DEBOUNCE_MS);
 }
@@ -640,7 +643,7 @@ async function sshOnMainVmWrite(payload: string): Promise<void> {
   return new Promise((resolve) => {
     const proc = execFile("ssh", args, { timeout: 15_000 }, (err) => {
       if (err) {
-        console.error("[config-store] SSH write to main-VM failed:", err.message);
+        logger.error("SSH write to main-VM failed:", err.message);
         // Non-blocking: just log and continue
       }
       resolve();
@@ -665,7 +668,7 @@ function localConfigWrite(payload: string): void {
 
     fs.writeFileSync(configPath, payload, { encoding: "utf8", mode: 0o600 });
   } catch (err) {
-    console.error("[config-store] local config write failed:", err);
+    logger.error("local config write failed:", err);
     // Non-blocking: just log and continue
   }
 }

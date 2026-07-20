@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import type { TranscriptMessage, ToolCallRecord } from "../shared/ipc.js";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("transcript-store");
 
 // ---------------------------------------------------------------------------
 // Per-session file storage for chat transcripts
@@ -37,7 +40,7 @@ function serializeSession<T>(sessionId: string, fn: () => T): Promise<T> {
     next.then(
       () => undefined,
       (err) => {
-        console.error(`[transcript-store] serialized write failed for session ${sessionId}:`, err);
+        logger.error(`serialized write failed for session ${sessionId}:`, err);
       },
     ),
   );

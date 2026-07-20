@@ -1,6 +1,6 @@
 import { cid, container } from "inversify-hooks";
 import { addIdToCache } from "inversify-props";
-import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IOutageService, IReachabilityService, ITranscriptService, IMcpService, IAgentService, ILoopShapeCacheService, ISiblingOfferService, IPrPollingService, IPrVerdictService, IReviewModeService } from "./interfaces";
+import type { IConfigService, IConnectionService, IOpenCodeService, IVmWizardService, IInfraService, IApiService, IStreamService, ITailscaleService, INotificationService, IBudgetService, IInboxService, IOutageService, IReachabilityService, ITranscriptService, IMcpService, IAgentService, ILoopShapeCacheService, ISiblingOfferService, IPrPollingService, IPrVerdictService, IReviewModeService, ILogService } from "./interfaces";
 import { ConfigService } from "./impl/ConfigService";
 import { ConnectionService } from "./impl/ConnectionService";
 import { OpenCodeService } from "./impl/OpenCodeService";
@@ -8,6 +8,7 @@ import { VmWizardService } from "./impl/VmWizardService";
 import { InfraService } from "./impl/InfraService";
 import { ApiService, StreamService, TailscaleService } from "./impl/ApiStreamTailscale";
 import { NotificationService } from "./impl/NotificationService";
+import { LogService } from "./impl/LogService";
 import { BudgetService } from "./impl/BudgetService";
 import { InboxService } from "./impl/InboxService";
 import { OutageService } from "./impl/OutageService";
@@ -42,6 +43,7 @@ import {
   MockPrPollingService,
   MockPrVerdictService,
   MockReviewModeService,
+  MockLogService,
 } from "./mock/MockServices";
 
 let built = false;
@@ -74,6 +76,7 @@ function ensureCidIds(): void {
     "IPrPollingService",
     "IPrVerdictService",
     "IReviewModeService",
+    "ILogService",
   ];
   for (const id of ids) {
     if (!(cid as Record<string, unknown>)[id]) {
@@ -112,6 +115,7 @@ export function buildContainer(): void {
     container.addSingleton<IPrPollingService>(PrPollingService, cid.IPrPollingService);
     container.addSingleton<IPrVerdictService>(PrVerdictService, cid.IPrVerdictService);
     container.addSingleton<IReviewModeService>(ReviewModeService, cid.IReviewModeService);
+    container.addSingleton<ILogService>(LogService, cid.ILogService);
   } else {
     container.addSingleton<IConfigService>(MockConfigService, cid.IConfigService);
     container.addSingleton<IConnectionService>(MockConnectionService, cid.IConnectionService);
@@ -134,5 +138,6 @@ export function buildContainer(): void {
     container.addSingleton<IPrPollingService>(MockPrPollingService, cid.IPrPollingService);
     container.addSingleton<IPrVerdictService>(MockPrVerdictService, cid.IPrVerdictService);
     container.addSingleton<IReviewModeService>(MockReviewModeService, cid.IReviewModeService);
+    container.addSingleton<ILogService>(MockLogService, cid.ILogService);
   }
 }

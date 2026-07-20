@@ -1,4 +1,5 @@
 // Shared IPC contract between main, preload, and renderer.
+import type { LogEntry } from "./log.js";
 // All HTTP to loop-task environments runs in the MAIN process: the loop-task
 // daemon sends no CORS headers, so renderer fetch would be blocked, and
 // main-process fetch also works unchanged for environments on remote VMs.
@@ -1340,6 +1341,10 @@ export interface SiblingDeclineBridge {
   recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) => Promise<void>;
 }
 
+export interface LogBridge {
+  write: (entry: LogEntry) => void;
+}
+
 export interface LoopTaskBridge {
   request: <T = unknown>(args: ApiRequestArgs) => Promise<ApiResponse<T>>;
   subscribeStream: (args: StreamSubscribeArgs) => Promise<void>;
@@ -1363,4 +1368,5 @@ export interface LoopTaskBridge {
   loopShapeCache: LoopShapeCacheBridge;
   siblingDecline: SiblingDeclineBridge;
   settings: SettingsBridge;
+  log: LogBridge;
 }

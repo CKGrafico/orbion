@@ -49,6 +49,7 @@ import type {
   LoopShape,
   GlobalSettings,
 } from "../shared/ipc.js";
+import type { LogEntry } from "../shared/log.js";
 
 const bridge: LoopTaskBridge = {
   request: (args: ApiRequestArgs) => ipcRenderer.invoke("api:request", args),
@@ -438,6 +439,11 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("settings:get") as Promise<GlobalSettings>,
     updateSettings: (updates: Partial<GlobalSettings>) =>
       ipcRenderer.invoke("settings:update", updates) as Promise<void>,
+  },
+
+  log: {
+    write: (entry: LogEntry) =>
+      void ipcRenderer.invoke("log:write", entry),
   },
 };
 
