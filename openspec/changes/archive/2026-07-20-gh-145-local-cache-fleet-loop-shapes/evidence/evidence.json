@@ -1,0 +1,8 @@
+{
+  "changeId": "gh-145-local-cache-fleet-loop-shapes",
+  "githubIssue": 145,
+  "evidenceRequired": false,
+  "reason": "This change is purely invisible plumbing with no user-visible UI or behavior. The cache operates entirely in the main process and has no visual representation. Per issue acceptance criteria: 'Purely invisible plumbing; no UI surface.'",
+  "assets": [],
+  "markdown": "## gh-145: Local cache of fleet loop shapes\n\n**Status:** Completed\n\n**Summary:** Lightweight local cache of loop/chain shapes per instance, refreshed on connect and opportunistically. No UI surface, purely invisible plumbing.\n\n**Verification:** `pnpm typecheck` passes (no new errors). 5 Vitest unit tests pass covering chain-building logic and data integrity."
+}

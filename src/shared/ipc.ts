@@ -1003,6 +1003,42 @@ export interface AgentBridge {
   listModels: (environmentId: string) => Promise<ListModelsResult>;
 }
 
+// ── Local loop-shape cache (fleet patterns, offline-capable) ─────────
+
+/** A single step in a task chain (no secrets). */
+export interface ChainStep {
+  taskId: string;
+  taskName: string;
+  command: string;
+  commandArgs: string[];
+  onSuccessTaskId: string | null;
+  onFailureTaskId: string | null;
+}
+
+/** Cached structural shape of a loop (no secrets, no runtime state). */
+export interface LoopShape {
+  loopId: string;
+  environmentId: string;
+  command: string;
+  commandArgs: string[];
+  intervalHuman: string;
+  projectId: string | undefined;
+  taskId: string | null;
+  chainSteps: ChainStep[];
+  cachedAt: number;
+}
+
+export interface LoopShapeCacheBridge {
+  /** Get cached loop shapes for a specific environment. */
+  getCached: (environmentId: string) => Promise<LoopShape[]>;
+  /** Get cached loop shapes for all environments. */
+  getAll: () => Promise<LoopShape[]>;
+  /** Force-refresh cache for a specific environment from the daemon API. */
+  refresh: (environmentId: string) => Promise<LoopShape[]>;
+  /** Subscribe to cache updates. */
+  onUpdate: (cb: (shapes: LoopShape[]) => void) => () => void;
+}
+
 // ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
@@ -1040,4 +1076,5 @@ export interface LoopTaskBridge {
   transcript: TranscriptBridge;
   mcp: McpBridge;
   agent: AgentBridge;
+  loopShapeCache: LoopShapeCacheBridge;
 }

@@ -50,6 +50,7 @@ import type {
   ListModelsResult,
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
+  LoopShape,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -71,6 +72,7 @@ import type {
   ITranscriptService,
   IMcpService,
   IAgentService,
+  ILoopShapeCacheService,
 } from "../interfaces";
 
 const now = Date.now();
@@ -1337,5 +1339,61 @@ export class MockAgentService implements IAgentService {
       { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet", provider: "anthropic", available: false, unavailableReason: "Missing API key", reasoningEfforts: ["low", "medium", "high"] },
     ];
     return { ok: true, models };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mock Loop Shape Cache Service (browser-only dev)
+// ---------------------------------------------------------------------------
+
+const MOCK_LOOP_SHAPES: LoopShape[] = MOCK_LOOPS.map((loop) => ({
+  loopId: loop.id,
+  environmentId: "mock-env",
+  command: loop.command,
+  commandArgs: loop.commandArgs,
+  intervalHuman: loop.intervalHuman,
+  projectId: loop.projectId,
+  taskId: loop.taskId ?? null,
+  chainSteps: loop.taskId
+    ? (() => {
+        const steps: LoopShape["chainSteps"] = [];
+        const visited = new Set<string>();
+        let currentId: string | null = loop.taskId;
+        while (currentId && !visited.has(currentId)) {
+          visited.add(currentId);
+          const task = MOCK_TASKS.find((t) => t.id === currentId);
+          if (!task) break;
+          steps.push({
+            taskId: task.id,
+            taskName: task.name,
+            command: task.command,
+            commandArgs: task.commandArgs,
+            onSuccessTaskId: task.onSuccessTaskId,
+            onFailureTaskId: task.onFailureTaskId,
+          });
+          currentId = task.onSuccessTaskId;
+        }
+        return steps;
+      })()
+    : [],
+  cachedAt: Date.now(),
+}));
+
+@injectable()
+export class MockLoopShapeCacheService implements ILoopShapeCacheService {
+  async getCached(environmentId: string): Promise<LoopShape[]> {
+    return MOCK_LOOP_SHAPES.filter((s) => s.environmentId === environmentId);
+  }
+
+  async getAll(): Promise<LoopShape[]> {
+    return MOCK_LOOP_SHAPES;
+  }
+
+  async refresh(environmentId: string): Promise<LoopShape[]> {
+    return this.getCached(environmentId);
+  }
+
+  onUpdate(): () => void {
+    return () => {};
   }
 }

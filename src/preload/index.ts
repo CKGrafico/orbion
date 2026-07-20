@@ -46,6 +46,7 @@ import type {
   ListModelsResult,
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
+  LoopShape,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -399,6 +400,27 @@ const bridge: LoopTaskBridge = {
     },
     listModels: (environmentId: string) =>
       ipcRenderer.invoke("agent:listModels", environmentId) as Promise<ListModelsResult>,
+  },
+
+  loopShapeCache: {
+    getCached: (environmentId: string) =>
+      ipcRenderer.invoke("loopShapeCache:getCached", environmentId) as Promise<LoopShape[]>,
+    getAll: () =>
+      ipcRenderer.invoke("loopShapeCache:getAll") as Promise<LoopShape[]>,
+    refresh: (environmentId: string) =>
+      ipcRenderer.invoke("loopShapeCache:refresh", environmentId) as Promise<LoopShape[]>,
+    onUpdate: (cb: (shapes: LoopShape[]) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        shapes: LoopShape[],
+      ): void => {
+        cb(shapes);
+      };
+      ipcRenderer.on("loopShapeCache:update", listener);
+      return () => {
+        ipcRenderer.removeListener("loopShapeCache:update", listener);
+      };
+    },
   },
 };
 
