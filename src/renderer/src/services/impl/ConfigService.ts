@@ -14,6 +14,8 @@ import type {
   PullRestoreResult,
   ConfigStamp,
   StampCheckedWriteResult,
+  SweepEphemeralSessionsArgs,
+  SweepEphemeralSessionsResult,
 } from "../../../../shared/ipc";
 import type { IConfigService } from "../interfaces";
 
@@ -109,5 +111,8 @@ export class ConfigService implements IConfigService {
   }
   async forceSetMainVm(environmentId: string): Promise<ConfigStamp> {
     return this.api.forceSetMainVm(environmentId);
+  }
+  async sweepEphemeralSessions(args: SweepEphemeralSessionsArgs): Promise<SweepEphemeralSessionsResult> {
+    return this.api.sweepEphemeralSessions(args);
   }
 }

@@ -1203,6 +1203,47 @@ export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatS
   });
 }
 
+export interface SweepEphemeralSessionsArgs {
+  activeSessionId: string | null;
+  inactivityThresholdHours: number;
+}
+
+export interface SweepEphemeralSessionsResult {
+  removedSessionIds: string[];
+}
+
+/**
+ * Remove ephemeral sessions whose lastActiveAt exceeds the inactivity threshold.
+ * Never removes the currently active session or persisted sessions.
+ * Keys exclusively on lastActiveAt, never on createdAt.
+ */
+export async function sweepEphemeralSessions(args: SweepEphemeralSessionsArgs): Promise<SweepEphemeralSessionsResult> {
+  const { activeSessionId, inactivityThresholdHours } = args;
+  const cutoff = Date.now() - inactivityThresholdHours * 60 * 60 * 1000;
+  const sessions = store.get("chatSessions", []) as ChatSession[];
+  const removedIds: string[] = [];
+
+  for (const session of sessions) {
+    // Only sweep ephemeral (not persisted) sessions
+    if (session.persisted) continue;
+    // Never sweep the currently active session
+    if (session.id === activeSessionId) continue;
+    // Key on lastActiveAt only
+    const lastActive = new Date(session.lastActiveAt).getTime();
+    if (lastActive < cutoff) {
+      removedIds.push(session.id);
+    }
+  }
+
+  if (removedIds.length > 0) {
+    const remaining = sessions.filter((s) => !removedIds.includes(s.id));
+    store.set("chatSessions", remaining);
+    bumpStamp();
+  }
+
+  return { removedSessionIds: removedIds };
+}
+
 // ---------------------------------------------------------------------------
 // Expanded project state — persisted in config store
 // ---------------------------------------------------------------------------

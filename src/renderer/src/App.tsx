@@ -37,6 +37,7 @@ import { SessionChatView } from "./components/SessionChatView";
 import { ModelSelector, getReasoningEffortsForModel } from "./components/ModelSelector";
 import { ReasoningEffortSelector } from "./components/ReasoningEffortSelector";
 import { InstanceSelector } from "./components/InstanceSelector";
+import { ToastProvider, Toast, useToast } from "./components/Toast";
 import type { IAgentService } from "./services/interfaces";
 
 type View =
@@ -77,6 +78,14 @@ function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHeal
 }
 
 export function App(): React.ReactNode {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
+  );
+}
+
+function AppInner(): React.ReactNode {
   const { environments, selectedId, mainVm, loaded, select, remove, setActiveEndpoint, setMainVm, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
   const intl = useIntl();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
@@ -88,6 +97,7 @@ export function App(): React.ReactNode {
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [mcpService] = useInject<IMcpService>(cid.IMcpService);
+  const { showToast } = useToast();
   const [view, setView] = useState<View>({ kind: "instance" });
   const [vmWizardOpen, setVmWizardOpen] = useState(false);
   const [wizardSeed, setWizardSeed] = useState<BootstrapSeed | null>(null);
@@ -156,6 +166,92 @@ export function App(): React.ReactNode {
     });
     return () => { cancelled = true; };
   }, [activeSessionId, sessions, agentService, envModels]);
+
+  // ── Ephemeral session discard-on-leave ──────────────────────────────
+  // When the user navigates away from an ephemeral session, show a discard
+  // toast with an "Undo" button. If undo is not clicked within 5s, delete
+  // the session and its transcript.
+  const prevViewRef = useRef<View>(view);
+  const pendingDiscardRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const prevView = prevViewRef.current;
+    prevViewRef.current = view;
+
+    // Detect leaving an ephemeral session
+    if (
+      prevView.kind === "session" &&
+      (view.kind !== "session" || view.sessionId !== prevView.sessionId)
+    ) {
+      const leftSessionId = prevView.sessionId;
+      const leftSession = sessions.find((s) => s.id === leftSessionId);
+
+      if (leftSession && !leftSession.persisted) {
+        // If there's a previous pending discard, finalize it immediately
+        if (pendingDiscardRef.current && pendingDiscardRef.current !== leftSessionId) {
+          const previousId = pendingDiscardRef.current;
+          void configService.removeChatSession(previousId);
+          void transcriptService.deleteSession(previousId);
+        }
+
+        pendingDiscardRef.current = leftSessionId;
+
+        showToast({
+          message: intl.formatMessage({ id: "session.discardToast" }),
+          action: {
+            label: intl.formatMessage({ id: "session.discardUndo" }),
+            onClick: () => {
+              // Navigate back to the session (it wasn't deleted yet)
+              pendingDiscardRef.current = null;
+              setActiveSessionId(leftSessionId);
+              setView({ kind: "session", sessionId: leftSessionId });
+            },
+          },
+          duration: 5000,
+          onDismissed: () => {
+            // Timer expired without undo — delete the session
+            if (pendingDiscardRef.current === leftSessionId) {
+              void configService.removeChatSession(leftSessionId);
+              void transcriptService.deleteSession(leftSessionId);
+              pendingDiscardRef.current = null;
+              // Refresh sessions list
+              void configService.getChatSessions().then((s) => setSessions(s));
+            }
+          },
+        });
+      }
+    }
+  }, [view, sessions, configService, transcriptService, intl, showToast]);
+
+  // ── Inactivity sweep for ephemeral sessions ──────────────────────────
+  // Runs every 30 minutes. Removes ephemeral sessions whose lastActiveAt
+  // exceeds 4 hours, but never the currently active session.
+  const SWEEP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+  const SWEEP_INACTIVITY_HOURS = 4;
+
+  useEffect(() => {
+    const sweep = async (): Promise<void> => {
+      try {
+        const result = await configService.sweepEphemeralSessions({
+          activeSessionId,
+          inactivityThresholdHours: SWEEP_INACTIVITY_HOURS,
+        });
+        if (result.removedSessionIds.length > 0) {
+          // If a pending discard toast was for a swept session, clear it
+          if (pendingDiscardRef.current && result.removedSessionIds.includes(pendingDiscardRef.current)) {
+            pendingDiscardRef.current = null;
+          }
+          // Refresh sessions list
+          void configService.getChatSessions().then((s) => setSessions(s));
+        }
+      } catch {
+        // Best-effort: don't block the UI on sweep failure
+      }
+    };
+
+    const timer = setInterval(sweep, SWEEP_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [configService, activeSessionId]);
 
   const { isUnread, markVisited } = useUnreadTracker();
 
@@ -1548,6 +1644,9 @@ export function App(): React.ReactNode {
           onClose={() => setBudgetPanelOpen(false)}
         />
       ) : null}
+
+      {/* Toast overlay for discard undo and other transient messages */}
+      <Toast />
     </div>
   );
 }

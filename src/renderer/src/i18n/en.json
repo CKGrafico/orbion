@@ -707,7 +707,9 @@
     "unpersistCancel": "Cancel",
     "unpersistConfirmBtn": "Make ephemeral",
     "autoPersistNotice": "kept — this became a session",
-    "autoPersistDecline": "Undo"
+    "autoPersistDecline": "Undo",
+    "discardToast": "Chat discarded",
+    "discardUndo": "Undo"
   },
   "modelSelector": {
     "selectModel": "Select model",

@@ -1,4 +1,4 @@
-import type {
+  import type {
   Environment,
   AccessEndpoint,
   EndpointKind,
@@ -48,6 +48,8 @@ import type {
   ConfigStamp,
   StampCheckedWriteResult,
   ListModelsResult,
+  SweepEphemeralSessionsArgs,
+  SweepEphemeralSessionsResult,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
@@ -85,6 +87,8 @@ export interface IConfigService {
   stampCheckedSetMainVm(environmentId: string, knownStamp: ConfigStamp): Promise<StampCheckedWriteResult>;
   /** Force-write the main-VM designate regardless of staleness (last-write-wins with explicit consent). */
   forceSetMainVm(environmentId: string): Promise<ConfigStamp>;
+  /** Sweep ephemeral sessions idle beyond the inactivity threshold. */
+  sweepEphemeralSessions(args: SweepEphemeralSessionsArgs): Promise<SweepEphemeralSessionsResult>;
 }
 
 export interface IConnectionService {

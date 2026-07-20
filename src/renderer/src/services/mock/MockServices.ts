@@ -48,6 +48,8 @@ import type {
   StampCheckedWriteResult,
   ModelInfo,
   ListModelsResult,
+  SweepEphemeralSessionsArgs,
+  SweepEphemeralSessionsResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -434,6 +436,24 @@ export class MockConfigService implements IConfigService {
     mockBumpStamp();
     saveMockEnvironments();
     return mockStamp;
+  }
+  async sweepEphemeralSessions(args: SweepEphemeralSessionsArgs): Promise<SweepEphemeralSessionsResult> {
+    const sessions = await this.getChatSessions();
+    const cutoff = Date.now() - args.inactivityThresholdHours * 60 * 60 * 1000;
+    const removedSessionIds: string[] = [];
+    for (const session of sessions) {
+      if (session.persisted) continue;
+      if (session.id === args.activeSessionId) continue;
+      const lastActive = new Date(session.lastActiveAt).getTime();
+      if (lastActive < cutoff) {
+        removedSessionIds.push(session.id);
+      }
+    }
+    if (removedSessionIds.length > 0) {
+      const filtered = sessions.filter((s) => !removedSessionIds.includes(s.id));
+      try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(filtered)); } catch { /* empty */ }
+    }
+    return { removedSessionIds };
   }
 }
 

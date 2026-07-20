@@ -44,6 +44,8 @@ import type {
   ConfigStamp,
   StampCheckedWriteResult,
   ListModelsResult,
+  SweepEphemeralSessionsArgs,
+  SweepEphemeralSessionsResult,
 } from "../shared/ipc.js";
 
 const bridge: LoopTaskBridge = {
@@ -123,6 +125,8 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:stampCheckedSetMainVm", environmentId, knownStamp) as Promise<StampCheckedWriteResult>,
     forceSetMainVm: (environmentId: string) =>
       ipcRenderer.invoke("config:forceSetMainVm", environmentId) as Promise<ConfigStamp>,
+    sweepEphemeralSessions: (args: SweepEphemeralSessionsArgs) =>
+      ipcRenderer.invoke("config:sweepEphemeralSessions", args) as Promise<SweepEphemeralSessionsResult>,
   },
 
   connection: {

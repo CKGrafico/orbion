@@ -444,6 +444,20 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
+  "config:sweepEphemeralSessions": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) {
+      issues.push("args must be an object");
+      return issues;
+    }
+    const a = args[0] as Record<string, unknown>;
+    if (a.activeSessionId !== null && a.activeSessionId !== undefined && !isNonEmptyString(a.activeSessionId))
+      issues.push("activeSessionId must be a non-empty string or null");
+    if (!isNumber(a.inactivityThresholdHours))
+      issues.push("inactivityThresholdHours must be a number");
+    return issues;
+  },
+
   "config:exportBootstrapSeed": () => [],
 
   "config:importBootstrapSeed": (args) => {

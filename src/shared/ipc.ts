@@ -211,6 +211,8 @@ export interface ConfigBridge {
   stampCheckedSetMainVm: (environmentId: string, knownStamp: ConfigStamp) => Promise<StampCheckedWriteResult>;
   /** Force-write the main-VM designate regardless of staleness (last-write-wins with explicit consent). */
   forceSetMainVm: (environmentId: string) => Promise<ConfigStamp>;
+  /** Sweep (delete) ephemeral sessions idle beyond the inactivity threshold. */
+  sweepEphemeralSessions: (args: SweepEphemeralSessionsArgs) => Promise<SweepEphemeralSessionsResult>;
 }
 
 // ── Platform detection ─────────────────────────────────────────────────
@@ -791,6 +793,20 @@ export interface ChatSession {
   lastActiveAt: string;
   /** ISO timestamp when the session was created. */
   createdAt: string;
+}
+
+// ── Ephemeral session sweep ──────────────────────────────────────────
+
+export interface SweepEphemeralSessionsArgs {
+  /** The session currently open in the window — never swept. */
+  activeSessionId: string | null;
+  /** Hours of inactivity before an ephemeral session is swept. */
+  inactivityThresholdHours: number;
+}
+
+export interface SweepEphemeralSessionsResult {
+  /** IDs of sessions that were removed by the sweep. */
+  removedSessionIds: string[];
 }
 
 // ── Transcript persistence (local, instance-independent) ────────────

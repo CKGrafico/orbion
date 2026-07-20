@@ -91,6 +91,7 @@ import {
   getConfigStamp,
   stampCheckedSetMainVm,
   forceSetMainVm,
+  sweepEphemeralSessions,
 } from "./config-store.js";
 import {
   getMessages as transcriptGetMessages,
@@ -951,6 +952,16 @@ app.whenReady().then(() => {
   safeHandle("config:forceSetMainVm", async (_event, ...rawArgs): Promise<ConfigStamp> => {
     const [environmentId] = validateIpc<[string]>("config:forceSetMainVm", rawArgs);
     return forceSetMainVm(environmentId);
+  });
+
+  safeHandle("config:sweepEphemeralSessions", async (_event, ...rawArgs): Promise<import("../shared/ipc").SweepEphemeralSessionsResult> => {
+    const [args] = validateIpc<[import("../shared/ipc").SweepEphemeralSessionsArgs]>("config:sweepEphemeralSessions", rawArgs);
+    // Also delete transcripts for swept sessions
+    const result = await sweepEphemeralSessions(args);
+    for (const sessionId of result.removedSessionIds) {
+      try { await transcriptDeleteSession(sessionId); } catch { /* best-effort */ }
+    }
+    return result;
   });
 
   // ── CLI input sanitization (issue #191) ──────────────────────────────
