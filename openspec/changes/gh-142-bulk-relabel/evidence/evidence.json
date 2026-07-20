@@ -19,7 +19,7 @@
       "caption": "Bulk relabel per-item results with success and failure",
       "width": 1280,
       "height": 720,
-      "bytes": 27460,
+      "bytes": 27464,
       "format": "webp"
     }
   ],
@@ -47,5 +47,5 @@
       "status": "passed"
     }
   ],
-  "prMarkdown": "## Visual Evidence\n### Bulk relabel issues using one sentence\n\n![Bulk relabel confirmation naming every affected issue](https://raw.githubusercontent.com/CKGrafico/orbion/af4a0383cf5cafc186cdf70d90b903ab7fc5ddb9/openspec/changes/gh-142-bulk-relabel/evidence/01-confirmation.webp)\n![Bulk relabel per-item results with success and failure](https://raw.githubusercontent.com/CKGrafico/orbion/af4a0383cf5cafc186cdf70d90b903ab7fc5ddb9/openspec/changes/gh-142-bulk-relabel/evidence/02-result.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. List issues labeled to-implement\n2. Enter mark these as to-refine\n3. Verify the confirmation names every affected issue\n4. Apply once\n5. Verify per-item success and failure results\n\n</details>"
+  "prMarkdown": "## Visual Evidence\n### Bulk relabel issues using one sentence\n\n![Bulk relabel confirmation naming every affected issue](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-142-bulk-relabel/evidence/01-confirmation.webp)\n![Bulk relabel per-item results with success and failure](https://raw.githubusercontent.com/CKGrafico/orbion/4cecd344234a7045bd087fc6deef6b3989d6ec45/openspec/changes/gh-142-bulk-relabel/evidence/02-result.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. List issues labeled to-implement\n2. Enter mark these as to-refine\n3. Verify the confirmation names every affected issue\n4. Apply once\n5. Verify per-item success and failure results\n\n</details>"
 }
