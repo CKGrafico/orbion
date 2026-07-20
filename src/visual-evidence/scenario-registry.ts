@@ -218,6 +218,31 @@ registerScenario({
   changeId: "gh-153-diff-view-review-mode",
   runner: gh153DiffViewReviewModeScenario,
   description: "Diff viewer in review mode with file list, unified diff, and binary file labels",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "diff-file-list",
+        description: "Review mode shows changed files and line statistics.",
+        assertionDescriptions: [
+          "The diff file list is visible with file entries",
+          "File stats (additions/deletions) are visible in the file list",
+        ],
+        captureLabels: ["unified-diff"],
+      },
+      {
+        id: "unified-diff",
+        description: "Selecting a text file displays its unified diff.",
+        assertionDescriptions: ["Selecting a file shows its unified diff with line coloring"],
+        captureLabels: ["unified-diff"],
+      },
+      {
+        id: "binary-fallback",
+        description: "Selecting a binary file displays a readable fallback.",
+        assertionDescriptions: ["Binary file shows a label instead of diff content"],
+        captureLabels: ["binary-file"],
+      },
+    ],
+  },
 });
 
 registerScenario({

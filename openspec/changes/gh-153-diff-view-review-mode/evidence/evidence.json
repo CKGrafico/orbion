@@ -2,14 +2,68 @@
   "version": 1,
   "changeId": "gh-153-diff-view-review-mode",
   "required": true,
-  "status": "failed",
-  "assets": [],
-  "temporaryArtifacts": {
-    "screenshot": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/failure.png",
-    "video": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/video.webm",
-    "trace": "/home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/trace.zip"
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-153-diff-view-review-mode/evidence/01-unified-diff.webp",
+      "caption": "Review mode showing file list, stats, and unified diff",
+      "width": 1280,
+      "height": 720,
+      "bytes": 46788,
+      "format": "webp"
+    },
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-153-diff-view-review-mode/evidence/02-binary-file.webp",
+      "caption": "Review mode showing the binary file fallback",
+      "width": 1280,
+      "height": 720,
+      "bytes": 23514,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Diff view in review mode",
+    "steps": [
+      "Navigate to the inbox view",
+      "Click a PR awaiting review item",
+      "Verify the diff file list appears with file entries and stats",
+      "Verify file stats (additions/deletions) are visible",
+      "Verify the selected file shows unified diff with add/remove coloring",
+      "Verify binary files show a label instead of diff content",
+      "Press Escape and verify review mode closes"
+    ]
   },
-  "failedStep": "run",
-  "error": "page.waitForTimeout: Target page, context or browser has been closed",
-  "prMarkdown": "## Visual Evidence\n\n⚠️ **Automated visual evidence failed.**\n\nFailed step: run\n\nError:\n```\npage.waitForTimeout: Target page, context or browser has been closed\n```\n\nTemporary artifacts (not committed):\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/failure.png\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/video.webm\n- /home/azureuser/projects/orbion/.tmp/visual-evidence/gh-153-diff-view-review-mode/trace.zip"
+  "assertions": [
+    {
+      "description": "A PR awaiting review item is visible in the inbox",
+      "status": "passed"
+    },
+    {
+      "description": "Clicking a PR item opens review mode with diff viewer",
+      "status": "passed"
+    },
+    {
+      "description": "The diff file list is visible with file entries",
+      "status": "passed"
+    },
+    {
+      "description": "File stats (additions/deletions) are visible in the file list",
+      "status": "passed"
+    },
+    {
+      "description": "Selecting a file shows its unified diff with line coloring",
+      "status": "passed"
+    },
+    {
+      "description": "Binary file shows a label instead of diff content",
+      "status": "passed"
+    },
+    {
+      "description": "Pressing Escape closes review mode and returns to inbox",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Diff view in review mode\n\n![Review mode showing file list, stats, and unified diff](https://raw.githubusercontent.com/CKGrafico/orbion/3fa5744ac7df62f2c284526d3f950cac2d873d98/openspec/changes/gh-153-diff-view-review-mode/evidence/01-unified-diff.webp)\n![Review mode showing the binary file fallback](https://raw.githubusercontent.com/CKGrafico/orbion/3fa5744ac7df62f2c284526d3f950cac2d873d98/openspec/changes/gh-153-diff-view-review-mode/evidence/02-binary-file.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. Navigate to the inbox view\n2. Click a PR awaiting review item\n3. Verify the diff file list appears with file entries and stats\n4. Verify file stats (additions/deletions) are visible\n5. Verify the selected file shows unified diff with add/remove coloring\n6. Verify binary files show a label instead of diff content\n7. Press Escape and verify review mode closes\n\n</details>"
 }
