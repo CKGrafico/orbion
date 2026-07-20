@@ -733,10 +733,15 @@
     "emptyState": "No loops yet — ask to create one",
     "unknownState": "{count} loops — status unknown",
     "healthyCount": "{count} running",
+    "healthyCountAria": "Show {count} running loop{count, plural, one {} other {s}} in chat",
     "failedCount": "{count} failed",
+    "failedCountAria": "Show {count} failed loop{count, plural, one {} other {s}} in chat",
     "pausedCount": "{count} paused",
+    "pausedCountAria": "Show {count} paused loop{count, plural, one {} other {s}} in chat",
     "stoppedCount": "{count} stopped",
+    "stoppedCountAria": "Show {count} stopped loop{count, plural, one {} other {s}} in chat",
     "finishedCount": "{count} finished",
+    "finishedCountAria": "Show {count} finished loop{count, plural, one {} other {s}} in chat",
     "nextRun": "next: {loop} in {countdown}"
   },
   "loopCard": {

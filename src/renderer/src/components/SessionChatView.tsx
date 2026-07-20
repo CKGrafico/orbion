@@ -7,7 +7,7 @@ import type { IAgentService, ITranscriptService } from "../services/interfaces";
 import type { LoopMeta, Environment } from "../types";
 import { useTranscript } from "../chat/useTranscript";
 import { ChatComposer } from "../chat/ChatComposer";
-import { LoopSummaryBar } from "./LoopSummaryBar";
+import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { LoopCard } from "./LoopCard";
 import { WifiOff } from "lucide-react";
 
@@ -50,6 +50,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     finishTurn,
     interruptTurn,
     reloadTranscript,
+    insertLoopCards,
   } = useTranscript(sessionId);
 
   const [accessMode, setAccessMode] = useState<AccessMode>("full");
@@ -272,6 +273,25 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [],
   );
 
+  // ── Loop-bar segment click → summon matching loop cards ──────────────
+
+  const handleSegmentClick = useCallback(
+    (kind: LoopSegmentKind) => {
+      // Map the segment kind to the matching loop IDs
+      const matchingLoops = kind === "healthy"
+        ? loops.filter((l) => l.status === "running" || l.status === "waiting")
+        : loops.filter((l) => l.status === kind);
+
+      if (matchingLoops.length > 0) {
+        insertLoopCards(
+          matchingLoops.map((l) => l.id),
+          environmentId,
+        );
+      }
+    },
+    [loops, environmentId, insertLoopCards],
+  );
+
   return (
     <div className="session-chat-panel">
       {!isReachable ? (
@@ -283,7 +303,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           )}
         </div>
       ) : null}
-      <LoopSummaryBar loops={loops} reachability={reachability} />
+      <LoopSummaryBar loops={loops} reachability={reachability} onSegmentClick={handleSegmentClick} />
       <div className="session-chat-scroll" ref={scrollRef}>
         {rows.length === 0 ? (
           <div className="session-chat-empty">
