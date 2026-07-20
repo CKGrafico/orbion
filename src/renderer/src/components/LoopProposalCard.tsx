@@ -18,9 +18,13 @@ interface LoopProposalCardProps {
   onStatusChange: (proposalId: string, status: LoopProposalStatus, error?: string) => void;
   /** Similar loops from other reachable instances (transient, computed on render). */
   similarLoops?: SimilarLoopMatch[];
+  /** The session's home environment ID, for cross-scope detection. */
+  homeEnvironmentId?: string;
+  /** All environments, for resolving the target instance name in cross-scope badge. */
+  environments?: Array<{ id: string; name: string }>;
 }
 
-export function LoopProposalCard({ row, instance, onApproved, onRejected, onStatusChange, similarLoops }: LoopProposalCardProps): React.ReactNode {
+export function LoopProposalCard({ row, instance, onApproved, onRejected, onStatusChange, similarLoops, homeEnvironmentId, environments }: LoopProposalCardProps): React.ReactNode {
   const intl = useIntl();
 
   const isPending = row.status === "pending";
@@ -29,6 +33,12 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
   const isRejected = row.status === "rejected";
   const isError = row.status === "error";
   const isTerminal = isCreated || isRejected;
+
+  // Cross-scope detection: proposal targets a non-home instance
+  const isCrossScope = homeEnvironmentId != null && row.environmentId !== homeEnvironmentId;
+  const targetEnvName = isCrossScope
+    ? environments?.find((e) => e.id === row.environmentId)?.name ?? row.environmentId
+    : undefined;
 
   // Local editable state for command, interval, max-runs, and run-immediately
   const [command, setCommand] = useState(row.command);
@@ -123,6 +133,13 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
           </span>
         )}
       </div>
+
+      {/* Cross-scope badge */}
+      {isCrossScope && targetEnvName && (
+        <div className="cross-scope-badge">
+          {intl.formatMessage({ id: "loopProposal.crossScopeBadge" }, { instance: targetEnvName })}
+        </div>
+      )}
 
       {/* Provenance badge (fleet-shaped adaptation) */}
       {row.provenance && isPending && (

@@ -43,6 +43,7 @@ import { gh163BootstrapSeedScenario } from "./scenarios/gh-163-bootstrap-seed.js
 import { gh162ReferencesNotSecretsScenario } from "./scenarios/gh-162-references-not-secrets.js";
 import { gh156ChatInfraBugClusterScenario } from "./scenarios/gh-156-chat-infra-bug-cluster.js";
 import { gh157CrossPrOverlapDetectionScenario } from "./scenarios/gh-157-cross-pr-overlap-detection.js";
+import { gh159CrossScopeBorderAnnouncementScenario } from "./scenarios/gh-159-cross-scope-border-announcement.js";
 
 export interface ScenarioContext {
   readonly repoRoot: string;
@@ -553,6 +554,36 @@ registerScenario({
           "The briefing view shows file-level overlap notes on shared files",
         ],
         captureLabels: ["file-overlap-notes"],
+      },
+    ],
+  },
+});
+
+registerScenario({
+  changeId: "gh-159-cross-scope-border-announcement",
+  runner: gh159CrossScopeBorderAnnouncementScenario,
+  description: "Cross-scope actions announce the border crossing with instance attribution",
+  evidenceContract: {
+    criteria: [
+      {
+        id: "cross-scope-badge-styles",
+        description: "CSS classes for cross-scope badges are defined in stylesheets.",
+        assertionDescriptions: [
+          "The cross-scope-badge CSS class is defined in stylesheets",
+          "The chain-edit-proposal-cross-scope-banner CSS class is defined in stylesheets",
+          "The sibling-offer-attribution--cross-scope CSS class is defined in stylesheets",
+          "The loop-card-origin-label--cross-scope CSS class is defined in stylesheets",
+          "The transcript-instance-attribution--cross-scope CSS class is defined in stylesheets",
+        ],
+        captureLabels: ["cross-scope-styles"],
+      },
+      {
+        id: "cross-scope-i18n",
+        description: "i18n keys for cross-scope messaging are registered.",
+        assertionDescriptions: [
+          "The cross-scope i18n keys are registered (crossScope.badge resolves to a non-key string)",
+        ],
+        captureLabels: ["cross-scope-styles"],
       },
     ],
   },

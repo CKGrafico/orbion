@@ -18,6 +18,10 @@ interface ChainEditProposalCardProps {
   onStatusChange: (proposalId: string, status: ChainEditProposalStatus, error?: string) => void;
   /** Callback when the user chooses a fork strategy for a shared-task warning. */
   onForkDecision?: (proposalId: string, decision: "change-all" | "fork-copy") => void;
+  /** The session's home environment ID, for cross-scope detection. */
+  homeEnvironmentId?: string;
+  /** All environments, for resolving the target instance name in cross-scope banner. */
+  environments?: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -34,7 +38,7 @@ interface ChainEditProposalCardProps {
  * apply the chain edit. On rejection, the proposal is marked as rejected.
  * No form-based editing is provided — the chat is the editor.
  */
-export function ChainEditProposalCard({ row, instance, onApproved, onRejected, onStatusChange, onForkDecision }: ChainEditProposalCardProps): React.ReactNode {
+export function ChainEditProposalCard({ row, instance, onApproved, onRejected, onStatusChange, onForkDecision, homeEnvironmentId, environments }: ChainEditProposalCardProps): React.ReactNode {
   const intl = useIntl();
 
   const isPending = row.status === "pending";
@@ -43,6 +47,12 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
   const isRejected = row.status === "rejected";
   const isError = row.status === "error";
   const isTerminal = isApplied || isRejected;
+
+  // Cross-scope detection: chain edit targets a non-home instance
+  const isCrossScope = homeEnvironmentId != null && row.environmentId !== homeEnvironmentId;
+  const targetEnvName = isCrossScope
+    ? environments?.find((e) => e.id === row.environmentId)?.name ?? row.environmentId
+    : undefined;
 
   const warning = row.sharedTaskWarning;
   const hasWarning = warning != null && warning.referencingLoops.length > 0;
@@ -97,6 +107,13 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
           </span>
         )}
       </div>
+
+      {/* Cross-scope banner */}
+      {isCrossScope && targetEnvName && (
+        <div className="chain-edit-proposal-cross-scope-banner">
+          {intl.formatMessage({ id: "chainEditProposal.crossScopeBanner" }, { instance: targetEnvName })}
+        </div>
+      )}
 
       {/* Operation summaries */}
       {row.operationSummaries.length > 0 && (

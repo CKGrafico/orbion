@@ -14,6 +14,8 @@ interface SiblingOfferCardProps {
   onDeclined: (offerId: string, siblingLoopId: string, siblingEnvironmentId: string, fingerprint: string) => void;
   /** Callback when the offer status changes (e.g., applying, error). */
   onStatusChange: (offerId: string, status: SiblingOfferStatus, error?: string) => void;
+  /** The session's home environment ID, for cross-scope detection. */
+  homeEnvironmentId?: string;
 }
 
 /**
@@ -32,7 +34,7 @@ interface SiblingOfferCardProps {
  * apply the structural diff on the sibling instance. On decline, the
  * decline is persisted so the offer is not shown again.
  */
-export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStatusChange }: SiblingOfferCardProps): React.ReactNode {
+export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStatusChange, homeEnvironmentId }: SiblingOfferCardProps): React.ReactNode {
   const intl = useIntl();
 
   const isPending = row.status === "pending";
@@ -41,6 +43,9 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
   const isDeclined = row.status === "declined";
   const isError = row.status === "error";
   const isTerminal = isApplied || isDeclined;
+
+  // Cross-scope detection: sibling offer targets a non-home instance
+  const isCrossScope = homeEnvironmentId != null && row.siblingEnvironmentId !== homeEnvironmentId;
 
   const handleApprove = useCallback((): void => {
     onStatusChange(row.offerId, "applying");
@@ -72,11 +77,17 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
       </div>
 
       {/* Instance attribution */}
-      <div className="sibling-offer-attribution">
-        {intl.formatMessage(
-          { id: "siblingOffer.attribution" },
-          { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName },
-        )}
+      <div className={`sibling-offer-attribution${isCrossScope ? " sibling-offer-attribution--cross-scope" : ""}`}>
+        {isCrossScope
+          ? intl.formatMessage(
+              { id: "siblingOffer.crossScopeAttribution" },
+              { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName },
+            )
+          : intl.formatMessage(
+              { id: "siblingOffer.attribution" },
+              { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName },
+            )
+        }
       </div>
 
       {/* Structural change summary */}

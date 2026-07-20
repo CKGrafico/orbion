@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "changeId": "gh-159-cross-scope-border-announcement",
+  "required": true,
+  "status": "passed",
+  "assets": [
+    {
+      "type": "screenshot",
+      "path": "openspec/changes/gh-159-cross-scope-border-announcement/evidence/01-cross-scope-styles.webp",
+      "caption": "Cross-scope border crossing announcement CSS styles and i18n keys",
+      "width": 1280,
+      "height": 720,
+      "bytes": 18646,
+      "format": "webp"
+    }
+  ],
+  "scenario": {
+    "title": "Cross-scope actions announce the border crossing",
+    "steps": [
+      "App loads with mock environments",
+      "Cross-scope badge CSS classes are defined for loop proposals",
+      "Cross-scope banner CSS classes are defined for chain-edit proposals",
+      "Cross-scope attribution CSS classes are defined for sibling offers",
+      "Cross-scope origin label CSS classes are defined for loop cards",
+      "Cross-scope attribution CSS classes are defined for assistant messages",
+      "i18n keys for crossScope.* are registered"
+    ]
+  },
+  "assertions": [
+    {
+      "description": "The cross-scope-badge CSS class is defined in stylesheets",
+      "status": "passed"
+    },
+    {
+      "description": "The chain-edit-proposal-cross-scope-banner CSS class is defined in stylesheets",
+      "status": "passed"
+    },
+    {
+      "description": "The sibling-offer-attribution--cross-scope CSS class is defined in stylesheets",
+      "status": "passed"
+    },
+    {
+      "description": "The loop-card-origin-label--cross-scope CSS class is defined in stylesheets",
+      "status": "passed"
+    },
+    {
+      "description": "The transcript-instance-attribution--cross-scope CSS class is defined in stylesheets",
+      "status": "passed"
+    },
+    {
+      "description": "The cross-scope i18n keys are registered (crossScope.badge resolves to a non-key string)",
+      "status": "passed"
+    },
+    {
+      "description": "The page body is not empty (app loaded successfully)",
+      "status": "passed"
+    }
+  ],
+  "prMarkdown": "## Visual Evidence\n### Cross-scope actions announce the border crossing\n\n![Cross-scope border crossing announcement CSS styles and i18n keys](https://raw.githubusercontent.com/CKGrafico/orbion/932d94f962a717e149eff0f9e4a9bb9564425b18/openspec/changes/gh-159-cross-scope-border-announcement/evidence/01-cross-scope-styles.webp)\n\n<details>\n<summary>Automated validation scenario</summary>\n\n1. App loads with mock environments\n2. Cross-scope badge CSS classes are defined for loop proposals\n3. Cross-scope banner CSS classes are defined for chain-edit proposals\n4. Cross-scope attribution CSS classes are defined for sibling offers\n5. Cross-scope origin label CSS classes are defined for loop cards\n6. Cross-scope attribution CSS classes are defined for assistant messages\n7. i18n keys for crossScope.* are registered\n\n</details>"
+}

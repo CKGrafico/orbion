@@ -18,6 +18,8 @@ interface FleetShapedProposalCardProps {
   environmentId: string;
   loopShapeCacheService: ILoopShapeCacheService;
   infraService: IInfraService;
+  /** The session's home environment ID, for cross-scope detection. */
+  homeEnvironmentId?: string;
 }
 
 /**
@@ -36,6 +38,7 @@ export function FleetShapedProposalCard({
   environmentId,
   loopShapeCacheService,
   infraService,
+  homeEnvironmentId,
 }: FleetShapedProposalCardProps): React.ReactNode {
   const [provenance, setProvenance] = useState<string | null>(row.provenance);
   const [adaptedFrom, setAdaptedFrom] = useState<ShapeAdaptation | null | undefined>(row.adaptedFrom);
@@ -106,6 +109,8 @@ export function FleetShapedProposalCard({
       onRejected={onRejected}
       onStatusChange={onStatusChange}
       similarLoops={similarLoops}
+      homeEnvironmentId={homeEnvironmentId}
+      environments={environments}
     />
   );
 }
