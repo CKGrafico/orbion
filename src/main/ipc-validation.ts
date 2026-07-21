@@ -831,6 +831,121 @@ const validators: Record<string, Validator> = {
       issues.push("context must be an object if provided");
     return issues;
   },
+
+  // ── Budget ───────────────────────────────────────────────────
+  "budget:getWatches": () => [],
+  "budget:getBreaches": () => [],
+  "budget:addWatch": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("watch must be an object");
+    return issues;
+  },
+  "budget:removeWatch": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
+    return issues;
+  },
+  "budget:updateWatch": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
+    if (!isObject(args[1])) issues.push("updates must be an object");
+    return issues;
+  },
+  "budget:addBreach": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("breach must be an object");
+    return issues;
+  },
+  "budget:dismissBreach": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("breachId must be a non-empty string");
+    return issues;
+  },
+
+  // ── Inbox ────────────────────────────────────────────────────
+  "inbox:getItems": () => [],
+  "inbox:getResolvedItems": () => [],
+  "inbox:pruneResolvedItems": () => [],
+  "inbox:dismissItem": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("itemId must be a non-empty string");
+    return issues;
+  },
+  "inbox:queryFleet": () => [],
+  "inbox:resolveItem": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("resolved must be an object");
+    return issues;
+  },
+
+  // ── Notifications ─────────────────────────────────────────────
+  "notification:send": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("args must be an object");
+    return issues;
+  },
+  "notification:setMuted": (args) => {
+    const issues: string[] = [];
+    if (!isBoolean(args[0])) issues.push("muted must be a boolean");
+    return issues;
+  },
+  "notification:isMuted": () => [],
+
+  // ── Outage ───────────────────────────────────────────────────
+  "outage:getEscalations": () => [],
+
+  // ── Settings ─────────────────────────────────────────────────
+  "settings:get": () => [],
+  "settings:update": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("updates must be an object");
+    return issues;
+  },
+
+  // ── Condition watch ──────────────────────────────────────────
+  "watch:getWatches": () => [],
+  "watch:addWatch": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("watch must be an object");
+    return issues;
+  },
+  "watch:removeWatch": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
+    return issues;
+  },
+  "watch:tripWatch": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
+    return issues;
+  },
+
+  // ── Loop shape cache ─────────────────────────────────────────
+  "loopShapeCache:getCached": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+  "loopShapeCache:getAll": () => [],
+  "loopShapeCache:refresh": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+
+  // ── Sibling decline ──────────────────────────────────────────
+  "siblingDecline:isDeclined": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    if (!isNonEmptyString(args[1])) issues.push("loopId must be a non-empty string");
+    if (!isNonEmptyString(args[2])) issues.push("fingerprint must be a non-empty string");
+    return issues;
+  },
+  "siblingDecline:recordDecline": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) issues.push("record must be an object");
+    return issues;
+  },
 };
 
 // ── Structured IPC error result ───────────────────────────────────────
