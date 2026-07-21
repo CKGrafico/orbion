@@ -1,0 +1,30 @@
+{
+  "type": "security",
+  "description": "Migrated log:write IPC channel from raw ipcMain.handle() to safeHandle() with structured validation, module allowlist, and rate limiting",
+  "evidence": [
+    {
+      "type": "test-results",
+      "description": "31 new passing tests for log:write validator (27) and rate limiter (4)",
+      "status": "passing"
+    },
+    {
+      "type": "typecheck",
+      "description": "pnpm typecheck passes with no errors",
+      "status": "passing"
+    }
+  ],
+  "changes": [
+    {
+      "file": "src/main/ipc-validation.ts",
+      "change": "Added log:write validator with level/message/module/context checks, RENDERER_MODULE_ALLOWLIST, isAllowedRendererModule(), token-bucket rate limiter (checkLogRateLimit)"
+    },
+    {
+      "file": "src/main/index.ts",
+      "change": "Replaced ipcMain.handle('log:write') with safeHandle('log:write') + validateIpc + checkLogRateLimit; removed isLogEntry() and LOG_LEVELS"
+    },
+    {
+      "file": "tests/ipc-validation.test.ts",
+      "change": "Added 27 validator tests and 4 rate limiter tests"
+    }
+  ]
+}

@@ -109,7 +109,7 @@ import { fetchPeers } from "./tailscale.js";
 import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus, destroyAllOpenCodeStatus } from "./opencode-client.js";
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent, respondHostKey } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
-import { validateIpc, safeHandle, IpcValidationError } from "./ipc-validation.js";
+import { validateIpc, safeHandle, IpcValidationError, checkLogRateLimit } from "./ipc-validation.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
 import { OutageTracker } from "./outage-tracker.js";
@@ -676,13 +676,11 @@ app.whenReady().then(() => {
     },
   ]));
 
-  ipcMain.handle("log:write", (_event, rawEntry: unknown) => {
-    if (!isLogEntry(rawEntry)) {
-      logger.warn("Rejected invalid renderer log entry");
-      return;
-    }
-    const scopedLogger = rawEntry.module ? createLogger(rawEntry.module.slice(0, 100)) : logger;
-    scopedLogger[rawEntry.level](`${rawEntry.message.slice(0, 10_000)}${formatLogContext(rawEntry.context)}`);
+  safeHandle("log:write", (_event, ...rawArgs) => {
+    checkLogRateLimit(_event.sender.id);
+    const [entry] = validateIpc<[LogEntry]>("log:write", rawArgs);
+    const scopedLogger = entry.module ? createLogger(entry.module.slice(0, 100)) : logger;
+    scopedLogger[entry.level](`${entry.message.slice(0, 10_000)}${formatLogContext(entry.context)}`);
   });
 
   safeHandle("api:request", (_event, ...rawArgs) => {
@@ -1335,17 +1333,7 @@ process.on("exit", () => {
   forceKillAllRegistryTunnels();
 });
 
-const LOG_LEVELS = new Set<LogEntry["level"]>(["debug", "info", "warn", "error"]);
 const SENSITIVE_LOG_CONTEXT_KEY = /password|secret|token|credential|authorization|cookie/i;
-
-function isLogEntry(value: unknown): value is LogEntry {
-  if (!value || typeof value !== "object") return false;
-  const entry = value as Record<string, unknown>;
-  return LOG_LEVELS.has(entry.level as LogEntry["level"])
-    && typeof entry.message === "string"
-    && (entry.module === undefined || typeof entry.module === "string")
-    && (entry.context === undefined || (typeof entry.context === "object" && entry.context !== null && !Array.isArray(entry.context)));
-}
 
 function formatLogContext(context: Record<string, unknown> | undefined): string {
   if (!context) return "";

@@ -124,6 +124,69 @@ function makeOpenCodeEndpointValidator(): Validator {
   };
 }
 
+// ── Log module allowlist ───────────────────────────────────────────────
+
+const RENDERER_MODULE_ALLOWLIST = new Set(["renderer", "chat", "sidebar"]);
+const RENDERER_MODULE_PREFIX = "renderer/";
+const MAX_MODULE_LENGTH = 100;
+
+function isAllowedRendererModule(v: string): boolean {
+  if (v.length > MAX_MODULE_LENGTH) return false;
+  if (RENDERER_MODULE_ALLOWLIST.has(v)) return true;
+  if (v.startsWith(RENDERER_MODULE_PREFIX) && v.length > RENDERER_MODULE_PREFIX.length) return true;
+  return false;
+}
+
+// ── Log rate limiter (token bucket per sender) ─────────────────────────
+
+const LOG_RATE_BUCKET_SIZE = 120;
+const LOG_RATE_REFILL_MS = 60_000;
+const LOG_RATE_CLEANUP_AGE_MS = 5 * 60_000;
+
+interface RateBucket {
+  tokens: number;
+  lastRefill: number;
+}
+
+const logRateBuckets = new Map<number, RateBucket>();
+
+function refillBucket(bucket: RateBucket, now: number): void {
+  const elapsed = now - bucket.lastRefill;
+  if (elapsed <= 0) return;
+  const gained = Math.floor((elapsed / LOG_RATE_REFILL_MS) * LOG_RATE_BUCKET_SIZE);
+  if (gained <= 0) return;
+  bucket.tokens = Math.min(LOG_RATE_BUCKET_SIZE, bucket.tokens + gained);
+  bucket.lastRefill = now;
+}
+
+export function checkLogRateLimit(senderId: number): void {
+  const now = Date.now();
+  let bucket = logRateBuckets.get(senderId);
+
+  if (!bucket) {
+    bucket = { tokens: LOG_RATE_BUCKET_SIZE - 1, lastRefill: now };
+    logRateBuckets.set(senderId, bucket);
+    return;
+  }
+
+  refillBucket(bucket, now);
+
+  if (bucket.tokens <= 0) {
+    throw new IpcValidationError("log:write", ["rate limit exceeded: max 120 log entries per 60 seconds"]);
+  }
+
+  bucket.tokens--;
+
+  // Cleanup stale buckets
+  for (const [id, b] of logRateBuckets) {
+    if (id === senderId) continue;
+    const age = now - b.lastRefill;
+    if (age > LOG_RATE_CLEANUP_AGE_MS && b.tokens >= LOG_RATE_BUCKET_SIZE) {
+      logRateBuckets.delete(id);
+    }
+  }
+}
+
 // ── Per-channel validators ────────────────────────────────────────────
 
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
@@ -725,6 +788,32 @@ const validators: Record<string, Validator> = {
   "agent:listModels": (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+
+  // ── Log ─────────────────────────────────────────────────────
+  "log:write": (args) => {
+    const issues: string[] = [];
+    if (!isObject(args[0])) {
+      issues.push("entry must be an object");
+      return issues;
+    }
+    const e = args[0] as Record<string, unknown>;
+    if (!isEnum(e.level, ["debug", "info", "warn", "error"]))
+      issues.push("level must be debug, info, warn, or error");
+    if (!isString(e.message) || e.message.length === 0)
+      issues.push("message must be a non-empty string");
+    else if (e.message.length > 10_000)
+      issues.push("message must be at most 10,000 characters");
+    if (e.module !== undefined) {
+      if (!isString(e.module)) {
+        issues.push("module must be a string if provided");
+      } else if (!isAllowedRendererModule(e.module)) {
+        issues.push("module must be an allowed renderer module name or prefixed with renderer/");
+      }
+    }
+    if (e.context !== undefined && !isObject(e.context))
+      issues.push("context must be an object if provided");
     return issues;
   },
 };

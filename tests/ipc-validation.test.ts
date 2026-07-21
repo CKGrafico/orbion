@@ -5,7 +5,7 @@ vi.mock("electron", () => ({
   ipcMain: { handle: vi.fn() },
 }));
 
-import { isAllowedPath, validateIpc, IpcValidationError } from "../src/main/ipc-validation.js";
+import { isAllowedPath, validateIpc, IpcValidationError, checkLogRateLimit } from "../src/main/ipc-validation.js";
 
 // ── isAllowedPath unit tests ────────────────────────────────────────────
 
@@ -311,5 +311,135 @@ describe("blocklisted host validation", () => {
 
   it("rejects config:addEndpoint with arbitrary link-local URL", () => {
     expect(() => validateIpc("config:addEndpoint", ["env-1", "http://169.254.0.1:8845", "ssh"])).toThrow(IpcValidationError);
+  });
+});
+
+// ── log:write validator ────────────────────────────────────────────────
+
+describe("validateIpc log:write", () => {
+  const validEntry = () => [{ level: "info", message: "test log message" }];
+
+  it("accepts valid log entry with level and message", () => {
+    expect(() => validateIpc("log:write", validEntry())).not.toThrow();
+  });
+
+  it("accepts all valid log levels", () => {
+    for (const level of ["debug", "info", "warn", "error"] as const) {
+      expect(() => validateIpc("log:write", [{ level, message: "msg" }])).not.toThrow();
+    }
+  });
+
+  it("accepts entry without module", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg" }])).not.toThrow();
+  });
+
+  it("accepts entry with allowed module name 'renderer'", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "renderer" }])).not.toThrow();
+  });
+
+  it("accepts entry with allowed module name 'chat'", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "chat" }])).not.toThrow();
+  });
+
+  it("accepts entry with allowed module name 'sidebar'", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "sidebar" }])).not.toThrow();
+  });
+
+  it("accepts entry with renderer/ prefix module", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "renderer/feature-x" }])).not.toThrow();
+  });
+
+  it("accepts entry with context object", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { key: "val" } }])).not.toThrow();
+  });
+
+  it("rejects entry that is not an object", () => {
+    expect(() => validateIpc("log:write", ["not-an-object"])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry without level", () => {
+    expect(() => validateIpc("log:write", [{ message: "msg" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with invalid level", () => {
+    expect(() => validateIpc("log:write", [{ level: "trace", message: "msg" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry without message", () => {
+    expect(() => validateIpc("log:write", [{ level: "info" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with empty message", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with message exceeding 10,000 chars", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "x".repeat(10_001) }])).toThrow(IpcValidationError);
+  });
+
+  it("accepts entry with message at exactly 10,000 chars", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "x".repeat(10_000) }])).not.toThrow();
+  });
+
+  it("rejects entry with disallowed module name", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "credential-vault" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with main-process module name 'ssh-probe'", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "ssh-probe" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with renderer/ prefix but no suffix", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "renderer/" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with non-string module", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: 123 }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with module exceeding 100 chars", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", module: "renderer/" + "x".repeat(100) }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with non-object context", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: "string" }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with null context", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: null }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects entry with array context", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: [1, 2, 3] }])).toThrow(IpcValidationError);
+  });
+});
+
+// ── checkLogRateLimit ──────────────────────────────────────────────────
+
+describe("checkLogRateLimit", () => {
+  it("allows first request", () => {
+    expect(() => checkLogRateLimit(1)).not.toThrow();
+  });
+
+  it("allows requests under the limit", () => {
+    for (let i = 0; i < 119; i++) {
+      checkLogRateLimit(2);
+    }
+    expect(() => checkLogRateLimit(2)).not.toThrow();
+  });
+
+  it("rejects requests over the limit", () => {
+    for (let i = 0; i < 120; i++) {
+      checkLogRateLimit(3);
+    }
+    expect(() => checkLogRateLimit(3)).toThrow(IpcValidationError);
+  });
+
+  it("tracks buckets independently per sender", () => {
+    for (let i = 0; i < 120; i++) {
+      checkLogRateLimit(10);
+    }
+    expect(() => checkLogRateLimit(10)).toThrow();
+    expect(() => checkLogRateLimit(11)).not.toThrow();
   });
 });
