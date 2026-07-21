@@ -145,6 +145,8 @@ import {
 } from "./loop-shape-cache.js";
 import { isDeclined as isSiblingDeclined, recordDecline as recordSiblingDecline } from "./sibling-decline-store.js";
 import { handleInfraExecuteAction } from "./infra-handlers.js";
+import { validateBounds } from "./window-bounds.js";
+import type { WindowBounds } from "./window-bounds.js";
 
 interface StreamEntry {
   controller: AbortController;
@@ -530,14 +532,6 @@ async function handleStreamSubscribe(
   }
 }
 
-interface WindowBounds {
-  x?: number;
-  y?: number;
-  width: number;
-  height: number;
-  maximized?: boolean;
-}
-
 function boundsFile(): string {
   return path.join(app.getPath("userData"), "window-bounds.json");
 }
@@ -545,11 +539,10 @@ function boundsFile(): string {
 function loadBounds(): WindowBounds {
   try {
     const raw = fs.readFileSync(boundsFile(), "utf8");
-    const parsed = JSON.parse(raw) as WindowBounds;
-    if (typeof parsed.width === "number" && typeof parsed.height === "number") return parsed;
+    const validated = validateBounds(JSON.parse(raw));
+    if (validated) return validated;
     logger.warn("[bounds] Invalid bounds file content, using defaults");
   } catch (err) {
-    // first launch or corrupt file, use defaults
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
       logger.warn("[bounds] Failed to load bounds file, using defaults:", err);
     }
