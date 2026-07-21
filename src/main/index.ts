@@ -146,7 +146,12 @@ import {
 import { isDeclined as isSiblingDeclined, recordDecline as recordSiblingDecline } from "./sibling-decline-store.js";
 import { handleInfraExecuteAction } from "./infra-handlers.js";
 
-const streams = new Map<string, AbortController>();
+interface StreamEntry {
+  controller: AbortController;
+  sender: Electron.WebContents;
+}
+
+const streams = new Map<string, StreamEntry>();
 const streamEnvironments = new Map<string, string>();
 
 const notificationService = new NotificationService();
@@ -287,7 +292,7 @@ function removeSupervisor(environmentId: string): void {
 function abortStreamsForEnvironment(environmentId: string): void {
   for (const [subId, envId] of streamEnvironments) {
     if (envId === environmentId) {
-      streams.get(subId)?.abort();
+      streams.get(subId)?.controller.abort();
       streams.delete(subId);
       streamEnvironments.delete(subId);
     }
@@ -470,8 +475,14 @@ async function handleStreamSubscribe(
   }
 
   const controller = new AbortController();
-  streams.set(args.subId, controller);
+  streams.set(args.subId, { controller, sender });
   streamEnvironments.set(args.subId, envId);
+
+  sender.once("destroyed", () => {
+    controller.abort();
+    streams.delete(args.subId);
+    streamEnvironments.delete(args.subId);
+  });
 
   const send = (kind: "data" | "event" | "end" | "error", text: string): void => {
     if (!sender.isDestroyed()) {
@@ -695,7 +706,7 @@ app.whenReady().then(() => {
 
   safeHandle("stream:unsubscribe", (_event, ...rawArgs) => {
     const [subId] = validateIpc<[string]>("stream:unsubscribe", rawArgs);
-    streams.get(subId)?.abort();
+    streams.get(subId)?.controller.abort();
     streams.delete(subId);
     streamEnvironments.delete(subId);
   });
@@ -1314,7 +1325,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  for (const controller of streams.values()) controller.abort();
+  for (const entry of streams.values()) entry.controller.abort();
   streams.clear();
   streamEnvironments.clear();
   for (const supervisor of supervisors.values()) supervisor.destroy();
