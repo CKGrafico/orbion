@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-331-ssh-tunnel-port-verify",
+  "required": false,
+  "status": "skipped",
+  "reason": "Main-process-only change with no user-visible behavior. The fix adds port verification logic inside the SSH tunnel timeout handler. No renderer components, styling, or UI state changes.",
+  "assets": [],
+  "prMarkdown": ""
+}
