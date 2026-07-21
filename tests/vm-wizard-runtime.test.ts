@@ -9,6 +9,7 @@ const wizardMocks = vi.hoisted(() => ({
   fetchAndUnwrap: vi.fn(),
   getEnvironments: vi.fn(),
   installNodeViaMise: vi.fn(),
+  isHostInKnownHosts: vi.fn(),
   launchOnVm: vi.fn(),
   listSshHosts: vi.fn(),
   parseTarget: vi.fn(),
@@ -16,6 +17,7 @@ const wizardMocks = vi.hoisted(() => ({
   progressSend: vi.fn(),
   removeEnvironment: vi.fn(),
   setOpenCodeEndpoint: vi.fn(),
+  setEnvironmentRuntimeState: vi.fn(),
   storeSessionToken: vi.fn(),
   storeSshKeyPassphrase: vi.fn(),
 }));
@@ -29,11 +31,13 @@ vi.mock("../src/main/config-store.js", () => ({
   setOpenCodeEndpoint: wizardMocks.setOpenCodeEndpoint,
   storeSessionToken: wizardMocks.storeSessionToken,
   storeSshKeyPassphrase: wizardMocks.storeSshKeyPassphrase,
+  setEnvironmentRuntimeState: wizardMocks.setEnvironmentRuntimeState,
 }));
 
 vi.mock("../src/main/ssh-config.js", () => ({
   listSshHosts: wizardMocks.listSshHosts,
   parseTarget: wizardMocks.parseTarget,
+  isHostInKnownHosts: wizardMocks.isHostInKnownHosts,
 }));
 
 vi.mock("../src/main/ssh-probe.js", () => ({
@@ -56,6 +60,14 @@ vi.mock("../src/main/i18n.js", () => ({
 
 vi.mock("../src/main/http-utils.js", () => ({
   fetchAndUnwrap: wizardMocks.fetchAndUnwrap,
+}));
+
+vi.mock("../src/main/runtime-adapter.js", () => ({
+  createRuntimeAdapter: () => ({
+    detect: () => ({ available: true }),
+  }),
+  runtimeDetectMessage: () => ({ key: "runtime.detect" }),
+  runtimeConsentMessage: () => ({ key: "runtime.consent" }),
 }));
 
 import { respondConsent, respondServiceSelection, runWizard } from "../src/main/vm-wizard.js";
@@ -181,6 +193,8 @@ describe("VM wizard runtime behavior", () => {
     wizardMocks.storeSshKeyPassphrase.mockResolvedValue(true);
     wizardMocks.setOpenCodeEndpoint.mockResolvedValue({ ok: true });
     wizardMocks.removeEnvironment.mockResolvedValue(undefined);
+    wizardMocks.isHostInKnownHosts.mockReturnValue(true);
+    wizardMocks.setEnvironmentRuntimeState.mockResolvedValue(undefined);
   });
 
   it("never probes or launches through the local wizard path", async () => {

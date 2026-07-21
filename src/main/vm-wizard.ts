@@ -95,20 +95,24 @@ async function askServiceSelection(probe: VmWizardProbeResult, agentRuntime: Age
     serviceSelection: defaultSelection,
   });
 
-  const selection = await new Promise<VmWizardServiceSelection>((resolve) => {
-    serviceSelectionResolver = resolve;
-  });
+  try {
+    const selection = await new Promise<VmWizardServiceSelection>((resolve) => {
+      serviceSelectionResolver = resolve;
+    });
 
-  if (wizardCancelled) throw new Error("vmWizard.mainCancelled");
-  if (!probe.installedTools[selectedRuntimeToolId]) {
-    return {
-      installTools: {
-        ...selection.installTools,
-        [selectedRuntimeToolId]: true,
-      },
-    };
+    if (wizardCancelled) throw new Error("vmWizard.mainCancelled");
+    if (!probe.installedTools[selectedRuntimeToolId]) {
+      return {
+        installTools: {
+          ...selection.installTools,
+          [selectedRuntimeToolId]: true,
+        },
+      };
+    }
+    return selection;
+  } finally {
+    serviceSelectionResolver = null;
   }
-  return selection;
 }
 
 async function askConsent(
@@ -125,15 +129,19 @@ async function askConsent(
     consentPrompt: prompt,
   });
 
-  const decision = await new Promise<"install" | "skip">((resolve) => {
-    consentResolver = resolve;
-  });
+  try {
+    const decision = await new Promise<"install" | "skip">((resolve) => {
+      consentResolver = resolve;
+    });
 
-  if (wizardCancelled) {
-    throw new Error("vmWizard.mainCancelled");
+    if (wizardCancelled) {
+      throw new Error("vmWizard.mainCancelled");
+    }
+
+    return decision;
+  } finally {
+    consentResolver = null;
   }
-
-  return decision;
 }
 
 async function persistWizardCredentials(
@@ -220,9 +228,14 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
         hostKeyLine: hostKeyResult.rawLines,
       });
 
-      const accepted = await new Promise<boolean>((resolve) => {
-        hostKeyResolver = resolve;
-      });
+      let accepted: boolean;
+      try {
+        accepted = await new Promise<boolean>((resolve) => {
+          hostKeyResolver = resolve;
+        });
+      } finally {
+        hostKeyResolver = null;
+      }
 
       if (wizardCancelled) {
         emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
@@ -480,9 +493,14 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
         consentPrompt: runtimeConsentMessage(agentRuntime),
       });
 
-      const runtimeDecision = await new Promise<"install" | "skip">((resolve) => {
-        runtimeConsentResolver = resolve;
-      });
+      let runtimeDecision: "install" | "skip";
+      try {
+        runtimeDecision = await new Promise<"install" | "skip">((resolve) => {
+          runtimeConsentResolver = resolve;
+        });
+      } finally {
+        runtimeConsentResolver = null;
+      }
 
       if (wizardCancelled) {
         emitProgress({ step: "error", message: msg("vmWizard.mainWizardCancelled"), reachMethod: "ssh" });
