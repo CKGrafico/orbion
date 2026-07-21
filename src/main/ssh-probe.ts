@@ -88,7 +88,15 @@ fi
 // Detects which optional tools are already installed on the VM.
 // Generated dynamically from TOOL_DEFINITIONS — adding a tool there
 // automatically adds a check_tool line here.
+// Sources shell profile files so PATH includes mise/nvm/npm-global paths.
 const TOOLS_PROBE_SCRIPT = `
+# Load profile files so PATH includes mise/nvm/fnm/npm-global paths
+[ -f ~/.profile ] && . ~/.profile 2>/dev/null
+[ -f ~/.bashrc ] && . ~/.bashrc 2>/dev/null
+[ -f ~/.bash_profile ] && . ~/.bash_profile 2>/dev/null
+# mise
+[ -f ~/.local/bin/mise ] && eval "$(~/.local/bin/mise activate bash 2>/dev/null)" 2>/dev/null
+
 # Each line: TOOL_INSTALLED|<name> or TOOL_MISSING|<name>
 check_tool() {
   local name="\$1"
