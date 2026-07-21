@@ -255,10 +255,10 @@ fi
 # ── Optional tool installs (generated from TOOL_DEFINITIONS) ───────
 ${optionalBlocks}
 
-# ── Start loop-task daemon (bound to loopback) ───────────────────
+# ── Start loop-task daemon (bound to all interfaces for Tailscale/direct access) ───────────────────
 if [ -z "$DAEMON_SKIP" ]; then
   echo "DAEMON_STARTING|\${DAEMON_PORT}"
-  nohup loop-task serve --host 127.0.0.1 --port "\${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.log" 2>&1 &
+  nohup loop-task serve --host 0.0.0.0 --port "\${DAEMON_PORT}" > "$LAUNCH_DIR/daemon.log" 2>&1 &
   DAEMON_PID=$!
   echo "$DAEMON_PID" > "$LAUNCH_DIR/daemon.pid"
 
