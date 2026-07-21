@@ -192,6 +192,7 @@ export function checkLogRateLimit(senderId: number): void {
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
 const SESSION_SCOPES = ["read-only", "operate", "admin"] as const;
 const API_METHODS = ["GET", "POST", "PATCH", "DELETE"] as const;
+const MAX_BODY_SIZE = 1_000_000;
 const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-platform", "list-issues", "add-label", "edit-issue", "bulk-relabel", "list-prs-awaiting-review", "get-pr-verdict", "get-pr-diff", "get-pr-briefing", "submit-pr-review", "open-pr-in-browser"] as const;
 
 // Compile-time exhaustiveness check: if a new InfraAction is added to the
@@ -225,6 +226,20 @@ const validators: Record<string, Validator> = {
       issues.push("timeoutMs must be a finite number");
     if (a.timeoutMs !== undefined && isNumber(a.timeoutMs) && a.timeoutMs <= 0)
       issues.push("timeoutMs must be positive");
+    if (a.body !== undefined) {
+      if (!isObject(a.body) && !Array.isArray(a.body)) {
+        issues.push("body must be an object or array if provided");
+      } else {
+        try {
+          const serialized = JSON.stringify(a.body);
+          if (serialized.length > MAX_BODY_SIZE) {
+            issues.push(`body exceeds maximum size of ${MAX_BODY_SIZE} bytes when serialized`);
+          }
+        } catch {
+          issues.push("body must be JSON-serializable");
+        }
+      }
+    }
     // Allowlist enforcement: reject method+path combinations not explicitly permitted.
     // A compromised renderer can send any IPC payload; this check is the trust boundary.
     const method = (a.method ?? "GET") as string;

@@ -129,7 +129,7 @@ describe("isAllowedPath", () => {
 describe("validateIpc api:request path validation", () => {
   const validArgs = () => [{
     baseUrl: "https://example.com",
-    path: "/api/status",
+    path: "/api/loops",
     method: "GET",
   }];
 
@@ -156,13 +156,63 @@ describe("validateIpc api:request path validation", () => {
     const args = [{ ...validArgs()[0], path: "/api/%252e%252e/admin" }];
     expect(() => validateIpc("api:request", args)).toThrow(IpcValidationError);
   });
+
+  // ── Body validation ──────────────────────────────────────────
+
+  it("accepts api:request without body", () => {
+    const args = [{ baseUrl: "https://example.com", path: "/api/loops", method: "GET" }];
+    expect(() => validateIpc("api:request", args)).not.toThrow();
+  });
+
+  it("accepts api:request with object body under 1 MB", () => {
+    const args = [{ ...validArgs()[0], body: { key: "value" } }];
+    expect(() => validateIpc("api:request", args)).not.toThrow();
+  });
+
+  it("accepts api:request with array body under 1 MB", () => {
+    const args = [{ ...validArgs()[0], body: [1, 2, 3] }];
+    expect(() => validateIpc("api:request", args)).not.toThrow();
+  });
+
+  it("accepts api:request with body at exactly 1 MB serialized", () => {
+    const body = { data: "a".repeat(999_988) }; // {"data":"..."} = 1_000_000 - 12 + overhead
+    const serialized = JSON.stringify(body);
+    expect(serialized.length).toBeLessThanOrEqual(1_000_000);
+    expect(() => validateIpc("api:request", [{ ...validArgs()[0], body }])).not.toThrow();
+  });
+
+  it("rejects api:request with body exceeding 1 MB serialized", () => {
+    const body = { data: "a".repeat(1_000_000) };
+    expect(() => validateIpc("api:request", [{ ...validArgs()[0], body }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects api:request with non-object, non-array body (string)", () => {
+    const args = [{ ...validArgs()[0], body: "not-an-object" }];
+    expect(() => validateIpc("api:request", args)).toThrow(IpcValidationError);
+  });
+
+  it("rejects api:request with non-object, non-array body (number)", () => {
+    const args = [{ ...validArgs()[0], body: 42 }];
+    expect(() => validateIpc("api:request", args)).toThrow(IpcValidationError);
+  });
+
+  it("rejects api:request with circular reference body", () => {
+    const body: Record<string, unknown> = {};
+    body.self = body;
+    expect(() => validateIpc("api:request", [{ ...validArgs()[0], body }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects api:request with null body", () => {
+    const args = [{ ...validArgs()[0], body: null }];
+    expect(() => validateIpc("api:request", args)).toThrow(IpcValidationError);
+  });
 });
 
 describe("validateIpc stream:subscribe path validation", () => {
   const validArgs = () => [{
     subId: "sub-123",
     baseUrl: "https://example.com",
-    path: "/api/events",
+    path: "/api/loops/abc-123/logs/stream",
   }];
 
   it("accepts valid stream:subscribe with good path", () => {

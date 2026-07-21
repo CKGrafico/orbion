@@ -37,6 +37,7 @@ export type FetchAndUnwrapResult<T> =
 // ── Implementation ───────────────────────────────────────────────────────
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const MAX_BODY_SIZE = 1_000_000;
 
 export async function fetchAndUnwrap<T = unknown>(
   url: string,
@@ -62,10 +63,15 @@ export async function fetchAndUnwrap<T = unknown>(
       headers["Content-Type"] = "application/json";
     }
 
+    const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
+    if (serializedBody !== undefined && serializedBody.length > MAX_BODY_SIZE) {
+      return { ok: false, status: 0, error: `body exceeds maximum size of ${MAX_BODY_SIZE} bytes when serialized` };
+    }
+
     const res = await fetch(url, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: serializedBody,
       signal: controller.signal,
     });
 
