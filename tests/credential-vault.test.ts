@@ -50,7 +50,7 @@ vi.mock("electron-store", () => {
   };
 });
 
-import { getCredential, storeCredential } from "../src/main/credential-vault.js";
+import { getCredential, storeCredential, CredentialTamperedError } from "../src/main/credential-vault.js";
 import {
   addEnvironment,
   findSecretFieldInJson,
@@ -304,6 +304,112 @@ describe("sync-safe serialization (references-not-secrets)", () => {
       "encryptedAccessToken",
       "encryptedValue",
       "accessToken",
+      "hmac",
     ]);
+  });
+});
+
+describe("credential vault integrity (HMAC)", () => {
+  beforeEach(() => {
+    electronMocks.encryptionAvailable = true;
+    electronMocks.encryptString.mockClear();
+    electronMocks.decryptString.mockClear();
+    for (const values of electronMocks.stores.values()) values.clear();
+  });
+
+  it("stores HMAC alongside encryptedValue on write", () => {
+    const reference = storeCredential("integrity-test-value");
+    expect(reference).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(reference)]);
+    expect(stored.encryptedValue).toEqual(expect.any(String));
+    expect(stored.hmac).toEqual(expect.any(String));
+  });
+
+  it("decrypts successfully when HMAC is valid", () => {
+    const plaintext = "hmac-verified-secret";
+    const reference = storeCredential(plaintext);
+    expect(getCredential(String(reference))).toBe(plaintext);
+  });
+
+  it("throws CredentialTamperedError when encryptedValue is tampered", () => {
+    const reference = storeCredential("original-value");
+    expect(reference).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(reference)]);
+    stored.encryptedValue = Buffer.from("tampered-ciphertext").toString("base64");
+    storeValues("credentials").set("credentials", credentials);
+
+    expect(() => getCredential(String(reference))).toThrow(CredentialTamperedError);
+    try {
+      getCredential(String(reference));
+    } catch (error) {
+      expect(error).toBeInstanceOf(CredentialTamperedError);
+      expect((error as CredentialTamperedError).reference).toBe(String(reference));
+    }
+  });
+
+  it("migrates old entries without HMAC on first read", () => {
+    const plaintext = "pre-hmac-value";
+    const reference = storeCredential(plaintext);
+    expect(reference).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(reference)]);
+    const { hmac: _, ...withoutHmac } = stored;
+    credentials[String(reference)] = withoutHmac;
+    storeValues("credentials").set("credentials", credentials);
+
+    const result = getCredential(String(reference));
+    expect(result).toBe(plaintext);
+
+    const updated = record(storeValues("credentials").get("credentials"));
+    const migrated = record(updated[String(reference)]);
+    expect(migrated.hmac).toEqual(expect.any(String));
+  });
+
+  it("getSessionToken catches CredentialTamperedError and sets authState to blocked", async () => {
+    const environment = await addEnvironment("Tampered", "http://localhost:8845");
+    await storeSessionToken(environment.id, {
+      accessToken: "will-be-tampered",
+      scope: "operate",
+      expiresAt: null,
+    });
+
+    const storedEnv = getEnvironments().find((e) => e.id === environment.id);
+    const sessionRef = storedEnv?.credentialRefs?.sessionToken;
+    expect(sessionRef).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(sessionRef)]);
+    stored.encryptedValue = Buffer.from("tampered!").toString("base64");
+    storeValues("credentials").set("credentials", credentials);
+
+    const token = getSessionToken(environment.id);
+    expect(token).toBeNull();
+
+    const envAfter = getEnvironments().find((e) => e.id === environment.id);
+    expect(envAfter?.authState).toBe("blocked");
+  });
+
+  it("getSshKeyPassphrase catches CredentialTamperedError and sets authState to blocked", async () => {
+    const environment = await addEnvironment("TamperedSSH", "http://localhost:8845");
+    await storeSshKeyPassphrase(environment.id, "ssh-secret");
+
+    const storedEnv = getEnvironments().find((e) => e.id === environment.id);
+    const passphraseRef = storedEnv?.credentialRefs?.sshKeyPassphrase;
+    expect(passphraseRef).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(passphraseRef)]);
+    stored.encryptedValue = Buffer.from("tampered!").toString("base64");
+    storeValues("credentials").set("credentials", credentials);
+
+    expect(getSshKeyPassphrase(environment.id)).toBeNull();
+
+    const envAfter = getEnvironments().find((e) => e.id === environment.id);
+    expect(envAfter?.authState).toBe("blocked");
   });
 });

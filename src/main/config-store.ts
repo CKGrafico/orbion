@@ -7,7 +7,7 @@ import path from "node:path";
 import type { AccessEndpoint, AgentRuntime, EndpointKind, Environment, EnvironmentRole, SessionScope, SessionToken, PairingCodeExchangeResponse, EnvironmentAuthState, OpenCodeEndpoint, SetOpenCodeEndpointResult, I18nMessage, BudgetWatch, BudgetBreach, ResolvedInboxItem, RuntimeState, ChatSession, BootstrapSeedExportResult, BootstrapSeedImportResult, RestoreAvailability, PullRestoreResult, ConfigStamp, StaleConfigResult, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
 import { trimTrailingSlash, encodeBootstrapSeed, decodeBootstrapSeed } from "../shared/utils.js";
 import { createLogger } from "./logger.js";
-import { getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
+import { CredentialTamperedError, getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseTarget, buildSshArgs } from "./ssh-config.js";
 import { msg } from "./i18n.js";
@@ -258,6 +258,7 @@ export const SECRET_FIELD_NAMES: readonly string[] = [
   "encryptedAccessToken",
   "encryptedValue",
   "accessToken",
+  "hmac",
 ] as const;
 
 /**
@@ -404,7 +405,17 @@ export function getSessionToken(environmentId: string): SessionToken | null {
   const env = getEnvironments().find((candidate) => candidate.id === environmentId);
   const reference = env?.credentialRefs?.sessionToken;
   if (reference) {
-    const serializedToken = getCredential(reference);
+    let serializedToken: string | null;
+    try {
+      serializedToken = getCredential(reference);
+    } catch (error) {
+      if (error instanceof CredentialTamperedError) {
+        logger.error("Session token tampered for environment:", environmentId);
+        _setEnvironmentAuthState(environmentId, "blocked");
+        return null;
+      }
+      throw error;
+    }
     if (!serializedToken) return null;
     const token = parseSessionToken(serializedToken);
     if (!token) return null;
@@ -439,7 +450,17 @@ export function getSessionToken(environmentId: string): SessionToken | null {
 export function getSshKeyPassphrase(environmentId: string): string | null {
   const env = getEnvironments().find((candidate) => candidate.id === environmentId);
   const reference = env?.credentialRefs?.sshKeyPassphrase;
-  return reference ? getCredential(reference) : null;
+  if (!reference) return null;
+  try {
+    return getCredential(reference);
+  } catch (error) {
+    if (error instanceof CredentialTamperedError) {
+      logger.error("SSH key passphrase tampered for environment:", environmentId);
+      _setEnvironmentAuthState(environmentId, "blocked");
+      return null;
+    }
+    throw error;
+  }
 }
 
 function parseSessionToken(value: string): SessionToken | null {
