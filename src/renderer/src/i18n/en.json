@@ -1080,6 +1080,7 @@
     "removeSectionDesc": "Permanently remove this instance and all its credentials from Orbion.",
     "removeButton": "Remove instance",
     "removeConfirm": "Remove {name}? This cannot be undone. All loops, logs, and credentials for this instance are lost.",
+    "cancel": "Cancel",
     "nameLabel": "Name",
     "namePlaceholder": "Instance name"
   }

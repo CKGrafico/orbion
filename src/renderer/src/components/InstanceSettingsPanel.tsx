@@ -337,7 +337,7 @@ export function InstanceSettingsPanel({
                   {intl.formatMessage({ id: "instanceSettings.removeButton" })}
                 </button>
                 <button className="btn" onClick={() => setRemoveConfirm(false)}>
-                  Cancel
+                  {intl.formatMessage({ id: "instanceSettings.cancel" })}
                 </button>
               </div>
             </div>
