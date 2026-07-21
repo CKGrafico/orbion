@@ -8,7 +8,7 @@ interface InstanceSettingsPanelProps {
   open: boolean;
   onClose: () => void;
   environment: Environment | null;
-  onUpdateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime }) => void;
+  onUpdateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }) => void;
   onAddEndpoint: (environmentId: string, url: string, kind: EndpointKind) => void;
   onRemoveEndpoint: (environmentId: string, endpointId: string) => void;
   onSetActiveEndpoint: (environmentId: string, endpointId: string) => void;
@@ -33,6 +33,7 @@ export function InstanceSettingsPanel({
 
   const [nameInput, setNameInput] = useState("");
   const [nameDirty, setNameDirty] = useState(false);
+  const [sshControlTarget, setSshControlTarget] = useState("");
 
   const [newEndpointUrl, setNewEndpointUrl] = useState("");
   const [newEndpointKind, setNewEndpointKind] = useState<EndpointKind>("direct");
@@ -52,6 +53,7 @@ export function InstanceSettingsPanel({
     if (environment) {
       setNameInput(environment.name);
       setNameDirty(false);
+      setSshControlTarget(environment.sshControlTarget ?? "");
     }
   }, [environment]);
 
@@ -68,6 +70,13 @@ export function InstanceSettingsPanel({
   const handleRuntimeChange = (runtime: AgentRuntime) => {
     if (runtime !== environment.agentRuntime) {
       onUpdateEnvironment(environment.id, { agentRuntime: runtime });
+    }
+  };
+
+  const handleSshControlTargetCommit = () => {
+    const target = sshControlTarget.trim();
+    if (target !== (environment.sshControlTarget ?? "")) {
+      onUpdateEnvironment(environment.id, { sshControlTarget: target || null });
     }
   };
 
@@ -231,6 +240,22 @@ export function InstanceSettingsPanel({
             <button className="btn" style={{ fontSize: 12, padding: "4px 10px" }} onClick={handleAddEndpoint} disabled={!newEndpointUrl.trim()}>
               <Plus size={12} />
             </button>
+          </div>
+
+          <div className="settings-row">
+            <div className="settings-row-label">
+              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.sshControlTarget" })}</span>
+              <span className="settings-row-description">{intl.formatMessage({ id: "instanceSettings.sshControlTargetDesc" })}</span>
+            </div>
+            <input
+              className="settings-threshold-input"
+              style={{ width: "100%" }}
+              placeholder={intl.formatMessage({ id: "instanceSettings.sshControlTargetPlaceholder" })}
+              value={sshControlTarget || environment.sshControlTarget || ""}
+              onChange={(event) => setSshControlTarget(event.target.value)}
+              onBlur={handleSshControlTargetCommit}
+              onKeyDown={(event) => { if (event.key === "Enter") handleSshControlTargetCommit(); }}
+            />
           </div>
 
           {/* ── Runtime section ── */}

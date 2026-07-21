@@ -1176,6 +1176,59 @@ input {
   background: transparent;
 }
 
+.sidebar-context-menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 8px;
+}
+
+.sidebar-rename-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-rename-dialog {
+  background: var(--bg-elevated, var(--bg_sidebar));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-rename-input {
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  width: 300px;
+  outline: none;
+}
+
+.sidebar-rename-input:focus {
+  border-color: var(--accent);
+}
+
+/* Drag-and-drop reorder feedback */
+.tree-session-row[draggable="true"] {
+  cursor: grab;
+}
+
+.tree-session-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.tree-session-row.drag-over {
+  border-top: 2px solid var(--accent);
+  padding-top: calc(3px - 2px);
+}
+
 .session-chat-placeholder {
   display: flex;
   flex-direction: column;
@@ -1258,6 +1311,50 @@ input {
 @keyframes unreachable-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.65; }
+}
+
+/* ── Loop button bar (per-loop buttons under chat header) ── */
+
+.loop-button-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.loop-button-bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-input);
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.loop-button-bar-item:hover {
+  border-color: var(--border);
+  background: var(--bg-active);
+}
+
+.loop-button-bar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.loop-button-bar-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Loop summary bar (thin ambient status line under chat header) ── */

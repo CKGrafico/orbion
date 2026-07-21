@@ -294,7 +294,7 @@ export class MockConfigService implements IConfigService {
     mockBumpStamp();
     saveMockEnvironments();
   }
-  async updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void> {
+  async updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }): Promise<void> {
     const env = mockEnvironments.find((e) => e.id === id);
     if (!env) return;
     if (updates.name !== undefined) env.name = updates.name;
@@ -374,13 +374,27 @@ export class MockConfigService implements IConfigService {
     const filtered = sessions.filter((s) => s.id !== sessionId);
     try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(filtered)); } catch { /* empty */ }
   }
-  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>): Promise<void> {
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>): Promise<void> {
     const sessions = await this.getChatSessions();
     const idx = sessions.findIndex((s) => s.id === sessionId);
     if (idx >= 0) {
       sessions[idx] = { ...sessions[idx], ...updates };
       try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(sessions)); } catch { /* empty */ }
     }
+  }
+  async pinChatSession(sessionId: string, pinned: boolean): Promise<void> {
+    return this.updateChatSession(sessionId, { pinned });
+  }
+  async renameChatSession(sessionId: string, title: string): Promise<void> {
+    return this.updateChatSession(sessionId, { title });
+  }
+  async reorderChatSessions(orderedSessionIds: string[]): Promise<void> {
+    const sessions = await this.getChatSessions();
+    for (let i = 0; i < orderedSessionIds.length; i++) {
+      const idx = sessions.findIndex((s) => s.id === orderedSessionIds[i]);
+      if (idx >= 0) sessions[idx].sortOrder = i;
+    }
+    try { localStorage.setItem("orbion.sessions.mock", JSON.stringify(sessions)); } catch { /* empty */ }
   }
   async getExpandedProjects(): Promise<string[]> {
     try {

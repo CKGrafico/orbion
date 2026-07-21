@@ -57,11 +57,13 @@ export function ChatComposer({
     : null;
 
   const draftKey = activeTurnId ?? "__new";
-  const currentDraft = localDraft !== undefined ? localDraft : (drafts[draftKey] ?? "");
+  const currentDraft = localDraft;
 
+  // Only reset localDraft when the draftKey changes (switching turns/sessions),
+  // NOT when drafts changes (that would wipe what the user is typing on every keystroke).
   useEffect(() => {
     setLocalDraft(drafts[draftKey] ?? "");
-  }, [draftKey, drafts]);
+  }, [draftKey]);
 
   useEffect(() => {
     if (textareaRef.current && !isRunning && !pendingApproval && !pendingQuestion && isReachable) {

@@ -316,6 +316,7 @@ const validators: Record<string, Validator> = {
       const updates = args[1] as Record<string, unknown>;
       if (updates.name !== undefined && !isNonEmptyString(updates.name)) issues.push("name must be a non-empty string when provided");
       if (updates.agentRuntime !== undefined && !isEnum(updates.agentRuntime, ["opencode", "claude"])) issues.push("agentRuntime must be opencode or claude when provided");
+      if (updates.sshControlTarget !== undefined && updates.sshControlTarget !== null && !isNonEmptyString(updates.sshControlTarget)) issues.push("sshControlTarget must be a non-empty string or null when provided");
     }
     return issues;
   },
@@ -960,6 +961,23 @@ const validators: Record<string, Validator> = {
   "config:forceSetMainVm": (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+  "config:pinChatSession": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
+    if (!isBoolean(args[1])) issues.push("pinned must be a boolean");
+    return issues;
+  },
+  "config:renameChatSession": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
+    if (!isNonEmptyString(args[1])) issues.push("title must be a non-empty string");
+    return issues;
+  },
+  "config:reorderChatSessions": (args) => {
+    const issues: string[] = [];
+    if (!Array.isArray(args[0])) issues.push("orderedSessionIds must be an array of strings");
     return issues;
   },
 

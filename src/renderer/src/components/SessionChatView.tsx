@@ -24,6 +24,7 @@ import { FailureDiagnosisPanel } from "./FailureDiagnosisPanel";
 import { PrReferenceCard } from "./PrReferenceCard";
 import { WifiOff } from "lucide-react";
 import { fetchLogs } from "../api";
+import { translateMessage } from "../i18n";
 
 const MarkdownContent = lazy(() =>
   import("../chat/MarkdownContent").then((m) => ({ default: m.MarkdownContent })),
@@ -252,7 +253,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
   }, [autoPersistedJustNow]);
 
   // ── Reachability ──────────────────────────────────────────────────────
-  const isReachable = reachability === "connected" || reachability === undefined;
+  const isReachable = reachability === "connected" || reachability === undefined || reachability === "reconnecting";
 
   // ── Clear active turn and reload transcript on instance switch ───
   // When the environmentId changes (instance switch), any in-flight
@@ -474,7 +475,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           } else if (!result.ok) {
             const errorMsg = typeof result.error === "string"
               ? result.error
-              : intl.formatMessage({ id: "agent.promptError" });
+              : translateMessage(intl, result.error) || intl.formatMessage({ id: "agent.promptError" });
             appendAssistantContent(turnId, errorMsg);
             finishTurn(turnId);
             setActiveTurnId(null);
@@ -1037,7 +1038,37 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           )}
         </div>
       ) : null}
-      <LoopSummaryBar loops={loops} reachability={reachability} onSegmentClick={handleSegmentClick} fleetMode={fleetMode} fleetRollup={fleetRollup} pipelineCounts={pipelineCounts} />
+      {loops.length > 0 && !fleetMode ? (
+        <div className="loop-button-bar">
+          {loops.map((loop) => {
+            const color = loop.status === "running" ? "var(--status-running)"
+              : loop.status === "waiting" ? "var(--status-waiting)"
+              : loop.status === "failed" ? "var(--status-failed)"
+              : loop.status === "finished" ? "var(--status-finished)"
+              : loop.status === "paused" ? "var(--status-paused)"
+              : "var(--status-stopped)";
+            const label = loop.description?.trim() || loop.id;
+            return (
+              <button
+                key={loop.id}
+                className="loop-button-bar-item"
+                title={label}
+                onClick={() => {
+                  insertLoopCards([loop.id], environmentId);
+                  if (loop.status === "failed") {
+                    void diagnoseAndInsert([loop], environmentId, Date.now());
+                  }
+                }}
+              >
+                <span className="loop-button-bar-dot" style={{ background: color }} />
+                <span className="loop-button-bar-label">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : fleetMode ? (
+        <LoopSummaryBar loops={loops} reachability={reachability} onSegmentClick={handleSegmentClick} fleetMode={fleetMode} fleetRollup={fleetRollup} pipelineCounts={pipelineCounts} />
+      ) : null}
       {showAutoPersistNotice ? (
         <div className="auto-persist-notice">
           <span className="auto-persist-notice-text">

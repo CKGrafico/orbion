@@ -19,7 +19,6 @@ import type { LoopTransition } from "./use-loop-transitions";
 import { PanelLeft, RotateCw, X, Star, BellOff, Bell } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { AddVmWizard } from "./components/AddVmWizard";
-import { LoopDetail } from "./components/LoopDetail";
 import { InstanceDetail } from "./components/InstanceDetail";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { PickMainVmModal } from "./components/PickMainVmModal";
@@ -32,7 +31,6 @@ import { hostLabel, timeAgo, healthTooltip } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
 import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService, IPrVerdictService, IReviewModeService } from "./services/interfaces";
-import { InfraChatPanel } from "./components/InfraChatPanel";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
 import { AgentRuntimeSwitcher } from "./components/AgentRuntimeSwitcher";
 import { SessionChatView } from "./components/SessionChatView";
@@ -48,7 +46,6 @@ type View =
   | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
-  | { kind: "loop"; loopId: string }
   | { kind: "session"; sessionId: string };
 
 function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
@@ -317,7 +314,7 @@ function AppInner(): React.ReactNode {
     switch (deepLink.kind) {
       case "loop":
         select(deepLink.environmentId);
-        setView({ kind: "loop", loopId: deepLink.loopId });
+        openLoop(deepLink.loopId);
         break;
       case "instance":
         select(deepLink.environmentId);
@@ -918,7 +915,50 @@ function AppInner(): React.ReactNode {
     });
   };
 
-  const openLoop = (loopId: string): void => setView({ kind: "loop", loopId });
+  const openLoop = useCallback(async (loopId: string): Promise<void> => {
+    // Every loop IS a chat. Find or create a persisted chat session linked to this specific loop.
+    const loop = loops.find((l) => l.id === loopId);
+    const envId = selected?.id ?? "";
+    const projectId = loop?.projectId ?? "default";
+    const projectList = perEnvProjects[envId] ?? [];
+    const project = projectList.find((p) => p.id === projectId);
+    const projectName = project?.name ?? "Default";
+
+    // Look for an existing session linked to this specific loop
+    const existing = sessions.find(
+      (s) => s.isLoopChat === true && s.loopId === loopId,
+    );
+    if (existing) {
+      setActiveSessionId(existing.id);
+      setView({ kind: "session", sessionId: existing.id });
+      void configService.updateChatSession(existing.id, {
+        lastActiveAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const env = environments.find((e) => e.id === envId);
+    const defaultRuntime = env?.agentRuntime ?? "opencode";
+    const envModelList = envModels[envId] ?? [];
+    const defaultModel = envModelList.find((m) => m.available)?.id;
+    const newSession = await configService.addChatSession({
+      title: loop?.description?.trim() || loopId,
+      projectName,
+      environmentId: envId,
+      workingDirectory: "",
+      activeRuntime: defaultRuntime,
+      activeModel: defaultModel,
+      lastActiveAt: new Date().toISOString(),
+      persisted: true,
+      isLoopChat: true,
+      loopId,
+    });
+    // Refresh sessions list so the new session appears in the sidebar
+    const updated = await configService.getChatSessions();
+    setSessions(updated);
+    setActiveSessionId(newSession.id);
+    setView({ kind: "session", sessionId: newSession.id });
+  }, [loops, selected, perEnvProjects, sessions, configService, environments, envModels]);
   const openProject = (projectId: string): void => setView({ kind: "project", projectId });
 
   const handlePullRestore = useCallback(async (): Promise<PullRestoreResult> => {
@@ -1238,39 +1278,28 @@ function AppInner(): React.ReactNode {
     return wasEphemeral && isNowPersisted;
   }, [sessions, prevPersistedState]);
 
-  const handleOpenProjectChat = useCallback((projectName: string, environmentId: string, workingDirectory: string) => {
-    const existing = sessions.find(
-      (s) => s.projectName === projectName && s.environmentId === environmentId,
-    );
-    if (existing) {
-      setActiveSessionId(existing.id);
-      setView({ kind: "session", sessionId: existing.id });
-      void configService.updateChatSession(existing.id, {
-        lastActiveAt: new Date().toISOString(),
-      });
-    } else {
-      const env = environments.find((e) => e.id === environmentId);
-      const defaultRuntime = env?.agentRuntime ?? "opencode";
-      const envModelList = envModels[environmentId] ?? [];
-      const defaultModel = envModelList.find((m) => m.available)?.id;
-      void configService
-        .addChatSession({
-          title: `Project: ${projectName}`,
-          projectName,
-          environmentId,
-          workingDirectory,
-          activeRuntime: defaultRuntime,
-          activeModel: defaultModel,
-          lastActiveAt: new Date().toISOString(),
-          persisted: false,
-        })
-        .then((newSession) => {
-          setActiveSessionId(newSession.id);
-          setView({ kind: "session", sessionId: newSession.id });
-          select(environmentId);
-        });
-    }
-  }, [sessions, configService, select, environments, envModels]);
+  const handleOpenProjectChat = useCallback(async (projectName: string, environmentId: string, workingDirectory: string): Promise<void> => {
+    // Always create a new chat session. Each click = new chat.
+    const env = environments.find((e) => e.id === environmentId);
+    const defaultRuntime = env?.agentRuntime ?? "opencode";
+    const envModelList = envModels[environmentId] ?? [];
+    const defaultModel = envModelList.find((m) => m.available)?.id;
+    const newSession = await configService.addChatSession({
+      title: `New chat`,
+      projectName,
+      environmentId,
+      workingDirectory,
+      activeRuntime: defaultRuntime,
+      activeModel: defaultModel,
+      lastActiveAt: new Date().toISOString(),
+      persisted: true,
+    });
+    const updated = await configService.getChatSessions();
+    setSessions(updated);
+    setActiveSessionId(newSession.id);
+    setView({ kind: "session", sessionId: newSession.id });
+    select(environmentId);
+  }, [configService, select, environments, envModels]);
 
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
@@ -1321,7 +1350,7 @@ function AppInner(): React.ReactNode {
             }
             select(item.environmentId);
             if (item.loopId) {
-              setView({ kind: "loop", loopId: item.loopId });
+              openLoop(item.loopId);
             } else {
               setView({ kind: "instance" });
             }
@@ -1436,16 +1465,6 @@ function AppInner(): React.ReactNode {
           />
         );
       }
-      case "loop":
-        return (
-          <LoopDetail
-            instance={selected}
-            loopId={view.loopId}
-            initial={loops.find((l) => l.id === view.loopId) ?? null}
-            reachability={reachability[selected.id]}
-            onBack={() => setView({ kind: "instance" })}
-          />
-        );
       case "session": {
         const session = sessions.find((s) => s.id === view.sessionId);
         const sessionEnvId = session?.environmentId ?? selected?.id ?? "";
@@ -1514,25 +1533,6 @@ function AppInner(): React.ReactNode {
           <span className="dot" style={{ background: project?.color ?? "var(--text-muted)" }} />
           <span className="main-title">{project?.name ?? view.projectId}</span>
           <span className="chip">{intl.formatMessage({ id: "projectDetail.loopsCount" }, { count: projectLoops.length })}</span>
-          <span style={{ flex: 1 }} />
-        </div>
-      );
-    }
-
-    if (view.kind === "loop") {
-      const loop = loops.find((l) => l.id === view.loopId);
-      const title = loop?.description?.trim() || loop?.id || view.loopId;
-      return (
-        <div className="main-header">
-          <span className="main-title">{title}</span>
-          {loop ? (
-            <span
-              className="chip"
-              style={{ color: `var(--status-${loop.status})` }}
-            >
-              {intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
-            </span>
-          ) : null}
           <span style={{ flex: 1 }} />
         </div>
       );
@@ -1676,8 +1676,14 @@ function AppInner(): React.ReactNode {
 
         {daemonSettings ? (
           <>
-            <span className={`chip ${daemonSettings.httpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonHttpApi" })}>HTTP</span>
-            <span className={`chip ${daemonSettings.mcpApiEnabled ? "chip-ok" : "chip-off"}`} title={intl.formatMessage({ id: "app.daemonMcpApi" })}>MCP</span>
+            <span className="chip" title={intl.formatMessage({ id: "app.daemonHttpApi" })} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: daemonSettings.httpApiEnabled ? "var(--health-ok)" : "var(--danger)", flexShrink: 0 }} />
+              HTTP
+            </span>
+            <span className="chip" title={intl.formatMessage({ id: "app.daemonMcpApi" })} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: daemonSettings.mcpApiEnabled ? "var(--health-ok)" : "var(--danger)", flexShrink: 0 }} />
+              MCP
+            </span>
           </>
         ) : null}
 
@@ -1809,7 +1815,7 @@ function AppInner(): React.ReactNode {
                   inboxItemCount={inboxItemCount}
                   onNavigateToLoop={(envId, loopId) => {
                     select(envId);
-                    setView({ kind: "loop", loopId });
+                    openLoop(loopId);
                   }}
                   onNavigateToProject={(envId, projectId) => {
                     select(envId);
@@ -1835,11 +1841,6 @@ function AppInner(): React.ReactNode {
               <div className={`content${view.kind === "inbox" ? " content-full" : ""}`}>
                 {renderContent()}
               </div>
-
-              {/* InfraChatPanel shows only on instance/project/loop views */}
-              {view.kind !== "inbox" && selected && mainVm ? (
-                <InfraChatPanel mainVmId={mainVm.id} mainVmName={mainVm.name} />
-              ) : null}
 
               {/* PR review mode overlay */}
               {reviewModeItem ? (

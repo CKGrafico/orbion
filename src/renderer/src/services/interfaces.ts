@@ -64,7 +64,7 @@ export interface IConfigService {
   getEnvironments(): Promise<Environment[]>;
   addEnvironment(name: string, url: string, kind?: EndpointKind): Promise<Environment>;
   removeEnvironment(id: string): Promise<void>;
-  updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void>;
+  updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }): Promise<void>;
   addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null>;
   removeEndpoint(environmentId: string, endpointId: string): Promise<void>;
   setActiveEndpoint(environmentId: string, endpointId: string): Promise<void>;
@@ -83,7 +83,10 @@ export interface IConfigService {
   getChatSessions(): Promise<ChatSession[]>;
   addChatSession(session: Omit<ChatSession, "id" | "createdAt">): Promise<ChatSession>;
   removeChatSession(sessionId: string): Promise<void>;
-  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>): Promise<void>;
+  updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>): Promise<void>;
+  pinChatSession(sessionId: string, pinned: boolean): Promise<void>;
+  renameChatSession(sessionId: string, title: string): Promise<void>;
+  reorderChatSessions(orderedSessionIds: string[]): Promise<void>;
   getExpandedProjects(): Promise<string[]>;
   setExpandedProjects(expandedKeys: string[]): Promise<void>;
   exportBootstrapSeed(): Promise<BootstrapSeedExportResult>;

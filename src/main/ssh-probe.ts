@@ -50,17 +50,39 @@ const DAEMON_PROBE_SCRIPT = `
 # Check for running loop-task daemon
 loop_pid="$(pgrep -f 'loop-task' 2>/dev/null || true)"
 if [ -n "\${loop_pid}" ]; then
-  loop_port="$(ss -tlnp 2>/dev/null | grep "\${loop_pid}" | grep -oP '(?<=:)\\d+' | head -1 || true)"
-  if [ -n "\${loop_port}" ]; then
-    echo "DAEMON_RUNNING|\${loop_port}"
-  else
+  # loop-task may listen on multiple ports (HTTP API on 8845, MCP on 8846).
+  # We want the HTTP API port. Collect all ports, prefer 8845, then probe.
+  all_ports="$(ss -tlnp 2>/dev/null | grep "\${loop_pid}" | grep -oP '(?<=:)\\d+' | sort -u 2>/dev/null || true)"
+  if [ -z "\${all_ports}" ]; then
     # Try lsof fallback
-    loop_port="$(lsof -Pan -p "\${loop_pid}" -i 2>/dev/null | grep LISTEN | grep -oP '(?<=:)\\d+' | head -1 || true)"
-    if [ -n "\${loop_port}" ]; then
-      echo "DAEMON_RUNNING|\${loop_port}"
-    else
-      echo "DAEMON_RUNNING_UNKNOWN_PORT"
+    all_ports="$(lsof -Pan -p "\${loop_pid}" -i 2>/dev/null | grep LISTEN | grep -oP '(?<=:)\\d+' | sort -u 2>/dev/null || true)"
+  fi
+  if [ -n "\${all_ports}" ]; then
+    found_port=""
+    # Prefer port 8845 (default HTTP API) if present
+    for p in \${all_ports}; do
+      if [ "\${p}" = "8845" ]; then
+        found_port="\${p}"
+        break
+      fi
+    done
+    # Otherwise probe each port for /api/loops (HTTP API endpoint)
+    if [ -z "\${found_port}" ]; then
+      for p in \${all_ports}; do
+        if curl -sS -o /dev/null --connect-timeout 1 "http://127.0.0.1:\${p}/api/loops" 2>/dev/null; then
+          found_port="\${p}"
+          break
+        fi
+      done
     fi
+    if [ -n "\${found_port}" ]; then
+      echo "DAEMON_RUNNING|\${found_port}"
+    else
+      # Fallback: first port found
+      echo "DAEMON_RUNNING|\$(echo \${all_ports} | head -1)"
+    fi
+  else
+    echo "DAEMON_RUNNING_UNKNOWN_PORT"
   fi
 else
   echo "DAEMON_NOT_RUNNING"

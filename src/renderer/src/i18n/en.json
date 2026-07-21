@@ -92,7 +92,11 @@
     "openProjectChat": "Open in chat",
     "moveToProject": "Move to project",
     "sessionMoved": "Chat moved to \"{project}\"",
-    "moveToProjectUnavailable": "No instance has the project \"{project}\""
+    "moveToProjectUnavailable": "No instance has the project \"{project}\"",
+    "pin": "Pin to top",
+    "unpin": "Unpin",
+    "rename": "Rename",
+    "renamePlaceholder": "Enter new name…"
   },
   "vmWizard": {
     "stepPickReachMethod": "Choose reach method",
@@ -1082,6 +1086,9 @@
     "removeConfirm": "Remove {name}? This cannot be undone. All loops, logs, and credentials for this instance are lost.",
     "cancel": "Cancel",
     "nameLabel": "Name",
-    "namePlaceholder": "Instance name"
+    "namePlaceholder": "Instance name",
+    "sshControlTarget": "SSH control target",
+    "sshControlTargetDesc": "Used for installs and runtime recovery. Kept when daemon access uses Tailscale.",
+    "sshControlTargetPlaceholder": "azureuser@100.99.155.102"
   }
 }

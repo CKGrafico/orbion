@@ -35,7 +35,7 @@ export class ConfigService implements IConfigService {
   async removeEnvironment(id: string): Promise<void> {
     return this.api.removeEnvironment(id);
   }
-  async updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void> {
+  async updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }): Promise<void> {
     return this.api.updateEnvironment(id, updates);
   }
   async addEndpoint(environmentId: string, url: string, kind: EndpointKind): Promise<AccessEndpoint | null> {
@@ -92,8 +92,17 @@ export class ConfigService implements IConfigService {
   async removeChatSession(sessionId: string): Promise<void> {
     return this.api.removeChatSession(sessionId);
   }
-  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>): Promise<void> {
+  async updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>): Promise<void> {
     return this.api.updateChatSession(sessionId, updates);
+  }
+  async pinChatSession(sessionId: string, pinned: boolean): Promise<void> {
+    return this.api.pinChatSession(sessionId, pinned);
+  }
+  async renameChatSession(sessionId: string, title: string): Promise<void> {
+    return this.api.renameChatSession(sessionId, title);
+  }
+  async reorderChatSessions(orderedSessionIds: string[]): Promise<void> {
+    return this.api.reorderChatSessions(orderedSessionIds);
   }
   async getExpandedProjects(): Promise<string[]> {
     return this.api.getExpandedProjects();

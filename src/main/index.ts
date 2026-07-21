@@ -77,6 +77,9 @@ import {
   addChatSession,
   removeChatSession,
   updateChatSession,
+  pinChatSession,
+  renameChatSession,
+  reorderChatSessions,
   getExpandedProjects,
   setExpandedProjects,
   exportBootstrapSeed,
@@ -754,7 +757,7 @@ app.whenReady().then(() => {
     await removeEnvironment(id);
   });
   safeHandle("config:updateEnvironment", async (_event, ...rawArgs) => {
-    const [id, updates] = validateIpc<[string, { name?: string; agentRuntime?: AgentRuntime }]>("config:updateEnvironment", rawArgs);
+    const [id, updates] = validateIpc<[string, { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }]>("config:updateEnvironment", rawArgs);
     await updateEnvironment(id, updates);
   });
   safeHandle("config:addEndpoint", async (_event, ...rawArgs) => {
@@ -966,8 +969,23 @@ app.whenReady().then(() => {
   });
 
   safeHandle("config:updateChatSession", async (_event, ...rawArgs) => {
-    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>]>("config:updateChatSession", rawArgs);
+    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>]>("config:updateChatSession", rawArgs);
     await updateChatSession(sessionId, updates);
+  });
+
+  safeHandle("config:pinChatSession", async (_event, ...rawArgs) => {
+    const [sessionId, pinned] = validateIpc<[string, boolean]>("config:pinChatSession", rawArgs);
+    await pinChatSession(sessionId, pinned);
+  });
+
+  safeHandle("config:renameChatSession", async (_event, ...rawArgs) => {
+    const [sessionId, title] = validateIpc<[string, string]>("config:renameChatSession", rawArgs);
+    await renameChatSession(sessionId, title);
+  });
+
+  safeHandle("config:reorderChatSessions", async (_event, ...rawArgs) => {
+    const [orderedIds] = validateIpc<[string[]]>("config:reorderChatSessions", rawArgs);
+    await reorderChatSessions(orderedIds);
   });
 
   safeHandle("config:getExpandedProjects", () => {

@@ -143,13 +143,23 @@ export function Sidebar(props: {
   // Text search filter
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Context menu for moving sessions between projects
+  // Context menu for sessions (move, rename, pin/unpin)
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     sessionId: string;
     currentProjectName: string;
+    isLoopChat: boolean;
+    pinned: boolean;
   } | null>(null);
+
+  // Rename inline state
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  // Drag-and-drop reorder state
+  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
+  const [dragOverSessionId, setDragOverSessionId] = useState<string | null>(null);
 
   // Track which project nodes are expanded — persisted across restarts
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -290,9 +300,16 @@ export function Sidebar(props: {
       existing.push(session);
       map.set(session.projectName, existing);
     }
-    // Sort sessions within each project by lastActiveAt (newest first)
+    // Sort sessions within each project: pinned first, then sortOrder (manual drag), then lastActiveAt desc
     for (const [key, list] of map) {
-      list.sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime());
+      list.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        const sa = a.sortOrder ?? 999999;
+        const sb = b.sortOrder ?? 999999;
+        if (sa !== sb) return sa - sb;
+        return new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime();
+      });
       map.set(key, list);
     }
     return map;
@@ -477,8 +494,8 @@ export function Sidebar(props: {
                       {instanceCount}
                     </span>
                   ) : null}
-                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.sessionCount" }, { count: projSessions.length })}>
-                    {projSessions.length}
+                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.sessionCount" }, { count: projSessions.length + node.allLoops.length })}>
+                    {projSessions.length + node.allLoops.length}
                   </span>
                   <button
                     className="tree-action-btn"
@@ -503,11 +520,48 @@ export function Sidebar(props: {
                       const sessionSelected = isSessionSelected(session.id);
                       const sessionActive = session.id === activeSessionId;
                       const relativeTime = timeAgo(session.lastActiveAt);
+                      const isDragOver = dragOverSessionId === session.id && draggedSessionId !== session.id;
 
                       return (
                         <div
                           key={session.id}
-                          className={`tree-node tree-node-depth-1 tree-session-row${sessionSelected ? " selected" : ""}${sessionActive ? " active-session" : ""}`}
+                          className={`tree-node tree-node-depth-1 tree-session-row${sessionSelected ? " selected" : ""}${sessionActive ? " active-session" : ""}${isDragOver ? " drag-over" : ""}`}
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggedSessionId(session.id);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDraggedSessionId(null);
+                            setDragOverSessionId(null);
+                          }}
+                          onDragOver={(e) => {
+                            if (draggedSessionId && draggedSessionId !== session.id) {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              setDragOverSessionId(session.id);
+                            }
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverSessionId === session.id) setDragOverSessionId(null);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (!draggedSessionId || draggedSessionId === session.id) return;
+                            // Reorder: move dragged session before this one
+                            const ordered = [...projSessions];
+                            const fromIdx = ordered.findIndex((s) => s.id === draggedSessionId);
+                            const toIdx = ordered.findIndex((s) => s.id === session.id);
+                            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+                            const [moved] = ordered.splice(fromIdx, 1);
+                            ordered.splice(toIdx, 0, moved);
+                            void configService.reorderChatSessions(ordered.map((s) => s.id)).then(async () => {
+                              const updated = await configService.getChatSessions();
+                              setLocalSessions(updated);
+                            });
+                            setDraggedSessionId(null);
+                            setDragOverSessionId(null);
+                          }}
                           onClick={() => {
                             onNavigateToSession?.(session.id);
                           }}
@@ -519,6 +573,8 @@ export function Sidebar(props: {
                               y: e.clientY,
                               sessionId: session.id,
                               currentProjectName: node.projectName,
+                              isLoopChat: session.isLoopChat === true,
+                              pinned: session.pinned === true,
                             });
                           }}
                           title={session.title}
@@ -560,7 +616,7 @@ export function Sidebar(props: {
                                   className={`tree-node tree-node-depth-2${loopSelected ? " selected" : ""}`}
                                   onClick={() => {
                                     onSelect(inst.envId);
-                                    onNavigate({ kind: "loop", loopId: loop.id });
+                                    onNavigateToLoop?.(inst.envId, loop.id);
                                   }}
                                 >
                                   <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
@@ -598,7 +654,7 @@ export function Sidebar(props: {
                             className={`tree-node tree-node-depth-1${loopSelected ? " selected" : ""}`}
                             onClick={() => {
                               onSelect(primaryInstance.envId);
-                              onNavigate({ kind: "loop", loopId: loop.id });
+                              onNavigateToLoop?.(primaryInstance.envId, loop.id);
                             }}
                           >
                             <span className="tree-chevron placeholder"><ChevronRight size={10} /></span>
@@ -667,9 +723,8 @@ export function Sidebar(props: {
         <span>{intl.formatMessage({ id: "sidebar.orbion" })}</span>
       </div>
 
-      {/* Context menu for moving sessions between projects */}
+      {/* Context menu for sessions */}
       {contextMenu ? (() => {
-        // Build the list of target projects (all projects except the session's current one)
         const targetProjects = projectNodes
           .map((n) => n.projectName)
           .filter((name) => name !== contextMenu.currentProjectName);
@@ -680,6 +735,40 @@ export function Sidebar(props: {
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Pin/Unpin */}
+            <div
+              className="sidebar-context-menu-item"
+              onClick={() => {
+                void configService.pinChatSession(contextMenu.sessionId, !contextMenu.pinned).then(async () => {
+                  const updated = await configService.getChatSessions();
+                  setLocalSessions(updated);
+                });
+                setContextMenu(null);
+              }}
+            >
+              {contextMenu.pinned
+                ? intl.formatMessage({ id: "sidebar.unpin" })
+                : intl.formatMessage({ id: "sidebar.pin" })}
+            </div>
+
+            {/* Rename (hidden for loop chats) */}
+            {!contextMenu.isLoopChat ? (
+              <div
+                className="sidebar-context-menu-item"
+                onClick={() => {
+                  setRenamingSessionId(contextMenu.sessionId);
+                  const sess = sessions.find((s) => s.id === contextMenu.sessionId);
+                  setRenameValue(sess?.title ?? "");
+                  setContextMenu(null);
+                }}
+              >
+                {intl.formatMessage({ id: "sidebar.rename" })}
+              </div>
+            ) : null}
+
+            <div className="sidebar-context-menu-divider" />
+
+            {/* Move to project */}
             <div className="sidebar-context-menu-header">
               {intl.formatMessage({ id: "sidebar.moveToProject" })}
             </div>
@@ -703,7 +792,36 @@ export function Sidebar(props: {
             )}
           </div>
         );
-      })() : null}
+      }) : null}
+
+      {/* Inline rename input */}
+      {renamingSessionId ? (
+        <div className="sidebar-rename-overlay" onClick={() => setRenamingSessionId(null)}>
+          <div className="sidebar-rename-dialog" onClick={(e) => e.stopPropagation()}>
+            <input
+              className="sidebar-rename-input"
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const trimmed = renameValue.trim();
+                  if (trimmed) {
+                    void configService.renameChatSession(renamingSessionId, trimmed).then(async () => {
+                      const updated = await configService.getChatSessions();
+                      setLocalSessions(updated);
+                    });
+                  }
+                  setRenamingSessionId(null);
+                }
+                if (e.key === "Escape") setRenamingSessionId(null);
+              }}
+              autoFocus
+              placeholder={intl.formatMessage({ id: "sidebar.renamePlaceholder" })}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

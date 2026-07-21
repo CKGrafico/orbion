@@ -38,8 +38,8 @@ interface McpSession {
   tools: McpToolInfo[];
   lastError: string | I18nMessage | null;
   connectedAt: number | null;
-  /** Per-session monotonic counter for JSON-RPC request IDs, avoiding cross-session collisions. */
-  nextRpcId: number;
+  /** SSE transport for communicating with the MCP server. */
+  transport: SseTransport;
 }
 
 // ── In-memory sessions ────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ function deriveMcpBaseUrl(environmentId: string): string | null {
   }
 }
 
-// ── JSON-RPC over HTTP ────────────────────────────────────────────────────
+// ── MCP SSE transport ────────────────────────────────────────────────────
 
 interface JsonRpcResponse {
   jsonrpc: "2.0";
@@ -122,12 +122,42 @@ interface JsonRpcResponse {
   };
 }
 
-async function rpcRequest(
-  session: McpSession,
+/**
+ * MCP SSE transport session — maintains an SSE connection for receiving
+ * responses and a POST endpoint for sending requests.
+ */
+interface SseTransport {
+  /** The POST endpoint URL the server tells us to send messages to. */
+  postEndpoint: string | null;
+  /** Pending requests waiting for responses, keyed by JSON-RPC id. */
+  pending: Map<number, { resolve: (r: JsonRpcResponse) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>;
+  /** The SSE reader, kept alive so responses can arrive. */
+  controller: AbortController | null;
+  /** Whether the transport has been shut down. */
+  closed: boolean;
+}
+
+/**
+ * Perform a single JSON-RPC request over the MCP SSE transport.
+ *
+ * The SSE transport works in two phases:
+ * 1. On connect, open a GET stream to /sse. The server sends an `endpoint`
+ *    event with a URL to POST messages to.
+ * 2. For each request, POST the JSON-RPC body to that endpoint and wait
+ *    for the response to arrive on the SSE stream.
+ */
+async function sseRpcRequest(
+  transport: SseTransport,
+  _baseUrl: string,
   method: string,
   params?: unknown,
+  timeoutMs: number = MCP_TIMEOUT_MS,
 ): Promise<JsonRpcResponse> {
-  const id = session.nextRpcId++;
+  if (!transport.postEndpoint) {
+    throw new Error("SSE transport not ready: no POST endpoint received yet");
+  }
+
+  const id = Math.floor(Math.random() * 1_000_000) + 1;
   const body = {
     jsonrpc: "2.0",
     id,
@@ -135,29 +165,131 @@ async function rpcRequest(
     ...(params !== undefined ? { params } : {}),
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), MCP_TIMEOUT_MS);
+  return new Promise<JsonRpcResponse>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      transport.pending.delete(id);
+      reject(new Error(`MCP request '${method}' timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
 
-  try {
-    const res = await fetch(`${session.baseUrl}/mcp`, {
+    transport.pending.set(id, { resolve, reject, timer });
+
+    const postUrl = transport.postEndpoint!;
+
+    fetch(postUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: controller.signal,
+    }).catch((err) => {
+      transport.pending.delete(id);
+      clearTimeout(timer);
+      reject(new Error(`Failed to POST MCP request: ${err instanceof Error ? err.message : String(err)}`));
     });
+  });
+}
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(
-        `MCP server returned HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`,
-      );
-    }
+/**
+ * Connect the SSE transport: open a GET stream to /sse and wait for
+ * the server to send the `endpoint` event with the POST URL.
+ */
+async function connectSseTransport(transport: SseTransport, baseUrl: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    transport.controller = new AbortController();
+    const timeout = setTimeout(() => {
+      if (!transport.postEndpoint) {
+        transport.controller?.abort();
+        reject(new Error("Timed out waiting for MCP SSE endpoint event"));
+      }
+    }, MCP_TIMEOUT_MS);
 
-    const data = (await res.json()) as JsonRpcResponse;
-    return data;
-  } finally {
-    clearTimeout(timeout);
-  }
+    fetch(`${baseUrl}/sse`, {
+      method: "GET",
+      headers: { Accept: "text/event-stream" },
+      signal: transport.controller.signal,
+    }).then(async (res) => {
+      if (!res.ok || !res.body) {
+        clearTimeout(timeout);
+        reject(new Error(`MCP SSE endpoint returned HTTP ${res.status}`));
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let currentEvent = "";
+
+      const processLine = (line: string): void => {
+        if (line.startsWith("event:")) {
+          currentEvent = line.slice(6).trim();
+        } else if (line.startsWith("data:") && currentEvent === "endpoint") {
+          const data = line.slice(5).trim();
+          transport.postEndpoint = data.startsWith("http")
+            ? data
+            : `${baseUrl}${data.startsWith("/") ? "" : "/"}${data}`;
+          clearTimeout(timeout);
+          resolve();
+        } else if (line === "") {
+          // Event boundary
+          currentEvent = "";
+
+          // Check if this is a JSON-RPC response (data line in a "message" event)
+          // We handle responses in the data accumulation below
+        }
+      };
+
+      const processData = (data: string): void => {
+        // Try to parse as JSON-RPC response
+        try {
+          const parsed = JSON.parse(data) as JsonRpcResponse;
+          if (parsed.jsonrpc === "2.0" && typeof parsed.id === "number") {
+            const pending = transport.pending.get(parsed.id);
+            if (pending) {
+              clearTimeout(pending.timer);
+              transport.pending.delete(parsed.id);
+              pending.resolve(parsed);
+            }
+          }
+        } catch {
+          // Not JSON, ignore — might be a keepalive or other event
+        }
+      };
+
+      (async () => {
+        try {
+          while (!transport.closed) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+
+            let dataBuffer = "";
+            for (const line of lines) {
+              if (line.startsWith("data:")) {
+                dataBuffer += line.slice(5).trim();
+              } else if (line === "" && dataBuffer) {
+                processData(dataBuffer);
+                dataBuffer = "";
+              }
+              processLine(line);
+            }
+          }
+        } catch (err) {
+          if (!transport.closed) {
+            // Stream closed unexpectedly — reject all pending
+            for (const [, pending] of transport.pending) {
+              clearTimeout(pending.timer);
+              pending.reject(new Error("SSE stream closed unexpectedly"));
+            }
+            transport.pending.clear();
+          }
+        }
+      })();
+    }).catch((err) => {
+      clearTimeout(timeout);
+      reject(new Error(`Failed to connect to MCP SSE: ${err instanceof Error ? err.message : String(err)}`));
+    });
+  });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────
@@ -214,7 +346,12 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
       tools: [],
       lastError: null,
       connectedAt: null,
-      nextRpcId: 1,
+      transport: {
+        postEndpoint: null,
+        pending: new Map(),
+        controller: null,
+        closed: false,
+      },
     };
     sessions.set(environmentId, session);
     broadcastStatus(session);
@@ -223,15 +360,23 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
   try {
     const session = getSession(environmentId)!;
 
-    // 1. Initialize handshake
-    const initResult = await rpcRequest(session, "initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: {
-        name: "orbion",
-        version: "0.1.0",
+    // 1. Connect SSE transport and wait for the server's endpoint event
+    await connectSseTransport(session.transport, baseUrl);
+
+    // 2. Initialize handshake
+    const initResult = await sseRpcRequest(
+      session.transport,
+      baseUrl,
+      "initialize",
+      {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: {
+          name: "orbion",
+          version: "0.1.0",
+        },
       },
-    });
+    );
 
     if (initResult.error) {
       updateSession(environmentId, {
@@ -241,8 +386,13 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
       return statusFromSession(getSession(environmentId)!);
     }
 
-    // 2. Discover available tools
-    const toolsResult = await rpcRequest(session, "tools/list", {});
+    // 3. Discover available tools
+    const toolsResult = await sseRpcRequest(
+      session.transport,
+      baseUrl,
+      "tools/list",
+      {},
+    );
 
     if (toolsResult.error) {
       updateSession(environmentId, {
@@ -306,6 +456,11 @@ export async function disconnectMcp(environmentId: string): Promise<void> {
   const session = getSession(environmentId);
   if (!session) return;
 
+  // Close the SSE transport
+  session.transport.closed = true;
+  session.transport.controller?.abort();
+  session.transport.pending.clear();
+
   session.state = "unreachable";
   session.tools = [];
   session.connectedAt = null;
@@ -344,10 +499,15 @@ export async function callMcpTool(
   }
 
   try {
-    const result = await rpcRequest(session, "tools/call", {
-      name: toolName,
-      arguments: args,
-    });
+    const result = await sseRpcRequest(
+      session.transport,
+      session.baseUrl,
+      "tools/call",
+      {
+        name: toolName,
+        arguments: args,
+      },
+    );
 
     if (result.error) {
       return {
@@ -379,5 +539,11 @@ export async function callMcpTool(
  * Remove an MCP session when an environment is removed.
  */
 export function removeMcpSession(environmentId: string): void {
+  const session = sessions.get(environmentId);
+  if (session) {
+    session.transport.closed = true;
+    session.transport.controller?.abort();
+    session.transport.pending.clear();
+  }
   sessions.delete(environmentId);
 }

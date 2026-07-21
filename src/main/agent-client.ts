@@ -26,6 +26,10 @@ import { getEnvironments } from "./config-store.js";
 import { getMainWindow } from "./main-window.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { decryptValue } from "./config-store.js";
+import { ensureOpenCodeReady } from "./agent-runtime-recovery.js";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("agent-client");
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -122,6 +126,8 @@ export async function sendPromptToAgent(
   const key = inFlightKey(args.chatSessionId, args.turnId);
 
   try {
+    await ensureOpenCodeReady(args.environmentId, baseUrl);
+
     // Step 1: Create or resume session + send prompt asynchronously
     const promptBody: Record<string, unknown> = {
       prompt: args.prompt,
@@ -149,6 +155,7 @@ export async function sendPromptToAgent(
 
     if (!promptRes.ok) {
       const errText = await promptRes.text().catch(() => "");
+      logger.error(`OpenCode prompt failed for ${args.environmentId}: HTTP ${promptRes.status} ${errText.slice(0, 200)}`);
       return {
         ok: false,
         error: msg("agent.promptFailed", { status: String(promptRes.status), detail: errText.slice(0, 200) }),
@@ -191,6 +198,7 @@ export async function sendPromptToAgent(
     }
 
     const message = err instanceof Error ? err.message : String(err);
+    logger.error(`OpenCode prompt request failed for ${args.environmentId}: ${message}`);
     return { ok: false, error: msg("agent.promptError", { detail: message }) };
   }
 }

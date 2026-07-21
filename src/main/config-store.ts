@@ -234,6 +234,7 @@ export function getEnvironments(): EnvironmentWithFingerprint[] {
   return store.get("environments", []).map((env) => ({
     ...env,
     agentRuntime: env.agentRuntime ?? "opencode",
+    sshControlTarget: env.sshControlTarget ?? env.endpoints.find((endpoint) => endpoint.kind === "ssh" && endpoint.sshTarget)?.sshTarget ?? null,
   }));
 }
 
@@ -273,6 +274,7 @@ const SAFE_ENVIRONMENT_KEYS: ReadonlySet<string> = new Set([
   "role",
   "agentRuntime",
   "runtimeState",
+  "sshControlTarget",
   "credentialRefs",
   "endpoints",
   "activeEndpointId",
@@ -723,6 +725,7 @@ function _addEnvironment(
     id: crypto.randomUUID().slice(0, 8),
     name: name.trim(),
     agentRuntime,
+    sshControlTarget: kind === "ssh" ? sshTarget ?? null : null,
     endpoints: [endpoint],
     activeEndpointId: endpointId,
   };
@@ -776,10 +779,11 @@ function _removeEndpoint(environmentId: string, endpointId: string): void {
   });
 }
 
-function _updateEnvironment(environmentId: string, updates: { name?: string; agentRuntime?: AgentRuntime }): void {
+function _updateEnvironment(environmentId: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }): void {
   mutateEnvironment(environmentId, (env) => {
     if (updates.name !== undefined) env.name = updates.name;
     if (updates.agentRuntime !== undefined) env.agentRuntime = updates.agentRuntime;
+    if (updates.sshControlTarget !== undefined) env.sshControlTarget = updates.sshControlTarget;
   });
 }
 
@@ -1001,7 +1005,7 @@ export function removeEnvironment(id: string): Promise<void> {
   return serialize(() => _removeEnvironment(id));
 }
 
-export function updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime }): Promise<void> {
+export function updateEnvironment(id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }): Promise<void> {
   return serialize(() => _updateEnvironment(id, updates));
 }
 
@@ -1367,7 +1371,7 @@ export function removeChatSession(sessionId: string): Promise<void> {
   });
 }
 
-export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>): Promise<void> {
+export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>): Promise<void> {
   return serialize(() => {
     const sessions = store.get("chatSessions", []);
     const idx = sessions.findIndex((s) => s.id === sessionId);
@@ -1376,6 +1380,44 @@ export function updateChatSession(sessionId: string, updates: Partial<Pick<ChatS
       store.set("chatSessions", sessions);
       bumpStamp();
     }
+  });
+}
+
+export function pinChatSession(sessionId: string, pinned: boolean): Promise<void> {
+  return serialize(() => {
+    const sessions = store.get("chatSessions", []);
+    const idx = sessions.findIndex((s) => s.id === sessionId);
+    if (idx >= 0) {
+      sessions[idx] = { ...sessions[idx], pinned };
+      store.set("chatSessions", sessions);
+      bumpStamp();
+    }
+  });
+}
+
+export function renameChatSession(sessionId: string, title: string): Promise<void> {
+  return serialize(() => {
+    const sessions = store.get("chatSessions", []);
+    const idx = sessions.findIndex((s) => s.id === sessionId);
+    if (idx >= 0) {
+      sessions[idx] = { ...sessions[idx], title };
+      store.set("chatSessions", sessions);
+      bumpStamp();
+    }
+  });
+}
+
+export function reorderChatSessions(orderedSessionIds: string[]): Promise<void> {
+  return serialize(() => {
+    const sessions = store.get("chatSessions", []);
+    for (let i = 0; i < orderedSessionIds.length; i++) {
+      const idx = sessions.findIndex((s) => s.id === orderedSessionIds[i]);
+      if (idx >= 0) {
+        sessions[idx] = { ...sessions[idx], sortOrder: i };
+      }
+    }
+    store.set("chatSessions", sessions);
+    bumpStamp();
   });
 }
 

@@ -10,6 +10,7 @@ import type { ModelInfo, ListModelsResult, OpenCodeEndpoint } from "../shared/ip
 import { getEnvironments } from "./config-store.js";
 import { decryptValue } from "./config-store.js";
 import { trimTrailingSlash } from "../shared/utils.js";
+import { ensureOpenCodeReady } from "./agent-runtime-recovery.js";
 
 // ── Static fallback catalogs ─────────────────────────────────────────────
 
@@ -81,6 +82,8 @@ export async function listModelsForEnvironment(
     "Content-Type": "application/json",
     ...buildAuthHeaders(endpointInfo.password),
   };
+
+  await ensureOpenCodeReady(environmentId, baseUrl);
 
   // Try dynamic model list from the server
   try {

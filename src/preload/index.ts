@@ -75,7 +75,7 @@ const bridge: LoopTaskBridge = {
     addEnvironment: (name: string, url: string, kind?: string) =>
       ipcRenderer.invoke("config:addEnvironment", name, url, kind),
     removeEnvironment: (id: string) => ipcRenderer.invoke("config:removeEnvironment", id),
-    updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: string }) =>
+    updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: string; sshControlTarget?: string | null }) =>
       ipcRenderer.invoke("config:updateEnvironment", id, updates) as Promise<void>,
     addEndpoint: (environmentId: string, url: string, kind: string) =>
       ipcRenderer.invoke("config:addEndpoint", environmentId, url, kind),
@@ -114,8 +114,14 @@ const bridge: LoopTaskBridge = {
       ipcRenderer.invoke("config:addChatSession", session) as Promise<ChatSession>,
     removeChatSession: (sessionId: string) =>
       ipcRenderer.invoke("config:removeChatSession", sessionId) as Promise<void>,
-    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>) =>
+    updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>) =>
       ipcRenderer.invoke("config:updateChatSession", sessionId, updates) as Promise<void>,
+    pinChatSession: (sessionId: string, pinned: boolean) =>
+      ipcRenderer.invoke("config:pinChatSession", sessionId, pinned) as Promise<void>,
+    renameChatSession: (sessionId: string, title: string) =>
+      ipcRenderer.invoke("config:renameChatSession", sessionId, title) as Promise<void>,
+    reorderChatSessions: (orderedSessionIds: string[]) =>
+      ipcRenderer.invoke("config:reorderChatSessions", orderedSessionIds) as Promise<void>,
     getExpandedProjects: () =>
       ipcRenderer.invoke("config:getExpandedProjects") as Promise<string[]>,
     setExpandedProjects: (expandedKeys: string[]) =>

@@ -110,6 +110,7 @@ export interface Environment {
   role?: EnvironmentRole;
   agentRuntime: AgentRuntime;
   runtimeState?: RuntimeState;
+  sshControlTarget?: string | null;
   credentialRefs?: EnvironmentCredentialRefs;
   endpoints: AccessEndpoint[];
   activeEndpointId: string | null;
@@ -182,7 +183,7 @@ export interface ConfigBridge {
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
   removeEnvironment: (id: string) => Promise<void>;
   /** Update mutable fields on an existing environment (name, agentRuntime). */
-  updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime }) => Promise<void>;
+  updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }) => Promise<void>;
   addEndpoint: (environmentId: string, url: string, kind: EndpointKind) => Promise<AccessEndpoint | null>;
   removeEndpoint: (environmentId: string, endpointId: string) => Promise<void>;
   setActiveEndpoint: (environmentId: string, endpointId: string) => Promise<void>;
@@ -202,7 +203,10 @@ export interface ConfigBridge {
   getChatSessions: () => Promise<ChatSession[]>;
   addChatSession: (session: Omit<ChatSession, "id" | "createdAt">) => Promise<ChatSession>;
   removeChatSession: (sessionId: string) => Promise<void>;
-  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil">>) => Promise<void>;
+  updateChatSession: (sessionId: string, updates: Partial<Pick<ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>) => Promise<void>;
+  pinChatSession: (sessionId: string, pinned: boolean) => Promise<void>;
+  renameChatSession: (sessionId: string, title: string) => Promise<void>;
+  reorderChatSessions: (orderedSessionIds: string[]) => Promise<void>;
   getExpandedProjects: () => Promise<string[]>;
   setExpandedProjects: (expandedKeys: string[]) => Promise<void>;
   exportBootstrapSeed: () => Promise<BootstrapSeedExportResult>;
@@ -1076,6 +1080,14 @@ export interface ChatSession {
    *  When the user declines an auto-persist offer, this is set to the session's
    *  createdAt timestamp of the next day, effectively silencing offers until reset. */
   declineAutoPersistUntil?: string;
+  /** Whether this session is pinned to the top of its project in the sidebar. */
+  pinned?: boolean;
+  /** Whether this session was auto-created from clicking a loop (non-renameable). */
+  isLoopChat?: boolean;
+  /** The loopId this session is linked to (when isLoopChat is true). */
+  loopId?: string;
+  /** Manual sort order for drag-and-drop reordering within a project. Lower = higher. */
+  sortOrder?: number;
   /** ISO timestamp of last activity in this session. */
   lastActiveAt: string;
   /** ISO timestamp when the session was created. */
