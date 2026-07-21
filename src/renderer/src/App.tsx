@@ -1238,6 +1238,40 @@ function AppInner(): React.ReactNode {
     return wasEphemeral && isNowPersisted;
   }, [sessions, prevPersistedState]);
 
+  const handleOpenProjectChat = useCallback((projectName: string, environmentId: string, workingDirectory: string) => {
+    const existing = sessions.find(
+      (s) => s.projectName === projectName && s.environmentId === environmentId,
+    );
+    if (existing) {
+      setActiveSessionId(existing.id);
+      setView({ kind: "session", sessionId: existing.id });
+      void configService.updateChatSession(existing.id, {
+        lastActiveAt: new Date().toISOString(),
+      });
+    } else {
+      const env = environments.find((e) => e.id === environmentId);
+      const defaultRuntime = env?.agentRuntime ?? "opencode";
+      const envModelList = envModels[environmentId] ?? [];
+      const defaultModel = envModelList.find((m) => m.available)?.id;
+      void configService
+        .addChatSession({
+          title: `Project: ${projectName}`,
+          projectName,
+          environmentId,
+          workingDirectory,
+          activeRuntime: defaultRuntime,
+          activeModel: defaultModel,
+          lastActiveAt: new Date().toISOString(),
+          persisted: false,
+        })
+        .then((newSession) => {
+          setActiveSessionId(newSession.id);
+          setView({ kind: "session", sessionId: newSession.id });
+          select(environmentId);
+        });
+    }
+  }, [sessions, configService, select, environments, envModels]);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -1787,43 +1821,7 @@ function AppInner(): React.ReactNode {
                   onNavigateToSession={handleNavigateToSession}
                   activeSessionId={activeSessionId}
                   sessions={sessions}
-                  onOpenProjectChat={useCallback((projectName: string, environmentId: string, workingDirectory: string) => {
-                    // Find or create a session for this project on this instance
-                    const existing = sessions.find(
-                      (s) => s.projectName === projectName && s.environmentId === environmentId,
-                    );
-                    if (existing) {
-                      setActiveSessionId(existing.id);
-                      setView({ kind: "session", sessionId: existing.id });
-                      // Touch lastActiveAt
-                      void configService.updateChatSession(existing.id, {
-                        lastActiveAt: new Date().toISOString(),
-                      });
-                    } else {
-                      // Derive the default runtime from the environment
-                      const env = environments.find((e) => e.id === environmentId);
-                      const defaultRuntime = env?.agentRuntime ?? "opencode";
-                      // Pick the first available model from envModels
-                      const envModelList = envModels[environmentId] ?? [];
-                      const defaultModel = envModelList.find((m) => m.available)?.id;
-                      void configService
-                        .addChatSession({
-                          title: `Project: ${projectName}`,
-                          projectName,
-                          environmentId,
-                          workingDirectory,
-                          activeRuntime: defaultRuntime,
-                          activeModel: defaultModel,
-                          lastActiveAt: new Date().toISOString(),
-                          persisted: false,
-                        })
-                        .then((newSession) => {
-                          setActiveSessionId(newSession.id);
-                          setView({ kind: "session", sessionId: newSession.id });
-                          select(environmentId);
-                        });
-                    }
-                  }, [sessions, configService, select, environments])}
+                  onOpenProjectChat={handleOpenProjectChat}
                   onMoveSessionToProject={handleMoveSessionToProject}
                   onOpenSettings={() => setSettingsPanelOpen(true)}
                 />

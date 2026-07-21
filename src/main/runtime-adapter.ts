@@ -19,11 +19,8 @@ export interface RuntimeAdapter {
 function openCodeAdapter(): RuntimeAdapter {
   return {
     detect(probe: VmWizardProbeResult): RuntimeDetectResult {
-      if (probe.installedTools.openCode && probe.opencodeRunning) {
-        return { available: true };
-      }
       if (probe.installedTools.openCode) {
-        return { available: false, reason: "opencode installed but not running" };
+        return { available: true };
       }
       return { available: false, reason: "opencode binary not found" };
     },

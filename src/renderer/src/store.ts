@@ -70,7 +70,16 @@ export function useEnvironments(): {
         configService.getSelectedEnvironmentId(),
       ]);
       setEnvironments(loadedEnvs);
-      setSelectedId(loadedId);
+      // If no environment is selected but environments exist, auto-select the main VM
+      // (or the first environment) so the app doesn't show an empty cold-open screen
+      // with environments hiding in the sidebar.
+      let finalId = loadedId;
+      if (!finalId && loadedEnvs.length > 0) {
+        const mainVm = loadedEnvs.find((e) => e.role === "main-vm") ?? loadedEnvs[0];
+        finalId = mainVm.id;
+        void configService.setSelectedEnvironmentId(finalId);
+      }
+      setSelectedId(finalId);
       setLoaded(true);
     };
 

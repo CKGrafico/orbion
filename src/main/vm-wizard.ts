@@ -476,8 +476,6 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
 
   {
     const runtimeAdapter = createRuntimeAdapter(agentRuntime);
-    emitProgress({ step: "runtime-provision", message: runtimeDetectMessage(agentRuntime, { available: false }), reachMethod: "ssh", probe });
-
     const detected = runtimeAdapter.detect(probe);
 
     if (detected.available) {

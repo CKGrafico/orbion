@@ -18,6 +18,12 @@ export default defineConfig({
   preload: {
     build: {
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          format: "cjs",
+          entryFileNames: "index.cjs",
+        },
+      },
     },
   },
   renderer: {
