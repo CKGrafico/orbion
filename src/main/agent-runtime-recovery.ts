@@ -47,12 +47,12 @@ async function startViaSsh(environmentId: string, port: number): Promise<boolean
   }
 
   const command = [
-    `if pgrep -f 'opencode.*serve.*--port ${port}' >/dev/null 2>&1; then exit 0; fi`,
     "mkdir -p ~/.orbion",
-    `nohup opencode serve --host 0.0.0.0 --port ${port} > ~/.orbion/opencode.log 2>&1 &`,
+    `if ss -tln 2>/dev/null | grep -q ':${port} '; then exit 0; fi`,
+    `nohup ~/.opencode/bin/opencode serve --port ${port} --hostname 0.0.0.0 > ~/.orbion/opencode.log 2>&1 &`,
   ].join("; ");
 
-  logger.info(`Starting OpenCode on ${environmentId} through SSH, port ${port}`);
+  logger.info(`Starting OpenCode on ${environmentId} through SSH, port ${port}; command: ${command}`);
 
   return new Promise((resolve) => {
     execFile("ssh", buildSshArgs(host, command), { timeout: 15_000 }, (error, _stdout, stderr) => {

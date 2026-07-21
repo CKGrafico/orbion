@@ -314,7 +314,7 @@ if [ -n "$INSTALL_OPENCODE" ]; then
     echo "OPENCODE_PORT_BUSY|\${OPENCODE_PORT}"
   else
     echo "OPENCODE_STARTING|\${OPENCODE_PORT}"
-    nohup opencode serve --host 127.0.0.1 --port "\${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.log" 2>&1 &
+    nohup opencode serve --hostname 127.0.0.1 --port "\${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.log" 2>&1 &
     OPENCODE_PID=$!
     echo "$OPENCODE_PID" > "$LAUNCH_DIR/opencode.pid"
     echo "port=\${OPENCODE_PORT}" > "$LAUNCH_DIR/opencode.info"

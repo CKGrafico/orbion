@@ -80,6 +80,12 @@ export function InstanceSettingsPanel({
     }
   };
 
+  const handleSaveAndClose = () => {
+    handleNameCommit();
+    handleSshControlTargetCommit();
+    onClose();
+  };
+
   const handleAddEndpoint = () => {
     const url = newEndpointUrl.trim();
     if (!url) return;
@@ -139,6 +145,9 @@ export function InstanceSettingsPanel({
       <div className="settings-drawer" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
           <h2>{intl.formatMessage({ id: "instanceSettings.title" })}</h2>
+          <button className="btn primary" onClick={handleSaveAndClose}>
+            {intl.formatMessage({ id: "instanceSettings.saveAndClose" })}
+          </button>
           <button className="icon-btn" onClick={() => { syncName(); onClose(); }} title={intl.formatMessage({ id: "settings.close" })}>
             <X size={16} />
           </button>

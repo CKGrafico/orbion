@@ -1089,6 +1089,7 @@
     "namePlaceholder": "Instance name",
     "sshControlTarget": "SSH control target",
     "sshControlTargetDesc": "Used for installs and runtime recovery. Kept when daemon access uses Tailscale.",
-    "sshControlTargetPlaceholder": "azureuser@100.99.155.102"
+    "sshControlTargetPlaceholder": "azureuser@100.99.155.102",
+    "saveAndClose": "Save and close"
   }
 }
