@@ -1,6 +1,6 @@
 import { safeStorage } from "electron";
 import Store from "electron-store";
-import crypto from "node:crypto";
+import crypto, { timingSafeEqual } from "node:crypto";
 import { createLogger } from "./logger.js";
 
 const logger = createLogger("credential-vault");
@@ -87,7 +87,9 @@ export function getCredential(reference: string): string | null {
     logger.info("Credential entry migrated to include integrity check:", reference);
   } else {
     const expected = computeHmac(reference, record.encryptedValue);
-    if (expected !== record.hmac) {
+    const expectedBuf = Buffer.from(expected, "utf8");
+    const actualBuf = Buffer.from(record.hmac, "utf8");
+    if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
       logger.error("Credential integrity check failed:", reference);
       throw new CredentialTamperedError(reference);
     }
