@@ -348,26 +348,28 @@ async function handleSubmitPrReview(args: InfraActionArgs): Promise<InfraActionR
     return { ok: false, error: msg("review.submitInvalidEvent") };
   }
 
+  const sanitizedBody = body ? sanitizeText(body) : undefined;
+
+  try {
+    validateCliInputs({ repo });
+  } catch (validationErr) {
+    return { ok: false, error: (validationErr as Error).message };
+  }
+
   const cliResolved = await resolvePlatformCli(null, "issues");
   if ("error" in cliResolved) {
     return { ok: false, error: cliResolved.error };
   }
 
   if (cliResolved.cli === "gh") {
-    try {
-      validateCliInputs({ repo });
-    } catch (validationErr) {
-      return { ok: false, error: (validationErr as Error).message };
-    }
-
     const ghArgs: string[] = [
       "pr", "review",
       String(prNumber),
       "--repo", repo,
       event === "APPROVE" ? "--approve" : "--request-changes",
     ];
-    if (body) {
-      ghArgs.push("--body", body);
+    if (sanitizedBody) {
+      ghArgs.push("--body", sanitizedBody);
     }
 
     return new Promise<InfraActionResult>((resolve) => {
@@ -403,8 +405,8 @@ async function handleSubmitPrReview(args: InfraActionArgs): Promise<InfraActionR
     if (repo) {
       azArgs.push("--org", repo);
     }
-    if (body) {
-      azArgs.push("--comment", body);
+    if (sanitizedBody) {
+      azArgs.push("--comment", sanitizedBody);
     }
 
     return new Promise<InfraActionResult>((resolve) => {

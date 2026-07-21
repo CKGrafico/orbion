@@ -10,7 +10,7 @@ export const LABEL_RE = /^[a-zA-Z0-9_.:/-]+$/;
 /** Repo: `owner/repo` where each part is alphanumeric, underscore, dot, or hyphen. */
 export const REPO_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 /** Control characters (newlines, null bytes, tabs, etc.) – reject in title/body. */
-export const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
+export const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/g;
 
 export function validateLabels(labels: string[]): void {
   for (const label of labels) {
