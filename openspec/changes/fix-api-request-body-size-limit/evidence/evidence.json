@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "fix-api-request-body-size-limit",
+  "required": false,
+  "status": "skipped",
+  "reason": "Change is main-process IPC validation only. No user-visible UI. Test results serve as proof: 88 ipc-validation tests pass including 10 new body-size tests.",
+  "assets": [],
+  "prMarkdown": ""
+}
