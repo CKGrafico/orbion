@@ -28,7 +28,7 @@ import { StaleConfigWarning } from "./components/StaleConfigWarning";
 import { InboxView } from "./features/inbox/InboxView";
 import { ReviewModeOverlay } from "./features/review/ReviewModeOverlay";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
-import { hostLabel, timeAgo } from "./format";
+import { hostLabel, timeAgo, healthTooltip } from "./format";
 import { translateMessage, standaloneIntl } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
 import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService, IPrVerdictService, IReviewModeService } from "./services/interfaces";
@@ -66,19 +66,6 @@ function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
     default:
       return "unknown";
   }
-}
-
-function healthTooltip(intl: ReturnType<typeof useIntl>, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
-  if (status) {
-    switch (status.phase) {
-      case "connected": return intl.formatMessage({ id: "sidebar.connected" });
-      case "connecting": return intl.formatMessage({ id: "sidebar.connecting" });
-      case "backoff": return intl.formatMessage({ id: "sidebar.retrying" }, { seconds: Math.round(status.backoffMs / 1000), failures: status.failureCount });
-      case "blocked": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.blockedTooltip" });
-      case "offline": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.offlineTooltip" });
-    }
-  }
-  return health;
 }
 
 export function App(): React.ReactNode {

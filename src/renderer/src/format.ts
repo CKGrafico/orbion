@@ -1,5 +1,7 @@
-import type { LoopStatus, RunRecord } from "./types";
-import { standaloneIntl } from "./i18n";
+import type { IntlShape } from "react-intl";
+import type { ConnectionStatus } from "../../shared/ipc";
+import type { LoopStatus, RunRecord, EnvironmentHealth } from "./types";
+import { standaloneIntl, translateMessage } from "./i18n";
 
 // Status palette matches the loop-task TUI theme so both products read the same.
 // All 6 loop-task states are represented with distinct colors:
@@ -91,4 +93,17 @@ export function formatDurationShort(ms: number | null): string {
   const mins = Math.floor(secs / 60);
   const remSecs = Math.round(secs % 60);
   return remSecs > 0 ? `${mins}m${remSecs}s` : `${mins}m`;
+}
+
+export function healthTooltip(intl: IntlShape, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
+  if (status) {
+    switch (status.phase) {
+      case "connected": return intl.formatMessage({ id: "sidebar.connected" });
+      case "connecting": return intl.formatMessage({ id: "sidebar.connecting" });
+      case "backoff": return intl.formatMessage({ id: "sidebar.retrying" }, { seconds: Math.round(status.backoffMs / 1000), failures: status.failureCount });
+      case "blocked": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.blockedTooltip" });
+      case "offline": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.offlineTooltip" });
+    }
+  }
+  return health;
 }

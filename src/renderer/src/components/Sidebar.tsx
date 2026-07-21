@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useIntl, type IntlShape } from "react-intl";
+import { useIntl } from "react-intl";
 import type { ChatSession, ConnectionStatus, ReachabilityState } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
@@ -8,8 +8,7 @@ import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox, MessageSquare,
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
 import { FleetHealthFooter } from "./FleetHealthFooter";
-import { translateMessage } from "../i18n";
-import { timeAgo } from "../format";
+import { timeAgo, healthTooltip } from "../format";
 import { cid, useInject } from "inversify-hooks";
 import type { IConfigService } from "../services/interfaces";
 
@@ -23,19 +22,6 @@ type View =
 /** Key for a merged project node — deduped by project name */
 function mergedProjectKey(projectName: string): string {
   return `merged:${projectName}`;
-}
-
-function healthTooltip(intl: IntlShape, health: EnvironmentHealth, status?: ConnectionStatus | null): string {
-  if (status) {
-    switch (status.phase) {
-      case "connected": return intl.formatMessage({ id: "sidebar.connected" });
-      case "connecting": return intl.formatMessage({ id: "sidebar.connecting" });
-      case "backoff": return intl.formatMessage({ id: "sidebar.retrying" }, { seconds: Math.round(status.backoffMs / 1000), failures: status.failureCount });
-      case "blocked": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.blockedTooltip" });
-      case "offline": return translateMessage(intl, status.lastError) || intl.formatMessage({ id: "sidebar.offlineTooltip" });
-    }
-  }
-  return health;
 }
 
 interface TreeNodeChevronProps {
