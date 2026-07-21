@@ -410,12 +410,12 @@ for (const tool of TOOL_DEFINITIONS) {
  * Parse a pipe-delimited integer from a stdout marker line.
  * Returns `fallback` when the field is missing, empty, non-numeric, or outside 1-65535.
  */
-function parsePipeInt(line: string, prefix: string, fallback: number): number {
+export function parsePipeInt(line: string, prefix: string, fallback: number): number {
   if (!line.startsWith(prefix)) return fallback;
   const raw = line.split("|")[1];
-  if (!raw) return fallback;
+  if (!raw || !/^\d+$/.test(raw)) return fallback;
   const parsed = parseInt(raw, 10);
-  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
+  return parsed > 0 && parsed <= 65535 ? parsed : fallback;
 }
 
 /** Map of npmKey -> tool id for placeholder replacement */

@@ -9,7 +9,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { probeVm } from "../src/main/ssh-probe.js";
-import { launchOnVm } from "../src/main/ssh-launch.js";
+import { launchOnVm, parsePipeInt } from "../src/main/ssh-launch.js";
 
 const sshHost = {
   host: "dev-vm",
@@ -166,5 +166,223 @@ describe("SSH loop-task daemon launch", () => {
     expect(result.logTail).toContain("Error: listen EADDRINUSE: address already in use 127.0.0.1:8845");
     expect(result.logTail).toContain("loop-task: failed to bind daemon listener");
     expect(result.logTail).toContain("remote launch exited before daemon readiness");
+  });
+
+  it("parses DAEMON_STARTED with valid port on success path", async () => {
+    mockSshResponses([
+      {
+        stdout: "DAEMON_STARTED|9100\nOPENCODE_STARTED|14000\n",
+      },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result).toMatchObject({
+      started: true,
+      daemonPort: 9100,
+      opencodePort: 14000,
+      loopTaskStatus: "started",
+    });
+  });
+
+  it("parses DAEMON_ALREADY_RUNNING with valid port", async () => {
+    mockSshResponses([
+      {
+        stdout: "DAEMON_ALREADY_RUNNING|7788\n",
+      },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result).toMatchObject({
+      started: true,
+      daemonPort: 7788,
+      loopTaskStatus: "already-running",
+    });
+  });
+
+  it("falls back to default port when DAEMON_STARTED has empty field", async () => {
+    mockSshResponses([
+      {
+        stdout: "DAEMON_STARTED|\n",
+      },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result.daemonPort).toBe(8845);
+    expect(result.started).toBe(true);
+  });
+
+  it("falls back to default port when port field is non-numeric", async () => {
+    mockSshResponses([
+      {
+        stdout: "DAEMON_STARTED|abc\nOPENCODE_STARTED|notaport\n",
+      },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result.daemonPort).toBe(8845);
+    expect(result.opencodePort).toBe(13284);
+  });
+
+  it("falls back to default port when port is out of range", async () => {
+    mockSshResponses([
+      {
+        stdout: "DAEMON_STARTED|0\nOPENCODE_STARTED|99999\n",
+      },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result.daemonPort).toBe(8845);
+    expect(result.opencodePort).toBe(13284);
+  });
+
+  it("extracts busy port from DAEMON_PORT_BUSY on error path", async () => {
+    mockSshResponses([
+      {
+        code: 1,
+        stdout: "DAEMON_PORT_BUSY|9001\n",
+        stderr: "",
+      },
+      { stdout: "" },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result.started).toBe(false);
+    expect(result.errorDetail).toMatchObject({
+      key: "vmWizard.mainDaemonPortBusy",
+      params: { port: 9001 },
+    });
+  });
+
+  it("extracts busy port from OPENCODE_PORT_BUSY on error path", async () => {
+    mockSshResponses([
+      {
+        code: 1,
+        stdout: "OPENCODE_PORT_BUSY|14000\n",
+        stderr: "",
+      },
+      { stdout: "" },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result.started).toBe(false);
+    expect(result.errorDetail).toMatchObject({
+      key: "vmWizard.mainOpenCodePortBusy",
+      params: { port: 14000 },
+    });
+  });
+
+  it("handles OPENCODE_PORT_BUSY on success path", async () => {
+    mockSshResponses([
+      {
+        stdout: "DAEMON_STARTED|8845\nOPENCODE_PORT_BUSY|13284\n",
+      },
+    ]);
+
+    const result = await launchOnVm(sshHost, {
+      daemonRunning: false,
+      daemonPort: null,
+      opencodeRunning: false,
+      opencodePort: null,
+      installTools: {},
+    });
+
+    expect(result).toMatchObject({
+      started: true,
+      daemonPort: 8845,
+      opencodePort: null,
+      loopTaskStatus: "started",
+    });
+    expect(result.toolStatuses.openCode).toBe("already-running");
+  });
+});
+
+describe("parsePipeInt", () => {
+  it("returns parsed port for valid marker", () => {
+    expect(parsePipeInt("DAEMON_STARTED|8845", "DAEMON_STARTED|", 9999)).toBe(8845);
+  });
+
+  it("returns fallback when line does not start with prefix", () => {
+    expect(parsePipeInt("OTHER_MARKER|1234", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("returns fallback when pipe field is empty", () => {
+    expect(parsePipeInt("DAEMON_STARTED|", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("returns fallback when pipe field is non-numeric", () => {
+    expect(parsePipeInt("DAEMON_STARTED|abc", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("returns fallback for port 0", () => {
+    expect(parsePipeInt("DAEMON_STARTED|0", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("returns fallback for negative port", () => {
+    expect(parsePipeInt("DAEMON_STARTED|-1", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("returns fallback for port above 65535", () => {
+    expect(parsePipeInt("DAEMON_STARTED|70000", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("returns fallback for float port", () => {
+    expect(parsePipeInt("DAEMON_STARTED|8080.5", "DAEMON_STARTED|", 9999)).toBe(9999);
+  });
+
+  it("accepts port 1 (minimum valid)", () => {
+    expect(parsePipeInt("DAEMON_STARTED|1", "DAEMON_STARTED|", 9999)).toBe(1);
+  });
+
+  it("accepts port 65535 (maximum valid)", () => {
+    expect(parsePipeInt("DAEMON_STARTED|65535", "DAEMON_STARTED|", 9999)).toBe(65535);
   });
 });
