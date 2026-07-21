@@ -555,28 +555,32 @@ function saveBounds(win: BrowserWindow): void {
   }
 }
 
+async function seedEnvironmentInfrastructure(environmentId: string, options?: { replaceSupervisor?: boolean }): Promise<void> {
+  const envs = getEnvironments();
+  const env = envs.find((e) => e.id === environmentId);
+  if (!env) return;
+
+  if (options?.replaceSupervisor) {
+    removeSupervisor(environmentId);
+  }
+
+  await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
+  const activeEp = env.activeEndpointId
+    ? env.endpoints.find((e) => e.id === env.activeEndpointId)
+    : env.endpoints[0];
+  const url = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
+  if (url) getOrCreateSupervisor(env.id, url);
+  syncEndpointTracker(env.id);
+  void connectMcp(env.id);
+  void refreshLoopShapesForEnvironment(env.id);
+}
+
 async function seedSupervisors(): Promise<void> {
   for (const env of getEnvironments()) {
-    // Open SSH tunnels for all SSH-reach endpoints before resolving the URL.
-    // The tunnel translates the remote host:port into a local loopback port.
-    await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
-
-    // Use the effective URL (tunneled for SSH endpoints, raw for others).
-    const activeEp = env.activeEndpointId
-      ? env.endpoints.find((e) => e.id === env.activeEndpointId)
-      : env.endpoints[0];
-    const url = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
-    if (url) {
-      getOrCreateSupervisor(env.id, url);
-    }
-    syncEndpointTracker(env.id);
+    await seedEnvironmentInfrastructure(env.id);
     if (env.opencode) {
       void refreshOpenCodeStatus(env.id, env.opencode);
     }
-    // Connect to the environment's MCP server (fire-and-forget)
-    void connectMcp(env.id);
-    // Refresh loop-shape cache for this environment (fire-and-forget)
-    void refreshLoopShapesForEnvironment(env.id);
   }
 }
 
@@ -709,15 +713,8 @@ app.whenReady().then(() => {
     if (fingerprint) {
       const existing = findEnvironmentByFingerprint(fingerprint.id);
       if (existing) {
-        const ep = await addEndpoint(existing.id, url, endpointKind);
-        syncEndpointTracker(existing.id);
-        // Open SSH tunnel if needed
-        if (ep) {
-          await openTunnelsForEnvironment(existing.id, [...existing.endpoints, ep], ep.id);
-        }
-        const activeEp = ep ?? existing.endpoints.find((e) => e.id === existing.activeEndpointId);
-        const activeUrl = activeEp ? resolveEffectiveUrl(existing.id, activeEp) : resolveActiveUrl(existing.endpoints, ep?.id ?? existing.activeEndpointId);
-        if (activeUrl) getOrCreateSupervisor(existing.id, activeUrl);
+        await addEndpoint(existing.id, url, endpointKind);
+        await seedEnvironmentInfrastructure(existing.id);
         return existing;
       }
     }
@@ -726,14 +723,7 @@ app.whenReady().then(() => {
       await setEnvironmentFingerprintId(env.id, fingerprint.id);
     }
     await autoPromoteFirstEnvIfNeeded();
-    // Open SSH tunnel if needed
-    await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
-    const activeEp = env.activeEndpointId
-      ? env.endpoints.find((e) => e.id === env.activeEndpointId)
-      : env.endpoints[0];
-    const activeUrl = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
-    if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
-    syncEndpointTracker(env.id);
+    await seedEnvironmentInfrastructure(env.id);
     return env;
   });
   safeHandle("config:exchangePairingCode", async (_event, ...rawArgs) => {
@@ -789,27 +779,7 @@ app.whenReady().then(() => {
   safeHandle("config:setActiveEndpoint", async (_event, ...rawArgs) => {
     const [environmentId, endpointId] = validateIpc<[string, string]>("config:setActiveEndpoint", rawArgs);
     await setActiveEndpoint(environmentId, endpointId);
-    const envs = getEnvironments();
-    const env = envs.find((e: Environment) => e.id === environmentId);
-    if (env) {
-      // Open SSH tunnel for the new active endpoint if needed
-      await openTunnelsForEnvironment(environmentId, env.endpoints, endpointId);
-      const activeEp = env.endpoints.find((e) => e.id === endpointId);
-      const url = activeEp ? resolveEffectiveUrl(environmentId, activeEp) : resolveActiveUrl(env.endpoints, endpointId);
-      if (url) {
-        removeSupervisor(environmentId);
-        // Re-open tunnels since removeSupervisor closed them
-        await openTunnelsForEnvironment(environmentId, env.endpoints, endpointId);
-        const activeEpRetry = env.endpoints.find((e) => e.id === endpointId);
-        const tunnelUrl = activeEpRetry ? resolveEffectiveUrl(environmentId, activeEpRetry) : resolveActiveUrl(env.endpoints, endpointId);
-        if (tunnelUrl) {
-          getOrCreateSupervisor(environmentId, tunnelUrl);
-        }
-      }
-      // Reconnect MCP to the new endpoint's MCP server (fire-and-forget)
-      void connectMcp(environmentId);
-    }
-    syncEndpointTracker(environmentId);
+    await seedEnvironmentInfrastructure(environmentId, { replaceSupervisor: true });
   });
   safeHandle("config:getSelectedEnvironmentId", () => {
     validateIpc("config:getSelectedEnvironmentId", []);
@@ -880,21 +850,7 @@ app.whenReady().then(() => {
   safeHandle("vmWizard:start", async (_event, ...rawArgs) => {
     const [options] = validateIpc<[VmWizardStartOptions]>("vmWizard:start", rawArgs);
     const result = await runWizard(options);
-    // After the wizard creates the environment, open SSH tunnels and
-    // seed the connection supervisor so the new environment is immediately live.
-    const envs = getEnvironments();
-    const env = envs.find((e: Environment) => e.id === result.environmentId);
-    if (env) {
-      await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
-      const activeEp = env.activeEndpointId
-        ? env.endpoints.find((e) => e.id === env.activeEndpointId)
-        : env.endpoints[0];
-      const activeUrl = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
-      if (activeUrl) getOrCreateSupervisor(env.id, activeUrl);
-      syncEndpointTracker(env.id);
-      // Connect to the new environment's MCP server (fire-and-forget)
-      void connectMcp(env.id);
-    }
+    await seedEnvironmentInfrastructure(result.environmentId);
     return result;
   });
 
@@ -1040,18 +996,9 @@ app.whenReady().then(() => {
     validateIpc("config:pullRestore", []);
     const result = await pullRestore();
 
-    // After a successful restore, seed supervisors and tunnels for the new environments
     if (result.ok) {
       for (const env of result.restored) {
-        await openTunnelsForEnvironment(env.id, env.endpoints, env.activeEndpointId);
-        const activeEp = env.activeEndpointId
-          ? env.endpoints.find((e) => e.id === env.activeEndpointId)
-          : env.endpoints[0];
-        const url = activeEp ? resolveEffectiveUrl(env.id, activeEp) : resolveActiveUrl(env.endpoints, env.activeEndpointId);
-        if (url) getOrCreateSupervisor(env.id, url);
-        syncEndpointTracker(env.id);
-        // Connect to the new environment's MCP server (fire-and-forget)
-        void connectMcp(env.id);
+        await seedEnvironmentInfrastructure(env.id);
       }
     }
 
