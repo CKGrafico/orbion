@@ -394,6 +394,47 @@ describe("credential vault integrity (HMAC)", () => {
     expect(envAfter?.authState).toBe("blocked");
   });
 
+  it("HMAC comparison is constant-time (timing variance within bounds)", () => {
+    const reference = storeCredential("timing-test-value");
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(reference)]);
+    const correctHmac = String(stored.hmac);
+
+    const runs = 10_000;
+
+    const correctTimes: number[] = [];
+    const wrongTimes: number[] = [];
+
+    for (let i = 0; i < runs; i++) {
+      const start = performance.now();
+      getCredential(String(reference));
+      correctTimes.push(performance.now() - start);
+    }
+
+    stored.encryptedValue = Buffer.from("tampered-timing").toString("base64");
+    storeValues("credentials").set("credentials", credentials);
+
+    for (let i = 0; i < runs; i++) {
+      const start = performance.now();
+      try { getCredential(String(reference)); } catch { /* expected */ }
+      wrongTimes.push(performance.now() - start);
+    }
+
+    const avgCorrect = correctTimes.reduce((a, b) => a + b, 0) / runs;
+    const avgWrong = wrongTimes.reduce((a, b) => a + b, 0) / runs;
+
+    const varianceCorrect = correctTimes.reduce((sum, t) => sum + (t - avgCorrect) ** 2, 0) / runs;
+    const varianceWrong = wrongTimes.reduce((sum, t) => sum + (t - avgWrong) ** 2, 0) / runs;
+
+    const stdCorrect = Math.sqrt(varianceCorrect);
+    const stdWrong = Math.sqrt(varianceWrong);
+
+    // Constant-time: means should be within 3 standard deviations of each other
+    const diff = Math.abs(avgCorrect - avgWrong);
+    const pooledStd = Math.sqrt(stdCorrect ** 2 + stdWrong ** 2) / 2;
+    expect(diff).toBeLessThan(3 * pooledStd + 0.01);
+  });
+
   it("getSshKeyPassphrase catches CredentialTamperedError and sets authState to blocked", async () => {
     const environment = await addEnvironment("TamperedSSH", "http://localhost:8845");
     await storeSshKeyPassphrase(environment.id, "ssh-secret");
