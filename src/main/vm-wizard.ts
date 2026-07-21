@@ -268,7 +268,7 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
     throw new Error("vmWizard.mainCancelled");
   }
 
-  const probe = await probeVm(host);
+  let probe = await probeVm(host);
   emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe });
 
   if (!probe.reachable || !probe.authOk) {
@@ -340,8 +340,7 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
       throw new Error("vmWizard.mainNodeStillNotFoundAfterMise");
     }
 
-    probe.nodeFound = true;
-    probe.nodeVersion = reprobe.nodeVersion;
+    probe = { ...probe, nodeFound: true, nodeVersion: reprobe.nodeVersion };
     emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe: reprobe });
   }
 
@@ -404,8 +403,7 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
       throw new Error("vmWizard.mainNodeStillNotFoundAfterUpgrade");
     }
 
-    probe.nodeVersion = reprobe.nodeVersion;
-    probe.errorDetail = null;
+    probe = { ...probe, nodeVersion: reprobe.nodeVersion, errorDetail: null };
     emitProgress({ step: "probing", message: msg("vmWizard.mainProbeComplete"), reachMethod: "ssh", probe: reprobe });
   }
 
@@ -453,9 +451,7 @@ export async function runWizard(options: VmWizardStartOptions): Promise<VmWizard
       throw new Error("vmWizard.mainFailedToStartServices");
     }
 
-    probe.loopTaskFound = true;
-    probe.daemonRunning = true;
-    probe.daemonPort = loopTaskLaunch.daemonPort;
+    probe = { ...probe, loopTaskFound: true, daemonRunning: true, daemonPort: loopTaskLaunch.daemonPort };
   }
 
   // Step 2: Pick services
