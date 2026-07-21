@@ -1,0 +1,4 @@
+- [ ] 1.1 Extract `parsePipeInt` helper in ssh-launch.ts <!-- agent: frontend-engineer.build, depends_on: [], touches: [src/main/ssh-launch.ts] -->
+- [ ] 1.2 Unify success/error stdout parsing into single pass <!-- agent: frontend-engineer.build, depends_on: [1.1], touches: [src/main/ssh-launch.ts] -->
+- [ ] 2.1 Add unit tests for parsePipeInt and unified parsing <!-- agent: frontend-engineer.fast, depends_on: [1.1], touches: [tests/ssh-loop-task-onboarding.test.ts] -->
+- [ ] 3.1 Run typecheck and fix errors <!-- agent: frontend-engineer.fast, depends_on: [1.2, 2.1], touches: [] -->

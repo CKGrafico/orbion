@@ -406,6 +406,18 @@ for (const tool of TOOL_DEFINITIONS) {
   FAILED_MARKER_PREFIX_TO_ID.set(`INSTALL_FAILED_${marker}`, tool.id);
 }
 
+/**
+ * Parse a pipe-delimited integer from a stdout marker line.
+ * Returns `fallback` when the field is missing, empty, non-numeric, or outside 1-65535.
+ */
+export function parsePipeInt(line: string, prefix: string, fallback: number): number {
+  if (!line.startsWith(prefix)) return fallback;
+  const raw = line.split("|")[1];
+  if (!raw || !/^\d+$/.test(raw)) return fallback;
+  const parsed = parseInt(raw, 10);
+  return parsed > 0 && parsed <= 65535 ? parsed : fallback;
+}
+
 /** Map of npmKey -> tool id for placeholder replacement */
 const NPM_KEY_TO_MARKER = new Map<string, string>();
 for (const tool of TOOL_DEFINITIONS) {
@@ -503,8 +515,9 @@ export async function launchOnVm(
   }
 
   const launchResult = await sshExec(host, script);
+  const failed = launchResult.code !== 0;
 
-  if (launchResult.code !== 0) {
+  if (failed) {
     const tailScript = TAIL_LAUNCH_FAILURE_LOGS_SCRIPT.replace(/__HASH__/g, hash);
     const tailResult = await sshExec(host, tailScript);
     result.logTail = buildLaunchFailureLogTail(
@@ -514,55 +527,56 @@ export async function launchOnVm(
       tailResult.stderr,
     );
     result.errorDetail = msg("vmWizard.mainLaunchScriptFailed", { code: launchResult.code });
-
-    for (const line of launchResult.stdout.split("\n")) {
-      const trimmed = line.trim();
-      if (trimmed === "INSTALL_NODE_FIRST") {
-        result.errorDetail = msg("vmWizard.mainNodeNotFoundOnVm");
-      } else if (trimmed === "INSTALL_FAILED_LOOP_TASK") {
-        result.errorDetail = msg("vmWizard.mainInstallLoopTaskFailed");
-        result.loopTaskStatus = "failed";
-      } else if (trimmed === "DAEMON_START_FAILED") {
-        result.errorDetail = msg("vmWizard.mainFailedToStartServices");
-        result.loopTaskStatus = "failed";
-      } else if (trimmed.startsWith("DAEMON_PORT_BUSY|")) {
-        result.errorDetail = msg("vmWizard.mainDaemonPortBusy", { port: daemonPort });
-      } else if (trimmed.startsWith("OPENCODE_PORT_BUSY|")) {
-        result.errorDetail = msg("vmWizard.mainOpenCodePortBusy", { port: opencodePort });
-      } else {
-        // Check dynamic tool failure markers
-        for (const [prefix, toolId] of FAILED_MARKER_PREFIX_TO_ID) {
-          if (trimmed.startsWith(prefix)) {
-            result.toolStatuses[toolId] = "failed";
-            break;
-          }
-        }
-      }
-    }
-
-    return result;
   }
 
   for (const line of launchResult.stdout.split("\n")) {
     const trimmed = line.trim();
+    if (!trimmed) continue;
+
     if (trimmed.startsWith("DAEMON_ALREADY_RUNNING|")) {
-      result.daemonPort = parseInt(trimmed.split("|")[1] ?? String(daemonPort), 10);
-      result.loopTaskStatus = "already-running";
+      result.daemonPort = parsePipeInt(trimmed, "DAEMON_ALREADY_RUNNING|", daemonPort);
+      result.loopTaskStatus = failed ? "failed" : "already-running";
     } else if (trimmed.startsWith("DAEMON_STARTED|")) {
-      result.daemonPort = parseInt(trimmed.split("|")[1] ?? String(daemonPort), 10);
-      result.loopTaskStatus = "started";
-    } else if (trimmed === "LOOP_TASK_INSTALLED") {
-      result.loopTaskStatus = "installed";
+      result.daemonPort = parsePipeInt(trimmed, "DAEMON_STARTED|", daemonPort);
+      result.loopTaskStatus = failed ? "failed" : "started";
     } else if (trimmed.startsWith("OPENCODE_STARTED|")) {
-      result.opencodePort = parseInt(trimmed.split("|")[1] ?? String(opencodePort), 10);
-      result.toolStatuses.openCode = "started";
-    } else if (trimmed === "OPENCODE_INSTALLED") {
-      result.toolStatuses.openCode = "installed";
+      result.opencodePort = parsePipeInt(trimmed, "OPENCODE_STARTED|", opencodePort);
+      result.toolStatuses.openCode = failed ? "failed" : "started";
+    } else if (trimmed.startsWith("DAEMON_PORT_BUSY|")) {
+      const busyPort = parsePipeInt(trimmed, "DAEMON_PORT_BUSY|", daemonPort);
+      if (failed) {
+        result.errorDetail = msg("vmWizard.mainDaemonPortBusy", { port: busyPort });
+      } else {
+        result.loopTaskStatus = "failed";
+      }
     } else if (trimmed.startsWith("OPENCODE_PORT_BUSY|")) {
-      result.opencodePort = null;
-      result.toolStatuses.openCode = "already-running";
+      const busyPort = parsePipeInt(trimmed, "OPENCODE_PORT_BUSY|", opencodePort);
+      if (failed) {
+        result.errorDetail = msg("vmWizard.mainOpenCodePortBusy", { port: busyPort });
+      } else {
+        result.opencodePort = null;
+        result.toolStatuses.openCode = "already-running";
+      }
+    } else if (trimmed === "INSTALL_NODE_FIRST") {
+      if (failed) result.errorDetail = msg("vmWizard.mainNodeNotFoundOnVm");
+    } else if (trimmed === "INSTALL_FAILED_LOOP_TASK") {
+      if (failed) result.errorDetail = msg("vmWizard.mainInstallLoopTaskFailed");
+      result.loopTaskStatus = "failed";
+    } else if (trimmed === "DAEMON_START_FAILED") {
+      if (failed) result.errorDetail = msg("vmWizard.mainFailedToStartServices");
+      result.loopTaskStatus = "failed";
+    } else if (trimmed === "LOOP_TASK_INSTALLED") {
+      if (!failed) result.loopTaskStatus = "installed";
+    } else if (trimmed === "OPENCODE_INSTALLED") {
+      if (!failed) result.toolStatuses.openCode = "installed";
+    } else if (failed) {
+      for (const [prefix, toolId] of FAILED_MARKER_PREFIX_TO_ID) {
+        if (trimmed.startsWith(prefix)) {
+          result.toolStatuses[toolId] = "failed";
+          break;
+        }
+      }
     } else {
-      // Check dynamic installed markers
       const toolId = INSTALLED_MARKER_TO_ID.get(trimmed);
       if (toolId) {
         result.toolStatuses[toolId] = "installed";
@@ -570,7 +584,9 @@ export async function launchOnVm(
     }
   }
 
-  result.started = true;
+  if (!failed) {
+    result.started = true;
+  }
   return result;
 }
 
