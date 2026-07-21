@@ -106,9 +106,9 @@ export function useEnvironments(): {
     (id: string, updates: { name?: string; agentRuntime?: import("../../../shared/ipc").AgentRuntime }) => {
       void configService.updateEnvironment(id, updates).then(async () => {
         setEnvironments(await configService.getEnvironments());
-      }).catch((err) => handleConfigError("updateEnvironment", err));
+      }).catch((err) => handleConfigError(logService, "updateEnvironment", err));
     },
-    [configService],
+    [configService, logService],
   );
 
   const addEndpointFn = useCallback(
