@@ -1,10 +1,15 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import net from "node:net";
 import type { SshHost, VmWizardTunnelResult } from "../shared/ipc.js";
 import { validateSshHost } from "./ssh-config.js";
 import { msg } from "./i18n.js";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("ssh-tunnel");
 
 const TUNNEL_CONNECT_TIMEOUT_MS = 15_000;
 const SIGKILL_TIMEOUT_MS = 2_000;
+const PORT_VERIFY_TIMEOUT_MS = 2_000;
 
 export interface TunnelExitEvent {
   tunnelId: string;
@@ -26,6 +31,25 @@ interface TunnelHandle {
 }
 
 const activeTunnels = new Map<string, TunnelHandle>();
+
+/** Check whether a local TCP port is accepting connections. */
+export function checkLocalPort(port: number, timeoutMs: number = PORT_VERIFY_TIMEOUT_MS): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: "127.0.0.1", port }, () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.setTimeout(timeoutMs);
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
 
 /** Global callback invoked when a tunnel process exits unexpectedly. */
 let tunnelExitCallback: ((event: TunnelExitEvent) => void) | null = null;
@@ -95,8 +119,21 @@ export function openTunnel(
     let resolved = false;
     let stderrBuf = "";
 
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       if (!resolved) {
+        const portReachable = await checkLocalPort(localPort);
+        if (resolved) return;
+        if (!portReachable) {
+          resolved = true;
+          proc.kill();
+          logger.warn(`Tunnel timeout: port ${localPort} not reachable after ${TUNNEL_CONNECT_TIMEOUT_MS}ms`);
+          resolve({
+            forwarded: false,
+            localPort: null,
+            errorDetail: msg("vmWizard.mainTunnelForwardingFailed", { detail: "Port verification failed" }),
+          });
+          return;
+        }
         resolved = true;
         const handle: TunnelHandle = { process: proc, localPort, remotePort, host, intentionalClose: false, killTimer: null };
         activeTunnels.set(tunnelId, handle);
