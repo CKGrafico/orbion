@@ -946,6 +946,30 @@ const validators: Record<string, Validator> = {
     if (!isObject(args[0])) issues.push("record must be an object");
     return issues;
   },
+
+  // ── Config restore / stamp ────────────────────────────────────
+  "config:checkRestoreAvailable": () => [],
+  "config:pullRestore": () => [],
+  "config:getConfigStamp": () => [],
+  "config:stampCheckedSetMainVm": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    if (!isObject(args[1])) issues.push("knownStamp must be an object");
+    return issues;
+  },
+  "config:forceSetMainVm": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    return issues;
+  },
+
+  // ── Infra platform detection ─────────────────────────────────
+  "infra:getPlatform": (args) => {
+    const issues: string[] = [];
+    if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
+    if (!isNonEmptyString(args[1])) issues.push("projectId must be a non-empty string");
+    return issues;
+  },
 };
 
 // ── Structured IPC error result ───────────────────────────────────────
