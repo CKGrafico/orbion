@@ -1,0 +1,22 @@
+{
+  "changeId": "migrate-to-shadcn-ui",
+  "status": "blocked",
+  "reason": "Visual evidence harness requires an active (non-archived) OpenSpec change. The change was archived before evidence capture. Browser automation native host is also offline, preventing generic fallback screenshot capture. Typecheck verification passed.",
+  "assets": [],
+  "verification": {
+    "typecheck": "passed",
+    "build": "not run",
+    "visual": "blocked"
+  },
+  "tasksTotal": 34,
+  "tasksCompleted": 34,
+  "commits": [
+    "propose: migrate Orbion UI to shadcn/ui",
+    "0: setup Tailwind v4 + shadcn/ui + guardrails + skills",
+    "1.1: add shadcn/ui components",
+    "1: migrate Sidebar menu to DropdownMenu, FleetActivityReadout to Popover",
+    "2,3: migrate modals to AlertDialog/Dialog, drawers to Sheet",
+    "4,5: catalog pass + dead CSS cleanup (155 lines removed)",
+    "archive: migrate Orbion UI to shadcn/ui"
+  ]
+}
