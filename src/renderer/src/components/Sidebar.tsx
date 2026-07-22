@@ -8,6 +8,16 @@ import { X, Plus, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown, Link, I
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
 import { FleetHealthFooter } from "./FleetHealthFooter";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { timeAgo, healthTooltip } from "../format";
 import { cid, useInject } from "inversify-hooks";
 import type { IConfigService } from "../services/interfaces";
@@ -146,10 +156,8 @@ export function Sidebar(props: {
   // Text search filter
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Context menu for sessions (move, rename, pin/unpin)
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
+  // Dropdown menu for sessions (move, rename, pin/unpin)
+  const [dropdownMenuSession, setDropdownMenuSession] = useState<{
     sessionId: string;
     currentProjectName: string;
     isLoopChat: boolean;
@@ -537,9 +545,7 @@ export function Sidebar(props: {
                           onContextMenu={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setContextMenu({
-                              x: e.clientX,
-                              y: e.clientY,
+                            setDropdownMenuSession({
                               sessionId: session.id,
                               currentProjectName: node.projectName,
                               isLoopChat: session.isLoopChat === true,
@@ -555,21 +561,124 @@ export function Sidebar(props: {
                           <span className="tree-label">{session.title}</span>
                            <span className="tree-session-time">{relativeTime}</span>
                            {!session.isLoopChat ? (
-                             <button
-                               className="icon-btn tree-session-menu"
-                               aria-label={intl.formatMessage({ id: "sidebar.sessionMenu" })}
-                               onPointerDown={(event) => {
-                                 event.preventDefault();
-                                 event.stopPropagation();
-                                 setContextMenu({ x: event.clientX, y: event.clientY, sessionId: session.id, currentProjectName: node.projectName, isLoopChat: false, pinned: session.pinned === true });
-                               }}
-                               onClick={(event) => {
-                                 event.preventDefault();
-                                 event.stopPropagation();
-                               }}
-                             >
-                               <MoreHorizontal size={13} />
-                             </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="icon-btn tree-session-menu"
+                                    aria-label={intl.formatMessage({ id: "sidebar.sessionMenu" })}
+                                    onPointerDown={(event) => {
+                                      event.stopPropagation();
+                                    }}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setDropdownMenuSession({
+                                        sessionId: session.id,
+                                        currentProjectName: node.projectName,
+                                        isLoopChat: false,
+                                        pinned: session.pinned === true,
+                                      });
+                                    }}
+                                  >
+                                    <MoreHorizontal size={12} />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem onClick={() => {
+                                    void configService.pinChatSession(session.id, !session.pinned).then(async () => {
+                                      const updated = await configService.getChatSessions();
+                                      setLocalSessions(updated);
+                                      onSessionsChanged?.(updated);
+                                    });
+                                  }}>
+                                    {session.pinned
+                                      ? intl.formatMessage({ id: "sidebar.unpin" })
+                                      : intl.formatMessage({ id: "sidebar.pin" })}
+                                  </DropdownMenuItem>
+
+                                  {!session.isLoopChat ? (
+                                    <DropdownMenuItem onClick={() => {
+                                      setRenamingSessionId(session.id);
+                                      const sess = sessions.find((s) => s.id === session.id);
+                                      setRenameValue(sess?.title ?? "");
+                                    }}>
+                                      {intl.formatMessage({ id: "sidebar.rename" })}
+                                    </DropdownMenuItem>
+                                  ) : null}
+
+                                  {!session.isLoopChat ? (
+                                    <DropdownMenuItem onClick={() => {
+                                      onDeleteSession?.(session.id);
+                                    }}>
+                                      {intl.formatMessage({ id: "sidebar.deleteChat" })}
+                                    </DropdownMenuItem>
+                                  ) : null}
+
+                                  {!session.isLoopChat ? (() => {
+                                    const currentSessions = sessionsByProject.get(node.projectName) ?? [];
+                                    const currentIndex = currentSessions.findIndex((s) => s.id === session.id);
+                                    return (
+                                      <>
+                                        <DropdownMenuItem disabled={currentIndex <= 0} onClick={() => {
+                                          if (currentIndex <= 0) return;
+                                          const targetIndex = currentIndex - 1;
+                                          const ordered = [...currentSessions];
+                                          const [moved] = ordered.splice(currentIndex, 1);
+                                          ordered.splice(targetIndex, 0, moved);
+                                          void configService.reorderChatSessions(ordered.map((s) => s.id)).then(async () => {
+                                            const updated = await configService.getChatSessions();
+                                            setLocalSessions(updated);
+                                            onSessionsChanged?.(updated);
+                                          });
+                                        }}>
+                                          <ArrowUp size={12} className="mr-2" /> {intl.formatMessage({ id: "sidebar.moveUp" })}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem disabled={currentIndex < 0 || currentIndex >= currentSessions.length - 1} onClick={() => {
+                                          if (currentIndex < 0) return;
+                                          const targetIndex = currentIndex + 1;
+                                          if (targetIndex >= currentSessions.length) return;
+                                          const ordered = [...currentSessions];
+                                          const [moved] = ordered.splice(currentIndex, 1);
+                                          ordered.splice(targetIndex, 0, moved);
+                                          void configService.reorderChatSessions(ordered.map((s) => s.id)).then(async () => {
+                                            const updated = await configService.getChatSessions();
+                                            setLocalSessions(updated);
+                                            onSessionsChanged?.(updated);
+                                          });
+                                        }}>
+                                          <ArrowDown size={12} className="mr-2" /> {intl.formatMessage({ id: "sidebar.moveDown" })}
+                                        </DropdownMenuItem>
+                                      </>
+                                    );
+                                  })() : null}
+
+                                  <DropdownMenuSeparator />
+
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                      {intl.formatMessage({ id: "sidebar.moveToProject" })}
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                      {projectNodes
+                                        .map((n) => n.projectName)
+                                        .filter((name) => name !== node.projectName)
+                                        .length === 0 ? (
+                                        <DropdownMenuItem disabled>—</DropdownMenuItem>
+                                      ) : (
+                                        projectNodes
+                                          .map((n) => n.projectName)
+                                          .filter((name) => name !== node.projectName)
+                                          .map((projectName) => (
+                                            <DropdownMenuItem key={projectName} onClick={() => {
+                                              onMoveSessionToProject?.(session.id, projectName);
+                                            }}>
+                                              {projectName}
+                                            </DropdownMenuItem>
+                                          ))
+                                      )}
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                            ) : null}
                           {sessionActive ? (
                             <span className="tree-session-active-dot" />
@@ -708,119 +817,6 @@ export function Sidebar(props: {
         <OrbionMark size={24} />
         <span>{intl.formatMessage({ id: "sidebar.orbion" })}</span>
       </div>
-
-      {/* Context menu for sessions */}
-      {contextMenu ? (
-        <div className="sidebar-context-menu-backdrop" onPointerDown={() => setContextMenu(null)} />
-      ) : null}
-      {contextMenu ? (() => {
-        const targetProjects = projectNodes
-          .map((n) => n.projectName)
-          .filter((name) => name !== contextMenu.currentProjectName);
-        const currentSessions = sessionsByProject.get(contextMenu.currentProjectName) ?? [];
-        const currentIndex = currentSessions.findIndex((session) => session.id === contextMenu.sessionId);
-        const moveSession = (offset: number): void => {
-          const targetIndex = currentIndex + offset;
-          if (currentIndex < 0 || targetIndex < 0 || targetIndex >= currentSessions.length) return;
-          const ordered = [...currentSessions];
-          const [moved] = ordered.splice(currentIndex, 1);
-          ordered.splice(targetIndex, 0, moved);
-          void configService.reorderChatSessions(ordered.map((session) => session.id)).then(async () => {
-            const updated = await configService.getChatSessions();
-            setLocalSessions(updated);
-            onSessionsChanged?.(updated);
-          });
-          setContextMenu(null);
-        };
-
-        return (
-          <div
-            className="sidebar-context-menu"
-            style={{ left: Math.max(8, contextMenu.x - 180), top: contextMenu.y }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Pin/Unpin */}
-            <div
-              className="sidebar-context-menu-item"
-              onClick={() => {
-                void configService.pinChatSession(contextMenu.sessionId, !contextMenu.pinned).then(async () => {
-                  const updated = await configService.getChatSessions();
-                  setLocalSessions(updated);
-                  onSessionsChanged?.(updated);
-                });
-                setContextMenu(null);
-              }}
-            >
-              {contextMenu.pinned
-                ? intl.formatMessage({ id: "sidebar.unpin" })
-                : intl.formatMessage({ id: "sidebar.pin" })}
-            </div>
-
-            {/* Rename (hidden for loop chats) */}
-            {!contextMenu.isLoopChat ? (
-              <div
-                className="sidebar-context-menu-item"
-                onClick={() => {
-                  setRenamingSessionId(contextMenu.sessionId);
-                  const sess = sessions.find((s) => s.id === contextMenu.sessionId);
-                  setRenameValue(sess?.title ?? "");
-                  setContextMenu(null);
-                }}
-              >
-                {intl.formatMessage({ id: "sidebar.rename" })}
-              </div>
-            ) : null}
-
-            {!contextMenu.isLoopChat ? (
-              <div
-                className="sidebar-context-menu-item"
-                onClick={() => {
-                  onDeleteSession?.(contextMenu.sessionId);
-                  setContextMenu(null);
-                }}
-              >
-                {intl.formatMessage({ id: "sidebar.deleteChat" })}
-              </div>
-            ) : null}
-
-            {!contextMenu.isLoopChat ? (
-              <div className="sidebar-context-menu-item" onClick={() => moveSession(-1)}>
-                <ArrowUp size={12} /> {intl.formatMessage({ id: "sidebar.moveUp" })}
-              </div>
-            ) : null}
-            {!contextMenu.isLoopChat ? (
-              <div className="sidebar-context-menu-item" onClick={() => moveSession(1)}>
-                <ArrowDown size={12} /> {intl.formatMessage({ id: "sidebar.moveDown" })}
-              </div>
-            ) : null}
-
-            <div className="sidebar-context-menu-divider" />
-
-            {/* Move to project */}
-            <div className="sidebar-context-menu-header">
-              {intl.formatMessage({ id: "sidebar.moveToProject" })}
-            </div>
-            {targetProjects.length === 0 ? (
-              <div className="sidebar-context-menu-item sidebar-context-menu-item-disabled">
-                —
-              </div>
-            ) : (
-              targetProjects.map((projectName) => (
-                <div
-                  key={projectName}
-                  className="sidebar-context-menu-item"
-                  onClick={() => {
-                    onMoveSessionToProject?.(contextMenu.sessionId, projectName);
-                    setContextMenu(null);
-                  }}
-                >
-                  {projectName}
-                </div>
-              ))
-            )}
-          </div>
-        );
-      }) : null}
 
       {/* Inline rename input */}
       {renamingSessionId ? (

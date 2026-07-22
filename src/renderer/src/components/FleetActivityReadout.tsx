@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 import type { ReachabilityState } from "../../../shared/ipc";
@@ -6,6 +6,11 @@ import { runsToday } from "../format";
 import { loopStatusToFleetItem } from "../fleet-mapping";
 import { PILL_COLORS } from "../fleet-status";
 import { Activity } from "lucide-react";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 
 /** Heuristic: is this loop likely an agent loop? */
 function isAgentLoop(loop: LoopMeta): boolean {
@@ -38,7 +43,6 @@ export function FleetActivityReadout(props: {
   const { perEnvLoops, perEnvHealth, environments, reachability } = props;
   const intl = useIntl();
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Aggregate runs today across reachable instances
   const { totalRuns, contributors } = useMemo(() => {
@@ -79,67 +83,54 @@ export function FleetActivityReadout(props: {
     return { totalRuns: total, contributors: items.slice(0, 10) };
   }, [perEnvLoops, perEnvHealth, environments]);
 
-  // Close popover on outside click
-  useEffect(() => {
-    if (!popoverOpen) return;
-    const handleClick = (e: MouseEvent): void => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setPopoverOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [popoverOpen]);
-
-  const handleToggle = useCallback(() => {
-    setPopoverOpen((prev) => !prev);
-  }, []);
-
   if (totalRuns === 0) return null;
 
   return (
-    <div className="fleet-activity-readout" ref={containerRef}>
-      <button
-        className={`fleet-activity-chip${popoverOpen ? " active" : ""}`}
-        onClick={handleToggle}
-        title={intl.formatMessage({ id: "fleetActivity.tooltip" }, { count: totalRuns })}
-      >
-        <Activity size={12} />
-        <span className="fleet-activity-count">
-          {intl.formatMessage({ id: "fleetActivity.runsToday" }, { count: totalRuns })}
-        </span>
-      </button>
-      {popoverOpen ? (
-        <div className="fleet-activity-popover">
-          <div className="fleet-activity-popover-header">
-            <span className="overline">
-              {intl.formatMessage({ id: "fleetActivity.topContributors" })}
+    <div className="fleet-activity-readout">
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className={`fleet-activity-chip${popoverOpen ? " active" : ""}`}
+            title={intl.formatMessage({ id: "fleetActivity.tooltip" }, { count: totalRuns })}
+          >
+            <Activity size={12} />
+            <span className="fleet-activity-count">
+              {intl.formatMessage({ id: "fleetActivity.runsToday" }, { count: totalRuns })}
             </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" side="top" className="w-72 p-0">
+          <div className="fleet-activity-popover">
+            <div className="fleet-activity-popover-header">
+              <span className="overline">
+                {intl.formatMessage({ id: "fleetActivity.topContributors" })}
+              </span>
+            </div>
+            {contributors.length === 0 ? (
+              <div className="fleet-activity-popover-empty">
+                {intl.formatMessage({ id: "fleetActivity.noContributors" })}
+              </div>
+            ) : (
+              <div className="fleet-activity-popover-list">
+                {contributors.map((c) => {
+                  const fleetItem = loopStatusToFleetItem(c.status, c.lastExitCode, reachability?.[c.envId]);
+                  const color = PILL_COLORS[fleetItem];
+                  return (
+                    <div key={`${c.envName}-${c.loopId}`} className="fleet-activity-row">
+                      <span className="fleet-activity-dot" style={{ background: color }} />
+                      <span className="fleet-activity-label">{c.description}</span>
+                      <span className="fleet-activity-env">{c.envName}</span>
+                      <span className="fleet-activity-runs">
+                        {intl.formatMessage({ id: "fleetActivity.runCount" }, { count: c.runsToday })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {contributors.length === 0 ? (
-            <div className="fleet-activity-popover-empty">
-              {intl.formatMessage({ id: "fleetActivity.noContributors" })}
-            </div>
-          ) : (
-            <div className="fleet-activity-popover-list">
-              {contributors.map((c) => {
-                const fleetItem = loopStatusToFleetItem(c.status, c.lastExitCode, reachability?.[c.envId]);
-                const color = PILL_COLORS[fleetItem];
-                return (
-                  <div key={`${c.envName}-${c.loopId}`} className="fleet-activity-row">
-                    <span className="fleet-activity-dot" style={{ background: color }} />
-                    <span className="fleet-activity-label">{c.description}</span>
-                    <span className="fleet-activity-env">{c.envName}</span>
-                    <span className="fleet-activity-runs">
-                      {intl.formatMessage({ id: "fleetActivity.runCount" }, { count: c.runsToday })}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : null}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
