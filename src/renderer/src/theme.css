@@ -1085,6 +1085,16 @@ input {
   gap: 6px;
 }
 
+.tree-session-menu {
+  flex-shrink: 0;
+  opacity: 0.72;
+}
+
+.tree-session-menu:hover,
+.tree-session-row:hover .tree-session-menu {
+  opacity: 1;
+}
+
 .tree-session-row.active-session {
   color: var(--text-primary);
 }
@@ -1137,6 +1147,12 @@ input {
   border-radius: var(--radius-sm);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   padding: 4px 0;
+}
+
+.sidebar-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
 }
 
 .sidebar-context-menu-header {

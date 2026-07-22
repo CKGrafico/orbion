@@ -1303,6 +1303,18 @@ function AppInner(): React.ReactNode {
     select(environmentId);
   }, [configService, select, environments, envModels, sessions]);
 
+  const handleDeleteChatSession = useCallback((sessionId: string): void => {
+    if (!window.confirm(intl.formatMessage({ id: "sidebar.deleteChatConfirm" }))) return;
+    void configService.removeChatSession(sessionId).then(async () => {
+      const updated = await configService.getChatSessions();
+      setSessions(updated);
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+        setView({ kind: "instance" });
+      }
+    });
+  }, [activeSessionId, configService, intl]);
+
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
 
@@ -1833,6 +1845,7 @@ function AppInner(): React.ReactNode {
                   onMoveSessionToProject={handleMoveSessionToProject}
                   onOpenSettings={() => setSettingsPanelOpen(true)}
                   onSessionsChanged={(updatedSessions) => setSessions(updatedSessions)}
+                  onDeleteSession={handleDeleteChatSession}
                 />
               </aside>
             ) : null}

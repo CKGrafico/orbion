@@ -96,6 +96,11 @@
     "pin": "Pin to top",
     "unpin": "Unpin",
     "rename": "Rename",
+    "sessionMenu": "Chat actions",
+    "deleteChat": "Delete chat",
+    "deleteChatConfirm": "Delete this chat? This cannot be undone.",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
     "renamePlaceholder": "Enter new name…"
   },
   "vmWizard": {

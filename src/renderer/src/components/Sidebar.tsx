@@ -4,7 +4,7 @@ import type { ChatSession, ConnectionStatus, ReachabilityState } from "../../../
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
 import { loopStatusToFleetItem } from "../fleet-mapping";
-import { X, Plus, ChevronRight, Search, ArrowUpDown, Link, Inbox, MessageSquare, Settings } from "lucide-react";
+import { X, Plus, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown, Link, Inbox, MessageSquare, Settings, MoreHorizontal } from "lucide-react";
 import { OrbionMark } from "./OrbionMark";
 import { FleetActivityReadout } from "./FleetActivityReadout";
 import { FleetHealthFooter } from "./FleetHealthFooter";
@@ -129,6 +129,7 @@ export function Sidebar(props: {
   onMoveSessionToProject?: (sessionId: string, targetProjectName: string) => void;
   /** Open the global settings panel. */
   onOpenSettings?: () => void;
+  onDeleteSession?: (sessionId: string) => void;
   /** Notify the parent when a session mutation changes persisted sessions. */
   onSessionsChanged?: (sessions: ChatSession[]) => void;
 }): React.ReactNode {
@@ -137,7 +138,7 @@ export function Sidebar(props: {
     perEnvLoops, perEnvProjects, view, onNavigate,
     onSelect, onAddVm, fleetActivityEnabled, inboxItemCount,
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
-    reachability, mainVmId,     onNavigateToSession, activeSessionId, onOpenProjectChat, sessions: propSessions, onMoveSessionToProject, onOpenSettings, onSessionsChanged,
+    reachability, mainVmId,     onNavigateToSession, activeSessionId, onOpenProjectChat, sessions: propSessions, onMoveSessionToProject, onOpenSettings, onSessionsChanged, onDeleteSession,
   } = props;
   const intl = useIntl();
   const [configService] = useInject<IConfigService>(cid.IConfigService);
@@ -159,9 +160,6 @@ export function Sidebar(props: {
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  // Drag-and-drop reorder state
-  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
-  const [dragOverSessionId, setDragOverSessionId] = useState<string | null>(null);
 
   // Track which project nodes are expanded — persisted across restarts
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -177,21 +175,6 @@ export function Sidebar(props: {
       }
     });
   }, [configService]);
-
-  // Close context menu on click outside or Escape
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handleClick = (): void => setContextMenu(null);
-    const handleKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") setContextMenu(null);
-    };
-    document.addEventListener("click", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("click", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [contextMenu]);
 
   // Chat sessions — prefer prop sessions (stays in sync with persist/unpersist),
   // fall back to loading from config store
@@ -254,6 +237,23 @@ export function Sidebar(props: {
       }
     }
 
+    // Chats can exist before a project has loops or after its daemon data is
+    // temporarily unavailable. Keep their project visible in the sidebar.
+    for (const session of sessions) {
+      if (!session.persisted || session.isLoopChat) continue;
+      const hasProject = envProjectData.some(
+        (entry) => entry.envId === session.environmentId && entry.project.name === session.projectName,
+      );
+      if (!hasProject) {
+        envProjectData.push({
+          envId: session.environmentId,
+          envName: environments.find((env) => env.id === session.environmentId)?.name ?? session.environmentId,
+          project: { id: `chat:${session.projectName}`, name: session.projectName, color: PILL_COLORS["idle"], createdAt: session.createdAt },
+          loops: [],
+        });
+      }
+    }
+
     // Phase 2: merge by project name
     const byName = new Map<string, MergedProjectNode>();
     // Track the color from the main-VM instance per project name so we can
@@ -290,14 +290,15 @@ export function Sidebar(props: {
     }
 
     return [...byName.values()];
-  }, [environments, perEnvProjects, perEnvLoops, mainVmId]);
+  }, [environments, perEnvProjects, perEnvLoops, mainVmId, sessions]);
 
   // Group sessions by project name — only persisted sessions appear in the sidebar
   const sessionsByProject = useMemo(() => {
     const map = new Map<string, ChatSession[]>();
     for (const session of sessions) {
-      // Ephemeral (scratch) sessions are not listed in the sidebar
-      if (!session.persisted) continue;
+      // Ephemeral sessions and loop-backed chats are represented by their own
+      // loop tree row, never as a duplicate chat row.
+      if (!session.persisted || session.isLoopChat) continue;
       const existing = map.get(session.projectName) ?? [];
       existing.push(session);
       map.set(session.projectName, existing);
@@ -366,7 +367,10 @@ export function Sidebar(props: {
   };
 
   const isLoopSelected = (loopId: string): boolean => {
-    return view.kind === "loop" && view.loopId === loopId;
+    if (view.kind === "loop") return view.loopId === loopId;
+    if (view.kind !== "session") return false;
+    const session = sessions.find((candidate) => candidate.id === view.sessionId);
+    return session?.isLoopChat === true && session.loopId === loopId;
   };
 
   const isSessionSelected = (sessionId: string): boolean => {
@@ -522,48 +526,11 @@ export function Sidebar(props: {
                       const sessionSelected = isSessionSelected(session.id);
                       const sessionActive = session.id === activeSessionId;
                       const relativeTime = timeAgo(session.lastActiveAt);
-                      const isDragOver = dragOverSessionId === session.id && draggedSessionId !== session.id;
 
                       return (
                         <div
                           key={session.id}
-                          className={`tree-node tree-node-depth-1 tree-session-row${sessionSelected ? " selected" : ""}${sessionActive ? " active-session" : ""}${isDragOver ? " drag-over" : ""}`}
-                          draggable
-                          onDragStart={(e) => {
-                            setDraggedSessionId(session.id);
-                            e.dataTransfer.effectAllowed = "move";
-                          }}
-                          onDragEnd={() => {
-                            setDraggedSessionId(null);
-                            setDragOverSessionId(null);
-                          }}
-                          onDragOver={(e) => {
-                            if (draggedSessionId && draggedSessionId !== session.id) {
-                              e.preventDefault();
-                              e.dataTransfer.dropEffect = "move";
-                              setDragOverSessionId(session.id);
-                            }
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverSessionId === session.id) setDragOverSessionId(null);
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            if (!draggedSessionId || draggedSessionId === session.id) return;
-                            // Reorder: move dragged session before this one
-                            const ordered = [...projSessions];
-                            const fromIdx = ordered.findIndex((s) => s.id === draggedSessionId);
-                            const toIdx = ordered.findIndex((s) => s.id === session.id);
-                            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
-                            const [moved] = ordered.splice(fromIdx, 1);
-                            ordered.splice(toIdx, 0, moved);
-                            void configService.reorderChatSessions(ordered.map((s) => s.id)).then(async () => {
-                              const updated = await configService.getChatSessions();
-                              setLocalSessions(updated);
-                            });
-                            setDraggedSessionId(null);
-                            setDragOverSessionId(null);
-                          }}
+                           className={`tree-node tree-node-depth-1 tree-session-row${sessionSelected ? " selected" : ""}${sessionActive ? " active-session" : ""}`}
                           onClick={() => {
                             onNavigateToSession?.(session.id);
                           }}
@@ -586,7 +553,24 @@ export function Sidebar(props: {
                             <MessageSquare size={12} />
                           </span>
                           <span className="tree-label">{session.title}</span>
-                          <span className="tree-session-time">{relativeTime}</span>
+                           <span className="tree-session-time">{relativeTime}</span>
+                           {!session.isLoopChat ? (
+                             <button
+                               className="icon-btn tree-session-menu"
+                               aria-label={intl.formatMessage({ id: "sidebar.sessionMenu" })}
+                               onPointerDown={(event) => {
+                                 event.preventDefault();
+                                 event.stopPropagation();
+                                 setContextMenu({ x: event.clientX, y: event.clientY, sessionId: session.id, currentProjectName: node.projectName, isLoopChat: false, pinned: session.pinned === true });
+                               }}
+                               onClick={(event) => {
+                                 event.preventDefault();
+                                 event.stopPropagation();
+                               }}
+                             >
+                               <MoreHorizontal size={13} />
+                             </button>
+                           ) : null}
                           {sessionActive ? (
                             <span className="tree-session-active-dot" />
                           ) : null}
@@ -726,15 +710,33 @@ export function Sidebar(props: {
       </div>
 
       {/* Context menu for sessions */}
+      {contextMenu ? (
+        <div className="sidebar-context-menu-backdrop" onPointerDown={() => setContextMenu(null)} />
+      ) : null}
       {contextMenu ? (() => {
         const targetProjects = projectNodes
           .map((n) => n.projectName)
           .filter((name) => name !== contextMenu.currentProjectName);
+        const currentSessions = sessionsByProject.get(contextMenu.currentProjectName) ?? [];
+        const currentIndex = currentSessions.findIndex((session) => session.id === contextMenu.sessionId);
+        const moveSession = (offset: number): void => {
+          const targetIndex = currentIndex + offset;
+          if (currentIndex < 0 || targetIndex < 0 || targetIndex >= currentSessions.length) return;
+          const ordered = [...currentSessions];
+          const [moved] = ordered.splice(currentIndex, 1);
+          ordered.splice(targetIndex, 0, moved);
+          void configService.reorderChatSessions(ordered.map((session) => session.id)).then(async () => {
+            const updated = await configService.getChatSessions();
+            setLocalSessions(updated);
+            onSessionsChanged?.(updated);
+          });
+          setContextMenu(null);
+        };
 
         return (
           <div
             className="sidebar-context-menu"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            style={{ left: Math.max(8, contextMenu.x - 180), top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Pin/Unpin */}
@@ -766,6 +768,29 @@ export function Sidebar(props: {
                 }}
               >
                 {intl.formatMessage({ id: "sidebar.rename" })}
+              </div>
+            ) : null}
+
+            {!contextMenu.isLoopChat ? (
+              <div
+                className="sidebar-context-menu-item"
+                onClick={() => {
+                  onDeleteSession?.(contextMenu.sessionId);
+                  setContextMenu(null);
+                }}
+              >
+                {intl.formatMessage({ id: "sidebar.deleteChat" })}
+              </div>
+            ) : null}
+
+            {!contextMenu.isLoopChat ? (
+              <div className="sidebar-context-menu-item" onClick={() => moveSession(-1)}>
+                <ArrowUp size={12} /> {intl.formatMessage({ id: "sidebar.moveUp" })}
+              </div>
+            ) : null}
+            {!contextMenu.isLoopChat ? (
+              <div className="sidebar-context-menu-item" onClick={() => moveSession(1)}>
+                <ArrowDown size={12} /> {intl.formatMessage({ id: "sidebar.moveDown" })}
               </div>
             ) : null}
 

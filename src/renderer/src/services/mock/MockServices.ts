@@ -151,11 +151,11 @@ const MOCK_TASKS: TaskDefinition[] = [
 ];
 
 const MOCK_CHAT_SESSIONS: ChatSession[] = [
-  { id: "session-1", title: "Build pipeline setup", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", activeModel: "openai/gpt-4o", reasoningEffort: "medium", persisted: true, lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
-  { id: "session-2", title: "Fix flaky tests", projectName: "Default", environmentId: "mock-env-1", workingDirectory: "/home/user/project", activeRuntime: "opencode", activeModel: "openai/gpt-4o", persisted: true, lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
-  { id: "session-3", title: "ETL data migration", projectName: "ETL", environmentId: "mock-env-1", workingDirectory: "/home/user/etl-pipeline", activeRuntime: "opencode", activeModel: "openai/o3-mini", reasoningEffort: "high", persisted: true, lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
-  { id: "session-4", title: "Agent code review", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-sonnet", reasoningEffort: "high", persisted: true, lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
-  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env-1", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-haiku", persisted: true, lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
+  { id: "session-1", title: "Build pipeline setup", projectName: "Default", environmentId: "mock-env", workingDirectory: "/home/user/project", activeRuntime: "opencode", activeModel: "openai/gpt-4o", reasoningEffort: "medium", persisted: true, lastActiveAt: iso(-1800000), createdAt: iso(-86400000 * 2) },
+  { id: "session-2", title: "Fix flaky tests", projectName: "Default", environmentId: "mock-env", workingDirectory: "/home/user/project", activeRuntime: "opencode", activeModel: "openai/gpt-4o", persisted: true, lastActiveAt: iso(-7200000), createdAt: iso(-86400000) },
+  { id: "session-3", title: "ETL data migration", projectName: "ETL", environmentId: "mock-env", workingDirectory: "/home/user/etl-pipeline", activeRuntime: "opencode", activeModel: "openai/o3-mini", reasoningEffort: "high", persisted: true, lastActiveAt: iso(-3600000), createdAt: iso(-86400000 * 3) },
+  { id: "session-4", title: "Agent code review", projectName: "Agents", environmentId: "mock-env", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-sonnet", reasoningEffort: "high", persisted: true, lastActiveAt: iso(-600000), createdAt: iso(-86400000) },
+  { id: "session-5", title: "Claude auto-fixes", projectName: "Agents", environmentId: "mock-env", workingDirectory: "/home/user/agents", activeRuntime: "claude", activeModel: "anthropic/claude-3.5-haiku", persisted: true, lastActiveAt: iso(-43200000), createdAt: iso(-86400000 * 5) },
 ];
 
 function mockRequest<T>(path: string, method: string = "GET", body?: unknown): Promise<ApiResponse<T>> {
@@ -233,11 +233,19 @@ let mockEnvironments: Environment[] = [];
 let mockSelectedId: string | null = null;
 let mockStamp: ConfigStamp = { timestamp: Date.now(), revision: 0 };
 
+function resetMockFixtureRequested(): boolean {
+  return new URLSearchParams(window.location.search).has("resetMock");
+}
+
 function mockBumpStamp(): void {
   mockStamp = { timestamp: Date.now(), revision: mockStamp.revision + 1 };
 }
 
 function loadMockEnvironments(): Environment[] {
+  if (resetMockFixtureRequested()) {
+    mockEnvironments = [];
+    mockSelectedId = null;
+  }
   try {
     const raw = localStorage.getItem("orbion.envs.mock");
     if (raw) {
@@ -352,9 +360,13 @@ export class MockConfigService implements IConfigService {
     // mock: no-op
   }
   async getChatSessions(): Promise<ChatSession[]> {
+    if (resetMockFixtureRequested()) return [...MOCK_CHAT_SESSIONS];
     try {
       const raw = localStorage.getItem("orbion.sessions.mock");
-      if (raw) return JSON.parse(raw) as ChatSession[];
+      if (raw) {
+        const sessions = JSON.parse(raw) as ChatSession[];
+        if (sessions.length > 0) return sessions;
+      }
     } catch { /* empty */ }
     return [...MOCK_CHAT_SESSIONS];
   }
