@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Frontend engineer agent uses shadcn skill
 The `frontend-engineer` agent SHALL list `@shadcn` under its `## Abilities > Development` section and SHALL NOT list `@accelint-design-foundation`. The shadcn skill provides guidance for working with shadcn/ui components and Tailwind CSS v4.
