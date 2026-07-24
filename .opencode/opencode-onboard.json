@@ -1,16 +1,16 @@
 {
   "version": 2,
-  "generatedAt": "2026-07-22T11:44:49.793Z",
-  "onboardVersion": "1.4.4",
-  "opencodeVersion": "1.17.14",
+  "generatedAt": "2026-07-24T21:55:03.901Z",
+  "onboardVersion": "1.4.17",
+  "opencodeVersion": "1.18.4",
   "platform": {
     "backlog": "github",
     "repo": "github"
   },
   "models": {
-    "plan": "opencode-go/glm-5.2",
-    "build": "opencode-go/glm-5.1",
-    "fast": "opencode/big-pickle"
+    "fast": "plainconcepts/glm-5-1",
+    "build": "plainconcepts/glm-5-1",
+    "plan": "plainconcepts/glm-5-2"
   },
   "agents": {
     "maxConcurrent": 4

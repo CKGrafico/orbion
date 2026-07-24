@@ -6,7 +6,7 @@ license: MIT
 
 ## Transitive loads (optimization skills)
 
-The marker sections below may contain instructions directing you to load additional optimization skills (caveman, humanizer, codegraph, memory, etc.). These are mandatory. If a section says "call `skill("xxx")`", you must call the skill tool with that exact name before doing any work. Failure to load an optimization skill means you are operating without rules that the user has explicitly enabled.
+The marker sections below may contain instructions for selected optimization skills. These are mandatory. If a section says "call `skill("xxx")`", you must call the skill tool with that exact name before doing any work.
 
 ## Secrets
 
@@ -21,6 +21,13 @@ The marker sections below may contain instructions directing you to load additio
 - Keep changes small and focused.
 - Comments are for WHY, not WHAT. Use them only when the code does something non-obvious or the reason cannot be inferred from context. Keep comment ratio under 10%. If more than 10% of lines in a file are comments, refactor for clarity instead.
 - Each file should have one clear responsibility. Split by domain or feature (e.g. `user-constants.ts`, `order-types.ts`, `auth-config.ts`) rather than creating catch-all files like `constants.js`, `types.ts`, `config.js`, or `utils.ts` that collect unrelated things. A file that imports from many unrelated modules is a sign it should be split.
+
+## Temporary files
+
+- Create scratch files only under `$REPO_ROOT/.opencode/.tmp/`; create a task-specific child directory when needed.
+- Keep final artifacts in their required repository path. Copy or move a scratch artifact into that path before reporting it.
+- Never use operating-system temporary directories or paths outside `$REPO_ROOT`.
+- Remove scratch files when the task ends unless they are needed to diagnose a failure.
 
 ## Security
 
@@ -64,8 +71,8 @@ The marker sections below may contain instructions directing you to load additio
 When the lead spawns you via the task tool, your assigned task IDs and text are already in your prompt:
 
 1. Load ALL skills listed under your own `## Abilities` now (Guardrails first, then the rest), by calling the `skill` tool once per `@skill-name`.
-2. Gather context using available tools (see sections above): search agentmemory for `change-<slug>-context` and any `task-<id>-result` notes from dependencies; use codegraph to locate relevant symbols.
+2. Gather context using the project-selected tools described above.
 3. Implement your assigned tasks in dependency order. Edit only files within your assigned scope.
 4. Run the project's tests/lint before marking done (see Code above).
-5. Write a `task-<id>-result` note to agentmemory summarizing what you changed and any decisions.
+5. Record the task result through the project-selected workflow.
 6. Return a summary containing: task IDs done, files changed, tests/lint result, and any decisions made. Then you exit; you do not poll, claim, or wait for more work.

@@ -8,6 +8,8 @@ permission:
   read: allow
   glob: allow
   grep: allow
+  question: allow
+  todowrite: allow
 model: opencode/big-pickle
 ---
 
