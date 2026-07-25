@@ -1,17 +1,11 @@
-## 1. Canonical SSRF module
+# Tasks
 
-- [x] 1.1 Create `src/main/ssrf-allowlist.ts` with `isUrlAllowedForFetch(url, options?)` function implementing allowlist polarity, IPv6 link-local blocking, cloud DNS metadata hostname blocking, and all existing SSRF vectors <!-- agent: fullstack-engineer.build, depends_on: [], touches: [src/main/ssrf-allowlist.ts] -->
-
-## 2. Refactor consumers
-
-- [x] 2.1 Replace `isBlocklistedHost` in `src/main/ipc-validation.ts` with import from `ssrf-allowlist.ts`, delete the private function <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [src/main/ipc-validation.ts] -->
-- [x] 2.2 Replace `isAllowedHost` in `src/main/index.ts` with import from `ssrf-allowlist.ts`, keep `isAllowedBaseUrl` and `isEffectiveUrlAllowed` as thin wrappers <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [src/main/index.ts] -->
-
-## 3. Tests
-
-- [x] 3.1 Rewrite `tests/host-blocklist.test.ts` to import from `ssrf-allowlist.ts` and add test cases for IPv6 link-local, cloud DNS metadata hostnames, and both polarity paths <!-- agent: fullstack-engineer.build, depends_on: [1.1], touches: [tests/host-blocklist.test.ts] -->
-- [x] 3.2 Add IPv6 link-local and DNS metadata rejection test cases to `tests/ipc-validation.test.ts` <!-- agent: fullstack-engineer.build, depends_on: [2.1], touches: [tests/ipc-validation.test.ts] -->
-
-## 4. Verification
-
-- [x] 4.1 Run `pnpm typecheck` and `pnpm check:comments`, fix any errors <!-- agent: fullstack-engineer.fast, depends_on: [2.1, 2.2, 3.1, 3.2], touches: [] -->
+- [x] T1: Create `src/main/ssrf-blocklist.ts` with `isHostAllowed`, `isUrlAllowedForFetch`, `isAllowedBaseUrl`
+- [x] T2: Refactor `ipc-validation.ts` — replace `isBlocklistedHost` with import from `ssrf-blocklist`
+- [x] T3: Refactor `index.ts` — replace `isAllowedHost`, `isAllowedBaseUrl` with imports from `ssrf-blocklist`
+- [x] T4: Add `metadata.azure.internal` to cloud metadata hostnames
+- [x] T5: Improve IPv6 link-local detection (bracket-aware helper)
+- [x] T6: Extract `isAllowedBaseUrl` into canonical module
+- [x] T7: Rewrite `tests/host-blocklist.test.ts` with comprehensive coverage
+- [x] T8: Add parity test verifying both call paths agree on allow/deny
+- [x] T9: Run `pnpm typecheck`, `pnpm check:comments`, `pnpm test`

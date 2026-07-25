@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { logger, createLogger } from "./logger.js";
+import { isHostAllowed, isUrlAllowedForFetch, isAllowedBaseUrl } from "./ssrf-blocklist.js";
 import type { LogEntry } from "../shared/log.js";
 import type {
   ApiRequestArgs,
@@ -27,7 +28,7 @@ import type {
   McpToolCallResult,
   LoopShape,
 } from "../shared/ipc.js";
-import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings, SecurityAuditEvent } from "../shared/ipc.js";
+import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -92,9 +93,7 @@ import {
   sweepEphemeralSessions,
   getGlobalSettings,
   updateGlobalSettings,
-  setCredentialTamperedCallback,
 } from "./config-store.js";
-import { logSecurityEvent, getSecurityAuditEvents } from "./security-audit-log.js";
 import {
   getMessages as transcriptGetMessages,
   appendMessage as transcriptAppendMessage,
@@ -115,7 +114,6 @@ import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus, destroyA
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent, respondHostKey } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
 import { validateIpc, safeHandle, IpcValidationError, checkLogRateLimit } from "./ipc-validation.js";
-import { isUrlAllowedForFetch } from "./ssrf-allowlist.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
 import { OutageTracker } from "./outage-tracker.js";
@@ -163,30 +161,6 @@ const streams = new Map<string, StreamEntry>();
 const streamEnvironments = new Map<string, string>();
 
 const notificationService = new NotificationService();
-
-setCredentialTamperedCallback((environmentId, credentialKind) => {
-  logSecurityEvent({
-    kind: "credential-tampered",
-    environmentId,
-    credentialKind,
-  });
-
-  const envs = getEnvironments();
-  const env = envs.find((e: Environment) => e.id === environmentId);
-  const envName = env?.name ?? environmentId;
-
-  notificationService.send({
-    title: `Security alert: ${envName} credentials tampered`,
-    body: `Stored ${credentialKind === "sessionToken" ? "session token" : "SSH key passphrase"} was modified unexpectedly. Re-pair this instance to restore access.`,
-    tag: `credential-tampered:${environmentId}`,
-    suppressIfFocused: false,
-  });
-
-  const win = getMainWindow();
-  if (win && !win.isDestroyed()) {
-    win.webContents.send("credential:tampered", { environmentId, credentialKind });
-  }
-});
 
 const outageTracker = new OutageTracker(
   (event: OutageEscalation) => {
@@ -363,25 +337,11 @@ function showEncryptionWarning(): void {
   });
 }
 
-function isAllowedHost(url: URL, allowLoopback: boolean): boolean {
-  return isUrlAllowedForFetch(url, { allowLoopback });
-}
-
-function isAllowedBaseUrl(baseUrl: string): boolean {
-  try {
-    const url = new URL(baseUrl);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    return isAllowedHost(url, true);
-  } catch {
-    return false;
-  }
-}
-
 function isEffectiveUrlAllowed(effectiveUrl: string): { allowed: boolean; host: string } {
   try {
     const url = new URL(effectiveUrl);
     const host = url.hostname.toLowerCase();
-    if (!isAllowedHost(url, false)) {
+    if (!isHostAllowed(host, { allowLoopback: false })) {
       if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
         const port = parseInt(url.port, 10);
         if (port && isTunnelLocalPort(port)) {
@@ -1206,13 +1166,6 @@ app.whenReady().then(() => {
       }
     }
     return result;
-  });
-
-  // ── Credential tampering ────────────────────────────────────────────
-
-  safeHandle("credential:getSecurityAuditEvents", (): SecurityAuditEvent[] => {
-    validateIpc("credential:getSecurityAuditEvents", []);
-    return getSecurityAuditEvents();
   });
 
   // ── Reachability (instance health layer, separate from loop status) ───
