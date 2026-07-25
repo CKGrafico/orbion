@@ -1,14 +1,8 @@
 /**
  * Decide whether a change requires visual evidence.
- *
- * Pure function over {@link ChangeContext} + optional changed-files hint.
- *
- * Require when the change affects user-visible renderer/layout/styling/
- * navigation/forms/interactions/states/window behavior.
- *
- * Skip when the change is docs-only, internal refactor with no visible
- * behavior, dependency-only, test-only, logging-only, or main/backend with
- * no user-visible component.
+ * Require when the change affects user-visible UI. Skip when docs-only,
+ * internal refactor, dependency-only, test-only, logging-only, or
+ * main/backend with no user-visible component.
  */
 import type { ChangeContext } from "./types.js";
 
@@ -17,9 +11,9 @@ export interface EvidenceDecision {
   readonly reason: string;
 }
 
-// ── File pattern signals ───────────────────────────────────────────────
+// ── File pattern signals ──
 
-/** Paths under these indicate user-visible UI */
+/** Paths indicating user-visible UI */
 const RENDERER_UI_PATTERNS: readonly RegExp[] = [
   /src\/renderer\//i,
   /src\/renderer\//,
@@ -38,10 +32,10 @@ const RENDERER_UI_PATTERNS: readonly RegExp[] = [
   /Sidebar/i,
 ];
 
-/** Patterns that, when ALL files match, indicate no visible change */
+/** When ALL files match, indicates no visible change */
 const NON_VISUAL_PATTERNS: readonly RegExp[] = [
   /\.md$/i,
-  /src\/main\//, // Electron main process (backend) — unless paired with UI
+  /src\/main\//, // Electron main process — unless paired with UI
   /src\/shared\/ipc\.ts$/,
   /http-utils/i,
   /sse-parser/i,
@@ -116,7 +110,7 @@ export function decideEvidenceRequired(ctx: ChangeContext): EvidenceDecision {
       ? ctx.affectedFiles
       : [];
 
-  // 1. If changed files list is empty, fall back to proposal text heuristics
+  // 1. No changed files — fall back to proposal text heuristics
   if (files.length === 0) {
     const proposal = ctx.proposal ?? ctx.archive ?? "";
     if (proposal.trim().length === 0) {
@@ -125,9 +119,9 @@ export function decideEvidenceRequired(ctx: ChangeContext): EvidenceDecision {
         reason: "No changed files or proposal text available to assess visual impact.",
       };
     }
-    // Skip keywords take precedence: if a proposal explicitly describes an
-    // internal refactor / dependency update / logging change, evidence is
-    // not required even if the word "visible" appears later in the text.
+    // Skip keywords take precedence: a proposal describing an internal
+    // refactor / dependency update / logging change is skipped even if the
+    // word "visible" appears later in the text.
     if (SKIP_KEYWORDS.some((re) => re.test(proposal))) {
       return {
         required: false,
@@ -159,7 +153,6 @@ export function decideEvidenceRequired(ctx: ChangeContext): EvidenceDecision {
   }
 
   if (allMatchNonVisual(files)) {
-    // Construct a readable reason
     const kinds: string[] = [];
     if (files.every((f) => /\.md$/i.test(f))) kinds.push("documentation");
     if (files.every((f) => /tests?\//i.test(f) || /\.test\.ts$/i.test(f)))
@@ -175,7 +168,7 @@ export function decideEvidenceRequired(ctx: ChangeContext): EvidenceDecision {
     };
   }
 
-  // 3. Mixed / unknown — default to required to be safe
+  // 3. Mixed/unknown — default to required
   return {
     required: true,
     reason:

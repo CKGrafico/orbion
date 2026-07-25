@@ -1,22 +1,7 @@
 /**
- * Scenario: gh-154-agent-briefing-default
- *
- * Exercises the agent briefing as the default PR review view:
- *   1. App launches into the inbox view with mock data.
- *   2. Clicking a PR item opens review mode.
- *   3. The briefing view is the default (not raw diff).
- *   4. The briefing summary is visible.
- *   5. Flagged files are visible with risk chips and inline diff hunks.
- *   6. A boilerplate section is visible and collapsed.
- *   7. Clicking the boilerplate section expands it to show collated files.
- *   8. The "Raw diff" tab switches to the raw diff view.
- *   9. The "Briefing" tab switches back to the briefing view.
- *
- * Uses mock mode (no real Electron environment needed).
- *
- * Note: the mock web app starts in cold-open state. The scenario first
- * adds a mock environment to bypass the cold-open, then navigates to the
- * inbox where PR items appear.
+ * Exercises the agent briefing as the default PR review view.
+ * The mock web app starts in cold-open state; this scenario first
+ * adds a mock environment to bypass it, then navigates to the inbox.
  */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
@@ -36,13 +21,12 @@ function prItem(page: Page) {
 export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render (inbox or cold-open)
   await page.waitForTimeout(3000);
 
-  // If we're on the cold-open screen, add a mock environment to get past it
+  // Cold-open bypass: add a mock environment to get past it
   const coldOpen = page.locator(".cold-open, .cold-open-card");
   if ((await coldOpen.count()) > 0) {
-    // Try clicking the "Add VM" or similar button to bypass cold-open
+    // Try the "Add VM" or similar button to bypass cold-open
     const addVmBtn = page.getByRole("button", { name: /add|connect|start/i }).first();
     if ((await addVmBtn.count()) > 0) {
       await addVmBtn.click();
@@ -62,37 +46,30 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
     await digestHeader.click();
   }
 
-  // Check if we have PR items - if not, try to navigate directly into review mode
-  // by triggering review mode from the mock service
+  // Check for PR items; if absent, try entering review mode directly
   let hasPrItems = false;
   const prItems = page.locator(".digest-child-item, .inbox-view-item").filter({ hasText: /#/ });
   if ((await prItems.count()) > 0) {
     hasPrItems = true;
   }
 
-  // If no PR items in inbox, try the session chat view's review mode trigger
-  // (In the mock adapter, review mode can be entered from the sidebar)
   if (!hasPrItems) {
-    // Try clicking on any notification-related element
     const notifBadge = page.locator(".notification-badge, .inbox-badge").first();
     if ((await notifBadge.count()) > 0) {
       await notifBadge.click();
       await page.waitForTimeout(2000);
     }
 
-    // Re-check for PR items after potential navigation
+    // Re-check for PR items after navigation
     const recheckPrItems = page.locator(".digest-child-item, .inbox-view-item").filter({ hasText: /#/ });
     if ((await recheckPrItems.count()) > 0) {
       hasPrItems = true;
     }
   }
 
-  // If still no PR items, we need to inject review mode directly
-  // This simulates a programmatic entry into review mode
+  // Last resort: inject review mode directly via the DI container
   if (!hasPrItems) {
-    // Use JavaScript to trigger the ReviewModeService.enter() via the DI container
     await page.evaluate(() => {
-      // Try to access the React tree to trigger review mode
       const reviewBtn = document.querySelector('[data-testid="open-review"], .pr-review-trigger');
       if (reviewBtn instanceof HTMLElement) {
         reviewBtn.click();
@@ -100,7 +77,6 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
     });
     await page.waitForTimeout(2000);
 
-    // Last resort: check if review mode is now visible
     const reviewOverlay = page.locator(".review-mode-overlay");
     if ((await reviewOverlay.count()) > 0) {
       hasPrItems = true; // We're in review mode now
@@ -111,7 +87,6 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
     {
       description: "Review mode is accessible (via inbox or direct entry)",
       run: async (p) => {
-        // If we have PR items, click one to enter review mode
         if (hasPrItems) {
             const item = prItem(p);
             if ((await item.count()) > 0) {
@@ -133,7 +108,7 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
         if ((await briefingView.count()) === 0) {
           throw new Error("Briefing view did not appear as the default in review mode");
         }
-        // Make sure the raw diff view is NOT the default
+        // Ensure raw diff view is NOT the default
         const diffView = p.locator(".review-diff-view");
         if ((await diffView.count()) > 0) {
           throw new Error("Raw diff view appeared as the default instead of briefing view");
@@ -164,7 +139,7 @@ export async function gh154AgentBriefingDefaultScenario(ctx: ScenarioContext): P
         if ((await flaggedFiles.count()) === 0) {
           throw new Error("No flagged files visible in the briefing");
         }
-        // Check that risk chips are present
+        // Check risk chips
         const riskChips = p.locator(".pr-risk-chip-high, .pr-risk-chip-medium, .pr-risk-chip-low");
         if ((await riskChips.count()) === 0) {
           throw new Error("No risk chips visible on flagged files");

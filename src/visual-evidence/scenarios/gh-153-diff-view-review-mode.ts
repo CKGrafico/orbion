@@ -1,15 +1,5 @@
 /**
- * Scenario: gh-153-diff-view-review-mode
- *
- * Exercises the diff viewer inside review mode:
- *   1. App launches into the inbox view with mock PR data.
- *   2. Clicking a PR item opens review mode.
- *   3. The diff file list is visible with file entries.
- *   4. Selecting a file shows its unified diff with add/remove coloring.
- *   5. Binary files show a "Binary file" label instead of diff content.
- *   6. The file stats (additions/deletions) are visible in the list.
- *
- * Uses mock mode (no real Electron environment needed).
+ * Exercises the diff viewer inside review mode. Uses mock mode.
  */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
@@ -29,10 +19,8 @@ function prItem(page: Page) {
 export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render (inbox or cold-open)
   await page.waitForTimeout(3000);
 
-  // Navigate to inbox if not already there
   const inboxTab = page.getByRole("button", { name: /inbox/i });
   if ((await inboxTab.count()) > 0) {
     await inboxTab.first().click();
@@ -116,14 +104,14 @@ export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Pro
         // Wait for diff to load
         await page.waitForTimeout(1500);
 
-        // Check that at least some diff lines are rendered
+        // At least some diff lines must be rendered
         const diffLines = p.locator(".review-diff-line");
         const lineCount = await diffLines.count();
         if (lineCount === 0) {
           throw new Error("No diff lines rendered in the content pane");
         }
 
-        // Check for addition line(s)
+        // Check for addition lines
         const addLines = p.locator(".review-diff-line-addition");
         if ((await addLines.count()) === 0) {
           throw new Error("No addition lines visible in the diff");
@@ -137,7 +125,7 @@ export async function gh153DiffViewReviewModeScenario(ctx: ScenarioContext): Pro
     {
       description: "Binary file shows a label instead of diff content",
       run: async (p) => {
-        // Find the binary file item in the file list and click it
+        // Find and click the binary file item
         const binaryItems = p.locator(".review-diff-file-item").filter({ hasText: "binary" });
         if ((await binaryItems.count()) === 0) {
           throw new Error("No binary file entry is available for validation");

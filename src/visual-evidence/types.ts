@@ -1,14 +1,9 @@
 /**
- * Strict input/output schemas for the visual-evidence capability.
- *
- * All types are pure data contracts — no behavior. Fine-grained modules
- * (config, resolver, capture, manifest, etc.) consume these.
- *
- * The evidence.json manifest written into the OpenSpec change has version 1
- * and is shaped as {@link EvidenceManifest}.
+ * Input/output schemas for the visual-evidence capability.
+ * evidence.json uses version 1 shaped as {@link EvidenceManifest}.
  */
 
-// ── Input ──────────────────────────────────────────────────────────────
+// ── Input ──
 
 export type EvidenceTypePreference = "auto" | "screenshot" | "gif" | "video";
 
@@ -36,7 +31,7 @@ export interface EvidenceInput {
   readonly commitSha?: string;
 }
 
-// ── Context read from the OpenSpec change on disk ─────────────────────
+// ── Context read from OpenSpec change on disk ──
 
 export interface ChangeContext {
   readonly changeId: string;
@@ -49,7 +44,7 @@ export interface ChangeContext {
   readonly active: boolean;
 }
 
-// ── Scenario + assertions ─────────────────────────────────────────────
+// ── Scenario + assertions ──
 
 export interface Scenario {
   readonly title: string;
@@ -75,7 +70,7 @@ export interface ScenarioEvidenceContract {
   readonly criteria: readonly EvidenceCriterion[];
 }
 
-// ── Assets ────────────────────────────────────────────────────────────
+// ── Assets ──
 
 export type AssetType = "screenshot" | "gif" | "video";
 export type ImageFormat = "webp" | "png";
@@ -105,7 +100,7 @@ export interface GifAsset {
 
 export type EvidenceAsset = ScreenshotAsset | GifAsset;
 
-// ── Temporary artifacts (kept only on failure, never committed) ───────
+// ── Temporary artifacts (kept only on failure) ──
 
 export interface TemporaryArtifacts {
   readonly screenshot?: string;
@@ -113,7 +108,7 @@ export interface TemporaryArtifacts {
   readonly trace?: string;
 }
 
-// ── Result ───────────────────────────────────────────────────────────
+// ── Result ──
 
 export type EvidenceStatus = "passed" | "skipped" | "failed" | "blocked";
 
@@ -162,24 +157,19 @@ export type EvidenceResult =
   | FailedEvidenceResult
   | BlockedEvidenceResult;
 
-// ── Manifest (the evidence.json file on disk) ─────────────────────────
+// ── Manifest (evidence.json) ──
 
-/**
- * The exact shape of `openspec/changes/<id>/evidence/evidence.json`.
- *
- * A union with the same discriminant as {@link EvidenceResult}; serialized
- * with JSON.stringify, so fields with `undefined` values are omitted.
- */
+/** Same shape as {@link EvidenceResult}; serialized with JSON.stringify so undefined fields are omitted. */
 export type EvidenceManifest = EvidenceResult;
 
-// ── Repo coordinates for PR markdown URLs ─────────────────────────────
+// ── Repo coordinates for PR markdown URLs ──
 
 export interface RepoCoordinates {
   readonly owner: string;
   readonly name: string;
 }
 
-// ── Capture-candidate (before size enforcement) ──────────────────────
+// ── Capture-candidate (before size enforcement) ──
 
 export interface CaptureCandidate {
   readonly type: AssetType;

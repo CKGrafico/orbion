@@ -1,24 +1,13 @@
 /**
- * The visual-evidence orchestrator.
+ * The visual-evidence orchestrator — the single entrypoint for autonomous
+ * agents. The CLI is a thin wrapper over {@link runVisualEvidence}.
  *
- * This is the single entrypoint an autonomous agent invokes. The CLI is a
- * thin wrapper over {@link runVisualEvidence}.
+ * Flow: validate → resolve change → decide required → derive scenario →
+ * launch → run scenario + assertions → capture screenshot → GIF conversion
+ * → enforce size limits → promote final assets + evidence.json.
  *
- * High-level flow:
- *   1. Validate input.
- *   2. Resolve the OpenSpec change.
- *   3. Decide whether evidence is required — skip if not.
- *   4. Derive the scenario — blocked if context insufficient.
- *   5. Build + launch Electron deterministically.
- *   6. Run the registered scenario runner with assertions + tracing.
- *   7. Capture final screenshot.
- *   8. Optionally convert the temp webm into an optimized GIF.
- *   9. Enforce size limits; drop oversized GIFs.
- *  10. Promote only final assets + evidence.json to the OpenSpec change.
- *
- * On failure at any step after launch: preserve temp failure.png + webm +
- * trace.zip; do NOT promote anything to permanent evidence; return a
- * structured failed result.
+ * On failure after launch: preserve temp artifacts, do NOT promote to
+ * permanent evidence, return structured failed result.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -101,7 +90,7 @@ export async function runVisualEvidence(
   const repoRoot = findRepoRoot();
   const config = opts.config ?? resolveConfig();
 
-  // 1. Resolve the OpenSpec change
+  // Resolve the OpenSpec change
   let ctx;
   try {
     ctx = readChangeContext(repoRoot, input.changeId, { allowArchived: opts.allowArchived });
@@ -109,18 +98,19 @@ export async function runVisualEvidence(
     return blockedResult(input.changeId, `Failed to resolve OpenSpec change: ${(err as Error).message}`);
   }
 
-  // 2. Decision: evidence required?
+  // Evidence required?
   const decision = decideEvidenceRequired(ctx);
   if (!decision.required) {
     return skippedResult(input.changeId, decision.reason);
   }
 
-  // 3. Derive scenario
+  // Derive scenario
   const derivation = deriveScenario(ctx, input);
   if (derivation.blocked || !derivation.scenario) {
     // We need a concrete runner registered for the change OR an explicit
     // scenario. Without one, we cannot execute Playwright blindly.
     if (!getScenario(input.changeId)) {
+      // No concrete runner and context insufficient to derive one
       return blockedResult(
         input.changeId,
         derivation.reason ??
@@ -137,7 +127,7 @@ export async function runVisualEvidence(
     );
   }
 
-  // 4. Prepare temp dir + launch Electron
+  // Prepare temp dir + launch Electron
   const temp = prepareTempDir(repoRoot, input.changeId, config);
   let launched: Awaited<ReturnType<typeof launchElectronApp>> | null = null;
   let videoController: ReturnType<typeof enableVideo> | null = null;
@@ -177,14 +167,14 @@ export async function runVisualEvidence(
       },
     };
 
-    // 5. Run the scenario
+    // Run the scenario
     const scenarioResult = await runScenario(scenarioDef, scenarioCtx);
 
-    // Check assertions: if any failed, the run fails. We still capture a
-    // screenshot for debugging, but do NOT promote to permanent evidence.
+    // If any assertions failed, the run fails. Capture a failure screenshot
+    // for debugging but do NOT promote to permanent evidence.
     const failedAssertions = scenarioResult.assertions.filter((a) => a.status === "failed");
     if (failedAssertions.length > 0) {
-      // Capture a failure screenshot for debugging (temp only)
+      // Capture failure screenshot (temp only)
       try {
         const { captureFailureScreenshot } = await import("./capture/screenshot.js");
         await captureFailureScreenshot(launched.window, temp.failureScreenshot);
@@ -246,14 +236,14 @@ export async function runVisualEvidence(
     await launched.close();
     launched = null;
 
-    // 7. Stop video + try GIF conversion if recording succeeded
+    // Stop video + try GIF conversion
     const webmPath = videoController ? await videoController.stop() : null;
     let gifResult: Awaited<ReturnType<typeof generateGif>> = null;
     if (webmPath && fs.existsSync(webmPath) && config.gif.enabled) {
       gifResult = await generateGif(webmPath, temp.gifOut, config.gif);
     }
 
-    // 8. Size limits + final-asset selection
+    // Size limits + final-asset selection
     const finalCheckpoint = checkpoints[checkpoints.length - 1];
     const candidates: CaptureCandidate[] = [{
       type: "screenshot",
@@ -295,7 +285,7 @@ export async function runVisualEvidence(
     }));
     if (selection.gif) assets.push(selection.gif);
 
-    // 9. Promote final assets + write manifest
+    // Promote final assets + write manifest
     clearEvidenceDir(repoRoot, input.changeId, config);
     const assetsToWrite: { filename: string; buffer: Buffer }[] = [];
     for (const [index, checkpoint] of checkpoints.entries()) {
@@ -327,8 +317,7 @@ export async function runVisualEvidence(
     });
 
     // Populate prMarkdown on the returned result so the CLI can emit it
-    // without regenerating from a manifest. Using the same builder keeps
-    // URLs consistent.
+    // without regenerating from manifest.
     const prMarkdown = generatePrMarkdown(
       {
         version: 1,
@@ -356,13 +345,13 @@ export async function runVisualEvidence(
     } as PassedEvidenceResult;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // Best-effort failure capture for debugging
+    // Best-effort failure capture
     if (launched) {
       try {
         const { captureFailureScreenshot } = await import("./capture/screenshot.js");
         await captureFailureScreenshot(launched.window, temp.failureScreenshot);
       } catch {
-        // ignore — primary failure is reported via the structured result
+        // ignore — primary failure reported via structured result
       }
     }
     return failedResult(
@@ -450,7 +439,6 @@ async function resolveHeadSha(repoRoot: string): Promise<string> {
 
 async function resolveRepo(repoRoot: string): Promise<RepoCoordinates> {
   void repoRoot;
-  // Default to the canonical repo from AGENTS.md / GitHub. The CLI tries `gh`
-  // first; we keep a sensible default here.
+  // Default to the canonical repo per AGENTS.md
   return { owner: "CKGrafico", name: "orbion" };
 }

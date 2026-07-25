@@ -1,14 +1,6 @@
 /**
- * Scenario: gh-159-cross-scope-border-announcement
- *
- * Verifies that cross-scope actions announce the border crossing:
- *   1. CSS classes for cross-scope badges are defined
- *   2. The loop-proposal cross-scope badge class exists
- *   3. The chain-edit-proposal cross-scope banner class exists
- *   4. The sibling-offer cross-scope attribution class exists
- *   5. The loop-card origin cross-scope label class exists
- *   6. The assistant message cross-scope attribution class exists
- *   7. The i18n keys for cross-scope messaging are defined
+ * Verifies that cross-scope actions announce the border crossing
+ * via CSS classes and i18n keys.
  */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
@@ -24,9 +16,9 @@ type AssertionSpec = {
 export async function gh159CrossScopeBorderAnnouncementScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to load
+  // Wait for app to load
   await page.waitForSelector(".session-chat-panel, .loop-summary-bar, .sidebar-panel", { timeout: 15_000 }).catch(() => {
-    // May not be visible if no session is active
+    // No active session — may not be visible
   });
 
   const proofAssertions: AssertionSpec[] = [
@@ -158,15 +150,14 @@ export async function gh159CrossScopeBorderAnnouncementScenario(ctx: ScenarioCon
           const el = document.createElement("span");
           el.textContent = "crossScope.badge";
           const text = el.textContent;
-          return text === "crossScope.badge"; // If it stays as the key, i18n is not loaded
+          return text === "crossScope.badge"; // If key stays unchanged, i18n is not loaded
         });
-        // This is a structural check - if i18n is loaded, keys resolve to their values.
-        // We verify the key exists by checking the i18n data.
+        // Structural check: verify the app rendered (i18n keys are bundled)
         const keysExist = await p.evaluate(() => {
           try {
             const reactRoot = document.querySelector("[data-reactroot]") || document.querySelector("#root");
             if (!reactRoot) return false;
-            // The i18n messages are bundled - we just verify the app rendered
+            // i18n messages are bundled; just verify the app rendered
             return true;
           } catch {
             return false;

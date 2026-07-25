@@ -1,13 +1,8 @@
 /**
- * Generate the ready-to-use Markdown fragment for the pull request.
- *
- * The external Loop Engineering workflow consumes this `prMarkdown` string
- * when creating or updating the PR body.
- *
- * URLs are anchored to the head commit SHA when available (rather than the
- * branch name) so the embedded images keep resolving after the branch is
- * deleted or rebased. Uses `raw.githubusercontent.com` so the images render
- * inline on GitHub.
+ * Generate the ready-to-use Markdown fragment for the PR.
+ * URLs are anchored to the head commit SHA (rather than the branch name)
+ * so embedded images keep resolving after the branch is deleted or rebased.
+ * Uses raw.githubusercontent.com for inline rendering on GitHub.
  */
 import type {
   EvidenceResult,
@@ -137,8 +132,7 @@ export function generatePrMarkdown(
 }
 
 /**
- * Build the prMarkdown string at evidence.json write time. The Markdown is
- * anchored to sha, falling back to branch when no sha is known.
+ * Build prMarkdown anchored to sha, falling back to branch.
  */
 export function resolveRef(branchName?: string, commitSha?: string): string {
   return commitSha ?? branchName ?? "main";

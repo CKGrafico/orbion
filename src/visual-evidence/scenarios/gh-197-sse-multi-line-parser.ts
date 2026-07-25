@@ -1,10 +1,6 @@
 /**
- * Scenario: gh-197-sse-multi-line-parser
- *
  * Exercises the fix for the SSE stream parser splitting on `\n\n`
- * boundaries, which broke on multi-line data values.
- * The parser now correctly concatenates multiple `data:` lines per the
- * SSE specification, preventing silent data corruption.
+ * boundaries, which broke multi-line data values per the SSE spec.
  */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
@@ -18,7 +14,6 @@ type AssertionSpec = {
 export async function gh197SseMultiLineParserScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render
   await page.waitForTimeout(3000);
 
   const assertions: AssertionSpec[] = [
