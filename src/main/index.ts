@@ -161,6 +161,30 @@ const streamEnvironments = new Map<string, string>();
 
 const notificationService = new NotificationService();
 
+setCredentialTamperedCallback((environmentId, credentialKind) => {
+  logSecurityEvent({
+    kind: "credential-tampered",
+    environmentId,
+    credentialKind,
+  });
+
+  const envs = getEnvironments();
+  const env = envs.find((e: Environment) => e.id === environmentId);
+  const envName = env?.name ?? environmentId;
+
+  notificationService.send({
+    title: `Security alert: ${envName} credentials tampered`,
+    body: `Stored ${credentialKind === "sessionToken" ? "session token" : "SSH key passphrase"} was modified unexpectedly. Re-pair this instance to restore access.`,
+    tag: `credential-tampered:${environmentId}`,
+    suppressIfFocused: false,
+  });
+
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send("credential:tampered", { environmentId, credentialKind });
+  }
+});
+
 const outageTracker = new OutageTracker(
   (event: OutageEscalation) => {
     const win = getMainWindow();
