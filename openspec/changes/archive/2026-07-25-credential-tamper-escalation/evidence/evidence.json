@@ -1,7 +1,7 @@
 {
   "changeId": "credential-tamper-escalation",
   "issueRef": "#338",
-  "capturedAt": "2026-07-25T19:10:00Z",
+  "capturedAt": "2026-07-25T19:20:00Z",
   "status": "passed",
   "evidence": [
     {
@@ -33,6 +33,11 @@
       "type": "gate",
       "description": "pnpm check:comments — all files ≤ 10%",
       "result": "passed"
+    },
+    {
+      "type": "gate",
+      "description": "credential-vault tests — 19/19 passed",
+      "result": "passed"
     }
   ],
   "filesChanged": [
@@ -40,6 +45,8 @@
     "src/main/config-store.ts",
     "src/main/security-audit-log.ts",
     "src/main/index.ts",
+    "src/main/ipc-validation.ts",
+    "src/preload/index.ts",
     "src/renderer/src/components/InstanceSettingsPanel.tsx",
     "src/renderer/src/i18n/en.json",
     "tests/credential-vault.test.ts"
