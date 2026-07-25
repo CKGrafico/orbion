@@ -61,10 +61,25 @@ All markdown rendered via `react-markdown` MUST pass through `rehype-sanitize`.
 ## Build (GR-BUILD)
 
 ### GR-BUILD-001: Both targets must compile
-Changes must compile under both `electron.vite.config.ts` and `vite.web.config.ts`. Run `pnpm typecheck` before marking done.
+Changes must compile under both `electron.vite.config.ts` and `vite.web.config.ts`. Run `pnpm typecheck` and `pnpm check:comments` before marking done.
 
 ### GR-BUILD-002: Prefix CLI commands with `rtk`
 All shell commands must be prefixed with `rtk` (e.g. `rtk pnpm test`, `rtk git diff`).
 
 ### GR-BUILD-003: Radix UI chunk
 Radix UI primitives MUST be grouped in the `radix-ui` manual chunk in `electron.vite.config.ts`.
+
+## Code Quality (GR-CODE)
+
+### GR-CODE-001: Comment ratio must stay under 10%
+**Definition:** Comment ratio = `(comment_lines / non_blank_lines) * 100` per file.
+
+**What counts as a comment line:** Lines starting with `//`, `/*`, `*/`, or `* ` (JSDoc inner lines). All comment types count — no exemptions for JSDoc/TSDoc.
+
+**Enforcement:** `pnpm check:comments` fails the build when any file exceeds 10%. This is a hard gate.
+
+**Scope:** All `src/**/*.ts` and `src/**/*.tsx` files. Test files (`tests/**/*.test.ts`) are exempt.
+
+**What to preserve:** Only "why" comments — workarounds, platform quirks, references to issues/specs, non-obvious constraints.
+
+**What to remove:** Comments that restate what the code does, JSDoc that restates type information from signatures, section dividers, step-number comments.
