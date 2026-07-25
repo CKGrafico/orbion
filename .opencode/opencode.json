@@ -18,6 +18,9 @@
     "todowrite": "allow"
   },
   "model": "plainconcepts/glm-5-1",
+  "skills": {
+    "paths": [".agents/skills"]
+  },
   "plugin": [
     "@slkiser/opencode-quota@latest"
   ],

@@ -1,0 +1,74 @@
+{
+  "version": 2,
+  "loops": [
+    {
+      "taskId": "ref-pick",
+      "intervalHuman": "20m",
+      "description": "Refinement loop: pick issue, AI rewrite as user story, check answers, done"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "ref-pick",
+      "name": "Select oldest refine:pick issue",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "number=$(gh issue list --label \"refine:pick\" --state open --limit 1000 --json number --jq 'sort_by(.number) | .[0].number'); test -n \"$number\" || exit 75; body=$(gh issue view \"$number\" --json number,title,body --jq '{number,title,body}'); gh issue edit \"$number\" --add-label refine:doing --remove-label refine:pick >/dev/null; printf \"%s\\n\" \"$body\""
+      ],
+      "onSuccessTaskId": "ref-refine",
+      "onFailureTaskId": "ref-nothing",
+      "maxRuns": 5
+    },
+    {
+      "id": "ref-refine",
+      "name": "AI: /plan-story to rewrite issue as grounded user story",
+      "command": "opencode",
+      "commandArgs": [
+        "run",
+        "--agent",
+        "fullstack-engineer",
+        "First, load all skills available for your current agent. Then execute /plan-story for GitHub issue {{number}}. The feature to capture is: {{title}}. Context from the issue body: {{body}}. You must update the GitHub issue body yourself with the resulting user story (Mike Cohn As a/I want to/so that format, Gherkin Given/When/Then acceptance criteria, edge cases, and Mermaid diagram if appropriate). Ground the story in the actual codebase by reading relevant files. Never explore or read files outside the current repository root. Run @humanizer on the final prose to remove AI writing patterns. At the end, if you have clarifying questions for the product owner, append them to the issue body and add the label 'refine:questions'. If the story is complete with no open questions, add label 'refine:done'. In either case, remove the 'refine:doing' label. Keep the final body as valid Markdown. Don't ask me anything during the session."
+      ],
+      "onSuccessTaskId": "ref-verify",
+      "onFailureTaskId": "ref-fail",
+      "maxRuns": 5
+    },
+    {
+      "id": "ref-verify",
+      "name": "Verify: issue has either refine:questions or refine:done label",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "labels=$(gh issue view {{number}} --json labels --jq '.labels[].name'); echo \"$labels\" | grep -qE 'refine:(questions|done)' && git checkout -- . && git clean -fd && exit 0 || exit 1"
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": "ref-refine",
+      "maxRuns": 5
+    },
+    {
+      "id": "ref-fail",
+      "name": "Recovery: relabel issue back to refine:pick",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "gh issue edit {{number}} --add-label refine:pick --remove-label refine:doing"
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": null,
+      "maxRuns": 5
+    },
+    {
+      "id": "ref-nothing",
+      "name": "No issues to refine",
+      "command": "echo",
+      "commandArgs": [
+        "Nothing to refine, no issues with refine:pick label"
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": null,
+      "maxRuns": 5,
+      "silentChain": true
+    }
+  ]
+}

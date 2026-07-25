@@ -1,0 +1,146 @@
+{
+  "version": 2,
+  "loops": [
+    {
+      "taskId": "dev-preflight",
+      "intervalHuman": "20m",
+      "description": "Main dev loop: preflight -> pick issue -> implement -> verify -> commit -> PR. All PRs auto squash-merged with --admin."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "dev-preflight",
+      "name": "Preflight: clean tree + sync main",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "test -z \"$(git status --porcelain)\" && git switch main && git fetch origin && git rebase origin/main"
+      ],
+      "onSuccessTaskId": "dev-pick",
+      "onFailureTaskId": "dev-clean-dirty",
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-clean-dirty",
+      "name": "Recovery: dirty tree, reset and return to main",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "git reset --hard && git clean -fd && git switch main && git fetch origin && git rebase origin/main"
+      ],
+      "onSuccessTaskId": "dev-pick",
+      "onFailureTaskId": null,
+      "maxRuns": 1
+    },
+    {
+      "id": "dev-pick",
+      "name": "Select and reserve oldest code:pick issue",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "number=$(gh issue list --label \"code:pick\" --state open --limit 1000 --json number --jq \"sort_by(.number) | .[0].number\"); test -n \"$number\" || exit 75; body=$(gh issue view \"$number\" --json number,title,body --jq \"{number,title,body}\"); gh issue edit \"$number\" --add-label code:doing --remove-label code:pick >/dev/null; printf \"%s\\n\" \"$body\""
+      ],
+      "onSuccessTaskId": "dev-implement",
+      "onFailureTaskId": "dev-nothing",
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-implement",
+      "name": "Implement: opencode /plan-goal",
+      "command": "opencode",
+      "commandArgs": [
+        "run",
+        "--agent",
+        "fullstack-engineer",
+        "First, load all skills available for your current agent. Then complete all remaining work for this issue. Inspect the current repository state first. If there is an unfinished OpenSpec change, partial implementation, or failing validation related to this issue, continue and finish that work. If no related work exists, execute /plan-goal to plan and implement the issue. Preserve correct existing work. Work on a feature branch. Never explore or read files outside the current repository root. Do not push or perform any GitHub actions. Never ask for confirmation. Archive the completed change and generate visual evidence. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
+      ],
+      "onSuccessTaskId": "dev-verify",
+      "onFailureTaskId": "dev-fail",
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-verify",
+      "name": "Verify: openspec clean + typecheck + tests + build",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "openspec list --json | python3 -c \"import sys,json; data=json.load(sys.stdin); exit(0 if len(data.get('changes',[]))==0 else 1)\" && pnpm typecheck && pnpm test && pnpm build"
+      ],
+      "onSuccessTaskId": "dev-commit",
+      "onFailureTaskId": "dev-implement",
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-commit",
+      "name": "Stage and commit all changes",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "git add -A && git commit -m \"fix: resolve #{{number}} {{title}}\" || true"
+      ],
+      "onSuccessTaskId": "dev-pr",
+      "onFailureTaskId": null,
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-pr",
+      "name": "Create PR and squash merge (auto-admin)",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "BRANCH=$(git branch --show-current) && git push -u origin \"$BRANCH\" >/dev/null && PR_URL=$(gh pr create --title \"Resolve #{{number}}: {{title}}\" --body \"Closes #{{number}}\" --label code:done) && gh pr merge \"$PR_URL\" --squash --delete-branch --admin && printf '{\"prUrl\":\"%s\"}\\n' \"$PR_URL\""
+      ],
+      "onSuccessTaskId": "dev-complete",
+      "onFailureTaskId": "dev-pr-retry",
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-complete",
+      "name": "Complete: close issue and return to main",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "gh issue edit {{number}} --add-label code:done --remove-label code:doing && gh issue close {{number}} && git checkout -- . && git clean -fd && git switch main"
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": null,
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-pr-retry",
+      "name": "Recovery: retry merge with admin, then relabel to pick",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "BRANCH=$(git branch --show-current 2>/dev/null); if [ -n \"$BRANCH\" ] && [ \"$BRANCH\" != \"main\" ]; then   PR_URL=$(gh pr list --head \"$BRANCH\" --state open --json url --jq \".[0].url\" 2>/dev/null);   if [ -n \"$PR_URL\" ]; then     gh pr merge \"$PR_URL\" --squash --delete-branch --admin && exit 0;   fi; fi; gh issue edit {{number}} --add-label code:pick --remove-label code:doing && git checkout -- . && git clean -fd && git switch main"
+      ],
+      "onSuccessTaskId": "dev-complete",
+      "onFailureTaskId": "dev-fail",
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-fail",
+      "name": "Recovery: reset hard + relabel issue back to pick",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "git reset --hard && git clean -fd && git switch main && gh issue edit {{number}} --add-label code:pick --remove-label code:doing"
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": null,
+      "maxRuns": 5
+    },
+    {
+      "id": "dev-nothing",
+      "name": "No tasks to pick",
+      "command": "echo",
+      "commandArgs": [
+        "Nothing to do, no issues with code:pick label"
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": null,
+      "maxRuns": 5,
+      "silentChain": true
+    }
+  ]
+}
