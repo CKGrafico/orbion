@@ -38,6 +38,14 @@ describe("isHostAllowed", () => {
     expect(isHostAllowed("metadata.azure.internal", { allowLoopback: true })).toBe(false);
   });
 
+  it("rejects GCP metadata hostname trailing-dot FQDN", () => {
+    expect(isHostAllowed("metadata.google.internal.")).toBe(false);
+  });
+
+  it("rejects Azure metadata hostname trailing-dot FQDN", () => {
+    expect(isHostAllowed("metadata.azure.internal.")).toBe(false);
+  });
+
   it("rejects IPv6 link-local fe80::/10 addresses", () => {
     expect(isHostAllowed("[fe80::1]")).toBe(false);
     expect(isHostAllowed("[fe80::1234:5678]")).toBe(false);
@@ -212,6 +220,8 @@ describe("IPC validation and fetch path parity", () => {
     { host: "[fd00:ec2::254]", allowLoopback: false, expected: false },
     { host: "metadata.google.internal", allowLoopback: false, expected: false },
     { host: "metadata.azure.internal", allowLoopback: false, expected: false },
+    { host: "metadata.google.internal.", allowLoopback: false, expected: false },
+    { host: "metadata.azure.internal.", allowLoopback: false, expected: false },
     { host: "[fe80::1]", allowLoopback: false, expected: false },
     { host: "[fe8f::1]", allowLoopback: false, expected: false },
     { host: "localhost", allowLoopback: false, expected: false },

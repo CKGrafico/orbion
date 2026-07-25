@@ -1,3 +1,6 @@
+// Allowlist polarity (returns true for allowed) — blocklist polarity inverted
+// the check result, which caused missed negations and drift between consumers; see issue #339.
+
 export interface SsrfOptions {
   allowLoopback?: boolean;
 }
@@ -9,7 +12,9 @@ const CLOUD_METADATA_IPS = new Set([
 
 const CLOUD_METADATA_HOSTNAMES = new Set([
   "metadata.google.internal",
+  "metadata.google.internal.",
   "metadata.azure.internal",
+  "metadata.azure.internal.",
 ]);
 
 const IPV4_LINK_LOCAL = /^169\.254\.\d{1,3}\.\d{1,3}$/;
