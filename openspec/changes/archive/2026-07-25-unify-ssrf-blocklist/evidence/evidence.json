@@ -1,6 +1,6 @@
 {
   "status": "skipped",
-  "reason": "Non-UI change: internal security module refactoring with no user-visible components. Test results (117/117 passing) serve as evidence.",
+  "reason": "Non-UI change: internal security module refactoring with no user-visible components. Test results (120/120 passing) serve as evidence. Duplicated isAllowedHost wrapper removed; cross-path consistency tests added.",
   "assets": [],
   "prMarkdown": "",
   "tasks": "5/5",
