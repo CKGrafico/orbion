@@ -4,18 +4,14 @@
 TBD - created by archiving change ssrf-host-blocklist. Update Purpose after archive.
 ## Requirements
 ### Requirement: Cloud metadata IPs SHALL be rejected
-The system SHALL reject any URL whose host resolves to a cloud metadata IP address: `169.254.169.254` (AWS/Azure), `169.254.169.253` (GCP), or `fd00:ec2::254` (AWS IPv6). This applies at both environment registration and API request time.
+The system SHALL reject any URL whose host resolves to a cloud metadata IP address: `169.254.169.254` (AWS/Azure), `169.254.169.253` (GCP), or `fd00:ec2::254` (AWS IPv6). Additionally, IPv6 link-local addresses in `fe80::/10` and cloud-provider DNS metadata hostnames (`metadata.google.internal`) SHALL be rejected. This applies at both environment registration and API request time.
 
-#### Scenario: AWS metadata endpoint rejected at registration
-- **WHEN** a renderer sends `config:addEnvironment` with URL `http://169.254.169.254/api/projects`
-- **THEN** the main process SHALL reject the request with an i18n error indicating the host is blocked
+#### Scenario: IPv6 link-local fe80::1 rejected at registration
+- **WHEN** a renderer sends `config:addEnvironment` with URL `http://[fe80::1]/api`
+- **THEN** the main process SHALL reject the request with a host-blocked error
 
-#### Scenario: GCP metadata endpoint rejected at registration
-- **WHEN** a renderer sends `config:addEndpoint` with URL `http://169.254.169.253/api/projects`
-- **THEN** the main process SHALL reject the request with an i18n error indicating the host is blocked
-
-#### Scenario: AWS metadata endpoint rejected at request time
-- **WHEN** a renderer sends `api:request` with `baseUrl` `http://169.254.169.254` and `path` `/api/projects`
+#### Scenario: GCP metadata DNS hostname rejected
+- **WHEN** a renderer sends `api:request` with `baseUrl` `http://metadata.google.internal`
 - **THEN** the main process SHALL return `{ ok: false, status: 0, error: <i18n message> }`
 
 ### Requirement: Link-local range SHALL be rejected
