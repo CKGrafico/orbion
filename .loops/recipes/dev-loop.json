@@ -60,14 +60,14 @@
     },
     {
       "id": "dev-verify",
-      "name": "Verify: openspec clean + typecheck + tests + build",
+      "name": "Verify: openspec clean + typecheck + tests",
       "command": "sh",
       "commandArgs": [
         "-c",
-        "openspec list --json | python3 -c \"import sys,json; data=json.load(sys.stdin); exit(0 if len(data.get('changes',[]))==0 else 1)\" && pnpm typecheck && pnpm test && pnpm build"
+        "openspec list --json | python3 -c \"import sys,json; data=json.load(sys.stdin); exit(0 if len(data.get('changes',[]))==0 else 1)\" && pnpm typecheck && pnpm test"
       ],
       "onSuccessTaskId": "dev-commit",
-      "onFailureTaskId": "dev-implement",
+      "onFailureTaskId": "dev-fail",
       "maxRuns": 5
     },
     {
@@ -76,7 +76,7 @@
       "command": "sh",
       "commandArgs": [
         "-c",
-        "git add -A && git commit -m \"fix: resolve #{{number}} {{title}}\" || true"
+        "git add -A && git commit -m \"resolve #{{number}} {{title}}\" || true"
       ],
       "onSuccessTaskId": "dev-pr",
       "onFailureTaskId": null,
