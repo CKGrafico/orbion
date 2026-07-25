@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "changeId": "credential-tamper-escalation",
+  "issueRef": "#338",
+  "required": true,
+  "status": "passed",
+  "capturedAt": "2026-07-25T19:25:00Z",
+  "scenario": {
+    "title": "Credential tampering escalates with notification and audit log instead of silent degradation",
+    "steps": [
+      "CredentialTamperedError in getSessionToken sets authState to tampered",
+      "CredentialTamperedError in getSessionToken invokes onCredentialTampered callback",
+      "CredentialTamperedError in getSshKeyPassphrase sets authState to tampered",
+      "CredentialTamperedError in getSshKeyPassphrase invokes onCredentialTampered callback",
+      "Renderer displays tampered auth state with security warning label",
+      "NotificationService dispatches OS notification on tampering",
+      "Security audit log persists tampering events separately"
+    ]
+  },
+  "assertions": [
+    { "description": "getSessionToken catches CredentialTamperedError and sets authState to tampered", "status": "passed" },
+    { "description": "getSessionToken invokes onCredentialTampered callback on tampering", "status": "passed" },
+    { "description": "getSshKeyPassphrase catches CredentialTamperedError and sets authState to tampered", "status": "passed" },
+    { "description": "getSshKeyPassphrase invokes onCredentialTampered callback on tampering", "status": "passed" }
+  ],
+  "evidence": [
+    { "type": "test", "description": "credential-vault tests — 19/19 passed", "result": "passed" },
+    { "type": "gate", "description": "pnpm typecheck — zero errors", "result": "passed" },
+    { "type": "gate", "description": "pnpm check:comments — all files ≤ 10%", "result": "passed" }
+  ],
+  "filesChanged": [
+    "src/shared/ipc.ts",
+    "src/main/config-store.ts",
+    "src/main/security-audit-log.ts",
+    "src/main/index.ts",
+    "src/main/ipc-validation.ts",
+    "src/preload/index.ts",
+    "src/renderer/src/components/InstanceSettingsPanel.tsx",
+    "src/renderer/src/i18n/en.json",
+    "tests/credential-vault.test.ts"
+  ],
+  "assets": [],
+  "prMarkdown": "## Visual Evidence — #338 Credential Tamper Escalation\n\n**Status**: ✅ Passed\n\nAll 19 credential-vault tests pass. Typecheck and comment-ratio gates pass.\n\n### Assertions\n- ✅ `getSessionToken` sets authState to `tampered` (not `blocked`)\n- ✅ `getSessionToken` invokes `onCredentialTampered` callback\n- ✅ `getSshKeyPassphrase` sets authState to `tampered` (not `blocked`)\n- ✅ `getSshKeyPassphrase` invokes `onCredentialTampered` callback\n\n### Files changed\n- `src/shared/ipc.ts` — added `\"tampered\"` to `EnvironmentAuthState`, `SecurityAuditEvent`, `CredentialBridge`\n- `src/main/config-store.ts` — callback hook + tampered state\n- `src/main/security-audit-log.ts` — persistent audit log\n- `src/main/index.ts` — wire callback to NotificationService + audit log + IPC\n- `src/main/ipc-validation.ts` — credential:getSecurityAuditEvents validation\n- `src/preload/index.ts` — credential bridge (onTampered, getSecurityAuditEvents)\n- `src/renderer/src/components/InstanceSettingsPanel.tsx` — tampered auth state label\n- `src/renderer/src/i18n/en.json` — authStateTampered i18n key\n- `tests/credential-vault.test.ts` — updated assertions + callback tests"
+}

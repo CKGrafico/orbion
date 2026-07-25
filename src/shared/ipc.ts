@@ -59,7 +59,7 @@ export interface AccessEndpoint {
   failureCount: number;
 }
 
-export type EnvironmentAuthState = "unauthenticated" | "paired" | "blocked" | "unknown";
+export type EnvironmentAuthState = "unauthenticated" | "paired" | "blocked" | "tampered" | "unknown";
 
 export type EnvironmentRole = "coding" | "main-vm";
 
@@ -1018,6 +1018,20 @@ export interface OpenCodeBridge {
   onStatusChange: (cb: (environmentId: string, status: OpenCodeConnectionStatus) => void) => () => void;
 }
 
+export interface SecurityAuditEvent {
+  id: string;
+  timestamp: string;
+  kind: string;
+  environmentId: string;
+  credentialKind: "sessionToken" | "sshKeyPassphrase";
+  detail?: string;
+}
+
+export interface CredentialBridge {
+  onTampered: (cb: (event: { environmentId: string; credentialKind: "sessionToken" | "sshKeyPassphrase" }) => void) => () => void;
+  getSecurityAuditEvents: () => Promise<SecurityAuditEvent[]>;
+}
+
 export interface SiblingDeclineBridge {
   isDeclined: (environmentId: string, loopId: string, fingerprint: string) => Promise<boolean>;
   recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) => Promise<void>;
@@ -1051,4 +1065,5 @@ export interface LoopTaskBridge {
   siblingDecline: SiblingDeclineBridge;
   settings: SettingsBridge;
   log: LogBridge;
+  credential: CredentialBridge;
 }
