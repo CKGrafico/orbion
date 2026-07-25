@@ -3,8 +3,9 @@
   "loops": [
     {
       "taskId": "audit-preflight",
-      "intervalHuman": "1d",
-      "description": "Guardrails audit loop: preflight, pick random area, audit against project guardrails, score, /plan-story for 3 issues"
+      "intervalHuman": "12h",
+      "description": "Guardrails audit loop: preflight, pick random area, audit against project guardrails, score, /plan-story for 3 issues",
+      "maxRuns": null
     }
   ],
   "tasks": [
