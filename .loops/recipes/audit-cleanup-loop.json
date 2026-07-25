@@ -1,0 +1,64 @@
+{
+  "version": 2,
+  "loops": [
+    {
+      "taskId": "audit-preflight",
+      "intervalHuman": "1d",
+      "description": "Audit cleanup loop: closes audit:report issues when resolved, and prunes stale local and remote branches"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "audit-preflight",
+      "name": "Preflight: clean tree + sync main",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "test -z \"$(git status --porcelain)\" && git switch main && git fetch origin && git rebase origin/main"
+      ],
+      "onSuccessTaskId": "audit-select",
+      "onFailureTaskId": null,
+      "maxRuns": 5
+    },
+    {
+      "id": "audit-select",
+      "name": "Select oldest open audit:report issue",
+      "command": "sh",
+      "commandArgs": [
+        "-c",
+        "number=$(gh issue list --label \"audit:report\" --state open --limit 1000 --json number --jq 'sort_by(.number) | .[0].number'); test -n \"$number\" || exit 75; body=$(gh issue view \"$number\" --json number,body --jq '{number,body}'); printf '%s\\n' \"$body\""
+      ],
+      "onSuccessTaskId": "audit-ai",
+      "onFailureTaskId": "audit-branches",
+      "maxRuns": 5
+    },
+    {
+      "id": "audit-ai",
+      "name": "AI: check referenced issues and close report if all resolved",
+      "command": "opencode",
+      "commandArgs": [
+        "run",
+        "--agent",
+        "fullstack-engineer",
+        "First, load all skills available for your current agent. You are an audit report cleanup agent. You receive an audit report issue with number {{number}} and body {{body}}. The body references GitHub issues with #NNN format. For each referenced issue number, check if it is closed using gh issue view NUMBER --json state. If ALL referenced issues are closed, close the report issue with gh issue close {{number}} --reason completed and add the label audit:closed using gh issue edit {{number}} --add-label audit:closed. If any referenced issue is still open, do nothing. Never explore or read files outside the current repository root. Do not ask for confirmation."
+      ],
+      "onSuccessTaskId": "audit-branches",
+      "onFailureTaskId": "audit-branches",
+      "maxRuns": 5
+    },
+    {
+      "id": "audit-branches",
+      "name": "AI: delete stale local and remote branches",
+      "command": "opencode",
+      "commandArgs": [
+        "run",
+        "--agent",
+        "fullstack-engineer",
+        "First, load all skills available for your current agent. You are a branch cleanup agent. Delete all local and remote branches that are NOT main or master and whose last commit is 1 day old or older. For remote branches: skip any that have open PRs. Use git for-each-ref to find stale branches, gh pr list to check for open PRs, git branch -D for local, git push origin --delete for remote. Print a summary of what was deleted and what was skipped. Never explore or read files outside the current repository root. Do not ask for confirmation."
+      ],
+      "onSuccessTaskId": null,
+      "onFailureTaskId": null,
+      "maxRuns": 1
+    }
+  ]
+}
