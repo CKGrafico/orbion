@@ -223,7 +223,7 @@ function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps)
   const [commandExpanded, setCommandExpanded] = useState(false);
 
   const cmdLine = commandLine(step.task.command, step.task.commandArgs);
-  const taskName = step.task.name.trim();
+  const taskName = (step.task.name ?? "").trim();
   const displayName = taskName || cmdLine;
   const hasNamedTask = taskName.length > 0;
 

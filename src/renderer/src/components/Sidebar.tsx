@@ -10,6 +10,7 @@ import { FleetActivityReadout } from "./FleetActivityReadout";
 import { FleetHealthFooter } from "./FleetHealthFooter";
 import {
   DropdownMenu,
+  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSub,

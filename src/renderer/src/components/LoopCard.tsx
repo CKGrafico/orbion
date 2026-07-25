@@ -128,38 +128,50 @@ function confirmDescriptionKey(action: LoopAction): string {
 export function LoopCard({ loop, reachability, instance, scrollContainerRef, chainVersion }: LoopCardProps): React.ReactNode {
   const intl = useIntl();
 
-  const isReachable = reachability === "connected" || reachability === undefined;
-  const failed = loop.lastExitCode !== null && loop.lastExitCode !== 0;
-  const isRunning = loop.status === "running";
-  const isPulsing = PULSING_STATUSES.has(loop.status);
+  // Defensive: the real API may omit array fields that the type declares as required
+  const safeLoop = useMemo(() => {
+    if (!loop) {
+      console.error("[LoopCard] loop prop is undefined/null");
+      return { id: "", status: "stopped" as LoopStatus, command: "", commandArgs: [], cwd: "", intervalHuman: "", maxRuns: null, runCount: 0, skippedCount: 0, lastExitCode: null, lastRunAt: null, nextRunAt: null, pid: null, runHistory: [], taskId: null };
+    }
+    return {
+      ...loop,
+      commandArgs: loop.commandArgs ?? [],
+      runHistory: loop.runHistory ?? [],
+    };
+  }, [loop]);
 
-  // Derive display name: description > command > id
-  const name = loop.description?.trim() || commandLine(loop.command, loop.commandArgs) || loop.id;
+  const isReachable = reachability === "connected" || reachability === undefined;
+  const failed = safeLoop.lastExitCode !== null && safeLoop.lastExitCode !== 0;
+  const isRunning = safeLoop.status === "running";
+  const isPulsing = PULSING_STATUSES.has(safeLoop.status);
+
+  const name = safeLoop.description?.trim() || commandLine(safeLoop.command, safeLoop.commandArgs) || safeLoop.id;
 
   // Next-run countdown
-  const countdown = useNextRunCountdown(loop.nextRunAt);
+  const countdown = useNextRunCountdown(safeLoop.nextRunAt);
   const nextRunLabel = isReachable
-    ? (countdown ?? (loop.nextRunAt ? timeUntil(loop.nextRunAt) : intl.formatMessage({ id: "loopCard.noNextRun" })))
+    ? (countdown ?? (safeLoop.nextRunAt ? timeUntil(safeLoop.nextRunAt) : intl.formatMessage({ id: "loopCard.noNextRun" })))
     : intl.formatMessage({ id: "loopCard.unknown" });
 
   // Exit code display
-  const exitCodeLabel = loop.lastExitCode === null
+  const exitCodeLabel = safeLoop.lastExitCode === null
     ? "-"
-    : String(loop.lastExitCode);
+    : String(safeLoop.lastExitCode);
 
   // Run count display
-  const runCountLabel = loop.maxRuns
-    ? `${loop.runCount}/${loop.maxRuns}`
-    : String(loop.runCount);
+  const runCountLabel = safeLoop.maxRuns
+    ? `${safeLoop.runCount}/${safeLoop.maxRuns}`
+    : String(safeLoop.runCount);
 
   // Status dot color
   const dotColor = isReachable
-    ? (STATUS_COLORS[loop.status] ?? "var(--text-secondary)")
+    ? (STATUS_COLORS[safeLoop.status] ?? "var(--text-secondary)")
     : "var(--status-unknown)";
 
   // Status label (shared between expanded header and collapsed one-liner)
   const statusLabel = isReachable
-    ? intl.formatMessage({ id: `loopCard.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })
+    ? intl.formatMessage({ id: `loopCard.status${safeLoop.status.charAt(0).toUpperCase()}${safeLoop.status.slice(1)}` })
     : intl.formatMessage({ id: "loopCard.statusUnknown" });
 
   // ── Click-to-expand for collapsed cards ────────────────────────────────
@@ -191,16 +203,16 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
       let res: { ok: boolean; error?: unknown };
       switch (action) {
         case "pause":
-          res = await pauseLoop(instance, loop.id);
+          res = await pauseLoop(instance, safeLoop.id);
           break;
         case "resume":
-          res = await resumeLoop(instance, loop.id);
+          res = await resumeLoop(instance, safeLoop.id);
           break;
         case "stop":
-          res = await stopLoop(instance, loop.id);
+          res = await stopLoop(instance, safeLoop.id);
           break;
         case "trigger":
-          res = await triggerLoop(instance, loop.id);
+          res = await triggerLoop(instance, safeLoop.id);
           break;
       }
 
@@ -224,15 +236,15 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     resultTimerRef.current = setTimeout(() => {
       setActionResult(null);
     }, duration);
-  }, [instance, loop.id, intl, actionResult?.kind]);
+  }, [instance, safeLoop.id, intl, actionResult?.kind]);
 
   const handleActionClick = useCallback((action: LoopAction): void => {
-    if (needsConfirmation(action, loop.status)) {
+    if (needsConfirmation(action, safeLoop.status)) {
       setConfirmingAction(action);
     } else {
       void executeAction(action);
     }
-  }, [executeAction, loop.status]);
+  }, [executeAction, safeLoop.status]);
 
   const handleConfirmCancel = useCallback((): void => {
     setConfirmingAction(null);
@@ -245,7 +257,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
   }, [confirmingAction, executeAction]);
 
   // Available actions for this loop
-  const availableActions = isReachable && instance ? getAvailableActions(loop.status) : [];
+  const availableActions = isReachable && instance ? getAvailableActions(safeLoop.status) : [];
 
   // ── Task chain expansion ─────────────────────────────────────────────
   const [chainExpanded, setChainExpanded] = useState(false);
@@ -253,8 +265,8 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
   const [chainLoading, setChainLoading] = useState(false);
 
   const chainSteps = useMemo(
-    () => resolveTaskChain(loop.taskId, chainTasks ?? []),
-    [loop.taskId, chainTasks],
+    () => resolveTaskChain(safeLoop.taskId, chainTasks ?? []),
+    [safeLoop.taskId, chainTasks],
   );
 
   const handleToggleChain = useCallback((): void => {
@@ -285,10 +297,10 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
       setChainExpanded(true);
       setChainLoading(false);
     });
-  }, [chainExpanded, chainTasks, instance, isReachable, loop.taskId]);
+  }, [chainExpanded, chainTasks, instance, isReachable, safeLoop.taskId]);
 
   // Whether the loop has a taskId (prerequisite for showing the expand affordance)
-  const hasTaskChain = loop.taskId != null && loop.taskId !== "";
+  const hasTaskChain = safeLoop.taskId != null && safeLoop.taskId !== "";
 
   // ── Chain version invalidation ─────────────────────────────────────────
   // When chainVersion changes (e.g., after a chain-edit proposal is applied),
@@ -373,7 +385,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     }
 
     let cancelled = false;
-    void fetchLogs(instance, loop.id, LOG_TAIL_SIZE).then((res) => {
+    void fetchLogs(instance, safeLoop.id, LOG_TAIL_SIZE).then((res) => {
       if (cancelled) return;
       if (res.ok && typeof res.data === "string" && res.data.length > 0) {
         const lines = res.data.split(/\r?\n/).filter((l) => l.length > 0);
@@ -388,7 +400,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     return () => {
       cancelled = true;
     };
-  }, [instance?.id, instance?.activeEndpointId, loop.id, isReachable]);
+  }, [instance?.id, instance?.activeEndpointId, safeLoop.id, isReachable]);
 
   // ── SSE live subscription (visibility-gated) ──────────────────────────
   // Cleanup ref for the current subscription
@@ -408,7 +420,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     }
 
     // Only subscribe if the loop is running or waiting (active states that produce output)
-    const isActive = loop.status === "running" || loop.status === "waiting";
+    const isActive = safeLoop.status === "running" || safeLoop.status === "waiting";
     if (!isActive) {
       setStreamState((prev) => prev !== null ? null : prev);
       return;
@@ -418,7 +430,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
 
     const unsub = subscribeLogs(
       instance,
-      loop.id,
+      safeLoop.id,
       (line: string) => {
         setLogLines((prev) => {
           const next = [...prev, line];
@@ -441,7 +453,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
         unsubRef.current = null;
       }
     };
-  }, [isVisible, instance?.id, instance?.activeEndpointId, loop.id, loop.status, isReachable]);
+  }, [isVisible, instance?.id, instance?.activeEndpointId, safeLoop.id, safeLoop.status, isReachable]);
 
   // ── Autoscroll ────────────────────────────────────────────────────────
   const handleLogScroll = useCallback(() => {
@@ -497,7 +509,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
           <span className="loop-card-collapsed-sep">{"\u2014"}</span>
           <span
             className="loop-card-status-chip"
-            style={{ color: isReachable ? STATUS_COLORS[loop.status] : "var(--status-unknown)" }}
+            style={{ color: isReachable ? STATUS_COLORS[safeLoop.status] : "var(--status-unknown)" }}
           >
             {statusLabel}
           </span>
@@ -513,7 +525,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             <span className="loop-card-name">{name}</span>
             <span
               className="loop-card-status-chip"
-              style={{ color: isReachable ? STATUS_COLORS[loop.status] : "var(--status-unknown)" }}
+              style={{ color: isReachable ? STATUS_COLORS[safeLoop.status] : "var(--status-unknown)" }}
             >
               {statusLabel}
             </span>
@@ -523,7 +535,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
           <div className="loop-card-meta">
             <span className="loop-card-meta-item">
               <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.interval" })}</span>
-              <span className="loop-card-meta-value">{loop.intervalHuman}</span>
+              <span className="loop-card-meta-value">{safeLoop.intervalHuman}</span>
             </span>
             <span className="loop-card-meta-sep" />
             <span className="loop-card-meta-item">

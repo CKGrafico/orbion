@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /*
  * Orbion design tokens mapped to shadcn/ui CSS variables.
@@ -45,9 +46,11 @@
   --color-chart-4: var(--status-paused);
   --color-chart-5: var(--status-failed);
 
-  /* Radii — Orbion scale */
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  /* Radii — hardcoded to avoid circular var() with same-named Orbion tokens.
+     Orbion theme.css also defines these in :root, but @theme inline must not
+     self-reference or the Tailwind design-token resolver breaks. */
+  --radius-sm: 7px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }

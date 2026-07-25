@@ -46,8 +46,8 @@ export function timeUntil(isoDate: string | null): string {
   return standaloneIntl.formatMessage({ id: "format.inDays" }, { count: Math.floor(hrs / 24) });
 }
 
-export function commandLine(command: string, args: string[]): string {
-  return [command, ...args].join(" ").trim();
+export function commandLine(command: string, args: string[] | undefined): string {
+  return [command, ...(args ?? [])].join(" ").trim();
 }
 
 export function hostLabel(baseUrl: string): string {
@@ -62,7 +62,8 @@ export function hostLabel(baseUrl: string): string {
 // ── Run activity summary (derived from runHistory) ─────────────────
 
 /** Count how many runs started today (local midnight). */
-export function runsToday(runHistory: RunRecord[]): number {
+export function runsToday(runHistory: RunRecord[] | undefined): number {
+  if (!runHistory) return 0;
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const todayMs = startOfToday.getTime();
@@ -70,7 +71,8 @@ export function runsToday(runHistory: RunRecord[]): number {
 }
 
 /** Average duration (ms) of completed runs; null if none have durations. */
-export function avgDuration(runHistory: RunRecord[]): number | null {
+export function avgDuration(runHistory: RunRecord[] | undefined): number | null {
+  if (!runHistory) return null;
   const completed = runHistory.filter((r) => r.duration !== null);
   if (completed.length === 0) return null;
   const total = completed.reduce((sum, r) => sum + (r.duration ?? 0), 0);
@@ -78,8 +80,8 @@ export function avgDuration(runHistory: RunRecord[]): number | null {
 }
 
 /** Last run duration (ms); null if the most recent run has no duration. */
-export function lastRunDuration(runHistory: RunRecord[]): number | null {
-  if (runHistory.length === 0) return null;
+export function lastRunDuration(runHistory: RunRecord[] | undefined): number | null {
+  if (!runHistory || runHistory.length === 0) return null;
   const last = runHistory[runHistory.length - 1];
   return last.duration;
 }
