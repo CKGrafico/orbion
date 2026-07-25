@@ -7,10 +7,12 @@ export function loopStatusToFleetItem(
   lastExitCode: number | null,
   reachability?: ReachabilityState,
 ): FleetItemStatus {
-  // Unreachable/reconnecting instances: loops are "unknown" (not "failed").
-  // "unknown" is distinct from loop-level statuses and doesn't inflate failure tallies.
   if (reachability === "unreachable" || reachability === "reconnecting") {
     return "unknown";
+  }
+
+  if (lastExitCode != null && lastExitCode !== 0) {
+    return "failed";
   }
 
   switch (status) {
@@ -21,7 +23,7 @@ export function loopStatusToFleetItem(
     case "paused":
       return "paused";
     case "stopped":
-      return "stopped";
+      return "failed";
     case "failed":
       return "failed";
     case "finished":

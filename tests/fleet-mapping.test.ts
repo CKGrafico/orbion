@@ -21,8 +21,8 @@ describe("loopStatusToFleetItem", () => {
     expect(loopStatusToFleetItem("waiting", null)).toBe("idle");
   });
 
-  it("maps paused to idle", () => {
-    expect(loopStatusToFleetItem("paused", null)).toBe("idle");
+  it("maps paused to paused", () => {
+    expect(loopStatusToFleetItem("paused", null)).toBe("paused");
   });
 
   it("maps idle to idle", () => {

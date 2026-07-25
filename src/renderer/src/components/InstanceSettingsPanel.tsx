@@ -138,6 +138,7 @@ export function InstanceSettingsPanel({
       case "paired": return intl.formatMessage({ id: "instanceSettings.authStateAuthenticated" });
       case "unauthenticated": return intl.formatMessage({ id: "instanceSettings.authStateUnauthenticated" });
       case "blocked": return intl.formatMessage({ id: "instanceSettings.authStateBlocked" });
+      case "tampered": return intl.formatMessage({ id: "instanceSettings.authStateTampered" });
       default: return intl.formatMessage({ id: "instanceSettings.authStateUnknown" });
     }
   };

@@ -1,0 +1,82 @@
+
+ RUN  v4.1.10 /home/azureuser/projects/orbion
+
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects AWS metadata endpoint 169.254.169.254 2ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects GCP metadata endpoint 169.254.169.253 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects arbitrary link-local IP in 169.254.0.0/16 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects AWS IPv6 metadata endpoint fd00:ec2::254 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects metadata IPs regardless of allowLoopback flag 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects GCP metadata hostname metadata.google.internal 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects Azure metadata hostname metadata.azure.internal 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects GCP metadata hostname trailing-dot FQDN 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects Azure metadata hostname trailing-dot FQDN 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects IPv6 link-local fe80::/10 addresses 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows non-link-local IPv6 addresses starting with fe9+ 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > does not treat bare fe80 hostname (no brackets) as IPv6 link-local 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects localhost when allowLoopback is false (default) 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows localhost when allowLoopback is true 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects 127.0.0.1 when allowLoopback is false 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows 127.0.0.1 when allowLoopback is true 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects 127.x.x.x when allowLoopback is false 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows 127.x.x.x when allowLoopback is true 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > rejects ::1 when allowLoopback is false 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows ::1 when allowLoopback is true 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows public IPs 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows public hostnames 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > allows Tailscale IPs (100.x.x.x) 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > is case-insensitive for localhost 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > is case-insensitive for metadata.google.internal 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > is case-insensitive for metadata.azure.internal 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > does not reject 169.255.x.x (not link-local) 0ms
+ ✓ tests/host-blocklist.test.ts > isHostAllowed > does not reject 169.253.x.x (not link-local) 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > allows https URLs to public hosts 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > rejects http URLs to 169.254.169.254 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > rejects non-http protocols 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > rejects localhost without allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > allows localhost with allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > rejects metadata.google.internal regardless of allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > rejects metadata.azure.internal regardless of allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isUrlAllowedForFetch > rejects IPv6 link-local regardless of allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > allows valid https URLs to public hosts 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > allows valid http URLs to public hosts 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > rejects invalid URLs 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > rejects non-http protocols 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > rejects metadata IPs 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > rejects cloud metadata hostnames 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > rejects localhost without allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > allows localhost with allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > isAllowedBaseUrl > allows loopback 127.0.0.1 with allowLoopback 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("169.254.169.254", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("169.254.169.253", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("169.254.0.1", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("169.254.100.50", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[fd00:ec2::254]", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("metadata.google.internal", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("metadata.azure.internal", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("metadata.google.internal.", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("metadata.azure.internal.", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[fe80::1]", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[fe8f::1]", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("localhost", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("127.0.0.1", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("127.0.0.2", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[::1]", { allowLoopback: false }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("localhost", { allowLoopback: true }) === true 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("127.0.0.1", { allowLoopback: true }) === true 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("127.0.0.2", { allowLoopback: true }) === true 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[::1]", { allowLoopback: true }) === true 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("169.254.169.254", { allowLoopback: true }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("169.254.169.253", { allowLoopback: true }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[fd00:ec2::254]", { allowLoopback: true }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("metadata.google.internal", { allowLoopback: true }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("metadata.azure.internal", { allowLoopback: true }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("[fe80::1]", { allowLoopback: true }) === false 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("8.8.8.8", { allowLoopback: false }) === true 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("example.com", { allowLoopback: false }) === true 0ms
+ ✓ tests/host-blocklist.test.ts > IPC validation and fetch path parity > isHostAllowed("100.64.0.1", { allowLoopback: false }) === true 0ms
+
+ Test Files  1 passed (1)
+      Tests  73 passed (73)
+   Start at  22:22:49
+   Duration  236ms (transform 62ms, setup 0ms, import 79ms, tests 13ms, environment 0ms)
+

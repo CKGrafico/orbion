@@ -1,4 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+vi.mock("../src/main/config-store.js", () => ({
+  getSessionToken: vi.fn(),
+  setEnvironmentAuthState: vi.fn(),
+  removeSessionToken: vi.fn(),
+}));
+
+vi.mock("../src/main/credential-vault.js", () => ({
+  getCredential: vi.fn(),
+  storeCredential: vi.fn(),
+  removeCredential: vi.fn(),
+  pruneOrphanCredentials: vi.fn(),
+  CredentialTamperedError: class extends Error {},
+}));
+
 import { ConnectionSupervisor, classifyError, isNetworkDownError } from "../src/main/connection-supervisor.js";
 
 async function flushMicrotasks(): Promise<void> {

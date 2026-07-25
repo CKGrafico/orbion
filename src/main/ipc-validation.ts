@@ -12,7 +12,7 @@ import { ipcMain } from "electron";
 import { isAllowedApiOperation, isAllowedStreamPath } from "../shared/daemon-allowlist.js";
 import type { InfraAction } from "../shared/ipc.js";
 import { createLogger } from "./logger.js";
-import { isUrlAllowedForFetch } from "./ssrf-allowlist.js";
+import { isAllowedBaseUrl as isCanonicalAllowedBaseUrl } from "./ssrf-blocklist.js";
 
 const logger = createLogger("ipc-validation");
 
@@ -48,14 +48,9 @@ function isValidHttpUrl(v: unknown): v is string {
   }
 }
 
-function isBlocklistedHost(v: unknown): boolean {
+function isBlocklistedUrl(v: unknown): boolean {
   if (!isString(v)) return false;
-  try {
-    const url = new URL(v);
-    return !isUrlAllowedForFetch(url, { allowLoopback: true });
-  } catch {
-    return false;
-  }
+  return !isCanonicalAllowedBaseUrl(v, { allowLoopback: true });
 }
 
 export function isAllowedPath(v: unknown): v is string {
@@ -278,7 +273,7 @@ const validators: Record<string, Validator> = {
     if (!isNonEmptyString(args[0]) || (args[0] as string).length > 256)
       issues.push("name must be a non-empty string (max 256 chars)");
     if (!isValidHttpUrl(args[1])) issues.push("url must be a valid http/https URL");
-    else if (isBlocklistedHost(args[1])) issues.push("url host is a blocked metadata or link-local address");
+    else if (isBlocklistedUrl(args[1])) issues.push("url host is a blocked metadata or link-local address");
     if (args[2] !== undefined && !isEnum(args[2], ENDPOINT_KINDS))
       issues.push("kind must be one of direct, ssh, tailscale");
     return issues;
@@ -322,7 +317,7 @@ const validators: Record<string, Validator> = {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isValidHttpUrl(args[1])) issues.push("url must be a valid http/https URL");
-    else if (isBlocklistedHost(args[1])) issues.push("url host is a blocked metadata or link-local address");
+    else if (isBlocklistedUrl(args[1])) issues.push("url host is a blocked metadata or link-local address");
     if (!isEnum(args[2], ENDPOINT_KINDS))
       issues.push("kind must be one of direct, ssh, tailscale");
     return issues;

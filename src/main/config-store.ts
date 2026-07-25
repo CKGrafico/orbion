@@ -10,9 +10,16 @@ import { createLogger } from "./logger.js";
 import { CredentialTamperedError, getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseTarget, buildSshArgs } from "./ssh-config.js";
-import { msg } from "./i18n.js";
 
 const logger = createLogger("config-store");
+
+export type CredentialTamperedCallback = (environmentId: string, credentialKind: "sessionToken" | "sshKeyPassphrase") => void;
+
+let onCredentialTampered: CredentialTamperedCallback | null = null;
+
+export function setCredentialTamperedCallback(cb: CredentialTamperedCallback): void {
+  onCredentialTampered = cb;
+}
 
 interface LegacyInstance {
   id: string;
@@ -359,7 +366,8 @@ export function getSessionToken(environmentId: string): SessionToken | null {
     } catch (error) {
       if (error instanceof CredentialTamperedError) {
         logger.error("Session token tampered for environment:", environmentId);
-        _setEnvironmentAuthState(environmentId, "blocked");
+        _setEnvironmentAuthState(environmentId, "tampered");
+        onCredentialTampered?.(environmentId, "sessionToken");
         return null;
       }
       throw error;
@@ -404,7 +412,8 @@ export function getSshKeyPassphrase(environmentId: string): string | null {
   } catch (error) {
     if (error instanceof CredentialTamperedError) {
       logger.error("SSH key passphrase tampered for environment:", environmentId);
-      _setEnvironmentAuthState(environmentId, "blocked");
+      _setEnvironmentAuthState(environmentId, "tampered");
+      onCredentialTampered?.(environmentId, "sshKeyPassphrase");
       return null;
     }
     throw error;

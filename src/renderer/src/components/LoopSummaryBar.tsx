@@ -271,8 +271,6 @@ function FleetLoopSummaryBar({
           );
         })}
       </div>
-
-          to show a single next-run when the estate has many schedulers. */}
     </div>
   );
 }
