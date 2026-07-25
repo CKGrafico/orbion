@@ -10,7 +10,6 @@ import { createLogger } from "./logger.js";
 import { CredentialTamperedError, getCredential, pruneOrphanCredentials, removeCredential, storeCredential } from "./credential-vault.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseTarget, buildSshArgs } from "./ssh-config.js";
-import { msg } from "./i18n.js";
 
 const logger = createLogger("config-store");
 

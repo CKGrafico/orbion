@@ -48,6 +48,7 @@ import type {
   SweepEphemeralSessionsResult,
   LoopShape,
   GlobalSettings,
+  SecurityAuditEvent,
 } from "../shared/ipc.js";
 import type { LogEntry } from "../shared/log.js";
 
@@ -450,6 +451,23 @@ const bridge: LoopTaskBridge = {
   log: {
     write: (entry: LogEntry) =>
       void ipcRenderer.invoke("log:write", entry),
+  },
+
+  credential: {
+    onTampered: (cb: (event: { environmentId: string; credentialKind: "sessionToken" | "sshKeyPassphrase" }) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: { environmentId: string; credentialKind: "sessionToken" | "sshKeyPassphrase" },
+      ): void => {
+        cb(payload);
+      };
+      ipcRenderer.on("credential:tampered", listener);
+      return () => {
+        ipcRenderer.removeListener("credential:tampered", listener);
+      };
+    },
+    getSecurityAuditEvents: () =>
+      ipcRenderer.invoke("credential:getSecurityAuditEvents") as Promise<SecurityAuditEvent[]>,
   },
 };
 

@@ -27,7 +27,7 @@ import type {
   McpToolCallResult,
   LoopShape,
 } from "../shared/ipc.js";
-import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
+import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings, SecurityAuditEvent } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -92,7 +92,9 @@ import {
   sweepEphemeralSessions,
   getGlobalSettings,
   updateGlobalSettings,
+  setCredentialTamperedCallback,
 } from "./config-store.js";
+import { logSecurityEvent, getSecurityAuditEvents } from "./security-audit-log.js";
 import {
   getMessages as transcriptGetMessages,
   appendMessage as transcriptAppendMessage,
@@ -1225,6 +1227,13 @@ app.whenReady().then(() => {
       }
     }
     return result;
+  });
+
+  // ── Credential tampering ────────────────────────────────────────────
+
+  safeHandle("credential:getSecurityAuditEvents", (): SecurityAuditEvent[] => {
+    validateIpc("credential:getSecurityAuditEvents", []);
+    return getSecurityAuditEvents();
   });
 
   // ── Reachability (instance health layer, separate from loop status) ───
