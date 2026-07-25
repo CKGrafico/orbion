@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { isUrlAllowedForFetch } from "../src/main/ssrf-allowlist.js";
+
+vi.mock("electron", () => ({
+  ipcMain: { handle: vi.fn() },
+}));
+
+import { validateIpc, IpcValidationError } from "../src/main/ipc-validation.js";
+
 
 function check(hostname: string, allowLoopback: boolean): boolean {
   const url = new URL(`http://${hostname}/`);
@@ -122,5 +129,61 @@ describe("isUrlAllowedForFetch", () => {
 
   it("rejects IPv6 link-local uppercase form", () => {
     expect(check("[FE80::1]", false)).toBe(false);
+  });
+});
+
+describe("cross-path SSRF consistency", () => {
+  const testHosts = [
+    { host: "169.254.169.254", blocked: true },
+    { host: "169.254.169.253", blocked: true },
+    { host: "169.254.0.1", blocked: true },
+    { host: "[fd00:ec2::254]", blocked: true },
+    { host: "[fe80::1]", blocked: true },
+    { host: "[FE80::1]", blocked: true },
+    { host: "metadata.google.internal", blocked: true },
+    { host: "metadata.google.internal.", blocked: true },
+    { host: "localhost", blocked: false },
+    { host: "127.0.0.1", blocked: false },
+    { host: "[::1]", blocked: false },
+    { host: "example.com", blocked: false },
+    { host: "8.8.8.8", blocked: false },
+  ];
+
+  it("ipc-validation and isUrlAllowedForFetch agree on blocked hosts", () => {
+    const blockedHosts = [
+      "169.254.169.254",
+      "169.254.169.253",
+      "169.254.0.1",
+      "[fd00:ec2::254]",
+      "[fe80::1]",
+      "metadata.google.internal",
+    ];
+    for (const host of blockedHosts) {
+      const url = `http://${host}/api`;
+      const canonicalResult = isUrlAllowedForFetch(new URL(url), { allowLoopback: true });
+      expect(canonicalResult, `host=${host} canonical`).toBe(false);
+      expect(() => validateIpc("config:addEnvironment", ["test-env", url, undefined]), `host=${host} ipc`).toThrow(IpcValidationError);
+    }
+  });
+
+  it("ipc-validation and isUrlAllowedForFetch agree on allowed hosts", () => {
+    const allowedHosts = ["example.com", "8.8.8.8", "192.168.1.1", "localhost"];
+    for (const host of allowedHosts) {
+      const url = `http://${host}/api`;
+      const urlObj = new URL(url);
+      const allowLoopback = host === "localhost";
+      const canonicalResult = isUrlAllowedForFetch(urlObj, { allowLoopback });
+      expect(canonicalResult, `host=${host} canonical`).toBe(true);
+      expect(() => validateIpc("config:addEnvironment", ["test-env", url, undefined]), `host=${host} ipc`).not.toThrow();
+    }
+  });
+
+  it("both paths reject metadata IPs even with allowLoopback", () => {
+    const metadataIps = ["169.254.169.254", "169.254.169.253", "[fd00:ec2::254]"];
+    for (const ip of metadataIps) {
+      const url = new URL(`http://${ip}/api`);
+      expect(isUrlAllowedForFetch(url, { allowLoopback: true }), `ip=${ip}`).toBe(false);
+      expect(isUrlAllowedForFetch(url, { allowLoopback: false }), `ip=${ip}`).toBe(false);
+    }
   });
 });

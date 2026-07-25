@@ -337,15 +337,11 @@ function showEncryptionWarning(): void {
   });
 }
 
-function isAllowedHost(url: URL, allowLoopback: boolean): boolean {
-  return isUrlAllowedForFetch(url, { allowLoopback });
-}
-
 function isAllowedBaseUrl(baseUrl: string): boolean {
   try {
     const url = new URL(baseUrl);
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    return isAllowedHost(url, true);
+    return isUrlAllowedForFetch(url, { allowLoopback: true });
   } catch {
     return false;
   }
@@ -355,7 +351,7 @@ function isEffectiveUrlAllowed(effectiveUrl: string): { allowed: boolean; host: 
   try {
     const url = new URL(effectiveUrl);
     const host = url.hostname.toLowerCase();
-    if (!isAllowedHost(url, false)) {
+    if (!isUrlAllowedForFetch(url, { allowLoopback: false })) {
       if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
         const port = parseInt(url.port, 10);
         if (port && isTunnelLocalPort(port)) {
