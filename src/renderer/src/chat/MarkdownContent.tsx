@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize from "rehype-sanitize";
@@ -28,7 +28,7 @@ function CodeBlock({
   className?: string;
   children?: React.ReactNode;
 }) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const lang = className?.replace("language-", "") ?? "";
   const codeStr = String(children).replace(/\n$/, "");
@@ -48,7 +48,7 @@ function CodeBlock({
       <div className="code-block-header">
         <span className="code-block-lang">{lang}</span>
         <button className="code-block-copy" onClick={handleCopy}>
-          {copied ? intl.formatMessage({ id: "chat.copied" }) : intl.formatMessage({ id: "chat.copy" })}
+          {copied ? t("chat.copied") : t("chat.copy")}
         </button>
       </div>
       <pre>

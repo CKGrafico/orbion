@@ -1,5 +1,5 @@
 import React from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { PrReferenceCardRow } from "../chat/types";
 import type { PrRiskLevel } from "../../../shared/ipc";
 import { GitPullRequest, ExternalLink } from "lucide-react";
@@ -31,7 +31,7 @@ interface PrReferenceCardProps {
 }
 
 export function PrReferenceCard({ row }: PrReferenceCardProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   return (
     <div
@@ -46,11 +46,11 @@ export function PrReferenceCard({ row }: PrReferenceCardProps): React.ReactNode 
         <span className="pr-reference-card-title">{row.prTitle}</span>
         {row.prVerdict ? (
           <span className={riskChipClass(row.prVerdict.riskLevel)}>
-            {intl.formatMessage({ id: `inbox.prRisk.${row.prVerdict.riskLevel}` })}
+            {t(`inbox.prRisk.${row.prVerdict.riskLevel}`)}
           </span>
         ) : (
           <span className="pr-risk-chip pr-risk-chip-pending">
-            {intl.formatMessage({ id: "prReferenceCard.noVerdict" })}
+            {t("prReferenceCard.noVerdict")}
           </span>
         )}
       </div>
@@ -69,10 +69,10 @@ export function PrReferenceCard({ row }: PrReferenceCardProps): React.ReactNode 
         <button
           className="pr-reference-card-link"
           onClick={() => window.open(row.prUrl, "_blank")}
-          title={intl.formatMessage({ id: "prReferenceCard.openOnPlatform" })}
+          title={t("prReferenceCard.openOnPlatform")}
         >
           <ExternalLink size={12} />
-          <span>{intl.formatMessage({ id: "prReferenceCard.openOnPlatform" })}</span>
+          <span>{t("prReferenceCard.openOnPlatform")}</span>
         </button>
       </div>
     </div>

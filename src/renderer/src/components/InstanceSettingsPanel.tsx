@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { AgentRuntime, Environment, EndpointKind, AccessEndpoint } from "../../../shared/ipc";
 import { Settings, Trash2, Plus, Check, Globe, Terminal } from "lucide-react";
 import { translateMessage } from "../i18n";
@@ -31,7 +31,7 @@ export function InstanceSettingsPanel({
   onExchangePairingCode,
   onRemoveSessionToken,
 }: InstanceSettingsPanelProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const [nameInput, setNameInput] = useState("");
   const [nameDirty, setNameDirty] = useState(false);
@@ -111,14 +111,14 @@ export function InstanceSettingsPanel({
           typeof result.error === "string"
             ? result.error
             : result.error && typeof result.error === "object" && "key" in result.error
-              ? translateMessage(intl, result.error as { key: string; params?: Record<string, string | number> })
-              : intl.formatMessage({ id: "instanceSettings.pairingCode" }),
+              ? translateMessage(result.error as { key: string; params?: Record<string, string | number> })
+              : t("instanceSettings.pairingCode"),
         );
       } else {
         setPairingCode("");
       }
     } catch {
-      setPairingError(intl.formatMessage({ id: "instanceSettings.pairingCode" }));
+      setPairingError(t("instanceSettings.pairingCode"));
     }
     setPairingBusy(false);
   };
@@ -135,11 +135,11 @@ export function InstanceSettingsPanel({
 
   const authStateLabel = (state: string | undefined) => {
     switch (state) {
-      case "paired": return intl.formatMessage({ id: "instanceSettings.authStateAuthenticated" });
-      case "unauthenticated": return intl.formatMessage({ id: "instanceSettings.authStateUnauthenticated" });
-      case "blocked": return intl.formatMessage({ id: "instanceSettings.authStateBlocked" });
-      case "tampered": return intl.formatMessage({ id: "instanceSettings.authStateTampered" });
-      default: return intl.formatMessage({ id: "instanceSettings.authStateUnknown" });
+      case "paired": return t("instanceSettings.authStateAuthenticated");
+      case "unauthenticated": return t("instanceSettings.authStateUnauthenticated");
+      case "blocked": return t("instanceSettings.authStateBlocked");
+      case "tampered": return t("instanceSettings.authStateTampered");
+      default: return t("instanceSettings.authStateUnknown");
     }
   };
 
@@ -147,18 +147,18 @@ export function InstanceSettingsPanel({
     <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) { syncName(); onClose(); } }}>
       <SheetContent side="right">
         <SheetHeader>
-          <SheetTitle>{intl.formatMessage({ id: "instanceSettings.title" })}</SheetTitle>
-          <SheetDescription>{intl.formatMessage({ id: "settings.close" })}</SheetDescription>
+          <SheetTitle>{t("instanceSettings.title")}</SheetTitle>
+          <SheetDescription>{t("settings.close")}</SheetDescription>
         </SheetHeader>
         <Button className="mb-4" onClick={handleSaveAndClose}>
-          {intl.formatMessage({ id: "instanceSettings.saveAndClose" })}
+          {t("instanceSettings.saveAndClose")}
         </Button>
 
         <div className="settings-body">
           {/* Instance name */}
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.nameLabel" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.nameLabel")}</span>
             </div>
             <input
               className="settings-threshold-input"
@@ -173,13 +173,13 @@ export function InstanceSettingsPanel({
           {/* ── Reach section ── */}
           <div className="settings-section-header">
             <Settings size={13} />
-            <span className="settings-section-title">{intl.formatMessage({ id: "instanceSettings.reachSection" })}</span>
+            <span className="settings-section-title">{t("instanceSettings.reachSection")}</span>
           </div>
-          <div className="settings-row-description">{intl.formatMessage({ id: "instanceSettings.reachSectionDesc" })}</div>
+          <div className="settings-row-description">{t("instanceSettings.reachSectionDesc")}</div>
 
           <div className="settings-endpoints">
             {environment.endpoints.length === 0 ? (
-              <div className="settings-endpoint-empty">{intl.formatMessage({ id: "instanceSettings.noEndpoints" })}</div>
+              <div className="settings-endpoint-empty">{t("instanceSettings.noEndpoints")}</div>
             ) : (
               environment.endpoints.map((ep) => (
                 <div key={ep.id} className="settings-endpoint-row">
@@ -189,18 +189,18 @@ export function InstanceSettingsPanel({
                   </span>
                   <span className="settings-endpoint-url mono" title={ep.url}>{ep.url}</span>
                   {ep.id === environment.activeEndpointId ? (
-                    <span className="settings-endpoint-active">{intl.formatMessage({ id: "instanceSettings.activeEndpoint" })}</span>
+                    <span className="settings-endpoint-active">{t("instanceSettings.activeEndpoint")}</span>
                   ) : (
                     <button
                       className="btn settings-endpoint-action"
                       onClick={() => onSetActiveEndpoint(environment.id, ep.id)}
                     >
-                      {intl.formatMessage({ id: "instanceSettings.switchActive" })}
+                      {t("instanceSettings.switchActive")}
                     </button>
                   )}
                   {removeEndpointId === ep.id ? (
                     <div className="settings-endpoint-confirm">
-                      <span>{intl.formatMessage({ id: "instanceSettings.removeEndpointConfirm" })}</span>
+                      <span>{t("instanceSettings.removeEndpointConfirm")}</span>
                       <button className="btn primary" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => handleRemoveEndpoint(ep.id)}>
                         <Check size={10} />
                       </button>
@@ -212,14 +212,14 @@ export function InstanceSettingsPanel({
                     <button
                       className="icon-btn settings-endpoint-remove"
                       onClick={() => setRemoveEndpointId(ep.id)}
-                      title={intl.formatMessage({ id: "instanceSettings.removeEndpoint" })}
+                      title={t("instanceSettings.removeEndpoint")}
                     >
                       <Trash2 size={12} />
                     </button>
                   )}
                   {ep.lastError ? (
                     <span className="settings-endpoint-error">
-                      {typeof ep.lastError === "string" ? ep.lastError : translateMessage(intl, ep.lastError as { key: string; params?: Record<string, string | number> })}
+                      {typeof ep.lastError === "string" ? ep.lastError : translateMessage(ep.lastError as { key: string; params?: Record<string, string | number> })}
                     </span>
                   ) : null}
                 </div>
@@ -232,7 +232,7 @@ export function InstanceSettingsPanel({
             <input
               className="settings-threshold-input"
               style={{ flex: 1 }}
-              placeholder={intl.formatMessage({ id: "instanceSettings.endpointUrl" })}
+              placeholder={t("instanceSettings.endpointUrl")}
               value={newEndpointUrl}
               onChange={(e) => setNewEndpointUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleAddEndpoint(); }}
@@ -254,13 +254,13 @@ export function InstanceSettingsPanel({
 
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.sshControlTarget" })}</span>
-              <span className="settings-row-description">{intl.formatMessage({ id: "instanceSettings.sshControlTargetDesc" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.sshControlTarget")}</span>
+              <span className="settings-row-description">{t("instanceSettings.sshControlTargetDesc")}</span>
             </div>
             <input
               className="settings-threshold-input"
               style={{ width: "100%" }}
-              placeholder={intl.formatMessage({ id: "instanceSettings.sshControlTargetPlaceholder" })}
+              placeholder={t("instanceSettings.sshControlTargetPlaceholder")}
               value={sshControlTarget || environment.sshControlTarget || ""}
               onChange={(event) => setSshControlTarget(event.target.value)}
               onBlur={handleSshControlTargetCommit}
@@ -271,13 +271,13 @@ export function InstanceSettingsPanel({
           {/* ── Runtime section ── */}
           <div className="settings-section-header">
             <Settings size={13} />
-            <span className="settings-section-title">{intl.formatMessage({ id: "instanceSettings.runtimeSection" })}</span>
+            <span className="settings-section-title">{t("instanceSettings.runtimeSection")}</span>
           </div>
-          <div className="settings-row-description">{intl.formatMessage({ id: "instanceSettings.runtimeSectionDesc" })}</div>
+          <div className="settings-row-description">{t("instanceSettings.runtimeSectionDesc")}</div>
 
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.agentRuntime" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.agentRuntime")}</span>
             </div>
             <div className="segmented">
               {(["opencode", "claude"] as const).map((runtime) => {
@@ -297,7 +297,7 @@ export function InstanceSettingsPanel({
 
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.runtimeState" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.runtimeState")}</span>
             </div>
             <span className="settings-row-desc">{environment.runtimeState ?? "unknown"}</span>
           </div>
@@ -305,32 +305,32 @@ export function InstanceSettingsPanel({
           {/* ── Credentials section ── */}
           <div className="settings-section-header">
             <Settings size={13} />
-            <span className="settings-section-title">{intl.formatMessage({ id: "instanceSettings.credentialsSection" })}</span>
+            <span className="settings-section-title">{t("instanceSettings.credentialsSection")}</span>
           </div>
-          <div className="settings-row-description">{intl.formatMessage({ id: "instanceSettings.credentialsSectionDesc" })}</div>
+          <div className="settings-row-description">{t("instanceSettings.credentialsSectionDesc")}</div>
 
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.authState" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.authState")}</span>
             </div>
             <span className="settings-row-desc">{authStateLabel(environment.authState)}</span>
           </div>
 
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.repairCode" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.repairCode")}</span>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <input
                 className="settings-threshold-input"
                 style={{ width: 140 }}
-                placeholder={intl.formatMessage({ id: "instanceSettings.repairCodePlaceholder" })}
+                placeholder={t("instanceSettings.repairCodePlaceholder")}
                 value={pairingCode}
                 onChange={(e) => setPairingCode(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void handlePair(); }}
               />
               <button className="btn" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => void handlePair()} disabled={pairingBusy || !pairingCode.trim()}>
-                {intl.formatMessage({ id: "instanceSettings.repairSubmit" })}
+                {t("instanceSettings.repairSubmit")}
               </button>
             </div>
           </div>
@@ -338,11 +338,11 @@ export function InstanceSettingsPanel({
 
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "instanceSettings.clearCredentials" })}</span>
+              <span className="settings-row-title">{t("instanceSettings.clearCredentials")}</span>
             </div>
             {clearCredConfirm ? (
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "var(--danger)" }}>{intl.formatMessage({ id: "instanceSettings.clearCredentialsConfirm" })}</span>
+                <span style={{ fontSize: 11, color: "var(--danger)" }}>{t("instanceSettings.clearCredentialsConfirm")}</span>
                 <button className="btn primary" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => { onRemoveSessionToken(environment.id); setClearCredConfirm(false); }}>
                   <Check size={10} />
                 </button>
@@ -360,26 +360,26 @@ export function InstanceSettingsPanel({
           {/* ── Remove section ── */}
           <div className="settings-section-header" style={{ color: "var(--danger)" }}>
             <Trash2 size={13} />
-            <span className="settings-section-title">{intl.formatMessage({ id: "instanceSettings.removeSection" })}</span>
+            <span className="settings-section-title">{t("instanceSettings.removeSection")}</span>
           </div>
-          <div className="settings-row-description">{intl.formatMessage({ id: "instanceSettings.removeSectionDesc" })}</div>
+          <div className="settings-row-description">{t("instanceSettings.removeSectionDesc")}</div>
 
           {removeConfirm ? (
             <div className="settings-remove-confirm">
-              <span>{intl.formatMessage({ id: "instanceSettings.removeConfirm" }, { name: environment.name })}</span>
+              <span>{t("instanceSettings.removeConfirm", { name: environment.name })}</span>
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button className="btn primary" style={{ background: "var(--danger)" }} onClick={handleRemoveInstance}>
-                  {intl.formatMessage({ id: "instanceSettings.removeButton" })}
+                  {t("instanceSettings.removeButton")}
                 </button>
                 <button className="btn" onClick={() => setRemoveConfirm(false)}>
-                  {intl.formatMessage({ id: "instanceSettings.cancel" })}
+                  {t("instanceSettings.cancel")}
                 </button>
               </div>
             </div>
           ) : (
             <button className="btn" style={{ fontSize: 12, padding: "4px 10px", color: "var(--danger)", border: "1px solid var(--danger)" }} onClick={handleRemoveInstance}>
               <Trash2 size={12} style={{ marginRight: 4 }} />
-              {intl.formatMessage({ id: "instanceSettings.removeButton" })}
+              {t("instanceSettings.removeButton")}
             </button>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { LoopMeta, Project } from "../types";
 import type { ReachabilityState } from "../../../shared/ipc";
 import { loopStatusToFleetItem } from "../fleet-mapping";
@@ -7,7 +7,7 @@ import { runsToday, avgDuration, formatDurationShort } from "../format";
 import { Folder } from "lucide-react";
 
 function LoopActivitySummary({ loop }: { loop: LoopMeta }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const todayCount = runsToday(loop.runHistory);
   const avg = avgDuration(loop.runHistory);
 
@@ -17,12 +17,12 @@ function LoopActivitySummary({ loop }: { loop: LoopMeta }): React.ReactNode {
     <span className="loop-activity">
       {todayCount > 0 ? (
         <span className="loop-activity-item">
-          {intl.formatMessage({ id: "activitySummary.runsToday" }, { count: todayCount })}
+          {t("activitySummary.runsToday", { count: todayCount })}
         </span>
       ) : null}
       {avg !== null ? (
         <span className="loop-activity-item">
-          {intl.formatMessage({ id: "activitySummary.avgDuration" }, { value: formatDurationShort(avg) })}
+          {t("activitySummary.avgDuration", { value: formatDurationShort(avg) })}
         </span>
       ) : null}
     </span>
@@ -37,7 +37,7 @@ export function ProjectDetail(props: {
   onOpenLoop: (loopId: string) => void;
 }): React.ReactNode {
   const { project, loops, reachability, onOpenLoop } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (loops.length === 0) {
     return (
@@ -46,8 +46,8 @@ export function ProjectDetail(props: {
           <span className="glyph">
             <Folder size={30} strokeWidth={1.2} />
           </span>
-          <h3>{intl.formatMessage({ id: "projectDetail.noLoops" })}</h3>
-          <p>{intl.formatMessage({ id: "projectDetail.noLoopsDescription" })}</p>
+          <h3>{t("projectDetail.noLoops")}</h3>
+          <p>{t("projectDetail.noLoopsDescription")}</p>
         </div>
       </div>
     );
@@ -60,7 +60,7 @@ export function ProjectDetail(props: {
           <span className="dot" style={{ background: project.color }} />
           <span className="overline">{project.name}</span>
           <span className="spacer" />
-          <span className="overline">{intl.formatMessage({ id: "projectDetail.loopsCount" }, { count: loops.length })}</span>
+          <span className="overline">{t("projectDetail.loopsCount", { count: loops.length })}</span>
         </div>
         <div className="card-body">
           <div className="loop-list">

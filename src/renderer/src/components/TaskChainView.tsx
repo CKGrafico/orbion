@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { TaskDefinition } from "../types";
 import { commandLine } from "../format";
 
@@ -115,13 +115,13 @@ interface TaskChainViewProps {
 }
 
 export function TaskChainView({ steps }: TaskChainViewProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (steps.length === 0) {
     return (
       <div className="task-chain task-chain--empty">
         <span className="task-chain-empty-text">
-          {intl.formatMessage({ id: "taskChain.noTasks" })}
+          {t("taskChain.noTasks")}
         </span>
       </div>
     );
@@ -133,10 +133,10 @@ export function TaskChainView({ steps }: TaskChainViewProps): React.ReactNode {
     <div className={`task-chain${hasBranches ? " task-chain--branched" : ""}`}>
       <div className="task-chain-header">
         <span className="task-chain-header-label">
-          {intl.formatMessage({ id: "taskChain.label" })}
+          {t("taskChain.label")}
         </span>
         <span className="task-chain-header-count">
-          {intl.formatMessage({ id: "taskChain.stepCount" }, { count: steps.length })}
+          {t("taskChain.stepCount", { count: steps.length })}
         </span>
       </div>
       <div className="task-chain-steps">
@@ -162,7 +162,7 @@ interface TaskChainStepProps {
 const COMMAND_MAX_LINES = 4;
 
 function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [commandExpanded, setCommandExpanded] = useState(false);
 
   const cmdLine = commandLine(step.task.command, step.task.commandArgs);
@@ -176,10 +176,10 @@ function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps)
   if (hasBranches && step.parentHasBranch) {
     if (step.branchType === "success") {
       connectorVariant = "ok";
-      branchLabel = intl.formatMessage({ id: "taskChain.onSuccess" });
+      branchLabel = t("taskChain.onSuccess");
     } else if (step.branchType === "failure") {
       connectorVariant = "fail";
-      branchLabel = intl.formatMessage({ id: "taskChain.onFailure" });
+      branchLabel = t("taskChain.onFailure");
     }
   }
 
@@ -191,7 +191,7 @@ function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps)
       {showConnector && (
         <div className={`task-chain-connector${connectorVariant !== "default" ? ` task-chain-connector--${connectorVariant}` : ""}`}>
           {connectorVariant === "ok" && (
-            <span className="task-chain-connector-ok">{intl.formatMessage({ id: "taskChain.ok" })}</span>
+            <span className="task-chain-connector-ok">{t("taskChain.ok")}</span>
           )}
         </div>
       )}
@@ -216,8 +216,8 @@ function TaskChainStep({ step, showConnector, hasBranches }: TaskChainStepProps)
               aria-expanded={commandExpanded}
             >
               {commandExpanded
-                ? intl.formatMessage({ id: "taskChain.hideCommand" })
-                : intl.formatMessage({ id: "taskChain.showCommand" })}
+                ? t("taskChain.hideCommand")
+                : t("taskChain.showCommand")}
             </button>
           )}
         </div>

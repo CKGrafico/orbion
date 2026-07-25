@@ -1,4 +1,4 @@
-import { standaloneIntl } from "./i18n";
+import i18n from "./i18n";
 
 export type FleetItemStatus =
   | "pending-approval"
@@ -40,7 +40,7 @@ const PILL_LABEL_KEYS: Record<FleetItemStatus, string> = {
 };
 
 export function getPillLabel(status: FleetItemStatus): string {
-  return standaloneIntl.formatMessage({ id: PILL_LABEL_KEYS[status] });
+  return i18n.t(PILL_LABEL_KEYS[status]);
 }
 
 export const PILL_COLORS: Record<FleetItemStatus, string> = {

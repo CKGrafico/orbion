@@ -20,8 +20,8 @@ Plain CSS remains valid only for: layout glue that Tailwind cannot express, thir
 ### GR-STYLE-004: No other CSS frameworks
 Do not introduce CSS-in-JS, styled-components, or another CSS framework without explicit team alignment and an approved architecture change. Tailwind CSS v4 + shadcn/ui are the approved styling stack.
 
-### GR-STYLE-005: User-facing copy through react-intl
-All user-facing copy MUST flow through react-intl keys. shadcn components receive `intl.formatMessage` results as `children` or `label` props, not hardcoded strings.
+### GR-STYLE-005: User-facing copy through react-i18next
+All user-facing copy MUST flow through react-i18next keys using the `useTranslation` hook. shadcn components receive `t()` results as `children` or `label` props, not hardcoded strings.
 
 ## Dependencies (GR-DEP)
 

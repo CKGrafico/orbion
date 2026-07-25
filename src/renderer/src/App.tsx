@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort, ReviewModeItem, GlobalSettings } from "../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project, FleetLoopRollup, LoopWithOrigin } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
@@ -29,7 +29,8 @@ import { InboxView } from "./features/inbox/InboxView";
 import { ReviewModeOverlay } from "./features/review/ReviewModeOverlay";
 import { BudgetWatchPanel } from "./components/BudgetWatchPanel";
 import { hostLabel, timeAgo, healthTooltip } from "./format";
-import { translateMessage, standaloneIntl } from "./i18n";
+import i18n from "i18next";
+import { translateMessage } from "./i18n";
 import { cid, useInject } from "inversify-hooks";
 import type { IConnectionService, IOpenCodeService, IOutageService, IInboxService, IReachabilityService, IConfigService, ITranscriptService, IMcpService, InboxBuildParams, IPrPollingService, IPrVerdictService, IReviewModeService } from "./services/interfaces";
 import { RuntimeHealthChip } from "./components/RuntimeHealthChip";
@@ -76,7 +77,7 @@ export function App(): React.ReactNode {
 
 function AppInner(): React.ReactNode {
   const { environments, selectedId, mainVm, loaded, select, remove, update, addEndpoint, removeEndpoint, setActiveEndpoint, removeSessionToken, setMainVm, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
   const [outageService] = useInject<IOutageService>(cid.IOutageService);
@@ -252,9 +253,9 @@ function AppInner(): React.ReactNode {
         pendingDiscardRef.current = leftSessionId;
 
         showToast({
-          message: intl.formatMessage({ id: "session.discardToast" }),
+          message: t("session.discardToast"),
           action: {
-            label: intl.formatMessage({ id: "session.discardUndo" }),
+            label: t("session.discardUndo"),
             onClick: () => {
               // Navigate back to the session (it wasn't deleted yet)
               pendingDiscardRef.current = null;
@@ -276,7 +277,7 @@ function AppInner(): React.ReactNode {
         });
       }
     }
-  }, [view, sessions, configService, transcriptService, intl, showToast]);
+  }, [view, sessions, configService, transcriptService, showToast]);
 
   // ── Inactivity sweep for ephemeral sessions ──────────────────────────
   // Runs every 30 minutes. Removes ephemeral sessions whose lastActiveAt
@@ -373,10 +374,7 @@ function AppInner(): React.ReactNode {
       itemId: breach.loopId,
       itemType: "loop",
       status: "failed",
-      message: standaloneIntl.formatMessage(
-        { id: "budget.breachNotification" },
-        { loopName: breach.loopDescription, threshold: breach.threshold, count: breach.runsToday, autoPause: breach.autoPaused },
-      ),
+      message: i18n.t("budget.breachNotification", { loopName: breach.loopDescription, threshold: breach.threshold, count: breach.runsToday, autoPause: breach.autoPaused }),
     });
   }, [sendInboxNotification]);
 
@@ -397,8 +395,8 @@ function AppInner(): React.ReactNode {
       itemId: transition.loopId,
       itemType: "loop",
       status: type === "failure" ? "failed" : "completed",
-      message: standaloneIntl.formatMessage(
-        { id: type === "failure" ? "inbox.transitionFailed" : "inbox.transitionFinished" },
+      message: i18n.t(
+        type === "failure" ? "inbox.transitionFailed" : "inbox.transitionFinished",
         { loopName: transition.loopDescription, exitCode: transition.lastExitCode, maxRuns: transition.maxRuns, runCount: transition.runCount },
       ),
     });
@@ -548,14 +546,8 @@ function AppInner(): React.ReactNode {
         const counts = digest.digestCounts;
         if (!globalMuted && counts) {
           void notificationService.send({
-            title: standaloneIntl.formatMessage(
-              { id: "inbox.digest.notifTitle" },
-              { count: counts.total },
-            ),
-            body: standaloneIntl.formatMessage(
-              { id: "inbox.digest.notifBody" },
-              { safe: counts.safe, needsYou: counts.needsYou, conflict: counts.conflict },
-            ),
+            title: i18n.t("inbox.digest.notifTitle", { count: counts.total }),
+            body: i18n.t("inbox.digest.notifBody", { safe: counts.safe, needsYou: counts.needsYou, conflict: counts.conflict }),
             tag: digest.id,
             deepLink: { kind: "inbox-item", environmentId: digest.environmentId, itemKind: "digest", itemId: digest.id },
             suppressIfFocused: true,
@@ -723,7 +715,7 @@ function AppInner(): React.ReactNode {
             itemId: env.id,
             itemType: "loop",
             status: current,
-            message: standaloneIntl.formatMessage({ id: "app.notificationItemNeedsAttention" }, { envName: env.name, itemType: "loop" }),
+            message: i18n.t("app.notificationItemNeedsAttention", { envName: env.name, itemType: "loop" }),
           });
         }
       }
@@ -1031,8 +1023,8 @@ function AppInner(): React.ReactNode {
     if (!session || session.activeRuntime === newRuntime) return;
 
     const runtimeLabel = newRuntime === "opencode"
-      ? intl.formatMessage({ id: "agentSwitcher.opencode" })
-      : intl.formatMessage({ id: "agentSwitcher.claude" });
+      ? t("agentSwitcher.opencode")
+      : t("agentSwitcher.claude");
 
     // Persist the runtime change
     void configService.updateChatSession(sessionId, { activeRuntime: newRuntime });
@@ -1041,13 +1033,13 @@ function AppInner(): React.ReactNode {
       id: `runtime-switch-${Date.now()}`,
       sessionId,
       role: "assistant",
-      content: intl.formatMessage({ id: "agentSwitcher.switchedRuntime" }, { runtime: runtimeLabel }),
+      content: t("agentSwitcher.switchedRuntime", { runtime: runtimeLabel }),
       startedAt: Date.now(),
       finishedAt: Date.now(),
     });
     // Refresh sessions in local state
     void configService.getChatSessions().then((s) => setSessions(s));
-  }, [sessions, configService, transcriptService, intl]);
+  }, [sessions, configService, transcriptService]);
 
   /** Handle model switch in a chat session: persist the change and add a transcript note. */
   const handleModelSwitch = useCallback((sessionId: string, newModelId: string): void => {
@@ -1073,13 +1065,13 @@ function AppInner(): React.ReactNode {
       id: `model-switch-${Date.now()}`,
       sessionId,
       role: "assistant",
-      content: intl.formatMessage({ id: "modelSelector.switchedModel" }, { model: modelLabel }),
+      content: t("modelSelector.switchedModel", { model: modelLabel }),
       startedAt: Date.now(),
       finishedAt: Date.now(),
     });
     // Refresh sessions in local state
     void configService.getChatSessions().then((s) => setSessions(s));
-  }, [sessions, configService, transcriptService, intl, envModels]);
+  }, [sessions, configService, transcriptService, envModels]);
 
   /** Handle reasoning effort change in a chat session: persist the change. */
   const handleReasoningEffortChange = useCallback((sessionId: string, effort: ReasoningEffort): void => {
@@ -1120,8 +1112,8 @@ function AppInner(): React.ReactNode {
       id: `instance-switch-${Date.now()}`,
       sessionId,
       role: "assistant",
-      content: intl.formatMessage(
-        { id: "instanceSelector.switchedInstance" },
+      content: t(
+        "instanceSelector.switchedInstance",
         { fromInstance: oldInstanceName, toInstance: newInstanceName },
       ),
       startedAt: Date.now(),
@@ -1136,7 +1128,7 @@ function AppInner(): React.ReactNode {
 
     // Step 5: Refresh sessions in local state
     void configService.getChatSessions().then((s) => setSessions(s));
-  }, [sessions, environments, configService, transcriptService, agentService, mcpService, intl]);
+  }, [sessions, environments, configService, transcriptService, agentService, mcpService]);
 
   /** Move a chat session to a different project (re-files it in the sidebar). */
   const handleMoveSessionToProject = useCallback((sessionId: string, targetProjectName: string): void => {
@@ -1162,8 +1154,8 @@ function AppInner(): React.ReactNode {
       if (!targetEnv) {
         // No instance has this project — show error toast
         showToast({
-          message: intl.formatMessage(
-            { id: "sidebar.moveToProjectUnavailable" },
+          message: t(
+            "sidebar.moveToProjectUnavailable",
             { project: targetProjectName },
           ),
         });
@@ -1198,13 +1190,13 @@ function AppInner(): React.ReactNode {
 
     // Show confirmation toast
     showToast({
-      message: intl.formatMessage(
-        { id: "sidebar.sessionMoved" },
+      message: t(
+        "sidebar.sessionMoved",
         { project: targetProjectName },
       ),
       duration: 3000,
     });
-  }, [sessions, environments, perEnvProjects, perEnvLoops, configService, intl, showToast, activeSessionId, select]);
+  }, [sessions, environments, perEnvProjects, perEnvLoops, configService, showToast, activeSessionId, select]);
 
   /** Persist an ephemeral (scratch) session so it appears in the sidebar. */
   const handlePersistSession = useCallback((sessionId: string): void => {
@@ -1305,7 +1297,7 @@ function AppInner(): React.ReactNode {
   }, [configService, select, environments, envModels, sessions]);
 
   const handleDeleteChatSession = useCallback((sessionId: string): void => {
-    if (!window.confirm(intl.formatMessage({ id: "sidebar.deleteChatConfirm" }))) return;
+    if (!window.confirm(t("sidebar.deleteChatConfirm"))) return;
     void configService.removeChatSession(sessionId).then(async () => {
       const updated = await configService.getChatSessions();
       setSessions(updated);
@@ -1314,7 +1306,7 @@ function AppInner(): React.ReactNode {
         setView({ kind: "instance" });
       }
     });
-  }, [activeSessionId, configService, intl]);
+  }, [activeSessionId, configService]);
 
   const updatedLabel =
     lastUpdated === null ? "..." : timeAgo(new Date(lastUpdated).toISOString());
@@ -1435,12 +1427,12 @@ function AppInner(): React.ReactNode {
           <span className="glyph">
             <RotateCw size={30} strokeWidth={1.2} />
           </span>
-          <h3>{intl.formatMessage({ id: "app.noEnvironmentSelected" })}</h3>
+          <h3>{t("app.noEnvironmentSelected")}</h3>
           <p>
-            {intl.formatMessage({ id: "app.noEnvironmentDescription" })}
+            {t("app.noEnvironmentDescription")}
           </p>
           <button className="btn primary" onClick={() => setVmWizardOpen(true)}>
-            {intl.formatMessage({ id: "app.addEnvironment" })}
+            {t("app.addEnvironment")}
           </button>
         </div>
       );
@@ -1466,7 +1458,7 @@ function AppInner(): React.ReactNode {
           return (
             <div className="content-inner">
               <div className="empty">
-                <h3>{intl.formatMessage({ id: "projectDetail.notFound" })}</h3>
+                <h3>{t("projectDetail.notFound")}</h3>
               </div>
             </div>
           );
@@ -1547,7 +1539,7 @@ function AppInner(): React.ReactNode {
         <div className="main-header">
           <span className="dot" style={{ background: project?.color ?? "var(--text-muted)" }} />
           <span className="main-title">{project?.name ?? view.projectId}</span>
-          <span className="chip">{intl.formatMessage({ id: "projectDetail.loopsCount" }, { count: projectLoops.length })}</span>
+          <span className="chip">{t("projectDetail.loopsCount", { count: projectLoops.length })}</span>
           <span style={{ flex: 1 }} />
         </div>
       );
@@ -1576,22 +1568,22 @@ function AppInner(): React.ReactNode {
             {!session.persisted ? (
               <span
                 className="chip chip-ephemeral chip-clickable"
-                title={intl.formatMessage({ id: "session.ephemeralMarker" })}
+                title={t("session.ephemeralMarker")}
                 onClick={() => handlePersistSession(session.id)}
                 role="button"
                 tabIndex={0}
               >
-                {intl.formatMessage({ id: "session.ephemeralMarker" })}
+                {t("session.ephemeralMarker")}
               </span>
             ) : (
               <span
                 className="chip chip-persisted chip-clickable"
-                title={intl.formatMessage({ id: "session.unpersistAction" })}
+                title={t("session.unpersistAction")}
                 onClick={() => setConfirmUnpersistId(session.id)}
                 role="button"
                 tabIndex={0}
               >
-                {intl.formatMessage({ id: "session.persistedMarker" })}
+                {t("session.persistedMarker")}
               </span>
             )}
             {session.workingDirectory ? (
@@ -1636,7 +1628,7 @@ function AppInner(): React.ReactNode {
       }
       return (
         <div className="main-header">
-          <span className="main-title">{intl.formatMessage({ id: "session.viewTitle" })}</span>
+          <span className="main-title">{t("sessionGeneral.viewTitle")}</span>
           <span style={{ flex: 1 }} />
         </div>
       );
@@ -1682,20 +1674,20 @@ function AppInner(): React.ReactNode {
             : h === "blocked" ? "var(--health-blocked)"
             : "var(--health-offline)";
           return (
-            <span className="chip" title={healthTooltip(intl, h, connectionStatus[selected.id])} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span className="chip" title={healthTooltip(h, connectionStatus[selected.id])} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-              {intl.formatMessage({ id: "app.daemonChip" })}
+              {t("app.daemonChip")}
             </span>
           );
         })()}
 
         {daemonSettings ? (
           <>
-            <span className="chip" title={intl.formatMessage({ id: "app.daemonHttpApi" })} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span className="chip" title={t("app.daemonHttpApi")} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: daemonSettings.httpApiEnabled ? "var(--health-ok)" : "var(--danger)", flexShrink: 0 }} />
               HTTP
             </span>
-            <span className="chip" title={intl.formatMessage({ id: "app.daemonMcpApi" })} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span className="chip" title={t("app.daemonMcpApi")} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: daemonSettings.mcpApiEnabled ? "var(--health-ok)" : "var(--danger)", flexShrink: 0 }} />
               MCP
             </span>
@@ -1720,18 +1712,18 @@ function AppInner(): React.ReactNode {
             const h = health[selected.id] ?? "unknown";
             const cs = connectionStatus[selected.id];
             if (cs && cs.phase === "blocked" && cs.lastError) {
-              return intl.formatMessage({ id: "app.blockedLabel" }, { detail: translateMessage(intl, cs.lastError) });
+              return t("app.blockedLabel", { detail: translateMessage(cs.lastError) });
             }
             if (h === "offline" || h === "backoff" || h === "blocked" || h === "connecting") {
-              return intl.formatMessage({ id: `app.${h}` });
+              return t(`app.${h}`);
             }
-            return intl.formatMessage({ id: "app.updatedLabel" }, { time: updatedLabel });
+            return t("app.updatedLabel", { time: updatedLabel });
           })()}
         </span>
 
         <button
           className="icon-btn"
-          title={intl.formatMessage({ id: "app.removeEnvironment" })}
+          title={t("app.removeEnvironment")}
           onClick={() => setConfirmRemoveId(selected.id)}
           style={{ color: "var(--danger)", opacity: 0.7 }}
         >
@@ -1741,7 +1733,7 @@ function AppInner(): React.ReactNode {
         {selected.role !== "main-vm" ? (
           <button
             className="icon-btn"
-            title={intl.formatMessage({ id: "app.markAsMainTooltip" })}
+            title={t("app.markAsMainTooltip")}
             onClick={() => { void handleStampCheckedSetMainVm(selected.id); }}
             style={{ opacity: 0.6 }}
           >
@@ -1749,7 +1741,7 @@ function AppInner(): React.ReactNode {
           </button>
         ) : (
           <span
-            title={intl.formatMessage({ id: "app.isMainTooltip" })}
+            title={t("app.isMainTooltip")}
             style={{ display: "flex", alignItems: "center", padding: "0 4px", color: "var(--chip-warm)", opacity: 0.9 }}
           >
             <Star size={14} fill="currentColor" />
@@ -1769,7 +1761,7 @@ function AppInner(): React.ReactNode {
         {!isColdOpen ? (
           <button
             className="icon-btn"
-            title={sidebarOpen ? intl.formatMessage({ id: "app.hideSidebar" }) : intl.formatMessage({ id: "app.showSidebar" })}
+            title={sidebarOpen ? t("app.hideSidebar") : t("app.showSidebar")}
             onClick={() => setSidebarOpen((v) => !v)}
           >
             <PanelLeft size={15} />
@@ -1777,14 +1769,14 @@ function AppInner(): React.ReactNode {
         ) : null}
         <span className="titlebar-brand">
           <OrbionMark size={16} />
-          {intl.formatMessage({ id: "app.brand" })}
+          {t("app.brand")}
         </span>
-        <span className="titlebar-tag">{isMock ? intl.formatMessage({ id: "app.mock" }) : intl.formatMessage({ id: "app.preview" })}</span>
+        <span className="titlebar-tag">{isMock ? t("app.mock") : t("app.preview")}</span>
         <span style={{ flex: 1 }} />
         {!isColdOpen ? (
           <button
             className="icon-btn"
-            title={globalMuted ? intl.formatMessage({ id: "app.unmuteNotifications" }) : intl.formatMessage({ id: "app.muteNotifications" })}
+            title={globalMuted ? t("app.unmuteNotifications") : t("app.muteNotifications")}
             onClick={handleToggleGlobalMute}
             style={{ opacity: globalMuted ? 1 : 0.5, color: globalMuted ? "var(--danger)" : "var(--text-secondary)" }}
           >
@@ -1959,20 +1951,20 @@ function AppInner(): React.ReactNode {
           <AlertDialog open={!!confirmRemoveId} onOpenChange={(open) => { if (!open) setConfirmRemoveId(null); }}>
             <AlertDialogContent style={{ width: 380 }}>
               <AlertDialogHeader>
-                <AlertDialogTitle>{intl.formatMessage({ id: "app.removeEnvironment" })}</AlertDialogTitle>
+                <AlertDialogTitle>{t("app.removeEnvironment")}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {intl.formatMessage({ id: "app.removeConfirm" }, { name: env?.name ?? confirmRemoveId })}
+                  {t("app.removeConfirm", { name: env?.name ?? confirmRemoveId })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setConfirmRemoveId(null)}>
-                  {intl.formatMessage({ id: "app.removeCancel" })}
+                  {t("app.removeCancel")}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
                   onClick={() => handleRemove(confirmRemoveId)}
                 >
-                  {intl.formatMessage({ id: "app.removeConfirmBtn" })}
+                  {t("app.removeConfirmBtn")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -1986,20 +1978,20 @@ function AppInner(): React.ReactNode {
           <AlertDialog open={!!confirmUnpersistId} onOpenChange={(open) => { if (!open) setConfirmUnpersistId(null); }}>
             <AlertDialogContent style={{ width: 380 }}>
               <AlertDialogHeader>
-                <AlertDialogTitle>{intl.formatMessage({ id: "session.unpersistTitle" })}</AlertDialogTitle>
+                <AlertDialogTitle>{t("session.unpersistTitle")}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {intl.formatMessage({ id: "session.unpersistConfirm" }, { title: session?.title ?? "" })}
+                  {t("session.unpersistConfirm", { title: session?.title ?? "" })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setConfirmUnpersistId(null)}>
-                  {intl.formatMessage({ id: "session.unpersistCancel" })}
+                  {t("session.unpersistCancel")}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/20"
                   onClick={() => handleUnpersistSession(confirmUnpersistId)}
                 >
-                  {intl.formatMessage({ id: "session.unpersistConfirmBtn" })}
+                  {t("session.unpersistConfirmBtn")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

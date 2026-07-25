@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposalStatus, ChainEditOperationSummary, LoopProposalStatus, SharedTaskWarning, SiblingOfferStatus, FleetPlanStatus, FleetPlanTarget } from "../chat/types";
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
@@ -122,7 +122,7 @@ interface SessionChatViewProps {
 }
 
 export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, fleetReachability, perEnvProjects, instance, isEphemeral = false, onPersistSession, turnCount, onTurnSent, autoPersistedJustNow, onDeclineAutoPersist, onUnpersistSession, fleetMode, fleetRollup, fleetLoopsWithOrigin, projectId }: SessionChatViewProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [mcpService] = useInject<IMcpService>(cid.IMcpService);
   const [transcriptService] = useInject<ITranscriptService>(cid.ITranscriptService);
@@ -405,14 +405,14 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           } else if (!result.ok) {
             const errorMsg = typeof result.error === "string"
               ? result.error
-              : translateMessage(intl, result.error) || intl.formatMessage({ id: "agent.promptError" });
+              : translateMessage(result.error) || t("agent.promptError");
             appendAssistantContent(turnId, errorMsg);
             finishTurn(turnId);
             setActiveTurnId(null);
           }
         });
     },
-    [accessMode, addTurn, agentService, appendAssistantContent, environmentId, finishTurn, intl, opencodeSessionId, sessionId, model, reasoningEffort],
+    [accessMode, addTurn, agentService, appendAssistantContent, environmentId, finishTurn, opencodeSessionId, sessionId, model, reasoningEffort],
   );
 
 
@@ -505,7 +505,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           userMessage: {
             id: userMsgId,
             role: "user",
-            content: intl.formatMessage({ id: "loopSummary.pipelineQuery" }, { label }),
+            content: t("loopSummary.pipelineQuery", { label }),
             startedAt: timestamp,
             environmentId,
           },
@@ -536,17 +536,17 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             const lines = listResult.issues.map((issue) =>
               `- #${issue.number} ${issue.title}`,
             );
-            const header = intl.formatMessage(
-              { id: "loopSummary.pipelineIssueStack" },
+            const header = t(
+              "loopSummary.pipelineIssueStack",
               { count: listResult.total, label },
             );
             content = listResult.truncated
-              ? `${header}\n${lines.join("\n")}\n${intl.formatMessage({ id: "issues.stackTruncated" }, { shown: listResult.issues.length, total: listResult.total })}`
+              ? `${header}\n${lines.join("\n")}\n${t("issues.stackTruncated", { shown: listResult.issues.length, total: listResult.total })}`
               : `${header}\n${lines.join("\n")}`;
           } else {
-            content = intl.formatMessage(
-              { id: "issues.listFailed" },
-              { detail: typeof result.error === "string" ? result.error : intl.formatMessage({ id: "infra.unknownError" }) },
+            content = t(
+              "issues.listFailed",
+              { detail: typeof result.error === "string" ? result.error : t("infra.unknownError") },
             );
           }
           appendAssistantContent(turnId, content);
@@ -620,7 +620,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         }
       }
     },
-    [fleetMode, fleetLoopsWithOrigin, loops, environmentId, insertLoopCards, diagnoseAndInsert, environments, infraService, intl, accessMode, addTurn, appendAssistantContent, finishTurn],
+    [fleetMode, fleetLoopsWithOrigin, loops, environmentId, insertLoopCards, diagnoseAndInsert, environments, infraService, accessMode, addTurn, appendAssistantContent, finishTurn],
   );
 
 
@@ -728,16 +728,16 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         } else {
           const errorMsg = typeof result.error === "string"
             ? result.error
-            : intl.formatMessage({ id: "chainEditProposal.applyError" });
+            : t("chainEditProposal.applyError");
           updateChainEditProposalStatus(proposalId, "error", { error: errorMsg });
         }
       }).catch(() => {
         updateChainEditProposalStatus(proposalId, "error", {
-          error: intl.formatMessage({ id: "chainEditProposal.applyError" }),
+          error: t("chainEditProposal.applyError"),
         });
       });
     },
-    [mcpService, updateChainEditProposalStatus, intl, rows, loopShapeCacheService, fleetReachability, environments, perEnvProjects, siblingOfferService, insertSiblingOffer],
+    [mcpService, updateChainEditProposalStatus, rows, loopShapeCacheService, fleetReachability, environments, perEnvProjects, siblingOfferService, insertSiblingOffer],
   );
 
   const handleChainEditRejected = useCallback(
@@ -772,7 +772,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       );
       if (!offerRow) {
         updateSiblingOfferStatus(offerId, "error", {
-          error: intl.formatMessage({ id: "siblingOffer.applyError" }),
+          error: t("siblingOffer.applyError"),
         });
         return;
       }
@@ -789,16 +789,16 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         } else {
           const errorMsg = typeof result.error === "string"
             ? result.error
-            : intl.formatMessage({ id: "siblingOffer.applyError" });
+            : t("siblingOffer.applyError");
           updateSiblingOfferStatus(offerId, "error", { error: errorMsg });
         }
       }).catch(() => {
         updateSiblingOfferStatus(offerId, "error", {
-          error: intl.formatMessage({ id: "siblingOffer.applyError" }),
+          error: t("siblingOffer.applyError"),
         });
       });
     },
-    [mcpService, updateSiblingOfferStatus, intl, rows],
+    [mcpService, updateSiblingOfferStatus, rows],
   );
 
   const handleSiblingOfferDeclined = useCallback(
@@ -851,7 +851,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             } else {
               const errorMsg = typeof result.error === "string"
                 ? result.error
-                : intl.formatMessage({ id: "fleetPlan.applyToSelected" }, { count: 0 });
+                : t("fleetPlan.applyToSelected", { count: 0 });
               updateFleetPlanTarget(planId, target.targetId, {
                 status: "failed",
                 error: errorMsg,
@@ -860,7 +860,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           } catch {
             updateFleetPlanTarget(planId, target.targetId, {
               status: "failed",
-              error: intl.formatMessage({ id: "fleetPlan.applyToSelected" }, { count: 0 }),
+              error: t("fleetPlan.applyToSelected", { count: 0 }),
             });
           }
         }
@@ -868,7 +868,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         updateFleetPlanStatus(planId, "applied");
       })();
     },
-    [environments, instance, mcpService, updateFleetPlanTarget, updateFleetPlanStatus, intl],
+    [environments, instance, mcpService, updateFleetPlanTarget, updateFleetPlanStatus],
   );
 
   const handleFleetPlanCancel = useCallback(
@@ -914,8 +914,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       {!isReachable ? (
         <div className="unreachable-banner">
           <WifiOff size={13} />
-          {intl.formatMessage(
-            { id: reachability === "reconnecting" ? "unreachableBanner.reconnecting" : "unreachableBanner.unreachable" },
+          {t(
+            reachability === "reconnecting" ? "unreachableBanner.reconnecting" : "unreachableBanner.unreachable",
             { instance: environmentName },
           )}
         </div>
@@ -954,14 +954,14 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       {showAutoPersistNotice ? (
         <div className="auto-persist-notice">
           <span className="auto-persist-notice-text">
-            {intl.formatMessage({ id: "session.autoPersistNotice" })}
+            {t("session.autoPersistNotice")}
           </span>
           {onDeclineAutoPersist ? (
             <button
               className="auto-persist-decline-btn"
               onClick={onDeclineAutoPersist}
             >
-              {intl.formatMessage({ id: "session.autoPersistDecline" })}
+              {t("session.autoPersistDecline")}
             </button>
           ) : null}
         </div>
@@ -969,7 +969,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       <div className="session-chat-scroll" ref={scrollRef}>
         {rows.length === 0 ? (
           <div className="session-chat-empty">
-            <p>{intl.formatMessage({ id: "session.emptyDescription" })}</p>
+            <p>{t("session.emptyDescription")}</p>
           </div>
         ) : (
           rows.map((row) => {
@@ -977,7 +977,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
               case "user-message":
                 return (
                   <div key={row.id} className="transcript-user-msg">
-                    <div className="transcript-avatar session-user-avatar">{intl.formatMessage({ id: "session.userInitials" })}</div>
+                    <div className="transcript-avatar session-user-avatar">{t("session.userInitials")}</div>
                     <div className="transcript-msg-body">
                       <Suspense fallback={null}>
                         <MarkdownContent content={row.content} />
@@ -1000,8 +1000,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                       {envName ? (
                         <span className={`transcript-instance-attribution${isAssistantCrossScope ? " transcript-instance-attribution--cross-scope" : ""}`}>
                           {isAssistantCrossScope
-                            ? intl.formatMessage({ id: "crossScope.assistantAttribution" }, { instance: envName })
-                            : intl.formatMessage({ id: "instanceAttribution.label" }, { instance: envName })
+                            ? t("crossScope.assistantAttribution", { instance: envName })
+                            : t("instanceAttribution.label", { instance: envName })
                           }
                         </span>
                       ) : null}
@@ -1044,8 +1044,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                   <div key={row.id} className="transcript-instance-handoff">
                     <span className="transcript-handoff-line" />
                     <span className="transcript-handoff-text">
-                      {intl.formatMessage(
-                        { id: "instanceHandoff.label" },
+                      {t(
+                        "instanceHandoff.label",
                         { fromInstance: row.fromInstance, toInstance: row.toInstance },
                       )}
                     </span>
@@ -1068,12 +1068,12 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                     {origin ? (
                       <span className={`loop-card-origin-label${isLoopCardCrossScope ? " loop-card-origin-label--cross-scope" : ""}`}>
                         {isLoopCardCrossScope
-                          ? intl.formatMessage(
-                              { id: "crossScope.loopCardLabel" },
+                          ? t(
+                              "crossScope.loopCardLabel",
                               { project: origin.projectName, instance: originEnv?.name ?? origin.environmentName },
                             )
-                          : intl.formatMessage(
-                              { id: "loopCard.originLabel" },
+                          : t(
+                              "loopCard.originLabel",
                               { project: origin.projectName, instance: originEnv?.name ?? origin.environmentName },
                             )
                         }

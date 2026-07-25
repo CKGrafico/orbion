@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { ChatSession, ConnectionStatus, ReachabilityState } from "../../../shared/ipc";
 import type { Environment, EnvironmentHealth, LoopMeta, Project } from "../types";
 import { getPillLabel, PILL_COLORS } from "../fleet-status";
@@ -151,7 +151,7 @@ export function Sidebar(props: {
     onNavigateToLoop, onNavigateToProject, onNavigateToInbox,
     reachability, mainVmId,     onNavigateToSession, activeSessionId, onOpenProjectChat, sessions: propSessions, onMoveSessionToProject, onOpenSettings, onSessionsChanged, onDeleteSession,
   } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [configService] = useInject<IConfigService>(cid.IConfigService);
 
   // Text search filter
@@ -399,7 +399,7 @@ export function Sidebar(props: {
         tabIndex={0}
       >
         <span className="sidebar-inbox-icon"><Inbox size={14} /></span>
-        <span className="sidebar-inbox-label">{intl.formatMessage({ id: "sidebar.inbox" })}</span>
+        <span className="sidebar-inbox-label">{t("sidebar.inbox")}</span>
         {(inboxItemCount ?? 0) > 0 ? (
           <span className="sidebar-inbox-badge">{inboxItemCount}</span>
         ) : null}
@@ -413,7 +413,7 @@ export function Sidebar(props: {
         <input
           className="sidebar-search"
           type="text"
-          placeholder={intl.formatMessage({ id: "sidebar.searchPlaceholder" })}
+          placeholder={t("sidebar.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -429,25 +429,25 @@ export function Sidebar(props: {
 
       {/* Toolbar: section label + action buttons */}
       <div className="sidebar-toolbar">
-        <span className="overline">{intl.formatMessage({ id: "sidebar.projects" })}</span>
+        <span className="overline">{t("sidebar.projects")}</span>
         <span className="overline sidebar-count">{totalProjects || ""}</span>
         <span style={{ flex: 1 }} />
         <button
           className="sidebar-toolbar-btn"
-          title={intl.formatMessage({ id: "sidebar.sort" })}
+          title={t("sidebar.sort")}
         >
           <ArrowUpDown size={13} />
         </button>
         <button
           className="sidebar-toolbar-btn"
-          title={intl.formatMessage({ id: "sidebar.connectInstance" })}
+          title={t("sidebar.connectInstance")}
           onClick={onAddVm}
         >
           <Link size={13} />
         </button>
         <button
           className="sidebar-toolbar-btn"
-          title={intl.formatMessage({ id: "sidebar.newProject" })}
+          title={t("sidebar.newProject")}
         >
           <Plus size={13} />
         </button>
@@ -458,8 +458,8 @@ export function Sidebar(props: {
         {filteredNodes.length === 0 ? (
           <div className="sidebar-empty">
             {searchQuery
-              ? intl.formatMessage({ id: "sidebar.noSearchResults" })
-              : intl.formatMessage({ id: "sidebar.noProjects" })}
+              ? t("sidebar.noSearchResults")
+              : t("sidebar.noProjects")}
           </div>
         ) : (
           filteredNodes.map((node) => {
@@ -500,21 +500,21 @@ export function Sidebar(props: {
                   <span className="tree-dot-wrap">
                     <span className="tree-dot" style={{ background: node.projectColor }} />
                     {hasFailedLoop ? (
-                      <span className="tree-dot-pip" title={intl.formatMessage({ id: "sidebar.projectHasFailure" })} />
+                      <span className="tree-dot-pip" title={t("sidebar.projectHasFailure")} />
                     ) : null}
                   </span>
                   <span className="tree-label">{node.projectName}</span>
                   {instanceCount > 1 ? (
-                    <span className="tree-instance-badge" title={intl.formatMessage({ id: "sidebar.instanceCount" }, { count: instanceCount })}>
+                    <span className="tree-instance-badge" title={t("sidebar.instanceCount", { count: instanceCount })}>
                       {instanceCount}
                     </span>
                   ) : null}
-                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={intl.formatMessage({ id: "sidebar.sessionCount" }, { count: projSessions.length + node.allLoops.length })}>
+                  <span className="tree-pill" style={{ background: "var(--bg-input)", color: "var(--text-muted)" }} title={t("sidebar.sessionCount", { count: projSessions.length + node.allLoops.length })}>
                     {projSessions.length + node.allLoops.length}
                   </span>
                   <button
                     className="tree-action-btn"
-                    title={intl.formatMessage({ id: "sidebar.openProjectChat" })}
+                    title={t("sidebar.openProjectChat")}
                     onClick={(e) => {
                       e.stopPropagation();
                       // Derive workingDirectory from first loop's cwd in this project on the primary instance
@@ -566,7 +566,7 @@ export function Sidebar(props: {
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     className="icon-btn tree-session-menu"
-                                    aria-label={intl.formatMessage({ id: "sidebar.sessionMenu" })}
+                                    aria-label={t("sidebar.sessionMenu")}
                                     onPointerDown={(event) => {
                                       event.stopPropagation();
                                     }}
@@ -592,8 +592,8 @@ export function Sidebar(props: {
                                     });
                                   }}>
                                     {session.pinned
-                                      ? intl.formatMessage({ id: "sidebar.unpin" })
-                                      : intl.formatMessage({ id: "sidebar.pin" })}
+                                      ? t("sidebar.unpin")
+                                      : t("sidebar.pin")}
                                   </DropdownMenuItem>
 
                                   {!session.isLoopChat ? (
@@ -602,7 +602,7 @@ export function Sidebar(props: {
                                       const sess = sessions.find((s) => s.id === session.id);
                                       setRenameValue(sess?.title ?? "");
                                     }}>
-                                      {intl.formatMessage({ id: "sidebar.rename" })}
+                                      {t("sidebar.rename")}
                                     </DropdownMenuItem>
                                   ) : null}
 
@@ -610,7 +610,7 @@ export function Sidebar(props: {
                                     <DropdownMenuItem onClick={() => {
                                       onDeleteSession?.(session.id);
                                     }}>
-                                      {intl.formatMessage({ id: "sidebar.deleteChat" })}
+                                      {t("sidebar.deleteChat")}
                                     </DropdownMenuItem>
                                   ) : null}
 
@@ -631,7 +631,7 @@ export function Sidebar(props: {
                                             onSessionsChanged?.(updated);
                                           });
                                         }}>
-                                          <ArrowUp size={12} className="mr-2" /> {intl.formatMessage({ id: "sidebar.moveUp" })}
+                                          <ArrowUp size={12} className="mr-2" /> {t("sidebar.moveUp")}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem disabled={currentIndex < 0 || currentIndex >= currentSessions.length - 1} onClick={() => {
                                           if (currentIndex < 0) return;
@@ -646,7 +646,7 @@ export function Sidebar(props: {
                                             onSessionsChanged?.(updated);
                                           });
                                         }}>
-                                          <ArrowDown size={12} className="mr-2" /> {intl.formatMessage({ id: "sidebar.moveDown" })}
+                                          <ArrowDown size={12} className="mr-2" /> {t("sidebar.moveDown")}
                                         </DropdownMenuItem>
                                       </>
                                     );
@@ -656,7 +656,7 @@ export function Sidebar(props: {
 
                                   <DropdownMenuSub>
                                     <DropdownMenuSubTrigger>
-                                      {intl.formatMessage({ id: "sidebar.moveToProject" })}
+                                      {t("sidebar.moveToProject")}
                                     </DropdownMenuSubTrigger>
                                     <DropdownMenuSubContent>
                                       {projectNodes
@@ -810,13 +810,13 @@ export function Sidebar(props: {
         <span style={{ flex: 1 }} />
         <button
           className="sidebar-toolbar-btn"
-          title={intl.formatMessage({ id: "settings.title" })}
+          title={t("settings.title")}
           onClick={onOpenSettings}
         >
           <Settings size={14} />
         </button>
         <OrbionMark size={24} />
-        <span>{intl.formatMessage({ id: "sidebar.orbion" })}</span>
+        <span>{t("sidebar.orbion")}</span>
       </div>
 
       {/* Inline rename input */}
@@ -843,7 +843,7 @@ export function Sidebar(props: {
                 if (e.key === "Escape") setRenamingSessionId(null);
               }}
               autoFocus
-              placeholder={intl.formatMessage({ id: "sidebar.renamePlaceholder" })}
+              placeholder={t("sidebar.renamePlaceholder")}
             />
           </div>
         </div>

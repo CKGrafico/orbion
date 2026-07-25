@@ -1,5 +1,6 @@
+import type { TFunction } from "i18next";
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useIntl, type IntlShape } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { ChatTurn, AccessMode } from "../types";
 import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult, EditIssueResult, BulkRelabelResult, IssueCard } from "../../../shared/ipc";
@@ -33,9 +34,9 @@ function escapeMd(str: string): string {
     .replace(/[*_~`#[\]|\\]/g, (ch) => `\\${ch}`);
 }
 
-function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
-  if (!Array.isArray(data)) return intl.formatMessage({ id: "infra.noData" });
-  const lines: string[] = [`## ${intl.formatMessage({ id: "infra.fleetStatusHeader" })}\n`];
+function formatMachineStatusReport(t: TFunction, data: unknown): string {
+  if (!Array.isArray(data)) return t("infra.noData");
+  const lines: string[] = [`## ${t("infra.fleetStatusHeader")}\n`];
   for (const machine of data as MachineStatusEntry[]) {
     const icon = machine.health === "connected" ? "🟢" : machine.health === "offline" ? "🔴" : "🟡";
     lines.push(`**${escapeMd(machine.name)}** ${icon} \`${escapeMd(machine.health)}\``);
@@ -47,10 +48,10 @@ function formatMachineStatusReport(intl: IntlShape, data: unknown): string {
   return lines.join("\n");
 }
 
-function formatIssueStack(intl: IntlShape, data: unknown): string {
+function formatIssueStack(t: TFunction, data: unknown): string {
   const result = data as ListIssuesResult;
   if (!result?.issues || result.issues.length === 0) {
-    return intl.formatMessage({ id: "issues.stackEmpty" });
+    return t("issues.stackEmpty");
   }
 
   const labelFilter = result.issues.length > 0 && result.issues[0].labels.length > 0
@@ -58,7 +59,7 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
     : undefined;
 
   const lines: string[] = [
-    intl.formatMessage(
+    t(
       { id: "issues.stackTitle" },
       { count: result.issues.length, label: labelFilter ?? false, state: "open" },
     ),
@@ -73,14 +74,14 @@ function formatIssueStack(intl: IntlShape, data: unknown): string {
   }
 
   if (result.truncated) {
-    lines.push(intl.formatMessage({ id: "issues.stackTruncated" }, { shown: result.issues.length, total: result.total }));
+    lines.push(t("issues.stackTruncated", { shown: result.issues.length, total: result.total }));
   }
 
   return lines.join("\n");
 }
 
 export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const {
@@ -190,7 +191,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
 
         if (isClearPickupLabel) {
           void configService.setProjectPickupLabels("__default__", []).then(() => {
-            const responseText = intl.formatMessage({ id: "labels.clearedPickupLabel" });
+            const responseText = t("labels.clearedPickupLabel");
             appendAssistantContent(turnId, responseText);
             finishTurn(turnId);
             setActiveTurnId(null);
@@ -199,8 +200,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           // Parse labels: split by comma, trim each
           const rawLabels = setPickupLabelMatch[1].split(",").map((l) => l.trim()).filter((l) => l.length > 0);
           void configService.setProjectPickupLabels("__default__", rawLabels).then(() => {
-            const responseText = intl.formatMessage(
-              { id: "labels.setPickupLabel" },
+            const responseText = t(
+              "labels.setPickupLabel",
               { labels: rawLabels.join("`, `") },
             );
             appendAssistantContent(turnId, responseText);
@@ -211,8 +212,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           // Show current pickup label
           void configService.getProjectPickupLabels("__default__").then((labels) => {
             const responseText = labels.length > 0
-              ? intl.formatMessage({ id: "labels.currentPickupLabel" }, { labels: labels.join("`, `") })
-              : intl.formatMessage({ id: "labels.noPickupLabel" });
+              ? t("labels.currentPickupLabel", { labels: labels.join("`, `") })
+              : t("labels.noPickupLabel");
             appendAssistantContent(turnId, responseText);
             finishTurn(turnId);
             setActiveTurnId(null);
@@ -248,7 +249,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             assistantMessage: {
               id: `infra-msg-${now}-a`,
               role: "assistant",
-              content: intl.formatMessage({ id: "issues.titleRequired" }),
+              content: t("issues.titleRequired"),
               toolCalls: [],
               startedAt: now + 100,
               finishedAt: now + 100,
@@ -262,7 +263,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           return;
         }
 
-        const draftPreview = `**${intl.formatMessage({ id: "issues.draftTitle" })}**\n\n### ${title}\n\n${body}`;
+        const draftPreview = `**${t("issues.draftTitle")}**\n\n### ${title}\n\n${body}`;
         const questionId = `issue-q-${now}`;
 
         const turn: ChatTurn = {
@@ -287,10 +288,10 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           question: {
             id: questionId,
             turnId,
-            text: intl.formatMessage({ id: "issues.fileQuestion" }),
+            text: t("issues.fileQuestion"),
             options: [
-              { key: "file", label: intl.formatMessage({ id: "issues.optionFile" }) },
-              { key: "cancel", label: intl.formatMessage({ id: "issues.optionCancel" }) },
+              { key: "file", label: t("issues.optionFile") },
+              { key: "cancel", label: t("issues.optionCancel") },
             ],
             singleChoice: true,
             allowFreeText: false,
@@ -327,7 +328,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             assistantMessage: {
               id: `infra-msg-${now}-a`,
               role: "assistant",
-              content: intl.formatMessage({ id: "editIssue.ambiguousReference" }),
+              content: t("editIssue.ambiguousReference"),
               toolCalls: [],
               startedAt: now + 100,
               finishedAt: now + 100,
@@ -387,7 +388,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             assistantMessage: {
               id: `infra-msg-${now}-a`,
               role: "assistant",
-              content: intl.formatMessage({ id: "editIssue.noChanges" }),
+              content: t("editIssue.noChanges"),
               toolCalls: [],
               startedAt: now + 100,
               finishedAt: now + 100,
@@ -404,20 +405,20 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         // Build preview of proposed changes
         const changeLines: string[] = [];
         if (newTitle) {
-          changeLines.push(intl.formatMessage({ id: "editIssue.changeTitle" }, { old: "...", new: newTitle }));
+          changeLines.push(t("editIssue.changeTitle", { old: "...", new: newTitle }));
         }
         if (newBody) {
-          changeLines.push(intl.formatMessage({ id: "editIssue.changeBody" }));
+          changeLines.push(t("editIssue.changeBody"));
         }
         if (addLabels?.length) {
-          changeLines.push(intl.formatMessage({ id: "editIssue.changeAddLabels" }, { labels: addLabels.map((l: string) => `\`${l}\``).join(" ") }));
+          changeLines.push(t("editIssue.changeAddLabels", { labels: addLabels.map((l: string) => `\`${l}\``).join(" ") }));
         }
         if (removeLabels?.length) {
-          changeLines.push(intl.formatMessage({ id: "editIssue.changeRemoveLabels" }, { labels: removeLabels.map((l: string) => `\`${l}\``).join(" ") }));
+          changeLines.push(t("editIssue.changeRemoveLabels", { labels: removeLabels.map((l: string) => `\`${l}\``).join(" ") }));
         }
 
-        const previewText = intl.formatMessage(
-          { id: "editIssue.previewChanges" },
+        const previewText = t(
+          "editIssue.previewChanges",
           { number: issueNumber, changes: changeLines.join("\n") },
         );
 
@@ -444,10 +445,10 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           question: {
             id: questionId,
             turnId,
-            text: intl.formatMessage({ id: "editIssue.applyQuestion" }),
+            text: t("editIssue.applyQuestion"),
             options: [
-              { key: "apply-edit", label: intl.formatMessage({ id: "editIssue.optionApply" }) },
-              { key: "cancel-edit", label: intl.formatMessage({ id: "editIssue.optionCancel" }) },
+              { key: "apply-edit", label: t("editIssue.optionApply") },
+              { key: "cancel-edit", label: t("editIssue.optionCancel") },
             ],
             singleChoice: true,
             allowFreeText: false,
@@ -495,7 +496,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             assistantMessage: {
               id: `infra-msg-${now}-a`,
               role: "assistant",
-              content: intl.formatMessage({ id: "bulkRelabel.noLabelSpecified" }),
+              content: t("bulkRelabel.noLabelSpecified"),
               toolCalls: [],
               startedAt: now + 100,
               finishedAt: now + 100,
@@ -523,7 +524,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             assistantMessage: {
               id: `infra-msg-${now}-a`,
               role: "assistant",
-              content: intl.formatMessage({ id: "bulkRelabel.noIssuesInContext" }),
+              content: t("bulkRelabel.noIssuesInContext"),
               toolCalls: [],
               startedAt: now + 100,
               finishedAt: now + 100,
@@ -545,8 +546,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           (iss) => `- [#${iss.number}](issue://${iss.number}) ${escapeMd(iss.title)}`,
         );
 
-        const previewText = intl.formatMessage(
-          { id: "bulkRelabel.preview" },
+        const previewText = t(
+          "bulkRelabel.preview",
           {
             count: issueNumbers.length,
             labels: addLabels.map((l: string) => `\`${l}\``).join(" "),
@@ -577,10 +578,10 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           question: {
             id: questionId,
             turnId,
-            text: intl.formatMessage({ id: "bulkRelabel.applyQuestion" }),
+            text: t("bulkRelabel.applyQuestion"),
             options: [
-              { key: "apply-bulk-relabel", label: intl.formatMessage({ id: "bulkRelabel.optionApply" }) },
-              { key: "cancel-bulk-relabel", label: intl.formatMessage({ id: "bulkRelabel.optionCancel" }) },
+              { key: "apply-bulk-relabel", label: t("bulkRelabel.optionApply") },
+              { key: "cancel-bulk-relabel", label: t("bulkRelabel.optionCancel") },
             ],
             singleChoice: true,
             allowFreeText: false,
@@ -655,11 +656,11 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
           let responseText: string;
           if (result.ok) {
             if (action!.action === "machine-status") {
-              responseText = formatMachineStatusReport(intl, result.data);
+              responseText = formatMachineStatusReport(t, result.data);
             } else if (action!.action === "clone-repo") {
-              responseText = intl.formatMessage({ id: "infra.cloneInitiated" }, { data: JSON.stringify(result.data, null, 2) });
+              responseText = t("infra.cloneInitiated", { data: JSON.stringify(result.data, null, 2) });
             } else if (action!.action === "list-issues") {
-              responseText = formatIssueStack(intl, result.data);
+              responseText = formatIssueStack(t, result.data);
               // Register issue URLs for click-through
               const issueResult = result.data as ListIssuesResult;
               if (issueResult?.issues) {
@@ -673,14 +674,14 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               responseText = JSON.stringify(result.data, null, 2);
             }
           } else {
-            responseText = intl.formatMessage({ id: "infra.errorMessage" }, { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) });
+            responseText = t("infra.errorMessage", { detail: translateMessage(result.error) || t("infra.unknownError") });
           }
           appendAssistantContent(turnId, responseText);
           finishTurn(turnId);
           setActiveTurnId(null);
         });
       } else {
-        const fallback = intl.formatMessage({ id: "infra.helpText" });
+        const fallback = t("infra.helpText");
         let idx = 0;
         const interval = setInterval(() => {
           const chunkSize = Math.floor(Math.random() * 6) + 3;
@@ -697,7 +698,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         streamIntervalRef.current = interval;
       }
     },
-    [intl, accessMode, addTurn, appendAssistantContent, finishTurn, infraService, configService],
+    [accessMode, addTurn, appendAssistantContent, finishTurn, infraService, configService],
   );
 
   const handleInterrupt = useCallback(
@@ -746,14 +747,14 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               let responseText: string;
               if (result.ok) {
                 const labelResult = result.data as AddLabelResult;
-                responseText = intl.formatMessage(
-                  { id: "labels.applied" },
+                responseText = t(
+                  "labels.applied",
                   { labels: labelResult.labels.join("`, `"), number: labelResult.issueNumber },
                 );
               } else {
-                responseText = intl.formatMessage(
-                  { id: "labels.applyFailed" },
-                  { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+                responseText = t(
+                  "labels.applyFailed",
+                  { detail: translateMessage( result.error) || t("infra.unknownError") },
                 );
               }
               appendAssistantContent(activeTurnId!, responseText);
@@ -767,7 +768,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             });
         } else {
           // Skip label
-          appendAssistantContent(activeTurnId, intl.formatMessage({ id: "labels.optionSkip" }));
+          appendAssistantContent(activeTurnId, t("labels.optionSkip"));
           finishTurn(activeTurnId);
           setActiveTurnId(null);
           setPendingLabelOffers((prev) => {
@@ -800,18 +801,18 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               if (result.ok) {
                 const editResult = result.data as EditIssueResult;
                 const summaryParts: string[] = [];
-                if (editResult.changes.title) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryTitle" }));
-                if (editResult.changes.body) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryBody" }));
-                if (editResult.changes.labelsAdded?.length) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryLabelsAdded" }, { labels: editResult.changes.labelsAdded.join("`, `") }));
-                if (editResult.changes.labelsRemoved?.length) summaryParts.push(intl.formatMessage({ id: "editIssue.summaryLabelsRemoved" }, { labels: editResult.changes.labelsRemoved.join("`, `") }));
-                responseText = intl.formatMessage(
-                  { id: "editIssue.applied" },
+                if (editResult.changes.title) summaryParts.push(t("editIssue.summaryTitle"));
+                if (editResult.changes.body) summaryParts.push(t("editIssue.summaryBody"));
+                if (editResult.changes.labelsAdded?.length) summaryParts.push(t("editIssue.summaryLabelsAdded", { labels: editResult.changes.labelsAdded.join("`, `") }));
+                if (editResult.changes.labelsRemoved?.length) summaryParts.push(t("editIssue.summaryLabelsRemoved", { labels: editResult.changes.labelsRemoved.join("`, `") }));
+                responseText = t(
+                  "editIssue.applied",
                   { number: editResult.issueNumber, summary: summaryParts.join(", ") },
                 );
               } else {
-                responseText = intl.formatMessage(
-                  { id: "editIssue.editFailed" },
-                  { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+                responseText = t(
+                  "editIssue.editFailed",
+                  { detail: translateMessage( result.error) || t("infra.unknownError") },
                 );
               }
               appendAssistantContent(activeTurnId!, responseText);
@@ -825,7 +826,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             });
         } else {
           // Cancel edit
-          appendAssistantContent(activeTurnId, intl.formatMessage({ id: "editIssue.optionCancel" }));
+          appendAssistantContent(activeTurnId, t("editIssue.optionCancel"));
           finishTurn(activeTurnId);
           setActiveTurnId(null);
           setPendingEdits((prev) => {
@@ -868,8 +869,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                 }
 
                 if (bulkResult.failed === 0) {
-                  responseText = intl.formatMessage(
-                    { id: "bulkRelabel.allApplied" },
+                  responseText = t(
+                    "bulkRelabel.allApplied",
                     {
                       count: bulkResult.succeeded,
                       labels: pendingBulk.addLabels.map((l) => `\`${l}\``).join(" "),
@@ -877,8 +878,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                     },
                   );
                 } else {
-                  responseText = intl.formatMessage(
-                    { id: "bulkRelabel.partiallyApplied" },
+                  responseText = t(
+                    "bulkRelabel.partiallyApplied",
                     {
                       succeeded: bulkResult.succeeded,
                       failed: bulkResult.failed,
@@ -888,9 +889,9 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                   );
                 }
               } else {
-                responseText = intl.formatMessage(
-                  { id: "bulkRelabel.applyFailed" },
-                  { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+                responseText = t(
+                  "bulkRelabel.applyFailed",
+                  { detail: translateMessage( result.error) || t("infra.unknownError") },
                 );
               }
               appendAssistantContent(activeTurnId!, responseText);
@@ -904,7 +905,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             });
         } else {
           // Cancel bulk relabel
-          appendAssistantContent(activeTurnId, intl.formatMessage({ id: "bulkRelabel.optionCancel" }));
+          appendAssistantContent(activeTurnId, t("bulkRelabel.optionCancel"));
           finishTurn(activeTurnId);
           setActiveTurnId(null);
           setPendingBulkRelabels((prev) => {
@@ -929,8 +930,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             let responseText: string;
             if (result.ok) {
               const issueResult = result.data as CreateIssueResult;
-              responseText = intl.formatMessage(
-                { id: "issues.created" },
+              responseText = t(
+                "issues.created",
                 { url: issueResult.url },
               );
 
@@ -947,8 +948,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                 // The turn already has a question resolved, but we can append content + new question
                 appendAssistantContent(
                   activeTurnId!,
-                  "\n\n" + intl.formatMessage(
-                    { id: "labels.pickupOffer" },
+                  "\n\n" + t(
+                    "labels.pickupOffer",
                     { labels: labelsStr, number: issueResult.number },
                   ),
                 );
@@ -972,8 +973,8 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                   userMessage: {
                     id: `infra-msg-${Date.now()}-u`,
                     role: "user",
-                    content: intl.formatMessage(
-                      { id: "labels.pickupOffer" },
+                    content: t(
+                      "labels.pickupOffer",
                       { labels: labelsStr, number: issueResult.number },
                     ),
                     startedAt: Date.now(),
@@ -992,13 +993,13 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                   question: {
                     id: labelQuestionId,
                     turnId: labelTurnId,
-                    text: intl.formatMessage(
-                      { id: "labels.pickupOffer" },
+                    text: t(
+                      "labels.pickupOffer",
                       { labels: labelsStr, number: issueResult.number },
                     ),
                     options: [
-                      { key: "apply-label", label: intl.formatMessage({ id: "labels.optionApply" }) },
-                      { key: "skip-label", label: intl.formatMessage({ id: "labels.optionSkip" }) },
+                      { key: "apply-label", label: t("labels.optionApply") },
+                      { key: "skip-label", label: t("labels.optionSkip") },
                     ],
                     singleChoice: true,
                     allowFreeText: false,
@@ -1019,9 +1020,9 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
                 setActiveTurnId(null);
               }
             } else {
-              responseText = intl.formatMessage(
-                { id: "issues.createFailed" },
-                { detail: translateMessage(intl, result.error) || intl.formatMessage({ id: "infra.unknownError" }) },
+              responseText = t(
+                "issues.createFailed",
+                { detail: translateMessage( result.error) || t("infra.unknownError") },
               );
               appendAssistantContent(activeTurnId!, responseText);
               finishTurn(activeTurnId!);
@@ -1034,7 +1035,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
             });
           });
       } else {
-        appendAssistantContent(activeTurnId, intl.formatMessage({ id: "issues.optionCancel" }));
+        appendAssistantContent(activeTurnId, t("issues.optionCancel"));
         finishTurn(activeTurnId);
         setActiveTurnId(null);
         setPendingIssues((prev) => {
@@ -1044,7 +1045,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
         });
       }
     },
-    [activeTurnId, answerQuestion, pendingIssues, pendingEdits, pendingLabelOffers, pendingBulkRelabels, infraService, configService, intl, appendAssistantContent, finishTurn, addTurn, accessMode],
+    [activeTurnId, answerQuestion, pendingIssues, pendingEdits, pendingLabelOffers, pendingBulkRelabels, infraService, configService, appendAssistantContent, finishTurn, addTurn, accessMode],
   );
 
   const handleAccessModeChange = useCallback(
@@ -1069,14 +1070,14 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
     <div className="infra-chat-panel">
       <div className="infra-chat-title">
         <Server size={14} />
-        <span>{intl.formatMessage({ id: "infra.title" })}</span>
+        <span>{t("infra.title")}</span>
         <span className="infra-chat-vm">{mainVmName}</span>
       </div>
 
       <div className="infra-chat-scroll" ref={scrollRef}>
         {rows.length === 0 ? (
           <div className="infra-chat-empty">
-            <p>{intl.formatMessage({ id: "infra.description" })}</p>
+            <p>{t("infra.description")}</p>
           </div>
         ) : (
           rows.map((row) => {
@@ -1084,7 +1085,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               case "user-message":
                 return (
                   <div key={row.id} className="transcript-user-msg">
-                    <div className="transcript-avatar infra-user-avatar">{intl.formatMessage({ id: "infra.userInitials" })}</div>
+                    <div className="transcript-avatar infra-user-avatar">{t("infra.userInitials")}</div>
                     <div className="transcript-msg-body">
                       <Suspense fallback={null}>
                         <MarkdownContent content={row.content} />
@@ -1095,7 +1096,7 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
               case "assistant-message":
                 return (
                   <div key={row.id} className="transcript-assistant-msg">
-                    <div className="transcript-avatar infra-assistant-avatar">{intl.formatMessage({ id: "infra.botInitials" })}</div>
+                    <div className="transcript-avatar infra-assistant-avatar">{t("infra.botInitials")}</div>
                     <div className="transcript-msg-body">
                       <Suspense fallback={null}>
                         <MarkdownContent content={row.content} streaming={row.streaming} />

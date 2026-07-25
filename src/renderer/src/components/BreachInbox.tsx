@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { BudgetBreach } from "../../../shared/ipc";
 import { AlertTriangle, Play, X } from "lucide-react";
 
@@ -11,7 +11,7 @@ interface BreachInboxProps {
 
 export function BreachInbox(props: BreachInboxProps): React.ReactNode {
   const { breaches, onDismiss, onResume, onClickBreach } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const activeBreaches = breaches.filter((b) => !b.dismissed);
 
@@ -21,7 +21,7 @@ export function BreachInbox(props: BreachInboxProps): React.ReactNode {
     <div className="breach-inbox">
       <div className="breach-inbox-header">
         <AlertTriangle size={12} />
-        <span className="overline">{intl.formatMessage({ id: "budget.breachTitle" })}</span>
+        <span className="overline">{t("budget.breachTitle")}</span>
         <span className="chip breach-count">{activeBreaches.length}</span>
       </div>
       <div className="breach-inbox-list">
@@ -44,7 +44,7 @@ export function BreachInbox(props: BreachInboxProps): React.ReactNode {
             {breach.autoPaused ? (
               <button
                 className="icon-btn breach-inbox-resume"
-                title={intl.formatMessage({ id: "budget.resumeLoop" })}
+                title={t("budget.resumeLoop")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onResume(breach.environmentId, breach.loopId);
@@ -55,7 +55,7 @@ export function BreachInbox(props: BreachInboxProps): React.ReactNode {
             ) : null}
             <button
               className="icon-btn breach-inbox-dismiss"
-              title={intl.formatMessage({ id: "budget.dismissBreach" })}
+              title={t("budget.dismissBreach")}
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(breach.id);

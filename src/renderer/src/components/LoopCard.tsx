@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { Environment, LoopMeta, LoopStatus, TaskDefinition } from "../types";
 import { STATUS_COLORS, commandLine, timeUntil } from "../format";
 import { fetchLogs, fetchTasks, pauseLoop, resumeLoop, stopLoop, subscribeLogs, triggerLoop } from "../api";
@@ -90,7 +90,7 @@ function confirmDescriptionKey(action: LoopAction): string {
 }
 
 export function LoopCard({ loop, reachability, instance, scrollContainerRef, chainVersion }: LoopCardProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   // Defensive: the real API may omit array fields that the type declares as required
   const safeLoop = useMemo(() => {    if (!loop) {
@@ -113,8 +113,8 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
 
   const countdown = useNextRunCountdown(safeLoop.nextRunAt);
   const nextRunLabel = isReachable
-    ? (countdown ?? (safeLoop.nextRunAt ? timeUntil(safeLoop.nextRunAt) : intl.formatMessage({ id: "loopCard.noNextRun" })))
-    : intl.formatMessage({ id: "loopCard.unknown" });
+    ? (countdown ?? (safeLoop.nextRunAt ? timeUntil(safeLoop.nextRunAt) : t("loopCard.noNextRun")))
+    : t("loopCard.unknown");
 
   const exitCodeLabel = safeLoop.lastExitCode === null
     ? "-"
@@ -129,8 +129,8 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     : "var(--status-unknown)";
 
   const statusLabel = isReachable
-    ? intl.formatMessage({ id: `loopCard.status${safeLoop.status.charAt(0).toUpperCase()}${safeLoop.status.slice(1)}` })
-    : intl.formatMessage({ id: "loopCard.statusUnknown" });
+    ? t(`loopCard.status${safeLoop.status.charAt(0).toUpperCase()}${safeLoop.status.slice(1)}`)
+    : t("loopCard.statusUnknown");
 
   const handleCollapsedClick = useCallback((): void => {
     setIsScrolledPast(false);
@@ -175,11 +175,11 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
       } else {
         const errorMsg = typeof res.error === "string"
           ? res.error
-          : intl.formatMessage({ id: "loopCard.resultError" });
+          : t("loopCard.resultError");
         setActionResult({ kind: "error", message: errorMsg });
       }
     } catch {
-      setActionResult({ kind: "error", message: intl.formatMessage({ id: "loopCard.resultError" }) });
+      setActionResult({ kind: "error", message: t("loopCard.resultError") });
     } finally {
       setActionLoading(false);
     }
@@ -189,7 +189,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     resultTimerRef.current = setTimeout(() => {
       setActionResult(null);
     }, duration);
-  }, [instance, safeLoop.id, intl, actionResult?.kind]);
+  }, [instance, safeLoop.id, t, actionResult?.kind]);
 
   const handleActionClick = useCallback((action: LoopAction): void => {
     if (needsConfirmation(action, safeLoop.status)) {
@@ -450,17 +450,17 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
 
           <div className="loop-card-meta">
             <span className="loop-card-meta-item">
-              <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.interval" })}</span>
+              <span className="loop-card-meta-label">{t("loopCard.interval")}</span>
               <span className="loop-card-meta-value">{safeLoop.intervalHuman}</span>
             </span>
             <span className="loop-card-meta-sep" />
             <span className="loop-card-meta-item">
-              <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.runs" })}</span>
+              <span className="loop-card-meta-label">{t("loopCard.runs")}</span>
               <span className="loop-card-meta-value loop-card-meta-value--mono">{runCountLabel}</span>
             </span>
             <span className="loop-card-meta-sep" />
             <span className="loop-card-meta-item">
-              <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.lastExit" })}</span>
+              <span className="loop-card-meta-label">{t("loopCard.lastExit")}</span>
               <span
                 className={`loop-card-meta-value loop-card-meta-value--mono${failed ? " loop-card-meta-value--exit-fail" : ""}`}
               >
@@ -469,8 +469,8 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             </span>
             <span className="loop-card-meta-sep" />
             <span className="loop-card-meta-item">
-              <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.nextRun" })}</span>
-              <span className="loop-card-meta-value loop-card-meta-value--mono">{isRunning ? intl.formatMessage({ id: "loopCard.runningNow" }) : nextRunLabel}</span>
+              <span className="loop-card-meta-label">{t("loopCard.nextRun")}</span>
+              <span className="loop-card-meta-value loop-card-meta-value--mono">{isRunning ? t("loopCard.runningNow") : nextRunLabel}</span>
             </span>
             {hasTaskChain && instance && isReachable && (
               <>
@@ -479,14 +479,14 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
                   className={`loop-card-chain-toggle${chainExpanded ? " loop-card-chain-toggle--expanded" : ""}`}
                   onClick={handleToggleChain}
                   disabled={chainLoading}
-                  title={intl.formatMessage({ id: "loopCard.expandChain" })}
+                  title={t("loopCard.expandChain")}
                   type="button"
                 >
                   <span className="loop-card-chain-toggle-icon">{chainExpanded ? "▾" : "▸"}</span>
                   <span className="loop-card-chain-toggle-label">
                     {chainLoading
-                      ? intl.formatMessage({ id: "loopCard.chainLoading" })
-                      : intl.formatMessage({ id: "loopCard.tasks" })}
+                      ? t("loopCard.chainLoading")
+                      : t("loopCard.tasks")}
                   </span>
                 </button>
               </>
@@ -501,18 +501,18 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             <div className="loop-card-log-tail">
               <div className="loop-card-log-tail-header">
                 <span className="loop-card-log-tail-label">
-                  {intl.formatMessage({ id: "loopCard.outputLabel" })}
+                  {t("loopCard.outputLabel")}
                   {streamState === "connected" && (
-                    <span className="loop-card-log-live-dot" title={intl.formatMessage({ id: "loopCard.live" })} />
+                    <span className="loop-card-log-live-dot" title={t("loopCard.live")} />
                   )}
                   {streamState === "connected" && (
-                    <span className="loop-card-log-live-label">{intl.formatMessage({ id: "loopCard.live" })}</span>
+                    <span className="loop-card-log-live-label">{t("loopCard.live")}</span>
                   )}
                 </span>
                 <button className="loop-card-log-tail-copy" onClick={() => void copyLogs()}>
                   {copied
-                    ? intl.formatMessage({ id: "loopCard.copied" })
-                    : intl.formatMessage({ id: "loopCard.copy" })}
+                    ? t("loopCard.copied")
+                    : t("loopCard.copy")}
                 </button>
               </div>
               <div className="loop-card-log-tail-content" ref={logContentRef} onScroll={handleLogScroll}>
@@ -535,7 +535,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
           {actionResult && (
             <div className={`loop-card-action-result${actionResult.kind === "error" ? " loop-card-action-result--error" : ""}`}>
               {actionResult.kind === "success"
-                ? intl.formatMessage({ id: actionResultLabel(actionResult.action) })
+                ? t(actionResultLabel(actionResult.action))
                 : actionResult.message}
             </div>
           )}
@@ -549,7 +549,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
                   disabled={actionLoading}
                   onClick={() => handleActionClick(action)}
                 >
-                  {intl.formatMessage({ id: actionButtonLabel(action) })}
+                  {t(actionButtonLabel(action))}
                 </button>
               ))}
             </div>
@@ -559,24 +559,24 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             <div className="loop-card-confirm-overlay">
               <div className="loop-card-confirm-content">
                 <div className="loop-card-confirm-title">
-                  {intl.formatMessage({ id: confirmTitleKey(confirmingAction) })}
+                  {t(confirmTitleKey(confirmingAction))}
                 </div>
                 <div className="loop-card-confirm-description">
-                  {intl.formatMessage({ id: confirmDescriptionKey(confirmingAction) })}
+                  {t(confirmDescriptionKey(confirmingAction))}
                 </div>
                 <div className="loop-card-confirm-buttons">
                   <button
                     className="loop-card-confirm-btn loop-card-confirm-btn--cancel"
                     onClick={handleConfirmCancel}
                   >
-                    {intl.formatMessage({ id: "loopCard.confirmCancel" })}
+                    {t("loopCard.confirmCancel")}
                   </button>
                   <button
                     className="loop-card-confirm-btn loop-card-confirm-btn--confirm"
                     onClick={handleConfirmExecute}
                     disabled={actionLoading}
                   >
-                    {intl.formatMessage({ id: actionButtonLabel(confirmingAction) })}
+                    {t(actionButtonLabel(confirmingAction))}
                   </button>
                 </div>
               </div>

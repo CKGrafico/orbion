@@ -1,5 +1,5 @@
 import React from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { FailureDiagnosisRow } from "../chat/types";
 import { categoryLabelKey, isEnvironmentDownCategory } from "../chat/diagnoseFailure";
 
@@ -8,7 +8,7 @@ interface FailureDiagnosisPanelProps {
 }
 
 export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const isEnvDown = isEnvironmentDownCategory(row.category);
   const panelCls = `failure-diagnosis-panel${isEnvDown ? " failure-diagnosis-panel--env-down" : ""}`;
@@ -17,7 +17,7 @@ export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): Reac
   const formatText = (text: string): string => {
     if (text.includes(".") && !text.includes(" ")) {
       try {
-        return intl.formatMessage({ id: text });
+        return t(text);
       } catch {
         return text;
       }
@@ -25,7 +25,7 @@ export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): Reac
     return text;
   };
 
-  const categoryLabel = intl.formatMessage({ id: categoryLabelKey(row.category) });
+  const categoryLabel = t(categoryLabelKey(row.category));
   const summaryText = formatText(row.summary);
   const nextStepText = formatText(row.nextStep);
 
@@ -42,7 +42,7 @@ export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): Reac
           {isEnvDown ? "⬇" : "⚠"}
         </span>
         <span className="failure-diagnosis-title">
-          {intl.formatMessage({ id: "diagnosis.title" })}
+          {t("diagnosis.title")}
         </span>
         <span className={`failure-diagnosis-category${isEnvDown ? " failure-diagnosis-category--env" : ""}`}>
           {categoryLabel}
@@ -52,14 +52,14 @@ export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): Reac
         <p className="failure-diagnosis-summary">{summaryText}</p>
         <div className="failure-diagnosis-next-step">
           <span className="failure-diagnosis-next-step-label">
-            {intl.formatMessage({ id: "diagnosis.nextStepLabel" })}
+            {t("diagnosis.nextStepLabel")}
           </span>
           <span className="failure-diagnosis-next-step-text">{nextStepText}</span>
         </div>
       </div>
       <div className="failure-diagnosis-footer">
         <span className="failure-diagnosis-confidence">
-          {intl.formatMessage({ id: "diagnosis.confidenceLabel" })} {confidenceLabel}
+          {t("diagnosis.confidenceLabel")} {confidenceLabel}
         </span>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { cid, useInject } from "inversify-hooks";
 import type { INotificationService } from "./services/interfaces";
 import type { DeepLinkTarget, NotificationSendArgs } from "../../shared/ipc";
-import { standaloneIntl } from "./i18n";
+import i18n from "./i18n";
 import type { FleetItemStatus } from "./fleet-status";
 import { isNotifiableStatus } from "./fleet-status";
 
@@ -45,8 +45,8 @@ export function useNativeNotifications(onNavigate?: (deepLink: DeepLinkTarget) =
           : { kind: "instance", environmentId: opts.environmentId };
 
       const args: NotificationSendArgs = {
-        title: standaloneIntl.formatMessage(
-          { id: "app.notificationItemNeedsAttention" },
+        title: i18n.t(
+          "app.notificationItemNeedsAttention",
           { envName: opts.environmentName, itemType: opts.itemType },
         ),
         body: opts.message,

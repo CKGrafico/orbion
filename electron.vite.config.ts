@@ -42,7 +42,6 @@ export default defineConfig({
             if (id.includes("highlight.js")) return "highlight";
             if (id.includes("react-markdown") || id.includes("rehype-highlight")) return "markdown";
             if (id.includes("/react-dom") || id.includes("/react/")) return "react-vendor";
-            if (id.includes("react-intl")) return "intl";
             if (id.includes("@radix-ui/react-") || id.includes("class-variance-authority") || id.includes("clsx") || id.includes("tailwind-merge")) return "radix-ui";
           },
         },

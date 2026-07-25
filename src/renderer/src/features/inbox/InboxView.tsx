@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
 import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem, PrVerdict, PrRiskLevel } from "../../../../shared/ipc";
@@ -110,13 +110,13 @@ function riskChipClass(riskLevel: PrRiskLevel): string {
 
 /** Render the verdict and risk chip for a PR inbox item */
 function PrVerdictDisplay({ verdict }: { verdict?: PrVerdict }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (!verdict) {
     return (
       <span className="inbox-view-item-verdict">
         <span className="pr-risk-chip pr-risk-chip-pending">
-          {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
+          {t("inbox.prVerdict.analyzing")}
         </span>
       </span>
     );
@@ -125,7 +125,7 @@ function PrVerdictDisplay({ verdict }: { verdict?: PrVerdict }): React.ReactNode
   return (
     <span className="inbox-view-item-verdict">
       <span className={riskChipClass(verdict.riskLevel)}>
-        {intl.formatMessage({ id: `inbox.prRisk.${verdict.riskLevel}` })}
+        {t(`inbox.prRisk.${verdict.riskLevel}`)}
       </span>
       <span className="inbox-view-item-verdict-text">{verdict.verdict}</span>
     </span>
@@ -147,7 +147,7 @@ export function InboxView({
   onDismissItem,
   onOpenInChat,
 }: InboxViewProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [queryText, setQueryText] = useState("");
@@ -281,7 +281,7 @@ export function InboxView({
       <div className="inbox-view-header">
         <div className="inbox-view-title-row">
           <Inbox size={18} />
-          <h2 className="inbox-view-title">{intl.formatMessage({ id: "inbox.viewTitle" })}</h2>
+          <h2 className="inbox-view-title">{t("inbox.viewTitle")}</h2>
           {activeItemCount > 0 && !showDone ? (
             <span className="chip inbox-view-count">{activeItemCount}</span>
           ) : null}
@@ -291,18 +291,18 @@ export function InboxView({
               className={`inbox-tab ${!showDone ? "inbox-tab-active" : ""}`}
               onClick={() => setShowDone(false)}
             >
-              {intl.formatMessage({ id: "inbox.tabActive" })}
+              {t("inbox.tabActive")}
             </button>
             <button
               className={`inbox-tab ${showDone ? "inbox-tab-active" : ""}`}
               onClick={() => setShowDone(true)}
             >
-              {intl.formatMessage({ id: "inbox.tabDone" })}
+              {t("inbox.tabDone")}
             </button>
           </div>
         </div>
         <p className="inbox-view-description">
-          {intl.formatMessage({ id: "inbox.viewDescription" })}
+          {t("inbox.viewDescription")}
         </p>
       </div>
 
@@ -363,7 +363,7 @@ export function InboxView({
                 <div className="inbox-view-empty-icon">
                   <Inbox size={32} strokeWidth={1.2} />
                 </div>
-                <p>{intl.formatMessage({ id: "inbox.emptyMessage" })}</p>
+                <p>{t("inbox.emptyMessage")}</p>
               </div>
             ) : null}
           </>
@@ -380,7 +380,7 @@ export function InboxView({
               </div>
             ) : (
               <div className="inbox-view-empty">
-                <p>{intl.formatMessage({ id: "inbox.doneEmptyMessage" })}</p>
+                <p>{t("inbox.doneEmptyMessage")}</p>
               </div>
             )}
           </>
@@ -393,7 +393,7 @@ export function InboxView({
           <Search size={13} className="inbox-composer-icon" />
           <textarea
             className="inbox-composer-input"
-            placeholder={intl.formatMessage({ id: "inbox.queryPlaceholder" })}
+            placeholder={t("inbox.queryPlaceholder")}
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -402,7 +402,7 @@ export function InboxView({
           />
           <button
             className="inbox-composer-send"
-            title={intl.formatMessage({ id: "inbox.sendQuery" })}
+            title={t("inbox.sendQuery")}
             onClick={handleSubmitQuery}
             disabled={!queryText.trim() || isQuerying}
           >
@@ -434,7 +434,7 @@ function DigestViewItemRow({
   onExecuteAction: (item: InboxItem, action: InboxAction) => Promise<void>;
   onOpenInChat: (item: InboxItem) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [expanded, setExpanded] = useState(false);
   const [childItems, setChildItems] = useState<InboxItem[]>([]);
@@ -477,21 +477,21 @@ function DigestViewItemRow({
     if (counts.safe > 0) {
       countBadges.push(
         <span key="safe" className="digest-count-badge digest-count-safe">
-          {counts.safe} {intl.formatMessage({ id: "inbox.digest.safe" })}
+          {counts.safe} {t("inbox.digest.safe")}
         </span>,
       );
     }
     if (counts.needsYou > 0) {
       countBadges.push(
         <span key="needsYou" className="digest-count-badge digest-count-needs-you">
-          {counts.needsYou} {intl.formatMessage({ id: "inbox.digest.needsYou" })}
+          {counts.needsYou} {t("inbox.digest.needsYou")}
         </span>,
       );
     }
     if (counts.conflict > 0) {
       countBadges.push(
         <span key="conflict" className="digest-count-badge digest-count-conflict">
-          {counts.conflict} {intl.formatMessage({ id: "inbox.digest.conflict" })}
+          {counts.conflict} {t("inbox.digest.conflict")}
         </span>,
       );
     }
@@ -518,7 +518,7 @@ function DigestViewItemRow({
         <div className="inbox-view-item-actions">
           <button
             className="icon-btn inbox-item-dismiss"
-            title={intl.formatMessage({ id: "inbox.action.dismiss" })}
+            title={t("inbox.action.dismiss")}
             onClick={(e) => {
               e.stopPropagation();
               onDismiss(item.id);
@@ -576,7 +576,7 @@ function InboxViewItemRow({
   onExecuteAction: (item: InboxItem, action: InboxAction) => Promise<void>;
   onOpenInChat: (item: InboxItem) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
 
   const color = kindColor(item.kind, item.notificationType);
@@ -610,7 +610,7 @@ function InboxViewItemRow({
   };
 
   const actionLabel = (action: InboxAction): string => {
-    return intl.formatMessage({ id: `inbox.action.${action}` });
+    return t(`inbox.action.${action}`);
   };
 
   // Filter out dismiss — it has its own button position
@@ -622,7 +622,7 @@ function InboxViewItemRow({
     ? projectLookup.get(`${item.environmentId}::${item.projectId}`)
     : undefined;
   const sourceLabel = projectName && env
-    ? intl.formatMessage({ id: "inbox.itemSourceProject" }, { project: projectName, instance: env.name })
+    ? t("inbox.itemSourceProject", { project: projectName, instance: env.name })
     : env?.name;
 
   const timestamp = item.occurredAt ? timeAgo(item.occurredAt) : "";
@@ -671,7 +671,7 @@ function InboxViewItemRow({
           {item.availableActions.includes("dismiss") ? (
             <button
               className="icon-btn inbox-item-dismiss"
-              title={intl.formatMessage({ id: "inbox.action.dismiss" })}
+              title={t("inbox.action.dismiss")}
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(item.id);
@@ -684,7 +684,7 @@ function InboxViewItemRow({
           {item.prUrl ? (
             <button
               className="icon-btn inbox-item-open-web"
-              title={intl.formatMessage({ id: "inbox.action.openOnWeb" })}
+              title={t("inbox.action.openOnWeb")}
               onClick={(e) => {
                 e.stopPropagation();
                 window.open(item.prUrl, "_blank");
@@ -708,9 +708,9 @@ function ResolvedViewItemRow({
 }: {
   resolved: ResolvedInboxItem;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const { item, resolvedAt, resolution } = resolved;
-  const reasonText = intl.formatMessage({ id: `inbox.resolution.${resolution}` });
+  const reasonText = t(`inbox.resolution.${resolution}`);
   const resolvedAgo = timeAgo(resolvedAt);
 
   return (

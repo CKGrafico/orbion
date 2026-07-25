@@ -1,6 +1,6 @@
 import type { Environment, EnvironmentHealth, ReachabilityState, AgentRuntime, RuntimeState } from "./types";
 import type { OpenCodeConnectionStatus } from "../../shared/ipc";
-import { standaloneIntl } from "./i18n";
+import i18n from "./i18n";
 
 export type RuntimeHealthState =
   | "ok"
@@ -21,25 +21,23 @@ export function deriveRuntimeHealth(
   openCodeStatus: OpenCodeConnectionStatus | undefined,
   runtimeState: RuntimeState | undefined,
 ): RuntimeHealthInfo {
-  // Unreachable/reconnecting overrides everything
   if (reachability === "unreachable" || reachability === "reconnecting") {
     return {
       state: "unreachable",
-      reason: standaloneIntl.formatMessage({ id: "runtimeHealth.unreachableReason" }),
+      reason: i18n.t("runtimeHealth.unreachableReason"),
     };
   }
 
-  // Daemon not connected — can't determine runtime health freshly
   if (health !== "ok") {
     if (runtimeState === "unavailable") {
       return {
         state: "not-installed",
-        reason: standaloneIntl.formatMessage({ id: "runtimeHealth.notInstalledReason" }),
+        reason: i18n.t("runtimeHealth.notInstalledReason"),
       };
     }
     return {
       state: "unreachable",
-      reason: standaloneIntl.formatMessage({ id: "runtimeHealth.daemonDownReason" }),
+      reason: i18n.t("runtimeHealth.daemonDownReason"),
     };
   }
 
@@ -60,7 +58,7 @@ function deriveOpenCodeHealth(
     return {
       state: "auth-problem",
       reason: extractErrorMessage(status.errorMessage)
-        ?? standaloneIntl.formatMessage({ id: "runtimeHealth.authProblemReason" }),
+        ?? i18n.t("runtimeHealth.authProblemReason"),
     };
   }
 
@@ -68,7 +66,7 @@ function deriveOpenCodeHealth(
     return {
       state: "auth-problem",
       reason: extractErrorMessage(status.errorMessage)
-        ?? standaloneIntl.formatMessage({ id: "runtimeHealth.rejectedReason" }),
+        ?? i18n.t("runtimeHealth.rejectedReason"),
     };
   }
 
@@ -76,13 +74,13 @@ function deriveOpenCodeHealth(
     if (runtimeState === "unavailable") {
       return {
         state: "not-installed",
-        reason: standaloneIntl.formatMessage({ id: "runtimeHealth.notInstalledReason" }),
+        reason: i18n.t("runtimeHealth.notInstalledReason"),
       };
     }
     return {
       state: "not-running",
       reason: extractErrorMessage(status.errorMessage)
-        ?? standaloneIntl.formatMessage({ id: "runtimeHealth.notRunningReason" }),
+        ?? i18n.t("runtimeHealth.notRunningReason"),
     };
   }
 
@@ -90,21 +88,21 @@ function deriveOpenCodeHealth(
     return {
       state: "not-running",
       reason: extractErrorMessage(status.errorMessage)
-        ?? standaloneIntl.formatMessage({ id: "runtimeHealth.versionTooOldReason" }),
+        ?? i18n.t("runtimeHealth.versionTooOldReason"),
     };
   }
 
   if (status.authState === "authenticated") {
     return {
       state: "ok",
-      reason: standaloneIntl.formatMessage({ id: "runtimeHealth.okReason" }),
+      reason: i18n.t("runtimeHealth.okReason"),
     };
   }
 
   if (status.authState === "unauthenticated") {
     return {
       state: "auth-problem",
-      reason: standaloneIntl.formatMessage({ id: "runtimeHealth.authProblemReason" }),
+      reason: i18n.t("runtimeHealth.authProblemReason"),
     };
   }
 
@@ -121,18 +119,18 @@ function deriveFromRuntimeState(
     case "available":
       return {
         state: "ok",
-        reason: standaloneIntl.formatMessage({ id: "runtimeHealth.okReason" }),
+        reason: i18n.t("runtimeHealth.okReason"),
       };
     case "unavailable":
       return {
         state: "not-installed",
-        reason: standaloneIntl.formatMessage({ id: "runtimeHealth.notInstalledLabelReason" }, { label }),
+        reason: i18n.t("runtimeHealth.notInstalledLabelReason", { label }),
       };
     case "unknown":
     default:
       return {
         state: "not-running",
-        reason: standaloneIntl.formatMessage({ id: "runtimeHealth.unknownReason" }, { label }),
+        reason: i18n.t("runtimeHealth.unknownReason", { label }),
       };
   }
 }
@@ -140,7 +138,6 @@ function deriveFromRuntimeState(
 function extractErrorMessage(msg: string | import("../../shared/ipc").I18nMessage | null): string | null {
   if (!msg) return null;
   if (typeof msg === "string") return msg;
-  // I18nMessage — return key as best-effort readable string
   return msg.key;
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { Environment, LoopMeta, Project } from "../types";
 import { fetchProjects } from "../api";
 import { Folder } from "lucide-react";
@@ -11,7 +11,7 @@ export function ProjectsView(props: {
   connectionPhase?: string;
 }): React.ReactNode {
   const { instance, loops, filter, connectionPhase } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -48,8 +48,8 @@ export function ProjectsView(props: {
           <span className="glyph">
             <Folder size={30} strokeWidth={1.2} />
           </span>
-          <h3>{intl.formatMessage({ id: "projects.noProjects" })}</h3>
-          <p>{intl.formatMessage({ id: "projects.noProjectsDescription" })}</p>
+          <h3>{t("projects.noProjects")}</h3>
+          <p>{t("projects.noProjectsDescription")}</p>
         </div>
       </div>
     );
@@ -59,7 +59,7 @@ export function ProjectsView(props: {
     <div className="content-inner">
       <div className="card">
         <div className="card-header">
-          <span className="overline">{intl.formatMessage({ id: "projects.count" }, { count: projects.length })}</span>
+          <span className="overline">{t("projects.count", { count: projects.length })}</span>
           <span className="spacer" />
         </div>
         <div className="card-body">
@@ -69,14 +69,14 @@ export function ProjectsView(props: {
                 <span className="dot" style={{ background: project.color }} />
                 <span className="desc">{project.name}</span>
                 <span className="right">
-                  {project.isSystem ? <span className="overline">{intl.formatMessage({ id: "projects.system" })}</span> : null}
-                  <span className="stat">{intl.formatMessage({ id: "projects.loopsCount" }, { count: loopCount(project.id) })}</span>
+                  {project.isSystem ? <span className="overline">{t("projects.system")}</span> : null}
+                  <span className="stat">{t("projects.loopsCount", { count: loopCount(project.id) })}</span>
                   <span className="when">{project.createdAt.slice(0, 10)}</span>
                 </span>
               </div>
             ))}
             {q && visible.length === 0 ? (
-              <div className="row-empty">{intl.formatMessage({ id: "projects.noMatch" }, { filter })}</div>
+              <div className="row-empty">{t("projects.noMatch", { filter })}</div>
             ) : null}
           </div>
         </div>

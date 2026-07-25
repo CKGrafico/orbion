@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { GlobalSettings, AgentRuntime, Environment } from "../../../shared/ipc";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
@@ -27,7 +27,7 @@ export function SettingsPanel({
   onToggleNotificationMute,
   onSetMainVm,
 }: SettingsPanelProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   // Local state for ephemeral threshold (debounced on blur/enter)
   const [thresholdInput, setThresholdInput] = useState(
@@ -82,35 +82,35 @@ export function SettingsPanel({
     <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <SheetContent side="right">
         <SheetHeader>
-          <SheetTitle>{intl.formatMessage({ id: "settings.title" })}</SheetTitle>
-          <SheetDescription>{intl.formatMessage({ id: "settings.close" })}</SheetDescription>
+          <SheetTitle>{t("settings.title")}</SheetTitle>
+          <SheetDescription>{t("settings.close")}</SheetDescription>
         </SheetHeader>
 
         <div className="settings-body">
           {/* Theme */}
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "settings.theme" })}</span>
-              <span className="settings-row-desc">{intl.formatMessage({ id: "settings.themeDesc" })}</span>
+              <span className="settings-row-title">{t("settings.theme")}</span>
+              <span className="settings-row-desc">{t("settings.themeDesc")}</span>
             </div>
             <div className="segmented">
               <button
                 className={`segment${settings.theme === "dark" ? " active" : ""}`}
                 onClick={() => handleThemeChange("dark")}
               >
-                {intl.formatMessage({ id: "settings.themeDark" })}
+                {t("settings.themeDark")}
               </button>
               <button
                 className={`segment${settings.theme === "light" ? " active" : ""}`}
                 onClick={() => handleThemeChange("light")}
               >
-                {intl.formatMessage({ id: "settings.themeLight" })}
+                {t("settings.themeLight")}
               </button>
               <button
                 className={`segment${settings.theme === "system" ? " active" : ""}`}
                 onClick={() => handleThemeChange("system")}
               >
-                {intl.formatMessage({ id: "settings.themeSystem" })}
+                {t("settings.themeSystem")}
               </button>
             </div>
           </div>
@@ -118,21 +118,21 @@ export function SettingsPanel({
           {/* Default Agent Runtime */}
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "settings.defaultAgent" })}</span>
-              <span className="settings-row-desc">{intl.formatMessage({ id: "settings.defaultAgentDesc" })}</span>
+              <span className="settings-row-title">{t("settings.defaultAgent")}</span>
+              <span className="settings-row-desc">{t("settings.defaultAgentDesc")}</span>
             </div>
             <div className="segmented">
               <button
                 className={`segment${settings.defaultAgentRuntime === "opencode" ? " active" : ""}`}
                 onClick={() => handleRuntimeChange("opencode")}
               >
-                {intl.formatMessage({ id: "agentSwitcher.opencode" })}
+                {t("agentSwitcher.opencode")}
               </button>
               <button
                 className={`segment${settings.defaultAgentRuntime === "claude" ? " active" : ""}`}
                 onClick={() => handleRuntimeChange("claude")}
               >
-                {intl.formatMessage({ id: "agentSwitcher.claude" })}
+                {t("agentSwitcher.claude")}
               </button>
             </div>
           </div>
@@ -140,19 +140,19 @@ export function SettingsPanel({
           {/* Config-home VM */}
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "settings.configHome" })}</span>
-              <span className="settings-row-desc">{intl.formatMessage({ id: "settings.configHomeDesc" })}</span>
+              <span className="settings-row-title">{t("settings.configHome")}</span>
+              <span className="settings-row-desc">{t("settings.configHomeDesc")}</span>
             </div>
             <select
               className="settings-select"
               value={settings.configHomeVmId ?? "__none__"}
               onChange={(e) => handleConfigHomeChange(e.target.value)}
             >
-              <option value="__none__">{intl.formatMessage({ id: "settings.configHomeNone" })}</option>
+              <option value="__none__">{t("settings.configHomeNone")}</option>
               {environments.map((env) => (
                 <option key={env.id} value={env.id}>
                   {env.name}
-                  {env.role === "main-vm" ? ` (${intl.formatMessage({ id: "settings.configHomeCurrent" })})` : ""}
+                  {env.role === "main-vm" ? ` (${t("settings.configHomeCurrent")})` : ""}
                 </option>
               ))}
             </select>
@@ -161,8 +161,8 @@ export function SettingsPanel({
           {/* Notification mute */}
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "settings.notifications" })}</span>
-              <span className="settings-row-desc">{intl.formatMessage({ id: "settings.notificationsDesc" })}</span>
+              <span className="settings-row-title">{t("settings.notifications")}</span>
+              <span className="settings-row-desc">{t("settings.notificationsDesc")}</span>
             </div>
             <button
               className={`settings-toggle${notificationMuted ? " active" : ""}`}
@@ -171,8 +171,8 @@ export function SettingsPanel({
               aria-checked={notificationMuted}
               title={
                 notificationMuted
-                  ? intl.formatMessage({ id: "app.unmuteNotifications" })
-                  : intl.formatMessage({ id: "app.muteNotifications" })
+                  ? t("app.unmuteNotifications")
+                  : t("app.muteNotifications")
               }
             >
               <span className="settings-toggle-dot" />
@@ -182,8 +182,8 @@ export function SettingsPanel({
           {/* Ephemeral threshold */}
           <div className="settings-row">
             <div className="settings-row-label">
-              <span className="settings-row-title">{intl.formatMessage({ id: "settings.ephemeralThreshold" })}</span>
-              <span className="settings-row-desc">{intl.formatMessage({ id: "settings.ephemeralThresholdDesc" })}</span>
+              <span className="settings-row-title">{t("settings.ephemeralThreshold")}</span>
+              <span className="settings-row-desc">{t("settings.ephemeralThresholdDesc")}</span>
             </div>
             <div className="settings-threshold-input-wrap">
               <input
@@ -199,7 +199,7 @@ export function SettingsPanel({
                   if (e.key === "Enter") handleThresholdCommit();
                 }}
               />
-              <span className="settings-threshold-unit">{intl.formatMessage({ id: "settings.hours" })}</span>
+              <span className="settings-threshold-unit">{t("settings.hours")}</span>
             </div>
           </div>
         </div>

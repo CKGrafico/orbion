@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { SiblingOfferRow } from "../chat/types";
 import type { SiblingOfferStatus } from "../../../shared/sibling-offer-types";
 import type { Environment } from "../types";
@@ -14,7 +14,7 @@ interface SiblingOfferCardProps {
 }
 
 export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStatusChange, homeEnvironmentId }: SiblingOfferCardProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const isPending = row.status === "pending";
   const isApplying = row.status === "applying";
@@ -39,30 +39,24 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
       <div className="sibling-offer-header">
         <span className="sibling-offer-icon">⇄</span>
         <span className="sibling-offer-title">
-          {intl.formatMessage({ id: "siblingOffer.title" })}
+          {t("siblingOffer.title")}
         </span>
         {isApplied && (
           <span className="sibling-offer-status sibling-offer-status--applied">
-            {intl.formatMessage({ id: "siblingOffer.statusApplied" })}
+            {t("siblingOffer.statusApplied")}
           </span>
         )}
         {isDeclined && (
           <span className="sibling-offer-status sibling-offer-status--declined">
-            {intl.formatMessage({ id: "siblingOffer.statusDeclined" })}
+            {t("siblingOffer.statusDeclined")}
           </span>
         )}
       </div>
 
       <div className={`sibling-offer-attribution${isCrossScope ? " sibling-offer-attribution--cross-scope" : ""}`}>
         {isCrossScope
-          ? intl.formatMessage(
-              { id: "siblingOffer.crossScopeAttribution" },
-              { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName },
-            )
-          : intl.formatMessage(
-              { id: "siblingOffer.attribution" },
-              { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName },
-            )
+          ? t("siblingOffer.crossScopeAttribution", { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName })
+          : t("siblingOffer.attribution", { loopName: row.siblingLoopDescription, instance: row.siblingEnvironmentName })
         }
       </div>
 
@@ -91,7 +85,7 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
             disabled={isApplying}
             type="button"
           >
-            {intl.formatMessage({ id: "siblingOffer.decline" })}
+            {t("siblingOffer.decline")}
           </button>
           <button
             className="sibling-offer-btn sibling-offer-btn--approve"
@@ -100,8 +94,8 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
             type="button"
           >
             {isApplying
-              ? intl.formatMessage({ id: "siblingOffer.applying" })
-              : intl.formatMessage({ id: "siblingOffer.approve" })}
+              ? t("siblingOffer.applying")
+              : t("siblingOffer.approve")}
           </button>
         </div>
       )}

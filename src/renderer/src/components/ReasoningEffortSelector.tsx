@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { ReasoningEffort } from "../../../shared/ipc";
 
 interface ReasoningEffortSelectorProps {
@@ -14,12 +14,12 @@ const EFFORT_LABELS: Record<ReasoningEffort, string> = {
 };
 
 export function ReasoningEffortSelector({ value, efforts, onChange }: ReasoningEffortSelectorProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (!efforts || efforts.length === 0) return null;
 
   return (
-    <div className="segmented" role="radiogroup" aria-label={intl.formatMessage({ id: "reasoningEffort.label" })}>
+    <div className="segmented" role="radiogroup" aria-label={t("reasoningEffort.label")}>
       {efforts.map((effort) => {
         const isActive = value === effort;
 
@@ -35,7 +35,7 @@ export function ReasoningEffortSelector({ value, efforts, onChange }: ReasoningE
               }
             }}
           >
-            {intl.formatMessage({ id: EFFORT_LABELS[effort] })}
+            {t(EFFORT_LABELS[effort])}
           </button>
         );
       })}

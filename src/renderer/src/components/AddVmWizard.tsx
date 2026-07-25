@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { useIntl, type IntlShape } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { AgentRuntime, ReachMethod, SshHost, VmWizardProgress, VmWizardServiceSelection, VmWizardServiceStatus, VmWizardStep, BootstrapSeed } from "../../../shared/ipc";
 import { TOOL_DEFINITIONS, type ToolDefinition } from "../../../shared/tool-definitions";
 import { ShieldCheck, X, Check, Loader, SkipForward, Lock, Globe, Terminal } from "lucide-react";
+import type { TFunction } from "i18next";
 import { translateMessage } from "../i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type { IVmWizardService, IConfigService, ILogService } from "../services/interfaces";
@@ -26,9 +27,9 @@ const STEP_LABEL_KEYS: Record<VmWizardStep, string> = {
   error: "vmWizard.stepError",
 };
 
-function stepLabel(intl: IntlShape, step: VmWizardStep): string {
+function stepLabel(t: TFunction, step: VmWizardStep): string {
   const key = STEP_LABEL_KEYS[step];
-  return key ? intl.formatMessage({ id: key }) : "";
+  return key ? t(key) : "";
 }
 
 const STEP_ORDER: VmWizardStep[] = [
@@ -58,7 +59,7 @@ export function AddVmWizard(props: {
   initialSeed?: BootstrapSeed | null;
 }): React.ReactNode {
   const { onDone, onCancel, initialSeed } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [vmWizardService] = useInject<IVmWizardService>(cid.IVmWizardService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [logService] = useInject<ILogService>(cid.ILogService);
@@ -223,12 +224,12 @@ export function AddVmWizard(props: {
 
   function serviceStatusLabel(status: VmWizardServiceStatus): string {
     switch (status) {
-      case "already-running": return intl.formatMessage({ id: "vmWizard.serviceStatusAlreadyRunning" });
-      case "installing": return intl.formatMessage({ id: "vmWizard.serviceStatusInstalling" });
-      case "installed": return intl.formatMessage({ id: "vmWizard.serviceStatusInstalled" });
-      case "started": return intl.formatMessage({ id: "vmWizard.serviceStatusStarted" });
-      case "skipped": return intl.formatMessage({ id: "vmWizard.serviceStatusSkipped" });
-      case "failed": return intl.formatMessage({ id: "vmWizard.serviceStatusFailed" });
+      case "already-running": return t("vmWizard.serviceStatusAlreadyRunning");
+      case "installing": return t("vmWizard.serviceStatusInstalling");
+      case "installed": return t("vmWizard.serviceStatusInstalled");
+      case "started": return t("vmWizard.serviceStatusStarted");
+      case "skipped": return t("vmWizard.serviceStatusSkipped");
+      case "failed": return t("vmWizard.serviceStatusFailed");
       default: return "";
     }
   }
@@ -280,15 +281,15 @@ export function AddVmWizard(props: {
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleCancel(); }}>
       <DialogContent className="max-w-[860px] max-h-[calc(100vh-80px)] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{intl.formatMessage({ id: "vmWizard.title" })}</DialogTitle>
-          <DialogDescription>{intl.formatMessage({ id: "vmWizard.description" })}</DialogDescription>
+          <DialogTitle>{t("vmWizard.title")}</DialogTitle>
+          <DialogDescription>{t("vmWizard.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="field">
-          <label>{intl.formatMessage({ id: "vmWizard.name" })}</label>
+          <label>{t("vmWizard.name")}</label>
           <input
             autoFocus
-            placeholder={intl.formatMessage({ id: "vmWizard.namePlaceholder" })}
+            placeholder={t("vmWizard.namePlaceholder")}
             value={envName}
             onChange={(e) => setEnvName(e.target.value)}
             disabled={running}
@@ -297,7 +298,7 @@ export function AddVmWizard(props: {
 
         {/* ── Reach method choice ────────────────────────────── */}
         <div className="field">
-          <label>{intl.formatMessage({ id: "vmWizard.reachMethodLabel" })}</label>
+          <label>{t("vmWizard.reachMethodLabel")}</label>
           <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
             <button
               type="button"
@@ -307,8 +308,8 @@ export function AddVmWizard(props: {
               disabled={running}
             >
               <Globe size={18} style={{ color: reachMethod === "local" ? "var(--accent)" : "var(--text-muted)" }} />
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: reachMethod === "local" ? "var(--text-primary)" : "var(--text-secondary)" }}>{intl.formatMessage({ id: "vmWizard.reachMethodLocal" })}</span>
-              <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.3 }}>{intl.formatMessage({ id: "vmWizard.reachMethodLocalDesc" })}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: reachMethod === "local" ? "var(--text-primary)" : "var(--text-secondary)" }}>{t("vmWizard.reachMethodLocal")}</span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.3 }}>{t("vmWizard.reachMethodLocalDesc")}</span>
             </button>
             <button
               type="button"
@@ -318,14 +319,14 @@ export function AddVmWizard(props: {
               disabled={running}
             >
               <Terminal size={18} style={{ color: reachMethod === "ssh" ? "var(--accent)" : "var(--text-muted)" }} />
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: reachMethod === "ssh" ? "var(--text-primary)" : "var(--text-secondary)" }}>{intl.formatMessage({ id: "vmWizard.reachMethodSsh" })}</span>
-              <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.3 }}>{intl.formatMessage({ id: "vmWizard.reachMethodSshDesc" })}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: reachMethod === "ssh" ? "var(--text-primary)" : "var(--text-secondary)" }}>{t("vmWizard.reachMethodSsh")}</span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.3 }}>{t("vmWizard.reachMethodSshDesc")}</span>
             </button>
           </div>
         </div>
 
         <div className="field">
-          <label id="vm-wizard-runtime-label">{intl.formatMessage({ id: "vmWizard.runtimeLabel" })}</label>
+          <label id="vm-wizard-runtime-label">{t("vmWizard.runtimeLabel")}</label>
           <div
             role="radiogroup"
             aria-labelledby="vm-wizard-runtime-label"
@@ -368,22 +369,22 @@ export function AddVmWizard(props: {
                     boxShadow: isSelected ? "inset 0 0 0 1px var(--border)" : "none",
                   }}
                 >
-                  {intl.formatMessage({ id: runtime === "opencode" ? "vmWizard.runtimeOpenCode" : "vmWizard.runtimeClaudeCode" })}
+                  {t(runtime === "opencode" ? "vmWizard.runtimeOpenCode" : "vmWizard.runtimeClaudeCode")}
                 </button>
               );
             })}
           </div>
           <div id="vm-wizard-runtime-description" style={{ marginTop: 6, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.4 }}>
-            {intl.formatMessage({ id: "vmWizard.runtimeDescription" })}
+            {t("vmWizard.runtimeDescription")}
           </div>
         </div>
 
         {/* ── Conditional fields based on reach method ─────── */}
         {reachMethod === "local" ? (
           <div className="field">
-            <label>{intl.formatMessage({ id: "vmWizard.localUrlLabel" })}</label>
+            <label>{t("vmWizard.localUrlLabel")}</label>
             <input
-              placeholder={intl.formatMessage({ id: "vmWizard.localUrlPlaceholder" })}
+              placeholder={t("vmWizard.localUrlPlaceholder")}
               value={localUrl}
               onChange={(e) => setLocalUrl(e.target.value)}
               onKeyDown={(e) => {
@@ -397,9 +398,9 @@ export function AddVmWizard(props: {
         ) : (
           <>
             <div className="field">
-              <label>{intl.formatMessage({ id: "vmWizard.target" })}</label>
+              <label>{t("vmWizard.target")}</label>
               <input
-                placeholder={intl.formatMessage({ id: "vmWizard.targetPlaceholder" })}
+                placeholder={t("vmWizard.targetPlaceholder")}
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 onKeyDown={(e) => {
@@ -411,34 +412,34 @@ export function AddVmWizard(props: {
               <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginTop: 6, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
                 <ShieldCheck size={13} />
                 <span>
-                  {intl.formatMessage({ id: "vmWizard.securityNote" })}
+                  {t("vmWizard.securityNote")}
                 </span>
               </div>
             </div>
 
             <div className="field">
               <label htmlFor="vm-wizard-ssh-key-passphrase">
-                {intl.formatMessage({ id: "vmWizard.sshKeyPassphraseLabel" })}
+                {t("vmWizard.sshKeyPassphraseLabel")}
               </label>
               <input
                 id="vm-wizard-ssh-key-passphrase"
                 type="password"
                 autoComplete="current-password"
                 spellCheck={false}
-                placeholder={intl.formatMessage({ id: "vmWizard.sshKeyPassphrasePlaceholder" })}
+                placeholder={t("vmWizard.sshKeyPassphrasePlaceholder")}
                 value={sshKeyPassphrase}
                 onChange={(event) => setSshKeyPassphrase(event.target.value)}
                 disabled={running}
                 aria-describedby="vm-wizard-ssh-key-passphrase-description"
               />
               <div id="vm-wizard-ssh-key-passphrase-description" style={{ marginTop: 6, fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.4 }}>
-                {intl.formatMessage({ id: "vmWizard.sshKeyPassphraseDescription" })}
+                {t("vmWizard.sshKeyPassphraseDescription")}
               </div>
             </div>
 
             {hostsLoaded && hosts.length > 0 && !running ? (
               <div className="field">
-                <label>{intl.formatMessage({ id: "vmWizard.sshConfigHosts" })}</label>
+                <label>{t("vmWizard.sshConfigHosts")}</label>
                 <div className="tailscale-peers" style={{ maxHeight: 160 }}>
                   {hosts.map((h) => (
                     <div
@@ -481,36 +482,36 @@ export function AddVmWizard(props: {
               {isError ? (
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <X size={14} />
-                  {translateMessage(intl, progress.message)}
+                  {translateMessage(progress.message)}
                 </span>
               ) : isDone ? (
                 <span style={{ color: "var(--accent)", display: "flex", alignItems: "center", gap: 6 }}>
                   <Check size={14} />
-                  {translateMessage(intl, progress.message)}
+                  {translateMessage(progress.message)}
                 </span>
               ) : (
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="spinner" style={{ width: 12, height: 12, border: "2px solid var(--text-muted)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  {stepLabel(intl, currentStep)}: {translateMessage(intl, progress.message)}
+                  {stepLabel(t, currentStep)}: {translateMessage(progress.message)}
                 </span>
               )}
             </div>
             {progress.probe && !isDone ? (
               <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--text-muted)" }}>
-                {progress.probe.nodeFound ? intl.formatMessage({ id: "vmWizard.nodeFound" }, { version: progress.probe.nodeVersion ?? "found" }) : intl.formatMessage({ id: "vmWizard.nodeNotFound" })}
+                {progress.probe.nodeFound ? t("vmWizard.nodeFound", { version: progress.probe.nodeVersion ?? "found" }) : t("vmWizard.nodeNotFound")}
                 {" · "}
-                {progress.probe.daemonRunning ? intl.formatMessage({ id: "vmWizard.daemonOnPort" }, { port: progress.probe.daemonPort ?? "?" }) : intl.formatMessage({ id: "vmWizard.daemonNotRunning" })}
+                {progress.probe.daemonRunning ? t("vmWizard.daemonOnPort", { port: progress.probe.daemonPort ?? "?" }) : t("vmWizard.daemonNotRunning")}
                 {" · "}
-                {progress.probe.opencodeRunning ? intl.formatMessage({ id: "vmWizard.opencodeOnPort" }, { port: progress.probe.opencodePort ?? "?" }) : intl.formatMessage({ id: "vmWizard.opencodeNotRunning" })}
+                {progress.probe.opencodeRunning ? t("vmWizard.opencodeOnPort", { port: progress.probe.opencodePort ?? "?" }) : t("vmWizard.opencodeNotRunning")}
               </div>
             ) : null}
             {isError && progress.launch?.logTail ? (
               <div style={{ marginTop: 8 }}>
                 <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>
-                  {intl.formatMessage({ id: "vmWizard.diagnosticOutput" })}
+                  {t("vmWizard.diagnosticOutput")}
                 </div>
                 <pre
-                  aria-label={intl.formatMessage({ id: "vmWizard.diagnosticOutput" })}
+                  aria-label={t("vmWizard.diagnosticOutput")}
                   style={{ margin: 0, fontSize: 11, color: "var(--danger)", background: "var(--bg-log)", padding: 8, borderRadius: 6, maxHeight: 160, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
                 >
                   {progress.launch.logTail}
@@ -523,31 +524,31 @@ export function AddVmWizard(props: {
         {isPickServices ? (
           <div style={{ marginTop: 12, padding: 12, background: "var(--bg-log)", borderRadius: 8, border: "1px solid var(--bg-active)" }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}>
-              {intl.formatMessage({ id: "vmWizard.pickServicesTitle" })}
+              {t("vmWizard.pickServicesTitle")}
             </div>
             <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 12 }}>
-              {intl.formatMessage({ id: "vmWizard.pickServicesDescription" })}
+              {t("vmWizard.pickServicesDescription")}
             </div>
 
             {/* Mandatory: Node.js + loop-task */}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
-                {intl.formatMessage({ id: "vmWizard.categoryCore" })}, {intl.formatMessage({ id: "vmWizard.mandatoryLabel" })}
+                {t("vmWizard.categoryCore")}, {t("vmWizard.mandatoryLabel")}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, opacity: 0.7 }}>
                   <Lock size={12} style={{ color: "var(--text-muted)" }} />
-                  <span style={{ fontWeight: 500 }}>{intl.formatMessage({ id: "vmWizard.serviceNodeJs" })}</span>
+                  <span style={{ fontWeight: 500 }}>{t("vmWizard.serviceNodeJs")}</span>
                   <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
                     {progress?.probe?.nodeFound
-                      ? `${intl.formatMessage({ id: "vmWizard.nodeFound" }, { version: progress.probe.nodeVersion ?? "?" })}`
-                      : intl.formatMessage({ id: "vmWizard.nodeNotFound" })}
+                      ? `${t("vmWizard.nodeFound", { version: progress.probe.nodeVersion ?? "?" })}`
+                      : t("vmWizard.nodeNotFound")}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, opacity: 0.7 }}>
                   <Lock size={12} style={{ color: "var(--text-muted)" }} />
-                  <span style={{ fontWeight: 500 }}>{intl.formatMessage({ id: "vmWizard.serviceLoopTask" })}</span>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{intl.formatMessage({ id: "vmWizard.serviceLoopTaskDesc" })}</span>
+                  <span style={{ fontWeight: 500 }}>{t("vmWizard.serviceLoopTask")}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t("vmWizard.serviceLoopTaskDesc")}</span>
                 </div>
               </div>
             </div>
@@ -556,7 +557,7 @@ export function AddVmWizard(props: {
             {Object.entries(groupedServices).filter(([cat]) => cat !== "core").map(([category, services]) => (
               <div key={category} style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 6 }}>
-                  {intl.formatMessage({ id: CATEGORY_KEYS[category as ServiceCategory] })}
+                  {t(CATEGORY_KEYS[category as ServiceCategory])}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 16px" }}>
                   {services.map((svc) => {
@@ -581,14 +582,14 @@ export function AddVmWizard(props: {
                         />
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 12.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                            {intl.formatMessage({ id: svc.nameKey })}
+                            {t(svc.nameKey)}
                             {installed ? (
                               <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--accent-bg, rgba(0,200,100,0.12))", padding: "1px 6px", borderRadius: 4 }}>
-                                {intl.formatMessage({ id: "vmWizard.alreadyInstalled" })}
+                                {t("vmWizard.alreadyInstalled")}
                               </span>
                             ) : null}
                           </div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.3 }}>{intl.formatMessage({ id: svc.descKey })}</div>
+                           <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.3 }}>{t(svc.descKey)}</div>
                         </div>
                       </label>
                     );
@@ -604,11 +605,11 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {/* Mandatory: loop-task */}
               <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 2 }}>
-                {intl.formatMessage({ id: "vmWizard.categoryCore" })}
+                {t("vmWizard.categoryCore")}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                 {serviceStatusIcon(progress.launch.loopTaskStatus)}
-                <span>{intl.formatMessage({ id: "vmWizard.serviceLoopTask" })}</span>
+                <span>{t("vmWizard.serviceLoopTask")}</span>
                 {progress.launch.loopTaskStatus !== "pending" ? (
                   <span style={{ color: "var(--text-muted)", fontSize: 11 }}>, {serviceStatusLabel(progress.launch.loopTaskStatus)}</span>
                 ) : null}
@@ -627,15 +628,15 @@ export function AddVmWizard(props: {
                 return (
                   <div key={category}>
                     <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 2, marginTop: 4 }}>
-                      {intl.formatMessage({ id: CATEGORY_KEYS[category] })}
+                      {t(CATEGORY_KEYS[category])}
                     </div>
                     {visibleServices.map((svc) => {
-                      const status = getLaunchStatus(svc);
-                      if (!status) return null;
-                      return (
-                        <div key={svc.toolId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                          {serviceStatusIcon(status)}
-                          <span>{intl.formatMessage({ id: svc.nameKey })}</span>
+                       const status = getLaunchStatus(svc);
+                       if (!status) return null;
+                       return (
+                         <div key={svc.toolId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                           {serviceStatusIcon(status)}
+                           <span>{t(svc.nameKey)}</span>
                           {status !== "pending" ? (
                             <span style={{ color: "var(--text-muted)", fontSize: 11 }}>, {serviceStatusLabel(status)}</span>
                           ) : null}
@@ -660,7 +661,7 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
               <ShieldCheck size={16} />
               <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                {translateMessage(intl, progress.consentPrompt)}
+                {translateMessage(progress.consentPrompt)}
               </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -668,13 +669,13 @@ export function AddVmWizard(props: {
                 className="btn primary"
                 onClick={() => vmWizardService.respondConsent("install")}
               >
-                {intl.formatMessage({ id: "vmWizard.installViaMise" })}
+                {t("vmWizard.installViaMise")}
               </button>
               <button
                 className="btn"
                 onClick={() => vmWizardService.respondConsent("skip")}
               >
-                {intl.formatMessage({ id: "vmWizard.skip" })}
+                {t("vmWizard.skip")}
               </button>
             </div>
           </div>
@@ -691,7 +692,7 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
               <ShieldCheck size={16} />
               <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                {translateMessage(intl, progress.consentPrompt)}
+                {translateMessage(progress.consentPrompt)}
               </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -699,7 +700,7 @@ export function AddVmWizard(props: {
                 className="btn primary"
                 onClick={() => vmWizardService.respondConsent("install")}
               >
-                {intl.formatMessage({ id: "vmWizard.installAndStartLoopTask" })}
+                {t("vmWizard.installAndStartLoopTask")}
               </button>
               <button
                 className="btn"
@@ -708,7 +709,7 @@ export function AddVmWizard(props: {
                   onCancel();
                 }}
               >
-                {intl.formatMessage({ id: "vmWizard.cancel" })}
+                {t("vmWizard.cancel")}
               </button>
             </div>
           </div>
@@ -725,7 +726,7 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
               <ShieldCheck size={16} />
               <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                {translateMessage(intl, progress.consentPrompt)}
+                {translateMessage(progress.consentPrompt)}
               </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -733,13 +734,13 @@ export function AddVmWizard(props: {
                 className="btn primary"
                 onClick={() => vmWizardService.respondRuntimeConsent("install")}
               >
-                {intl.formatMessage({ id: "vmWizard.installRuntime" })}
+                {t("vmWizard.installRuntime")}
               </button>
               <button
                 className="btn"
                 onClick={() => vmWizardService.respondRuntimeConsent("skip")}
               >
-                {intl.formatMessage({ id: "vmWizard.skip" })}
+                {t("vmWizard.skip")}
               </button>
             </div>
           </div>
@@ -756,7 +757,7 @@ export function AddVmWizard(props: {
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
               <ShieldCheck size={16} style={{ color: "var(--accent)" }} />
               <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                {intl.formatMessage({ id: "vmWizard.hostKeyVerifyDescription" })}
+                {t("vmWizard.hostKeyVerifyDescription")}
               </span>
             </div>
             <div style={{
@@ -778,13 +779,13 @@ export function AddVmWizard(props: {
                 className="btn primary"
                 onClick={() => vmWizardService.respondHostKey(true)}
               >
-                {intl.formatMessage({ id: "vmWizard.trustHost" })}
+                {t("vmWizard.trustHost")}
               </button>
               <button
                 className="btn"
                 onClick={() => vmWizardService.respondHostKey(false)}
               >
-                {intl.formatMessage({ id: "vmWizard.cancel" })}
+                {t("vmWizard.cancel")}
               </button>
             </div>
           </div>
@@ -802,17 +803,17 @@ export function AddVmWizard(props: {
               />
               <div>
                 <div style={{ fontSize: 12.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                  {intl.formatMessage({ id: "vmWizard.setAsMain" })}
+                  {t("vmWizard.setAsMain")}
                   {isFirstEnv ? (
                     <span style={{ fontSize: 10, color: "var(--accent)", background: "var(--accent-bg, rgba(0,200,100,0.12))", padding: "1px 6px", borderRadius: 4 }}>
-                      {intl.formatMessage({ id: "vmWizard.firstEnvMainBadge" })}
+                      {t("vmWizard.firstEnvMainBadge")}
                     </span>
                   ) : null}
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.4 }}>
                   {isFirstEnv
-                    ? intl.formatMessage({ id: "vmWizard.setAsMainFirstDesc" })
-                    : intl.formatMessage({ id: "vmWizard.setAsMainDesc" })}
+                    ? t("vmWizard.setAsMainFirstDesc")
+                    : t("vmWizard.setAsMainDesc")}
                 </div>
               </div>
             </label>
@@ -823,15 +824,15 @@ export function AddVmWizard(props: {
           {isError ? (
             <>
               <button className="btn" onClick={handleCancel}>
-                {intl.formatMessage({ id: "vmWizard.cancel" })}
+                {t("vmWizard.cancel")}
               </button>
               <button className="btn primary" onClick={() => void startWizard()}>
-                {intl.formatMessage({ id: "vmWizard.retry" })}
+                {t("vmWizard.retry")}
               </button>
             </>
           ) : !isConsentStep && !isHostKeyVerify ? (
             <button className="btn" onClick={handleClose}>
-              {running ? intl.formatMessage({ id: "vmWizard.cancel" }) : intl.formatMessage({ id: "vmWizard.close" })}
+              {running ? t("vmWizard.cancel") : t("vmWizard.close")}
             </button>
           ) : null}
           {!isError && isPickServices ? (
@@ -839,7 +840,7 @@ export function AddVmWizard(props: {
               className="btn primary"
               onClick={() => vmWizardService.respondServiceSelection(serviceSelection)}
             >
-              {intl.formatMessage({ id: "vmWizard.confirmServices" })}
+              {t("vmWizard.confirmServices")}
             </button>
           ) : !isError && !isDone && !isConsentStep ? (
             <button
@@ -847,7 +848,7 @@ export function AddVmWizard(props: {
               onClick={() => void startWizard()}
               disabled={running || (reachMethod === "local" ? !localUrl.trim() || (!localUrl.trim().startsWith("http://") && !localUrl.trim().startsWith("https://")) : !target.trim())}
             >
-              {running ? intl.formatMessage({ id: "vmWizard.running" }) : intl.formatMessage({ id: "vmWizard.startWizard" })}
+              {running ? t("vmWizard.running") : t("vmWizard.startWizard")}
             </button>
           ) : null}
         </div>

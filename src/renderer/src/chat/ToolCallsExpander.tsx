@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 
 interface ToolCallsExpanderProps {
   count: number;
@@ -6,16 +6,13 @@ interface ToolCallsExpanderProps {
 }
 
 export function ToolCallsExpander({ count, onClick }: ToolCallsExpanderProps) {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   return (
     <button className="transcript-expander" onClick={onClick}>
       <span className="transcript-expander-icon">⋯</span>
       <span>
-        {intl.formatMessage(
-          { id: "chat.earlierToolCalls" },
-          { count },
-        )}
+        {t("chat.earlierToolCalls", { count })}
       </span>
     </button>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { BudgetWatch } from "../../../shared/ipc";
 import type { ReachabilityState } from "../../../shared/ipc";
 import type { Environment, LoopMeta } from "../types";
@@ -20,7 +20,7 @@ export function LoopDetail(props: {
   onBack: () => void;
 }): React.ReactNode {
   const { instance, loopId, initial, reachability, onBack } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [loop, setLoop] = useState<LoopMeta | null>(initial);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
   const [budgetService] = useInject<IBudgetService>(cid.IBudgetService);
@@ -63,7 +63,7 @@ export function LoopDetail(props: {
   return (
     <div className="content-inner">
       <div className="detail-header">
-        <button className="icon-btn" title={intl.formatMessage({ id: "loopDetail.backToLoops" })} onClick={onBack}>
+        <button className="icon-btn" title={t("loopDetail.backToLoops")} onClick={onBack}>
           <ArrowLeft size={15} />
         </button>
         <span className="detail-title">{title}</span>
@@ -72,13 +72,13 @@ export function LoopDetail(props: {
             className="chip"
             style={{ color: isUnreachable ? "var(--status-unknown)" : STATUS_COLORS[loop.status] ?? "var(--text-secondary)" }}
           >
-            ● {isUnreachable ? intl.formatMessage({ id: "loopDetail.statusUnknown" }) : intl.formatMessage({ id: `loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}` })}
+            ● {isUnreachable ? t("loopDetail.statusUnknown") : t(`loopDetail.status${loop.status.charAt(0).toUpperCase()}${loop.status.slice(1)}`)}
           </span>
         ) : null}
         <span style={{ flex: 1 }} />
         <button
           className="icon-btn"
-          title={intl.formatMessage({ id: "budget.title" })}
+          title={t("budget.title")}
           onClick={() => setBudgetPanelOpen(true)}
           style={{ opacity: watches.length > 0 ? 1 : 0.5, color: watches.length > 0 ? "var(--warning)" : undefined }}
         >
@@ -89,38 +89,38 @@ export function LoopDetail(props: {
       {isUnreachable ? (
         <div className="stale-banner">
           <WifiOff size={13} />
-          {intl.formatMessage({ id: "loopDetail.staleBanner" })}
+          {t("loopDetail.staleBanner")}
         </div>
       ) : null}
 
       {loop ? (
         <div className="card">
           <div className="card-header">
-            <span className="overline">{intl.formatMessage({ id: "loopDetail.overview" })}</span>
+            <span className="overline">{t("loopDetail.overview")}</span>
             <span className="spacer" />
             <span className="card-stat">{loop.id}</span>
           </div>
           <div className="meta-grid">
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.interval" })}</div>
+              <div className="label">{t("loopDetail.interval")}</div>
               <div className="value">{loop.intervalHuman}</div>
             </div>
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.nextRun" })}</div>
-              <div className="value">{loop.nextRunAt ? timeUntil(loop.nextRunAt) : intl.formatMessage({ id: "loopDetail.emptyValue" })}</div>
+              <div className="label">{t("loopDetail.nextRun")}</div>
+              <div className="value">{loop.nextRunAt ? timeUntil(loop.nextRunAt) : t("loopDetail.emptyValue")}</div>
             </div>
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.lastRun" })}</div>
+              <div className="label">{t("loopDetail.lastRun")}</div>
               <div className="value">{timeAgo(loop.lastRunAt)}</div>
             </div>
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.lastExit" })}</div>
+              <div className="label">{t("loopDetail.lastExit")}</div>
               <div className="value" style={failed ? { color: "var(--danger)" } : undefined}>
                 {loop.lastExitCode === null ? "-" : loop.lastExitCode}
               </div>
             </div>
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.runs" })}</div>
+              <div className="label">{t("loopDetail.runs")}</div>
               <div className="value">
                 {loop.runCount}
                 {loop.maxRuns ? ` / ${loop.maxRuns}` : ""}
@@ -134,18 +134,18 @@ export function LoopDetail(props: {
               return (
                 <>
                   <div className="meta-item">
-                    <div className="label">{intl.formatMessage({ id: "loopDetail.activityToday" })}</div>
+                    <div className="label">{t("loopDetail.activityToday")}</div>
                     <div className="value">{todayCount}</div>
                   </div>
                   {avg !== null ? (
                     <div className="meta-item">
-                      <div className="label">{intl.formatMessage({ id: "loopDetail.activityAvgDuration" })}</div>
+                      <div className="label">{t("loopDetail.activityAvgDuration")}</div>
                       <div className="value">{formatDurationShort(avg)}</div>
                     </div>
                   ) : null}
                   {lastDur !== null ? (
                     <div className="meta-item">
-                      <div className="label">{intl.formatMessage({ id: "loopDetail.activityLastDuration" })}</div>
+                      <div className="label">{t("loopDetail.activityLastDuration")}</div>
                       <div className="value">{formatDurationShort(lastDur)}</div>
                     </div>
                   ) : null}
@@ -153,15 +153,15 @@ export function LoopDetail(props: {
               );
             })()}
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.pid" })}</div>
+              <div className="label">{t("loopDetail.pid")}</div>
               <div className="value">{loop.pid ?? "-"}</div>
             </div>
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.workingDir" })}</div>
+              <div className="label">{t("loopDetail.workingDir")}</div>
               <div className="value mono">{loop.cwd}</div>
             </div>
             <div className="meta-item">
-              <div className="label">{intl.formatMessage({ id: "loopDetail.command" })}</div>
+              <div className="label">{t("loopDetail.command")}</div>
               <div className="value mono">{commandLine(loop.command, loop.commandArgs)}</div>
             </div>
           </div>

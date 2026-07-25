@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { Environment, EnvironmentHealth, LoopMeta, Project, ReachabilityState } from "../types";
 import { Star, Settings } from "lucide-react";
 
@@ -39,7 +39,7 @@ export function InstanceSelector({
   onChange,
   onOpenSettings,
 }: InstanceSelectorProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +97,7 @@ export function InstanceSelector({
   );
 
   const currentOption = options.find((o) => o.isHome);
-  const triggerLabel = currentOption?.env.name ?? intl.formatMessage({ id: "instanceSelector.noInstance" });
+  const triggerLabel = currentOption?.env.name ?? t("instanceSelector.noInstance");
 
   const triggerHealth = currentOption?.health ?? "unknown";
   const triggerDotColor =
@@ -116,7 +116,7 @@ export function InstanceSelector({
       <button
         className="instance-selector-trigger"
         onClick={() => setOpen((v) => !v)}
-        title={intl.formatMessage({ id: "instanceSelector.tooltip" }, { project: projectName })}
+        title={t("instanceSelector.tooltip", { project: projectName })}
       >
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: triggerDotColor, flexShrink: 0 }} />
         <span className="instance-selector-trigger-label">{triggerLabel}</span>
@@ -126,7 +126,7 @@ export function InstanceSelector({
       {open ? (
         <div className="instance-selector-dropdown">
           <div className="instance-selector-dropdown-header">
-            {intl.formatMessage({ id: "instanceSelector.header" }, { project: projectName })}
+            {t("instanceSelector.header", { project: projectName })}
           </div>
           {options.map((option) => {
             const dotColor =
@@ -162,8 +162,8 @@ export function InstanceSelector({
                   </span>
                 ) : null}
                 <span className="instance-selector-option-loops">
-                  {intl.formatMessage(
-                    { id: "instanceSelector.loopCount" },
+                  {t(
+                    "instanceSelector.loopCount",
                     { count: option.loopCount },
                   )}
                 </span>
@@ -172,7 +172,7 @@ export function InstanceSelector({
                     className="instance-selector-gear"
                     role="button"
                     tabIndex={0}
-                    title={intl.formatMessage({ id: "instanceSelector.settingsTooltip" })}
+                    title={t("instanceSelector.settingsTooltip")}
                     onClick={(e) => { e.stopPropagation(); onOpenSettings(option.env.id); setOpen(false); }}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onOpenSettings(option.env.id); setOpen(false); } }}
                   >

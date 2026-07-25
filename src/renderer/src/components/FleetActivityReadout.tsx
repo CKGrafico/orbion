@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 import type { ReachabilityState } from "../../../shared/ipc";
 import { runsToday } from "../format";
@@ -41,7 +41,7 @@ export function FleetActivityReadout(props: {
   reachability?: Record<string, ReachabilityState>;
 }): React.ReactNode {
   const { perEnvLoops, perEnvHealth, environments, reachability } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   // Aggregate runs today across reachable instances
@@ -91,11 +91,11 @@ export function FleetActivityReadout(props: {
         <PopoverTrigger asChild>
           <button
             className={`fleet-activity-chip${popoverOpen ? " active" : ""}`}
-            title={intl.formatMessage({ id: "fleetActivity.tooltip" }, { count: totalRuns })}
+            title={t("fleetActivity.tooltip", { count: totalRuns })}
           >
             <Activity size={12} />
             <span className="fleet-activity-count">
-              {intl.formatMessage({ id: "fleetActivity.runsToday" }, { count: totalRuns })}
+              {t("fleetActivity.runsToday", { count: totalRuns })}
             </span>
           </button>
         </PopoverTrigger>
@@ -103,12 +103,12 @@ export function FleetActivityReadout(props: {
           <div className="fleet-activity-popover">
             <div className="fleet-activity-popover-header">
               <span className="overline">
-                {intl.formatMessage({ id: "fleetActivity.topContributors" })}
+                {t("fleetActivity.topContributors")}
               </span>
             </div>
             {contributors.length === 0 ? (
               <div className="fleet-activity-popover-empty">
-                {intl.formatMessage({ id: "fleetActivity.noContributors" })}
+                {t("fleetActivity.noContributors")}
               </div>
             ) : (
               <div className="fleet-activity-popover-list">
@@ -121,7 +121,7 @@ export function FleetActivityReadout(props: {
                       <span className="fleet-activity-label">{c.description}</span>
                       <span className="fleet-activity-env">{c.envName}</span>
                       <span className="fleet-activity-runs">
-                        {intl.formatMessage({ id: "fleetActivity.runCount" }, { count: c.runsToday })}
+                        {t("fleetActivity.runCount", { count: c.runsToday })}
                       </span>
                     </div>
                   );

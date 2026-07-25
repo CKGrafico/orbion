@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { Environment, LoopMeta, Project } from "../types";
 import type { ReachabilityState } from "../../../shared/ipc";
@@ -11,7 +11,7 @@ import { Folder, Copy } from "lucide-react";
 import type { IConfigService } from "../services/interfaces";
 
 function LoopActivitySummary({ loop }: { loop: LoopMeta }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const todayCount = runsToday(loop.runHistory);
   const avg = avgDuration(loop.runHistory);
 
@@ -21,12 +21,12 @@ function LoopActivitySummary({ loop }: { loop: LoopMeta }): React.ReactNode {
     <span className="loop-activity">
       {todayCount > 0 ? (
         <span className="loop-activity-item">
-          {intl.formatMessage({ id: "activitySummary.runsToday" }, { count: todayCount })}
+          {t("activitySummary.runsToday", { count: todayCount })}
         </span>
       ) : null}
       {avg !== null ? (
         <span className="loop-activity-item">
-          {intl.formatMessage({ id: "activitySummary.avgDuration" }, { value: formatDurationShort(avg) })}
+          {t("activitySummary.avgDuration", { value: formatDurationShort(avg) })}
         </span>
       ) : null}
     </span>
@@ -43,7 +43,7 @@ export function InstanceDetail(props: {
   onOpenProject: (projectId: string) => void;
 }): React.ReactNode {
   const { instance, loops, connectionPhase, reachability, onOpenLoop, onOpenProject } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [configService] = useInject<IConfigService>(cid.IConfigService);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -102,8 +102,8 @@ export function InstanceDetail(props: {
           <span className="glyph">
             <Folder size={30} strokeWidth={1.2} />
           </span>
-          <h3>{intl.formatMessage({ id: "instanceDetail.noProjects" })}</h3>
-          <p>{intl.formatMessage({ id: "instanceDetail.noProjectsDescription" })}</p>
+          <h3>{t("instanceDetail.noProjects")}</h3>
+          <p>{t("instanceDetail.noProjectsDescription")}</p>
         </div>
       </div>
     );
@@ -115,7 +115,7 @@ export function InstanceDetail(props: {
       {instance.role === "main-vm" ? (
         <div className="card" style={{ marginBottom: 12 }}>
           <div className="card-header">
-            <span className="overline">{intl.formatMessage({ id: "bootstrapSeed.exportLabel" })}</span>
+            <span className="overline">{t("bootstrapSeed.exportLabel")}</span>
             <span className="spacer" />
             <button
               className="btn"
@@ -124,8 +124,8 @@ export function InstanceDetail(props: {
             >
               <Copy size={12} style={{ marginRight: 4 }} />
               {seedCopied
-                ? intl.formatMessage({ id: "bootstrapSeed.exportCopied" })
-                : intl.formatMessage({ id: "bootstrapSeed.exportLabel" })}
+                ? t("bootstrapSeed.exportCopied")
+                : t("bootstrapSeed.exportLabel")}
             </button>
           </div>
         </div>
@@ -138,13 +138,13 @@ export function InstanceDetail(props: {
             <div className="card-header">
               <span className="dot" style={{ background: project.color }} />
               <span className="overline">{project.name}</span>
-              {project.isSystem ? <span className="overline" style={{ marginLeft: 4 }}>{intl.formatMessage({ id: "projects.system" })}</span> : null}
+              {project.isSystem ? <span className="overline" style={{ marginLeft: 4 }}>{t("projects.system")}</span> : null}
               <span className="spacer" />
-              <span className="card-stat">{intl.formatMessage({ id: "projects.loopsCount" }, { count: projectLoops.length })}</span>
+              <span className="card-stat">{t("projects.loopsCount", { count: projectLoops.length })}</span>
               <button
                 className="icon-btn"
                 style={{ marginLeft: 6, width: 24, height: 24, color: "var(--text-muted)" }}
-                title={intl.formatMessage({ id: "instanceDetail.viewProject" }, { name: project.name })}
+                title={t("instanceDetail.viewProject", { name: project.name })}
                 onClick={() => onOpenProject(project.id)}
               >
                 <Folder size={13} />
@@ -153,7 +153,7 @@ export function InstanceDetail(props: {
             <div className="card-body">
               <div className="loop-list">
                 {projectLoops.length === 0 ? (
-                  <div className="row-empty">{intl.formatMessage({ id: "instanceDetail.noLoopsInProject" })}</div>
+                  <div className="row-empty">{t("instanceDetail.noLoopsInProject")}</div>
                 ) : (
                   projectLoops.map((loop) => {
                     const fleetItem = loopStatusToFleetItem(loop.status, loop.lastExitCode, reachability);
@@ -190,9 +190,9 @@ export function InstanceDetail(props: {
         <div className="card">
           <div className="card-header">
             <span className="dot" style={{ background: "var(--text-muted)" }} />
-            <span className="overline">{intl.formatMessage({ id: "instanceDetail.unassigned" })}</span>
+            <span className="overline">{t("instanceDetail.unassigned")}</span>
             <span className="spacer" />
-            <span className="card-stat">{intl.formatMessage({ id: "projects.loopsCount" }, { count: unassignedLoops.length })}</span>
+            <span className="card-stat">{t("projects.loopsCount", { count: unassignedLoops.length })}</span>
           </div>
           <div className="card-body">
             <div className="loop-list">
