@@ -892,6 +892,9 @@ const validators: Record<string, Validator> = {
   // ── Outage ───────────────────────────────────────────────────
   "outage:getEscalations": () => [],
 
+  // ── Credential tampering ─────────────────────────────────────
+  "credential:getSecurityAuditEvents": () => [],
+
   // ── Settings ─────────────────────────────────────────────────
   "settings:get": () => [],
   "settings:update": (args) => {

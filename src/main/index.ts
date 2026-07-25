@@ -27,7 +27,7 @@ import type {
   McpToolCallResult,
   LoopShape,
 } from "../shared/ipc.js";
-import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
+import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings, SecurityAuditEvent } from "../shared/ipc.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -92,7 +92,9 @@ import {
   sweepEphemeralSessions,
   getGlobalSettings,
   updateGlobalSettings,
+  setCredentialTamperedCallback,
 } from "./config-store.js";
+import { logSecurityEvent, getSecurityAuditEvents } from "./security-audit-log.js";
 import {
   getMessages as transcriptGetMessages,
   appendMessage as transcriptAppendMessage,
@@ -161,6 +163,30 @@ const streams = new Map<string, StreamEntry>();
 const streamEnvironments = new Map<string, string>();
 
 const notificationService = new NotificationService();
+
+setCredentialTamperedCallback((environmentId, credentialKind) => {
+  logSecurityEvent({
+    kind: "credential-tampered",
+    environmentId,
+    credentialKind,
+  });
+
+  const envs = getEnvironments();
+  const env = envs.find((e: Environment) => e.id === environmentId);
+  const envName = env?.name ?? environmentId;
+
+  notificationService.send({
+    title: `Security alert: ${envName} credentials tampered`,
+    body: `Stored ${credentialKind === "sessionToken" ? "session token" : "SSH key passphrase"} was modified unexpectedly. Re-pair this instance to restore access.`,
+    tag: `credential-tampered:${environmentId}`,
+    suppressIfFocused: false,
+  });
+
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send("credential:tampered", { environmentId, credentialKind });
+  }
+});
 
 const outageTracker = new OutageTracker(
   (event: OutageEscalation) => {
@@ -1180,6 +1206,13 @@ app.whenReady().then(() => {
       }
     }
     return result;
+  });
+
+  // ── Credential tampering ────────────────────────────────────────────
+
+  safeHandle("credential:getSecurityAuditEvents", (): SecurityAuditEvent[] => {
+    validateIpc("credential:getSecurityAuditEvents", []);
+    return getSecurityAuditEvents();
   });
 
   // ── Reachability (instance health layer, separate from loop status) ───

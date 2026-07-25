@@ -60,6 +60,7 @@ import {
   getSshKeyPassphrase,
   removeEnvironment,
   SECRET_FIELD_NAMES,
+  setCredentialTamperedCallback,
   storeSessionToken,
   storeSshKeyPassphrase,
 } from "../src/main/config-store.js";
@@ -370,7 +371,7 @@ describe("credential vault integrity (HMAC)", () => {
     expect(migrated.hmac).toEqual(expect.any(String));
   });
 
-  it("getSessionToken catches CredentialTamperedError and sets authState to blocked", async () => {
+  it("getSessionToken catches CredentialTamperedError and sets authState to tampered", async () => {
     const environment = await addEnvironment("Tampered", "http://localhost:8845");
     await storeSessionToken(environment.id, {
       accessToken: "will-be-tampered",
@@ -391,7 +392,36 @@ describe("credential vault integrity (HMAC)", () => {
     expect(token).toBeNull();
 
     const envAfter = getEnvironments().find((e) => e.id === environment.id);
-    expect(envAfter?.authState).toBe("blocked");
+    expect(envAfter?.authState).toBe("tampered");
+  });
+
+  it("getSessionToken invokes onCredentialTampered callback on tampering", async () => {
+    const environment = await addEnvironment("CallbackTest", "http://localhost:8845");
+    await storeSessionToken(environment.id, {
+      accessToken: "callback-test-token",
+      scope: "operate",
+      expiresAt: null,
+    });
+
+    const storedEnv = getEnvironments().find((e) => e.id === environment.id);
+    const sessionRef = storedEnv?.credentialRefs?.sessionToken;
+    expect(sessionRef).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(sessionRef)]);
+    stored.encryptedValue = Buffer.from("tampered!").toString("base64");
+    storeValues("credentials").set("credentials", credentials);
+
+    const callbackCalls: Array<{ environmentId: string; credentialKind: string }> = [];
+    setCredentialTamperedCallback((envId, kind) => {
+      callbackCalls.push({ environmentId: envId, credentialKind: kind });
+    });
+
+    getSessionToken(environment.id);
+
+    expect(callbackCalls).toHaveLength(1);
+    expect(callbackCalls[0]?.environmentId).toBe(environment.id);
+    expect(callbackCalls[0]?.credentialKind).toBe("sessionToken");
   });
 
   it("HMAC comparison is constant-time (timing variance within bounds)", () => {
@@ -435,7 +465,7 @@ describe("credential vault integrity (HMAC)", () => {
     expect(diff).toBeLessThan(3 * pooledStd + 0.01);
   });
 
-  it("getSshKeyPassphrase catches CredentialTamperedError and sets authState to blocked", async () => {
+  it("getSshKeyPassphrase catches CredentialTamperedError and sets authState to tampered", async () => {
     const environment = await addEnvironment("TamperedSSH", "http://localhost:8845");
     await storeSshKeyPassphrase(environment.id, "ssh-secret");
 
@@ -451,6 +481,31 @@ describe("credential vault integrity (HMAC)", () => {
     expect(getSshKeyPassphrase(environment.id)).toBeNull();
 
     const envAfter = getEnvironments().find((e) => e.id === environment.id);
-    expect(envAfter?.authState).toBe("blocked");
+    expect(envAfter?.authState).toBe("tampered");
+  });
+
+  it("getSshKeyPassphrase invokes onCredentialTampered callback on tampering", async () => {
+    const environment = await addEnvironment("SshCallbackTest", "http://localhost:8845");
+    await storeSshKeyPassphrase(environment.id, "ssh-secret-cb");
+
+    const storedEnv = getEnvironments().find((e) => e.id === environment.id);
+    const passphraseRef = storedEnv?.credentialRefs?.sshKeyPassphrase;
+    expect(passphraseRef).toEqual(expect.any(String));
+
+    const credentials = record(storeValues("credentials").get("credentials"));
+    const stored = record(credentials[String(passphraseRef)]);
+    stored.encryptedValue = Buffer.from("tampered!").toString("base64");
+    storeValues("credentials").set("credentials", credentials);
+
+    const callbackCalls: Array<{ environmentId: string; credentialKind: string }> = [];
+    setCredentialTamperedCallback((envId, kind) => {
+      callbackCalls.push({ environmentId: envId, credentialKind: kind });
+    });
+
+    getSshKeyPassphrase(environment.id);
+
+    expect(callbackCalls).toHaveLength(1);
+    expect(callbackCalls[0]?.environmentId).toBe(environment.id);
+    expect(callbackCalls[0]?.credentialKind).toBe("sshKeyPassphrase");
   });
 });
