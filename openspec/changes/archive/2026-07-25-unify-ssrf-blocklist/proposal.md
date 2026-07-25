@@ -25,7 +25,7 @@ Gaps in both:
 5. Parity test: both call paths produce same allow/deny for comprehensive test URL set
 
 ## Verification
-- 69 host-blocklist tests pass (including metadata.azure.internal, isAllowedBaseUrl, parity)
+- 73 host-blocklist tests pass (including metadata.azure.internal, isAllowedBaseUrl, trailing-dot FQDN, parity)
 - 88 IPC validation tests pass
 - `pnpm typecheck` clean
 - `pnpm check:comments` clean
