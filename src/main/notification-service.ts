@@ -16,19 +16,11 @@ const store = new Store<NotificationConfigSchema>({
 });
 
 /**
- * Main-process notification service.
- *
- * Uses Electron's native Notification API which:
- * - Respects OS Do Not Disturb (macOS / Windows Focus Assist)
- * - Fires a reliable click event that can focus + navigate the window
- * - Works even when the window is minimized or hidden
+ * Uses Electron's native Notification API which respects OS Do Not Disturb,
+ * fires a reliable click event that can focus + navigate the window,
+ * and works even when the window is minimized or hidden.
  */
 export class NotificationService {
-  /**
-   * Show a native OS notification.
-   * Respects global mute and OS Do Not Disturb.
-   * If the window is focused and suppressIfFocused is true, skips the notification.
-   */
   send(args: NotificationSendArgs): void {
     if (this.isMuted()) return;
 
@@ -67,17 +59,10 @@ export class NotificationService {
     store.set("notificationsMuted", muted);
   }
 
-  /**
-   * Store a deep-link for cold-start recovery.
-   * Called when a notification is clicked but no window exists yet.
-   */
   setPendingDeepLink(link: DeepLinkTarget): void {
     store.set("pendingDeepLink", link);
   }
 
-  /**
-   * Retrieve and clear the pending deep-link (called once on window creation).
-   */
   consumePendingDeepLink(): DeepLinkTarget | null {
     const link = store.get("pendingDeepLink", null);
     if (link) {
@@ -86,10 +71,6 @@ export class NotificationService {
     return link;
   }
 
-  /**
-   * Send the pending deep-link to the renderer if one exists.
-   * Called after the main window is created and ready.
-   */
   dispatchPendingDeepLink(): void {
     const link = this.consumePendingDeepLink();
     if (!link) return;

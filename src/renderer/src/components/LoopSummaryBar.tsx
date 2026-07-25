@@ -4,36 +4,22 @@ import type { LoopMeta, LoopStatus, FleetLoopRollup } from "../types";
 import { useNextRunCountdown } from "./useNextRunCountdown";
 import type { PipelineCounts } from "./usePipelineCounts";
 
-/** A segment that can be clicked in the summary bar.
- *  "healthy" covers running + waiting loops.
- *  Individual exception statuses (failed, paused, stopped, finished) are their own segments.
- *  Pipeline labels are their own segment kind. */
+/** "healthy" = running+waiting. Individual exception statuses and pipeline labels are their own segments. */
 export type LoopSegmentKind = "healthy" | "failed" | "paused" | "stopped" | "finished" | `pipeline:${string}`;
 
 interface LoopSummaryBarProps {
-  /** Loops scoped to the session's home project x instance. */
   loops: LoopMeta[];
-  /** Whether the instance is reachable. When not connected, the bar shows a muted unknown state. */
   reachability?: "connected" | "reconnecting" | "unreachable";
-  /** Called when the user clicks a bar segment. The handler should summon matching loop cards or issue stacks. */
   onSegmentClick?: (kind: LoopSegmentKind) => void;
-  /** When true, the bar renders fleet-wide aggregated totals instead of per-scope counts. */
   fleetMode?: boolean;
-  /** Fleet rollup data. Required when fleetMode is true. */
   fleetRollup?: FleetLoopRollup;
-  /** Pipeline label counts for the session's project. Null when no pipeline labels are configured. */
   pipelineCounts?: PipelineCounts | null;
 }
 
-/** Healthy statuses that collapse to a single count. */
 const HEALTHY_STATUSES: Set<LoopStatus> = new Set(["running", "waiting"]);
 
-/** Exception statuses that get individual colored segments. */
 const EXCEPTION_STATUSES: LoopStatus[] = ["failed", "paused", "stopped", "finished"];
 
-/** Color CSS variable for each exception status.
- *  Failed uses the alert/danger color; stopped gets warm amber distinct from failed;
- *  paused gets yellow (schedule kept); finished gets green (success). */
 const EXCEPTION_COLORS: Record<string, string> = {
   failed: "var(--danger)",
   paused: "var(--status-paused)",
@@ -46,12 +32,10 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
 
   const isReachable = reachability === "connected" || reachability === undefined;
 
-  // ── Fleet mode rendering ────────────────────────────────────────────
   if (fleetMode) {
     return <FleetLoopSummaryBar fleetRollup={fleetRollup} onSegmentClick={onSegmentClick} />;
   }
 
-  // ── Standard (scoped) rendering ─────────────────────────────────────
   const counts = useMemo(() => {
     const result: Record<LoopStatus, number> = {
       running: 0,
@@ -77,7 +61,6 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
     [counts],
   );
 
-  /** Find the loop with the most imminent next run. */
   const nextRun = useMemo(() => {
     let earliest: { loopId: string; description: string; nextRunAt: string } | null = null;
     for (const loop of loops) {
@@ -95,9 +78,7 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
 
   const countdown = useNextRunCountdown(nextRun?.nextRunAt ?? null);
 
-  // When the instance is unreachable, show a muted state instead of
-  // potentially stale counts. This ensures a dropped tunnel never
-  // reads as "everything failed."
+  // When unreachable, show muted state so a dropped tunnel never reads as "everything failed."
   if (!isReachable && loops.length > 0) {
     return (
       <div className="loop-summary-bar loop-summary-bar--unknown">
@@ -111,7 +92,6 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
     );
   }
 
-  // Empty state: no loops in scope
   if (loops.length === 0) {
     return (
       <div className="loop-summary-bar loop-summary-bar--empty">
@@ -125,7 +105,6 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
   return (
     <div className="loop-summary-bar">
       <div className="loop-summary-segments">
-        {/* Healthy count: collapsed to a single number */}
         {healthyCount > 0 ? (
           <span
             className="loop-summary-segment loop-summary-healthy loop-summary-segment--clickable"
@@ -142,7 +121,6 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
           </span>
         ) : null}
 
-        {/* Exception segments: only shown when their count is nonzero */}
         {exceptions.map((status) => (
           <span
             key={status}
@@ -163,7 +141,6 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
           </span>
         ))}
 
-        {/* Pipeline segments: shown when pipeline counts are available */}
         {pipelineCounts ? (
           <>
             <span className="loop-summary-divider" />
@@ -189,7 +166,6 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
         ) : null}
       </div>
 
-      {/* Next-run countdown (right-aligned, hidden when nothing scheduled) */}
       {nextRun && countdown ? (
         <span className="loop-summary-next-run">
           {intl.formatMessage(
@@ -213,7 +189,6 @@ function FleetLoopSummaryBar({
 }): React.ReactNode {
   const intl = useIntl();
 
-  // No rollup data at all (shouldn't happen in practice, but be safe)
   if (!fleetRollup) {
     return (
       <div className="loop-summary-bar loop-summary-bar--empty loop-summary-bar--fleet">
@@ -227,7 +202,6 @@ function FleetLoopSummaryBar({
   const { counts, projectCount, loopsWithOrigin } = fleetRollup;
   const totalLoops = loopsWithOrigin.length;
 
-  // No loops across the entire fleet
   if (totalLoops === 0) {
     return (
       <div className="loop-summary-bar loop-summary-bar--empty loop-summary-bar--fleet">
@@ -239,9 +213,8 @@ function FleetLoopSummaryBar({
   }
 
   const healthyCount = counts.running + counts.waiting;
-  const exceptions = EXCEPTION_STATUSES.filter((s) => counts[s] > 0);
+  const exceptions = EXCEPTION_STATUSES.filter((s) => counts[s] > 0  );
 
-  /** Map an exception status to its fleet i18n key. */
   const fleetStatusKeys: Record<string, { count: string; aria: string }> = {
     failed: { count: "loopSummary.fleetFailed", aria: "loopSummary.fleetFailedAria" },
     paused: { count: "loopSummary.fleetPaused", aria: "loopSummary.fleetPausedAria" },
@@ -252,7 +225,6 @@ function FleetLoopSummaryBar({
   return (
     <div className="loop-summary-bar loop-summary-bar--fleet">
       <div className="loop-summary-segments">
-        {/* Fleet prefix: "across N projects" */}
         <span className="loop-summary-fleet-prefix">
           {intl.formatMessage(
             { id: "loopSummary.fleetAcrossProjects" },
@@ -260,7 +232,6 @@ function FleetLoopSummaryBar({
           )}
         </span>
 
-        {/* Healthy count */}
         {healthyCount > 0 ? (
           <span
             className="loop-summary-segment loop-summary-healthy loop-summary-segment--clickable"
@@ -277,7 +248,6 @@ function FleetLoopSummaryBar({
           </span>
         ) : null}
 
-        {/* Exception segments */}
         {exceptions.map((status) => {
           const keys = fleetStatusKeys[status];
           return (
@@ -302,7 +272,6 @@ function FleetLoopSummaryBar({
         })}
       </div>
 
-      {/* No next-run countdown in fleet mode — it doesn't make sense
           to show a single next-run when the estate has many schedulers. */}
     </div>
   );

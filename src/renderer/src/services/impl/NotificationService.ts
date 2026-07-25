@@ -2,14 +2,8 @@ import { injectable } from "inversify-hooks";
 import type { INotificationService } from "../interfaces";
 import type { DeepLinkTarget, NotificationSendArgs } from "../../../../shared/ipc";
 
-/**
- * Notification service that delegates to the main process via the IPC bridge.
- *
- * The main process uses Electron's native Notification API which:
- * - Respects OS Do Not Disturb (macOS / Windows Focus Assist)
- * - Fires a reliable click event for deep-linking
- * - Works even when the window is minimized
- */
+// Delegates to the main process via IPC. Uses Electron's native Notification API
+// which respects OS DnD, fires reliable click events, and works when minimized.
 @injectable()
 export class NotificationService implements INotificationService {
   private clickListeners: ((deepLink: DeepLinkTarget) => void)[] = [];
@@ -32,7 +26,6 @@ export class NotificationService implements INotificationService {
   onClick(cb: (deepLink: DeepLinkTarget) => void): () => void {
     this.clickListeners.push(cb);
 
-    // If this is the first listener, subscribe to the IPC event
     if (this.clickListeners.length === 1 && typeof window !== "undefined" && window.api) {
       this.unsub = window.api.notification.onClick((deepLink: DeepLinkTarget) => {
         for (const listener of this.clickListeners) {

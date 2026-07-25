@@ -1,16 +1,3 @@
-/**
- * Scenario: gh-157-cross-pr-overlap-detection
- *
- * Exercises cross-PR overlap detection in the review queue strip:
- *   1. App launches into the inbox view with mock data (3 PRs).
- *   2. Clicking a PR item opens review mode with a batch of 3 PRs.
- *   3. The queue strip shows overlap indicator chips on PRs #127 and #131
- *      (they share src/middleware/auth.ts and src/config.ts).
- *   4. The review order banner appears indicating overlapping PRs.
- *   5. The briefing view shows file-level overlap notes on shared files.
- *
- * Uses mock mode (no real Electron environment needed).
- */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
@@ -26,10 +13,8 @@ type AssertionSpec = {
 export async function gh157CrossPrOverlapDetectionScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render (inbox or cold-open)
   await page.waitForTimeout(3000);
 
-  // Navigate to inbox if not already there
   const inboxTab = page.getByRole("button", { name: /inbox/i });
   if ((await inboxTab.count()) > 0) {
     await inboxTab.first().click();
@@ -65,7 +50,7 @@ export async function gh157CrossPrOverlapDetectionScenario(ctx: ScenarioContext)
     {
       description: "The queue strip shows overlap indicator chips on affected PRs",
       run: async (p) => {
-        // Wait for overlap detection to complete (async fetch of diffs)
+        // Wait for async diff fetching to complete
         await page.waitForTimeout(3000);
         const overlapChip = p.locator(".review-queue-strip-row-overlap");
         const count = await overlapChip.count();
@@ -87,20 +72,14 @@ export async function gh157CrossPrOverlapDetectionScenario(ctx: ScenarioContext)
     {
       description: "The briefing view shows file-level overlap notes on shared files",
       run: async (p) => {
-        // Ensure we're on the briefing tab
         const briefingBtn = p.locator(".review-mode-tab-btn").filter({ hasText: /briefing/i });
         if ((await briefingBtn.count()) > 0) {
           await briefingBtn.click();
           await page.waitForTimeout(1000);
         }
-        // Look for file-level overlap notes
         const fileOverlapNote = p.locator(".review-briefing-file-overlap-note");
-        // If the active PR (#127) overlaps, we should see the note
-        // This assertion is soft: the overlap note appears on expanded flagged files
         const count = await fileOverlapNote.count();
         if (count === 0) {
-          // The overlap note may not be visible if the briefing hasn't loaded or
-          // the active PR doesn't have flagged files. Try selecting PR #127 first.
           const row127 = p.locator(".review-queue-strip-row").filter({ hasText: /127/ });
           if ((await row127.count()) > 0) {
             await row127.click();

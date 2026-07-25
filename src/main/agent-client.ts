@@ -6,13 +6,9 @@
  * running generations. All network I/O stays in the main process; events are
  * forwarded to the renderer via IPC push (agent:streamEvent).
  *
- * Architecture:
- * - Each in-flight prompt is tracked by a composite key
- *   (environmentId + chatSessionId + turnId) so the renderer can correlate
- *   stream events back to the correct turn.
- * - The OpenCode SSE event stream is consumed via the same spec-compliant
- *   eventsource-parser used for log streaming.
- * - Aborting is done via OpenCode's v2.session.interrupt endpoint.
+ * Each in-flight prompt is tracked by a composite key
+ * (environmentId + chatSessionId + turnId) so the renderer can correlate
+ * stream events back to the correct turn.
  */
 
 import type {
@@ -31,12 +27,8 @@ import { createLogger } from "./logger.js";
 
 const logger = createLogger("agent-client");
 
-// ── Types ────────────────────────────────────────────────────────────────
-
-/** Timeout for the promptAsync HTTP request. */
 const PROMPT_TIMEOUT_MS = 30_000;
 
-/** Timeout for the interrupt HTTP request. */
 const INTERRUPT_TIMEOUT_MS = 10_000;
 
 interface InFlightPrompt {
@@ -47,15 +39,11 @@ interface InFlightPrompt {
   abortController: AbortController;
 }
 
-// ── In-memory tracking ────────────────────────────────────────────────────
-
 const inFlight = new Map<string, InFlightPrompt>();
 
 function inFlightKey(chatSessionId: string, turnId: string): string {
   return `${chatSessionId}:${turnId}`;
 }
-
-// ── Event forwarding ────────────────────────────────────────────────────
 
 function forwardEvent(event: AgentStreamEvent): void {
   const win = getMainWindow();
@@ -64,9 +52,6 @@ function forwardEvent(event: AgentStreamEvent): void {
   }
 }
 
-// ── OpenCode HTTP helpers ────────────────────────────────────────────────
-
-/** Resolve the OpenCode endpoint for an environment. */
 function resolveOpenCodeEndpoint(environmentId: string): { url: string; password: string | null; wasEncrypted: boolean } | null {
   const envs = getEnvironments();
   const env = envs.find((e) => e.id === environmentId);
@@ -89,7 +74,6 @@ function resolveOpenCodeEndpoint(environmentId: string): { url: string; password
   return { url: endpoint.url, password, wasEncrypted: endpointAny.wasEncrypted === true };
 }
 
-/** Build auth headers for OpenCode API requests. */
 function buildAuthHeaders(password: string | null): Record<string, string> {
   if (!password) return {};
   const encoded = Buffer.from(`admin:${password}`).toString("base64");
@@ -105,16 +89,11 @@ function responseText(parts: unknown): string {
     .join("");
 }
 
-// ── Public API ────────────────────────────────────────────────────────────
-
 /**
  * Send a prompt to the OpenCode runtime and begin streaming events.
- *
- * This performs:
  * 1. Resolve the environment's OpenCode endpoint.
  * 2. POST promptAsync to create/continue a session.
- * 3. Consume the v2.session.events SSE stream, forwarding text-delta and
- *    other events to the renderer.
+ * 3. Consume the v2.session.events SSE stream, forwarding events to the renderer.
  * 4. Clean up on finish/error/abort.
  */
 export async function sendPromptToAgent(
@@ -182,7 +161,6 @@ export async function sendPromptToAgent(
 
     const promptData = await promptRes.json() as Record<string, unknown>;
 
-    // Track in-flight prompt
     const entry: InFlightPrompt = {
       environmentId: args.environmentId,
       chatSessionId: args.chatSessionId,
@@ -210,12 +188,6 @@ export async function sendPromptToAgent(
   }
 }
 
-/**
- * Consume the SSE event stream from the OpenCode runtime.
- *
- * Parses incoming events and forwards relevant ones to the renderer.
- * Handles text deltas, tool calls, and session completion.
- */
 async function consumeEventStream(
   baseUrl: string,
   eventsPath: string,
@@ -238,7 +210,6 @@ async function consumeEventStream(
       return;
     }
 
-    // Parse the SSE stream
     const decoder = new TextDecoder();
     const reader = res.body.getReader();
     let buffer = "";
@@ -266,7 +237,6 @@ async function consumeEventStream(
       }
     }
 
-    // Stream ended naturally
     forwardEvent({ kind: "turn-finished", chatSessionId, turnId });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
@@ -280,12 +250,8 @@ async function consumeEventStream(
   }
 }
 
-/**
- * Parse and forward a single OpenCode SSE event to the renderer.
- *
- * The OpenCode runtime emits various event types. We only forward the ones
- * relevant to the chat UI: text content updates, tool calls, and completion.
- */
+/** Parse and forward a single OpenCode SSE event to the renderer.
+ *  Only forwards text content, tool calls, and completion events. */
 function forwardParsedEvent(
   event: Record<string, unknown>,
   chatSessionId: string,
@@ -293,7 +259,6 @@ function forwardParsedEvent(
 ): void {
   const eventType = String(event.type ?? event.kind ?? "");
 
-  // Text content delta from the assistant
   if (eventType === "part-update" || eventType === "text-delta") {
     const text = String(event.text ?? event.content ?? "");
     if (text) {
@@ -302,7 +267,6 @@ function forwardParsedEvent(
     return;
   }
 
-  // Tool call started
   if (eventType === "tool-call-start" || eventType === "tool-start") {
     const toolCallId = String(event.id ?? event.toolCallId ?? `tc-${Date.now()}`);
     const toolName = String(event.name ?? event.toolName ?? "unknown");
@@ -311,7 +275,6 @@ function forwardParsedEvent(
     return;
   }
 
-  // Tool call completed / errored
   if (eventType === "tool-call-end" || eventType === "tool-end") {
     const toolCallId = String(event.id ?? event.toolCallId ?? "");
     const output = String(event.output ?? event.result ?? "");
@@ -321,13 +284,11 @@ function forwardParsedEvent(
     return;
   }
 
-  // Session completed / agent turn finished
   if (eventType === "session-complete" || eventType === "turn-complete" || eventType === "response-done") {
     forwardEvent({ kind: "turn-finished", chatSessionId, turnId });
     return;
   }
 
-  // Error
   if (eventType === "error") {
     const error = String(event.error ?? event.message ?? "Unknown error");
     forwardEvent({ kind: "turn-error", chatSessionId, turnId, error });
@@ -335,17 +296,11 @@ function forwardParsedEvent(
   }
 }
 
-/**
- * Interrupt an in-flight agent generation.
- *
- * Sends an interrupt signal to the OpenCode runtime and aborts the
- * local SSE stream consumer. Partial output is preserved in the transcript.
- */
+/** Sends an interrupt signal to the OpenCode runtime and aborts the local SSE stream consumer. Partial output is preserved. */
 export async function interruptAgent(
   environmentId: string,
   sessionId?: string,
 ): Promise<void> {
-  // Find and abort any in-flight prompt for this environment
   for (const [key, entry] of inFlight) {
     if (entry.environmentId === environmentId) {
       entry.abortController.abort();
@@ -353,7 +308,6 @@ export async function interruptAgent(
     }
   }
 
-  // Also send interrupt to the OpenCode runtime
   if (!sessionId) return;
 
   const endpointInfo = resolveOpenCodeEndpoint(environmentId);

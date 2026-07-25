@@ -1,22 +1,3 @@
-/**
- * Launch the Orbion app under Playwright for deterministic visual-evidence
- * capture.
- *
- * Supports two modes:
- *
- * 1. **Web mock mode** (default, `ORBION_VISUAL_EVIDENCE_MODE=web`):
- *    Starts `pnpm dev:web` (Vite dev server on port 5183) which serves the
- *    renderer with the mock adapter (no Electron, no daemon, no real data).
- *    Playwright's headless Chromium navigates to the dev server. This is
- *    fast, fully deterministic, and works on headless Linux without GUI
- *    system libraries.
- *
- * 2. **Electron mode** (`ORBION_VISUAL_EVIDENCE_MODE=electron`):
- *    Builds and launches the real Electron app. Requires system GUI libs
- *    (libatk, libgtk-3, etc.) and xvfb-run on headless Linux.
- *
- * The caller owns closing the app/browser.
- */
 import { chromium } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
@@ -36,21 +17,16 @@ interface WindowBounds {
 }
 
 export interface LaunchedApp {
-  /** The Electron app (when in electron mode) or null (web mode). */
   readonly app: import("playwright").ElectronApplication | null;
-  /** The browser context backing the page (for tracing/video). */
   readonly context: import("playwright").BrowserContext;
-  /** The main window page — either the Electron window or the Chromium tab. */
   readonly window: import("playwright").Page;
-  /** Call to shut everything down (browser, dev server, Electron). */
-  close: () => Promise<void>;
+  readonly close: () => Promise<void>;
 }
 
 function outputExists(repoRoot: string): boolean {
   return fs.existsSync(path.join(repoRoot, "out", "main", "index.js"));
 }
 
-/** Run `pnpm build`; resolves on success, rejects with stderr on failure. */
 export function buildApp(repoRoot: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const result = spawn("pnpm", ["build"], {
@@ -76,7 +52,6 @@ export async function ensureBuilt(repoRoot: string, opts?: { skip?: boolean }): 
   await buildApp(repoRoot);
 }
 
-/** Pre-write the window-bounds.json so the launched window is deterministic. */
 function prepareUserData(paths: TempPaths, config: VisualEvidenceConfig): void {
   const bounds: WindowBounds = {
     width: config.window.width,
@@ -101,10 +76,6 @@ function electronBinaryPath(repoRoot: string): string {
   }
 }
 
-/**
- * Wait for the React renderer to mount real content inside #root.
- * Works for both Electron and Chromium pages.
- */
 async function waitForReactMount(page: import("playwright").Page): Promise<void> {
   try {
     await page.waitForSelector("#root", { state: "attached", timeout: 15_000 });
@@ -121,10 +92,6 @@ async function waitForReactMount(page: import("playwright").Page): Promise<void>
   }
 }
 
-/**
- * Start the Vite dev server (`pnpm dev:web`) on the configured port and
- * wait for it to be ready.
- */
 function startDevServer(repoRoot: string, port: number): { process: ChildProcess; url: string } {
   const proc = spawn("pnpm", ["dev:web", "--port", String(port), "--strictPort"], {
     cwd: repoRoot,
@@ -136,9 +103,6 @@ function startDevServer(repoRoot: string, port: number): { process: ChildProcess
   return { process: proc, url };
 }
 
-/**
- * Wait for the Vite dev server to respond.
- */
 async function waitForDevServer(url: string, timeoutMs = 30_000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -146,23 +110,12 @@ async function waitForDevServer(url: string, timeoutMs = 30_000): Promise<void> 
       const resp = await fetch(url);
       if (resp.ok || resp.status === 200) return;
     } catch {
-      // Server not ready yet
     }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`Vite dev server at ${url} did not respond within ${timeoutMs}ms`);
 }
 
-/**
- * Launch the app in the mode selected by ORBION_VISUAL_EVIDENCE_MODE.
- *
- * Default: "web" (mock adapter via Vite dev server + headless Chromium).
- *   - Fast, no system GUI libs needed, fully deterministic.
- *   - Works on headless Linux without xvfb.
- *
- * "electron": build + launch the real Electron app.
- *   - Requires system GUI libs + xvfb on headless Linux.
- */
 export async function launchElectronApp(
   repoRoot: string,
   paths: TempPaths,
@@ -263,7 +216,6 @@ async function launchElectronMode(
   try {
     await window.setViewportSize({ width: config.window.width, height: config.window.height });
   } catch {
-    // Best-effort
   }
 
   await waitForReactMount(window);

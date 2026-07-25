@@ -1,18 +1,3 @@
-/**
- * Promote final optimized assets into the active OpenSpec change's
- * `evidence/` folder.
- *
- * Refuses to write raw video, traces, frames, logs, or duplicate screenshots.
- * Permanent evidence must be limited to:
- *   - one optimized final-state screenshot (final.webp or final.png)
- *   - one optimized GIF (flow.gif, only when meaningful)
- *   - the evidence.json manifest
- *
- * The folder lives at `openspec/changes/<id>/evidence/` so the existing
- * OpenSpec archive step (`mv changeRoot → openspec/changes/archive/...`)
- * moves the evidence together with the rest of the change without requiring
- * a separate copy step.
- */
 import fs from "node:fs";
 import path from "node:path";
 import type { VisualEvidenceConfig } from "./config.js";
@@ -34,12 +19,6 @@ function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
 
-/**
- * Write final assets (buffers in memory) to the evidence folder.
- *
- * @param assets concrete files to write, mapped to their final filename +
- *   buffer payload.
- */
 export interface AssetToWrite {
   readonly filename: string;
   readonly buffer: Buffer;
@@ -67,10 +46,6 @@ export function writeFinalAssets(
   return written;
 }
 
-/**
- * Compute the final list of {@link EvidenceAsset} descriptors whose `path`
- * field is the repo-relative path used inside the manifest + PR markdown.
- */
 export function assetRelativePaths(
   repoRoot: string,
   changeId: string,
@@ -82,7 +57,6 @@ export function assetRelativePaths(
   return assets.map((a) => ({ ...a, path: `${rel}/${path.basename(a.path)}` }));
 }
 
-/** Idempotent: clear any prior final assets before promoting new ones. */
 export function clearEvidenceDir(repoRoot: string, changeId: string, config: VisualEvidenceConfig): void {
   const dir = permanentEvidenceDir(repoRoot, changeId, config);
   if (!fs.existsSync(dir)) return;

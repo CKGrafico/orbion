@@ -1,14 +1,3 @@
-/**
- * Scenario: gh-164-restore-offer
- *
- * Exercises the RestoreOffer modal that appears when a config-home VM
- * has a config file available for pull-canonical restore.
- * The modal shows environment count and names, with Restore and Skip buttons.
- *
- * In the mock app, checkRestoreAvailable returns a mock availability
- * with 2 environments after adding a VM. The scenario verifies the
- * component structure and captures evidence.
- */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import { runAssertions } from "../assertions.js";
@@ -21,7 +10,6 @@ type AssertionSpec = {
 export async function gh164RestoreOfferScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render
   await page.waitForTimeout(3000);
 
   const assertions: AssertionSpec[] = [
@@ -42,10 +30,6 @@ export async function gh164RestoreOfferScenario(ctx: ScenarioContext): Promise<S
     {
       description: "The RestoreOffer component is wired in the App with checkRestoreAvailable",
       run: async (p) => {
-        // The RestoreOffer is rendered in App.tsx when restoreOfferOpen && restoreAvailability.available
-        // In the mock, checkRestoreAvailable returns { available: true, environmentCount: 2, environmentNames: [...] }
-        // The modal appears after the VM-wizard-done flow
-        // Verify the app renders correctly where the modal would trigger
         const app = p.locator(".app");
         if ((await app.count()) > 0) {
           return;

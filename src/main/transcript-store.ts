@@ -6,10 +6,6 @@ import { createLogger } from "./logger.js";
 
 const logger = createLogger("transcript-store");
 
-// ---------------------------------------------------------------------------
-// Per-session file storage for chat transcripts
-// ---------------------------------------------------------------------------
-
 let _transcriptDir: string | null = null;
 
 function getTranscriptDir(): string {
@@ -25,10 +21,6 @@ function sessionFilePath(sessionId: string): string {
   const safeId = sessionId.replace(/[^a-zA-Z0-9\-_]/g, "_");
   return path.join(getTranscriptDir(), `${safeId}.json`);
 }
-
-// ---------------------------------------------------------------------------
-// Write serialization per session
-// ---------------------------------------------------------------------------
 
 const writeQueues = new Map<string, Promise<void>>();
 
@@ -47,10 +39,6 @@ function serializeSession<T>(sessionId: string, fn: () => T): Promise<T> {
   return next;
 }
 
-// ---------------------------------------------------------------------------
-// Debounced writes for streaming updates
-// ---------------------------------------------------------------------------
-
 const pendingWrites = new Map<string, NodeJS.Timeout>();
 const DEBOUNCE_MS = 200;
 
@@ -63,15 +51,10 @@ function scheduleFlush(sessionId: string): void {
     setTimeout(() => {
       pendingWrites.delete(sessionId);
       // The debounce is only a signal to allow batching; actual writes
-      // happen through the serializeSession queue. Nothing extra to flush
-      // because every mutation already writes immediately through the queue.
+      // happen through the serializeSession queue.
     }, DEBOUNCE_MS),
   );
 }
-
-// ---------------------------------------------------------------------------
-// Read
-// ---------------------------------------------------------------------------
 
 function readSessionFile(sessionId: string): TranscriptMessage[] {
   const filePath = sessionFilePath(sessionId);
@@ -86,26 +69,17 @@ function readSessionFile(sessionId: string): TranscriptMessage[] {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Write helpers
-// ---------------------------------------------------------------------------
-
 function writeSessionFile(sessionId: string, messages: TranscriptMessage[]): void {
   const filePath = sessionFilePath(sessionId);
   if (messages.length === 0) {
     try {
       fs.unlinkSync(filePath);
     } catch {
-      // File may not exist
     }
     return;
   }
   fs.writeFileSync(filePath, JSON.stringify(messages), "utf-8");
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function getMessages(sessionId: string): TranscriptMessage[] {
   return readSessionFile(sessionId);
@@ -128,7 +102,6 @@ export function appendMessage(message: Omit<TranscriptMessage, "createdAt">): Pr
 export function appendMessages(batch: Array<Omit<TranscriptMessage, "createdAt">>): Promise<TranscriptMessage[]> {
   if (batch.length === 0) return Promise.resolve([]);
 
-  // All messages in a batch must belong to the same session
   const sessionId = batch[0].sessionId;
 
   return serializeSession(sessionId, () => {
@@ -148,9 +121,8 @@ export function updateMessage(
   messageId: string,
   updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>,
 ): Promise<void> {
-  // We need to find which session holds this message. Scan known session files.
-  // For efficiency, the caller should also pass sessionId, but the IPC bridge
-  // only passes messageId + updates. We search the transcript directory.
+  // We need to find which session holds this message. The IPC bridge only
+  // passes messageId + updates, so we scan the transcript directory.
   return findSessionForMessage(messageId).then((sessionId) => {
     if (!sessionId) return;
 
@@ -165,7 +137,6 @@ export function updateMessage(
   });
 }
 
-/** Update a message when the session is already known (avoids file scanning). */
 export function updateMessageInSession(
   sessionId: string,
   messageId: string,
@@ -189,14 +160,9 @@ export function deleteSession(sessionId: string): Promise<void> {
         fs.unlinkSync(filePath);
       }
     } catch {
-      // Already deleted or not accessible
     }
   });
 }
-
-// ---------------------------------------------------------------------------
-// Message lookup helper
-// ---------------------------------------------------------------------------
 
 async function findSessionForMessage(messageId: string): Promise<string | null> {
   const dir = getTranscriptDir();

@@ -88,9 +88,7 @@ const store = new Store<ConfigSchema>({
   },
 });
 
-// ---------------------------------------------------------------------------
 // Write serialization — prevents read-modify-write races under concurrent IPC
-// ---------------------------------------------------------------------------
 let writeChain: Promise<void> = Promise.resolve();
 const pendingLegacyTokenMaintenance = new Set<string>();
 
@@ -103,19 +101,6 @@ function serialize<T>(fn: () => T): Promise<T> {
   return next;
 }
 
-// ---------------------------------------------------------------------------
-// Shared mutation helpers — eliminate read-modify-write duplication
-// ---------------------------------------------------------------------------
-
-/**
- * Read-find-mutate-write helper for a single environment.
- * Encapsulates: read environments array → find by ID → apply callback → write back.
- * Returns the mutated environment, or null if not found.
- *
- * Guarantees `store.set("environments", envs)` is always called after the callback,
- * eliminating the risk of a forgotten write.
- * Bumps the config stamp on every write.
- */
 function mutateEnvironment(
   id: string,
   fn: (env: EnvironmentWithFingerprint) => void,
@@ -129,12 +114,6 @@ function mutateEnvironment(
   return env;
 }
 
-/**
- * Read-mutate-write helper for the full environments array.
- * Encapsulates: read → apply callback → write back.
- * Use when the mutation spans multiple environments or adds/removes entries.
- * Bumps the config stamp on every write.
- */
 function mutateEnvironments(
   fn: (envs: EnvironmentWithFingerprint[]) => void,
 ): void {
@@ -144,11 +123,6 @@ function mutateEnvironments(
   bumpStamp();
 }
 
-/**
- * Read-mutate-write helper for the session tokens record.
- * Encapsulates: read → apply callback → write back.
- * Bumps the config stamp on every write.
- */
 function mutateSessionTokens(
   fn: (tokens: Record<string, EncryptedSessionToken>) => void,
 ): void {
@@ -158,14 +132,8 @@ function mutateSessionTokens(
   bumpStamp();
 }
 
-// ---------------------------------------------------------------------------
 // Migration (synchronous — only runs once at startup before IPC is active)
-// ---------------------------------------------------------------------------
 
-/**
- * Collect all credential references currently in use by environments.
- * Used by the orphan-pruning logic to determine which credentials are still needed.
- */
 function collectActiveCredentialReferences(): Set<string> {
   const references = new Set<string>();
   for (const env of store.get("environments", [])) {
@@ -210,19 +178,12 @@ function ensureMigrated(): void {
   store.set("instancesMigrated", true);
 }
 
-/**
- * Run once at startup to prune orphaned credentials that no longer
- * have any environment referencing them. Called after ensureMigrated().
- */
 function pruneOrphanCredentialsOnStartup(): void {
   pruneOrphanCredentials(collectActiveCredentialReferences());
 }
 
-// ---------------------------------------------------------------------------
 // Read functions (synchronous — reads are consistent per-call and never lose data)
-// ---------------------------------------------------------------------------
 
-// Track whether startup pruning has been performed to avoid repeated work.
 let startupPruningDone = false;
 
 export function getEnvironments(): EnvironmentWithFingerprint[] {
@@ -238,9 +199,7 @@ export function getEnvironments(): EnvironmentWithFingerprint[] {
   }));
 }
 
-// ---------------------------------------------------------------------------
 // Sync-safe serialization — structurally excludes secret fields
-// ---------------------------------------------------------------------------
 
 /**
  * Field names that are known secrets or internal security metadata.
@@ -262,12 +221,7 @@ export const SECRET_FIELD_NAMES: readonly string[] = [
   "hmac",
 ] as const;
 
-/**
- * Fields safe to include in a synced/serialized environment.
- * Uses an explicit allowlist so that adding a new field to
- * EnvironmentWithFingerprint requires a deliberate decision here.
- * If a field is not listed, it is silently dropped by sanitizeEnvironmentForSync.
- */
+/** Allowlist of safe sync fields. Unlisted keys are dropped by sanitizeEnvironmentForSync. */
 const SAFE_ENVIRONMENT_KEYS: ReadonlySet<string> = new Set([
   "id",
   "name",
@@ -284,9 +238,6 @@ const SAFE_ENVIRONMENT_KEYS: ReadonlySet<string> = new Set([
   "fingerprintId",
 ]);
 
-/**
- * Fields safe to include on an AccessEndpoint in synced output.
- */
 const SAFE_ENDPOINT_KEYS: ReadonlySet<string> = new Set([
   "id",
   "kind",
@@ -365,10 +316,6 @@ function sanitizeEnvironmentForSync(env: EnvironmentWithFingerprint): Environmen
   return result as unknown as Environment;
 }
 
-/**
- * Check whether a serialized JSON string contains any known secret field names.
- * Returns the first secret field name found, or null if the output is clean.
- */
 export function findSecretFieldInJson(serialized: string): string | null {
   for (const field of SECRET_FIELD_NAMES) {
     // Match the field name as a JSON key: `"fieldName"`
@@ -380,7 +327,6 @@ export function findSecretFieldInJson(serialized: string): string | null {
   return null;
 }
 
-/** Get environments structurally sanitized for IPC/renderer/sync. */
 export function getEnvironmentsForRenderer(): Environment[] {
   return getEnvironments().map(sanitizeEnvironmentForSync);
 }
@@ -534,10 +480,6 @@ function cleanupLegacySessionToken(environmentId: string): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Versioned config stamp — bumped on every mutating write
-// ---------------------------------------------------------------------------
-
 function currentStamp(): ConfigStamp {
   return store.get("configStamp", { timestamp: Date.now(), revision: 0 });
 }
@@ -548,7 +490,6 @@ function bumpStamp(): void {
   scheduleConfigSyncToMainVm();
 }
 
-/** Get the current config stamp (read-only, synchronous). */
 export function getConfigStamp(): ConfigStamp {
   return currentStamp();
 }
@@ -590,14 +531,10 @@ export function forceSetMainVm(environmentId: string): Promise<ConfigStamp> {
   return serialize(() => _forceSetMainVm(environmentId));
 }
 
-// ---------------------------------------------------------------------------
 // Config sync to main-VM (debounced write to ~/.orbion/config.json)
-// ---------------------------------------------------------------------------
 
-/** Debounce timer for config sync to main-VM. */
 let configSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Debounce interval in milliseconds. */
 const CONFIG_SYNC_DEBOUNCE_MS = 2_000;
 
 /**
@@ -617,11 +554,6 @@ function scheduleConfigSyncToMainVm(): void {
   }, CONFIG_SYNC_DEBOUNCE_MS);
 }
 
-/**
- * Write the sanitized config to the main-VM's ~/.orbion/config.json.
- * Skips if no main-VM is designated. Uses SSH for remote VMs,
- * local filesystem for direct endpoints.
- */
 async function syncConfigToMainVm(): Promise<void> {
   const mainVm = getMainVm();
   if (!mainVm) return;
@@ -645,10 +577,6 @@ async function syncConfigToMainVm(): Promise<void> {
   // Tailscale and other kinds: not supported for config-home write yet
 }
 
-/**
- * Write config to the main-VM over SSH by piping the JSON payload via stdin.
- * The remote command creates the directory, writes the file, and sets permissions.
- */
 async function sshOnMainVmWrite(payload: string): Promise<void> {
   const mainVm = getMainVm();
   if (!mainVm) return;
@@ -659,7 +587,6 @@ async function sshOnMainVmWrite(payload: string): Promise<void> {
   const sshHost = parseTarget(activeEndpoint.sshTarget);
   if (!sshHost) return;
 
-  // Remote command: ensure directory exists, write from stdin, set permissions
   const remoteCommand = `mkdir -p ~/.orbion && cat > ~/.orbion/config.json && chmod 600 ~/.orbion/config.json`;
   const args = buildSshArgs(sshHost, remoteCommand);
 
@@ -671,15 +598,10 @@ async function sshOnMainVmWrite(payload: string): Promise<void> {
       }
       resolve();
     });
-    // Pipe the JSON payload via stdin
     proc.stdin?.end(payload, "utf8");
   });
 }
 
-/**
- * Write config to the local filesystem for direct endpoints.
- * The "VM" is the local machine in this scenario.
- */
 function localConfigWrite(payload: string): void {
   try {
     const configDir = path.join(os.homedir(), ".orbion");
@@ -696,9 +618,7 @@ function localConfigWrite(payload: string): void {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Mutation internals (unserialized — called from within serialize() only)
-// ---------------------------------------------------------------------------
 
 function _setEnvironmentFingerprintId(environmentId: string, fingerprintId: string): void {
   mutateEnvironment(environmentId, (env) => { env.fingerprintId = fingerprintId; });
@@ -750,7 +670,6 @@ function _removeEnvironment(id: string): void {
     store.set("selectedEnvironmentId", null);
     bumpStamp();
   }
-  // Prune any orphaned credentials left behind after environment removal.
   pruneOrphanCredentials(collectActiveCredentialReferences());
 }
 
@@ -921,13 +840,7 @@ function _removeSshKeyPassphrase(environmentId: string): void {
   });
 }
 
-/**
- * Shared implementation for setting an OpenCode-style endpoint with
- * optional password encryption. Used by both `_setOpenCodeEndpoint` and
- * `_setInfraOpenCodeEndpoint` to prevent security drift.
- *
- * @param field - The environment property to set (`"opencode"` or `"infraOpenCode"`).
- */
+/** Shared by `_setOpenCodeEndpoint` and `_setInfraOpenCodeEndpoint` to prevent security drift. */
 function _setEndpointWithEncryption(
   environmentId: string,
   endpoint: OpenCodeEndpoint | null,
@@ -983,9 +896,7 @@ function _autoPromoteFirstEnvIfNeeded(): void {
   });
 }
 
-// ---------------------------------------------------------------------------
 // Public mutating functions (serialized through write queue)
-// ---------------------------------------------------------------------------
 
 export function setEnvironmentFingerprintId(environmentId: string, fingerprintId: string): Promise<void> {
   return serialize(() => _setEnvironmentFingerprintId(environmentId, fingerprintId));
@@ -1073,10 +984,6 @@ export function autoPromoteFirstEnvIfNeeded(): Promise<void> {
   return serialize(() => _autoPromoteFirstEnvIfNeeded());
 }
 
-// ---------------------------------------------------------------------------
-// Budget watch persistence
-// ---------------------------------------------------------------------------
-
 export function getBudgetWatches(): BudgetWatch[] {
   return store.get("budgetWatches", []);
 }
@@ -1121,10 +1028,6 @@ export function removeBudgetWatch(watchId: string): Promise<void> {
 export function updateBudgetWatch(watchId: string, updates: Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>): Promise<void> {
   return serialize(() => _updateBudgetWatch(watchId, updates));
 }
-
-// ---------------------------------------------------------------------------
-// Budget breach persistence
-// ---------------------------------------------------------------------------
 
 export function getBudgetBreaches(): BudgetBreach[] {
   return store.get("budgetBreaches", []);
@@ -1176,10 +1079,6 @@ export function pruneOldBreaches(): Promise<void> {
   return serialize(() => _pruneOldBreaches());
 }
 
-// ---------------------------------------------------------------------------
-// Inbox dismissed items
-// ---------------------------------------------------------------------------
-
 function _getInboxDismissedIds(): string[] {
   return store.get("inboxDismissedIds", []);
 }
@@ -1207,10 +1106,6 @@ export function isInboxItemDismissed(itemId: string): boolean {
   return _isInboxItemDismissed(itemId);
 }
 
-// ---------------------------------------------------------------------------
-// Inbox resolved items (Done archive)
-// ---------------------------------------------------------------------------
-
 const RESOLVED_ITEMS_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000; // 30 days
 
 function _getResolvedItems(): ResolvedInboxItem[] {
@@ -1219,7 +1114,6 @@ function _getResolvedItems(): ResolvedInboxItem[] {
 
 function _addResolvedItem(resolved: ResolvedInboxItem): void {
   const items = _getResolvedItems();
-  // Don't add duplicates
   if (items.some((ri) => ri.item.id === resolved.item.id)) return;
   items.push(resolved);
   store.set("inboxResolvedItems", items);
@@ -1248,10 +1142,6 @@ export function pruneResolvedItems(): Promise<void> {
   return serialize(() => _pruneResolvedItems());
 }
 
-// ---------------------------------------------------------------------------
-// Project pickup labels persistence
-// ---------------------------------------------------------------------------
-
 export function getProjectPickupLabels(projectId: string): string[] {
   const all = store.get("projectPickupLabels", {});
   return all[projectId] ?? [];
@@ -1267,10 +1157,6 @@ function _setProjectPickupLabels(projectId: string, labels: string[]): void {
 export function setProjectPickupLabels(projectId: string, labels: string[]): Promise<void> {
   return serialize(() => _setProjectPickupLabels(projectId, labels));
 }
-
-// ---------------------------------------------------------------------------
-// Project pipeline labels persistence
-// ---------------------------------------------------------------------------
 
 export function getProjectPipelineLabels(projectId: string): string[] {
   const all = store.get("projectPipelineLabels", {});
@@ -1288,9 +1174,7 @@ export function setProjectPipelineLabels(projectId: string, labels: string[]): P
   return serialize(() => _setProjectPipelineLabels(projectId, labels));
 }
 
-// ---------------------------------------------------------------------------
 // Network / crypto utilities (no store mutations)
-// ---------------------------------------------------------------------------
 
 export async function exchangePairingCode(
   baseUrl: string,
@@ -1339,10 +1223,6 @@ export function decryptValue(encryptedBase64: string): string | null {
     return null;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Chat sessions — persisted in config store
-// ---------------------------------------------------------------------------
 
 export function getChatSessions(): ChatSession[] {
   return store.get("chatSessions", []);
@@ -1442,11 +1322,8 @@ export async function sweepEphemeralSessions(args: SweepEphemeralSessionsArgs): 
   const removedIds: string[] = [];
 
   for (const session of sessions) {
-    // Only sweep ephemeral (not persisted) sessions
     if (session.persisted) continue;
-    // Never sweep the currently active session
     if (session.id === activeSessionId) continue;
-    // Key on lastActiveAt only
     const lastActive = new Date(session.lastActiveAt).getTime();
     if (lastActive < cutoff) {
       removedIds.push(session.id);
@@ -1462,10 +1339,6 @@ export async function sweepEphemeralSessions(args: SweepEphemeralSessionsArgs): 
   return { removedSessionIds: removedIds };
 }
 
-// ---------------------------------------------------------------------------
-// Expanded project state — persisted in config store
-// ---------------------------------------------------------------------------
-
 export function getExpandedProjects(): string[] {
   return store.get("expandedProjects", []);
 }
@@ -1477,9 +1350,7 @@ export function setExpandedProjects(expandedKeys: string[]): Promise<void> {
   });
 }
 
-// ---------------------------------------------------------------------------
 // Global settings — app-wide preferences (no instance-specific options)
-// ---------------------------------------------------------------------------
 
 export function getGlobalSettings(): GlobalSettings {
   return store.get("globalSettings", { ...GLOBAL_SETTINGS_DEFAULTS });
@@ -1495,9 +1366,7 @@ export function updateGlobalSettings(updates: Partial<GlobalSettings>): Promise<
   return serialize(() => _updateGlobalSettings(updates));
 }
 
-// ---------------------------------------------------------------------------
 // Bootstrap seed — portable config-home reach info (no secrets)
-// ---------------------------------------------------------------------------
 
 /**
  * Export a bootstrap seed for the main-VM environment.
@@ -1542,16 +1411,8 @@ export function importBootstrapSeed(seedString: string): BootstrapSeedImportResu
   return { ok: true, seed };
 }
 
-// ---------------------------------------------------------------------------
-// Pull-canonical restore from config-home ────────────────────────────────
-// ---------------------------------------------------------------------------
-
 const REMOTE_CONFIG_PATH = "~/.orbion/config.json";
 
-/**
- * Execute an SSH command on the main-VM and return stdout.
- * Returns null if the main-VM cannot be reached or has no SSH endpoint.
- */
 function sshOnMainVm(command: string): Promise<string | null> {
   const mainVm = getMainVm();
   if (!mainVm) return Promise.resolve(null);
@@ -1559,9 +1420,6 @@ function sshOnMainVm(command: string): Promise<string | null> {
   const activeEndpoint = mainVm.endpoints.find((ep) => ep.id === mainVm.activeEndpointId) ?? mainVm.endpoints[0];
   if (!activeEndpoint) return Promise.resolve(null);
 
-  // Only SSH endpoints can run remote commands
-  // For direct/local endpoints, the "VM" is the local machine, so we can't
-  // cat a remote config file. Direct mode is not the config-home scenario.
   if (activeEndpoint.kind !== "ssh" || !activeEndpoint.sshTarget) {
     return Promise.resolve(null);
   }
@@ -1582,10 +1440,6 @@ function sshOnMainVm(command: string): Promise<string | null> {
   });
 }
 
-/**
- * Check whether the config-home VM has a config file available for restore.
- * Reads `~/.orbion/config.json` over SSH and counts environments.
- */
 export async function checkRestoreAvailable(): Promise<RestoreAvailability> {
   const mainVm = getMainVm();
   if (!mainVm) {
@@ -1601,7 +1455,6 @@ export async function checkRestoreAvailable(): Promise<RestoreAvailability> {
     return { available: false, reason: { key: "restore.notSshEndpoint" } };
   }
 
-  // SSH to the main-VM and check if the config file exists and is readable
   const output = await sshOnMainVm(`cat ${REMOTE_CONFIG_PATH} 2>/dev/null`);
   if (output === null) {
     return { available: false, reason: { key: "restore.sshFailed" } };
@@ -1651,7 +1504,6 @@ function sanitizeRemoteEnvironment(raw: unknown): Environment | null {
 
   const obj = raw as Record<string, unknown>;
 
-  // Required fields
   if (typeof obj["name"] !== "string" || !obj["name"].trim()) return null;
   if (!Array.isArray(obj["endpoints"])) return null;
 
@@ -1742,7 +1594,6 @@ export async function pullRestore(): Promise<PullRestoreResult> {
     return { ok: false, error: { key: "restore.noEnvironments" } };
   }
 
-  // Sanitize and parse each environment from the remote config
   const restored: Environment[] = [];
   for (const rawEnv of rawEnvs) {
     const env = sanitizeRemoteEnvironment(rawEnv);
@@ -1756,7 +1607,6 @@ export async function pullRestore(): Promise<PullRestoreResult> {
   // Pull-only replacement: remove all existing local environments and
   // replace with the canonical set from the VM.
   await serialize(() => {
-    // Remove credentials for all existing environments
     for (const env of store.get("environments", [])) {
       if (env.credentialRefs) {
         for (const reference of Object.values(env.credentialRefs)) {
@@ -1765,29 +1615,23 @@ export async function pullRestore(): Promise<PullRestoreResult> {
       }
     }
 
-    // Replace environments wholesale with the restored set
     const restoredWithFingerprint: EnvironmentWithFingerprint[] = restored.map((env) => ({
       ...env,
       authState: "unauthenticated" as EnvironmentAuthState,
     }));
     store.set("environments", restoredWithFingerprint);
 
-    // Clear legacy session tokens
     store.set("sessionTokens", {});
 
-    // Select the first restored environment
     if (restoredWithFingerprint.length > 0) {
       store.set("selectedEnvironmentId", restoredWithFingerprint[0].id);
     }
 
-    // Auto-promote the first environment to main-vm if none has the role
     _autoPromoteFirstEnvIfNeeded();
 
-    // Bump the stamp after the wholesale replace
     bumpStamp();
   });
 
-  // Prune orphaned credentials after clearing old environments
   pruneOrphanCredentials(collectActiveCredentialReferences());
 
   return { ok: true, restored };

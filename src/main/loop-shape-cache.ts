@@ -7,8 +7,6 @@ import { resolveActiveUrl } from "./connection-supervisor.js";
 import { resolveEffectiveUrl } from "./tunnel-registry.js";
 import { getSessionToken } from "./config-store.js";
 
-// ── Types for daemon API responses ───────────────────────────────────
-
 interface DaemonLoop {
   id: string;
   command: string;
@@ -37,8 +35,6 @@ interface DaemonTasksResponse {
   data: DaemonTask[];
 }
 
-// ── Cache persistence ────────────────────────────────────────────────
-
 interface LoopShapeCacheSchema {
   loopShapeCache: Record<string, LoopShape[]>;
 }
@@ -51,15 +47,10 @@ const store = new Store<LoopShapeCacheSchema>({
 
 const PERSISTENCE_KEY = "loopShapeCache";
 
-// ── In-memory cache ──────────────────────────────────────────────────
-
-/** environmentId → loop shapes */
 const cache = new Map<string, LoopShape[]>();
 
-/** Listeners for cache updates. */
 const listeners = new Set<(shapes: LoopShape[]) => void>();
 
-// Load persisted cache on startup
 function loadPersisted(): void {
   const persisted = store.get(PERSISTENCE_KEY) as Record<string, LoopShape[]> | undefined;
   if (persisted) {
@@ -87,8 +78,6 @@ function notifyListeners(): void {
     }
   }
 }
-
-// ── Public API ───────────────────────────────────────────────────────
 
 export function initLoopShapeCache(): void {
   loadPersisted();
@@ -119,10 +108,6 @@ export function onCacheUpdate(cb: (shapes: LoopShape[]) => void): () => void {
   };
 }
 
-/**
- * Build ChainSteps for loops that reference tasks.
- * Resolves on-success/on-failure links into a flat list.
- */
 function buildChainSteps(taskId: string, tasks: DaemonTask[]): ChainStep[] {
   const steps: ChainStep[] = [];
   const visited = new Set<string>();
@@ -148,10 +133,6 @@ function buildChainSteps(taskId: string, tasks: DaemonTask[]): ChainStep[] {
   return steps;
 }
 
-/**
- * Refresh the cache for a specific environment by fetching from its daemon API.
- * Returns the updated shapes for that environment.
- */
 export async function refreshForEnvironment(environmentId: string): Promise<LoopShape[]> {
   const envs = getEnvironments();
   const env = envs.find((e: Environment) => e.id === environmentId);
@@ -213,10 +194,6 @@ export async function refreshForEnvironment(environmentId: string): Promise<Loop
   }
 }
 
-/**
- * Refresh cached shapes for all connected environments.
- * Called on startup and opportunistically on supervisor connect.
- */
 export async function refreshAll(): Promise<void> {
   const envs = getEnvironments();
   await Promise.allSettled(

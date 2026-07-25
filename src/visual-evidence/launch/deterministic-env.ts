@@ -1,32 +1,16 @@
-/**
- * Deterministic temp directory management for visual-evidence runs.
- *
- * All raw artifacts (raw PNGs, webm recordings, Playwright traces, frames,
- * logs, failure captures) live under `.tmp/visual-evidence/<change-id>/`.
- * This directory is gitignored and never committed. Failure artifacts may
- * remain temporarily for debugging but are not promoted to permanent
- * OpenSpec evidence.
- *
- * Each run starts with a clean temp dir for the change (prior contents are
- * removed) so evidence captures stay reproducible.
- */
 import fs from "node:fs";
 import path from "node:path";
 import type { VisualEvidenceConfig } from "../config.js";
 
 export interface TempPaths {
-  /** Root: <tempDir>/<changeId>/ */
   readonly root: string;
   readonly failureScreenshot: string;
   readonly video: string;
   readonly trace: string;
   readonly framesDir: string;
   readonly logsDir: string;
-  /** Electron user-data dir (separate temp dir, isolated from repo) */
   readonly userDataDir: string;
-  /** Final screenshot output (before being promoted to OpenSpec evidence) */
   readonly screenshotOut: string;
-  /** Final gif output (before being promoted to OpenSpec evidence) */
   readonly gifOut: string;
 }
 
@@ -35,7 +19,6 @@ function rmrf(dir: string): void {
   try {
     fs.rmSync(dir, { recursive: true, force: true });
   } catch {
-    // Best-effort; ignore
   }
 }
 
@@ -78,7 +61,6 @@ export function prepareTempDir(
   };
 }
 
-/** Build the Playwright trace path (used by context.tracing). */
 export function tracePath(paths: TempPaths): string {
   return paths.trace;
 }

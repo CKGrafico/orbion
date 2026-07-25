@@ -1,15 +1,3 @@
-/**
- * Scenario: gh-149-agent-risk-verdict
- *
- * Exercises the PR risk verdict display on inbox items:
- *   1. App launches into the inbox view with mock data.
- *   2. PR inbox items are visible with risk-level chips.
- *   3. At least one risk chip is visible (low/medium/high/uncertain).
- *   4. A verdict text line is present on a PR item.
- *
- * Uses mock mode (no real Electron environment needed). The mock
- * PrVerdictService provides pre-populated verdicts for the 3 mock PRs.
- */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
@@ -25,10 +13,8 @@ type AssertionSpec = {
 export async function gh149AgentRiskVerdictScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render (inbox or cold-open)
   await page.waitForTimeout(3000);
 
-  // Navigate to inbox if not already there
   const inboxTab = page.getByRole("button", { name: /inbox/i });
   if ((await inboxTab.count()) > 0) {
     await inboxTab.first().click();

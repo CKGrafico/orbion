@@ -2,11 +2,8 @@ import { useIntl } from "react-intl";
 import type { ReasoningEffort } from "../../../shared/ipc";
 
 interface ReasoningEffortSelectorProps {
-  /** Currently selected reasoning effort (from session). */
   value: ReasoningEffort | undefined;
-  /** Available reasoning efforts for the current model. Undefined = hide. */
   efforts: ReasoningEffort[] | undefined;
-  /** Called when the user picks an effort level. */
   onChange: (effort: ReasoningEffort) => void;
 }
 
@@ -19,7 +16,6 @@ const EFFORT_LABELS: Record<ReasoningEffort, string> = {
 export function ReasoningEffortSelector({ value, efforts, onChange }: ReasoningEffortSelectorProps): React.ReactNode {
   const intl = useIntl();
 
-  // Hide when the model does not support reasoning effort
   if (!efforts || efforts.length === 0) return null;
 
   return (

@@ -6,34 +6,13 @@ import type { Environment } from "../types";
 
 interface SiblingOfferCardProps {
   row: SiblingOfferRow;
-  /** The environment instance for the source loop (for context). */
   instance?: Environment;
-  /** Callback when the offer is approved. */
   onApproved: (offerId: string, siblingLoopId: string, siblingEnvironmentId: string) => void;
-  /** Callback when the offer is declined. */
   onDeclined: (offerId: string, siblingLoopId: string, siblingEnvironmentId: string, fingerprint: string) => void;
-  /** Callback when the offer status changes (e.g., applying, error). */
   onStatusChange: (offerId: string, status: SiblingOfferStatus, error?: string) => void;
-  /** The session's home environment ID, for cross-scope detection. */
   homeEnvironmentId?: string;
 }
 
-/**
- * A card that presents a structural chain-change offer for a sibling loop.
- *
- * After a structural chain edit is applied to one loop, this card appears
- * for each sibling loop on other instances that shares the same structural
- * shape. The user can approve or decline each offer independently.
- *
- * Each card shows:
- * - The sibling loop's name and instance
- * - A summary of the structural change
- * - Approve / Decline buttons
- *
- * On approval, the parent (SessionChatView) calls the MCP service to
- * apply the structural diff on the sibling instance. On decline, the
- * decline is persisted so the offer is not shown again.
- */
 export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStatusChange, homeEnvironmentId }: SiblingOfferCardProps): React.ReactNode {
   const intl = useIntl();
 
@@ -44,7 +23,6 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
   const isError = row.status === "error";
   const isTerminal = isApplied || isDeclined;
 
-  // Cross-scope detection: sibling offer targets a non-home instance
   const isCrossScope = homeEnvironmentId != null && row.siblingEnvironmentId !== homeEnvironmentId;
 
   const handleApprove = useCallback((): void => {
@@ -58,7 +36,6 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
 
   return (
     <div className={`sibling-offer-card${isTerminal ? " sibling-offer-card--terminal" : ""}${isError ? " sibling-offer-card--error" : ""}`}>
-      {/* Header */}
       <div className="sibling-offer-header">
         <span className="sibling-offer-icon">⇄</span>
         <span className="sibling-offer-title">
@@ -76,7 +53,6 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
         )}
       </div>
 
-      {/* Instance attribution */}
       <div className={`sibling-offer-attribution${isCrossScope ? " sibling-offer-attribution--cross-scope" : ""}`}>
         {isCrossScope
           ? intl.formatMessage(
@@ -90,7 +66,6 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
         }
       </div>
 
-      {/* Structural change summary */}
       {row.structuralDiff.operations.length > 0 && (
         <div className="sibling-offer-operations">
           {row.structuralDiff.operations.map((op, idx) => (
@@ -104,12 +79,10 @@ export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStat
         </div>
       )}
 
-      {/* Error message */}
       {isError && row.error && (
         <div className="sibling-offer-error">{row.error}</div>
       )}
 
-      {/* Action buttons */}
       {isPending && (
         <div className="sibling-offer-actions">
           <button

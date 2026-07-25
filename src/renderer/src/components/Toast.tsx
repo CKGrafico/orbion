@@ -7,8 +7,6 @@ import {
   type ReactNode,
 } from 'react';
 
-// ── Public types ────────────────────────────────────────────────────
-
 interface ToastAction {
   label: string;
   onClick: () => void;
@@ -17,12 +15,9 @@ interface ToastAction {
 interface ToastOptions {
   message: string;
   action?: ToastAction;
-  duration?: number; // default 5000
-  /** Called when the toast is dismissed (timer expired, or replaced by new toast) */
+  duration?: number;
   onDismissed?: () => void;
 }
-
-// ── Internal state shape ────────────────────────────────────────────
 
 interface ActiveToast {
   message: string;
@@ -31,22 +26,16 @@ interface ActiveToast {
   onDismissed: (() => void) | undefined;
 }
 
-// ── Context ─────────────────────────────────────────────────────────
-
 interface ToastContextValue {
   showToast: (opts: ToastOptions) => void;
   activeToast: ActiveToast | null;
-  /** Dismiss due to timer expiry or replacement — calls onDismissed */
   dismissWithCallback: () => void;
-  /** Dismiss because the user chose the action — does NOT call onDismissed */
   dismissForAction: () => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const DEFAULT_DURATION = 5000;
-
-// ── Provider ────────────────────────────────────────────────────────
 
 function ToastProvider({ children }: { children: ReactNode }) {
   const [activeToast, setActiveToast] = useState<ActiveToast | null>(null);
@@ -60,7 +49,6 @@ function ToastProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /** Dismiss due to timeout or replacement — fires onDismissed */
   const dismissWithCallback = useCallback(() => {
     clearTimer();
     const dismissed = onDismissedRef.current;
@@ -69,7 +57,6 @@ function ToastProvider({ children }: { children: ReactNode }) {
     dismissed?.();
   }, [clearTimer]);
 
-  /** Dismiss because user clicked the action — does NOT fire onDismissed */
   const dismissForAction = useCallback(() => {
     clearTimer();
     onDismissedRef.current = undefined;
@@ -78,7 +65,6 @@ function ToastProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback(
     (opts: ToastOptions) => {
-      // If a toast is already showing, fire its onDismissed — it is being replaced
       onDismissedRef.current?.();
 
       clearTimer();
@@ -96,7 +82,6 @@ function ToastProvider({ children }: { children: ReactNode }) {
       onDismissedRef.current = opts.onDismissed;
       setActiveToast(toast);
 
-      // Auto-dismiss after duration — fires onDismissed
       timerRef.current = globalThis.setTimeout(() => {
         timerRef.current = null;
         const dismissed = onDismissedRef.current;
@@ -117,8 +102,6 @@ function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Hook ────────────────────────────────────────────────────────────
-
 function useToast(): { showToast: (opts: ToastOptions) => void } {
   const ctx = useContext(ToastContext);
   if (ctx === null) {
@@ -126,8 +109,6 @@ function useToast(): { showToast: (opts: ToastOptions) => void } {
   }
   return { showToast: ctx.showToast };
 }
-
-// ── Component ───────────────────────────────────────────────────────
 
 function Toast() {
   const ctx = useContext(ToastContext);
@@ -142,7 +123,6 @@ function Toast() {
   }
 
   const handleActionClick = () => {
-    // User chose an action — dismiss without calling onDismissed, then run action
     const actionOnClick = activeToast.action!.onClick;
     dismissForAction();
     actionOnClick();

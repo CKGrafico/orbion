@@ -1,7 +1,3 @@
-/**
- * Orbion brand mark: an orbit ring with a satellite dot on a navy tile.
- * Shared visual identity with the website (docs/).
- */
 export function OrbionMark({ size = 24 }: { size?: number }) {
   return (
     <svg

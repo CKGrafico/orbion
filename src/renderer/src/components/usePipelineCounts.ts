@@ -3,18 +3,8 @@ import { cid, container } from "inversify-hooks";
 import type { ListIssuesResult, InfraActionResult } from "../../../shared/ipc";
 import type { IInfraService } from "../services/interfaces";
 
-/** Counts of open issues per pipeline label. */
 export type PipelineCounts = Record<string, number>;
 
-/**
- * Hook that periodically fetches issue counts for each configured pipeline label
- * via the platform CLI (through the infra service's list-issues action).
- *
- * - Polls every 30 seconds (issue counts change slowly).
- * - Short-circuits when pipelineLabels is empty (returns null).
- * - Handles errors gracefully: partial failures show whatever succeeded.
- * - Skips polling when the environment is unreachable.
- */
 export function usePipelineCounts(
   environmentId: string | undefined,
   pipelineLabels: string[],
@@ -36,8 +26,7 @@ export function usePipelineCounts(
       const newCounts: PipelineCounts = {};
       let anySuccess = false;
 
-      // Fetch counts for each label sequentially to avoid hammering
-      // the platform API with parallel requests
+      // Sequential to avoid hammering the platform API
       for (const label of pipelineLabels) {
         try {
           const result: InfraActionResult = await infraService.executeAction({
@@ -49,7 +38,7 @@ export function usePipelineCounts(
             newCounts[label] = listResult.total;
             anySuccess = true;
           } else {
-            newCounts[label] = -1; // error sentinel
+            newCounts[label] = -1;
           }
         } catch {
           newCounts[label] = -1;
@@ -59,7 +48,6 @@ export function usePipelineCounts(
       if (anySuccess) {
         setCounts(newCounts);
       }
-      // If all failed, keep the previous counts (stale is better than empty)
     } finally {
       fetchingRef.current = false;
     }
