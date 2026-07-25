@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "unify-ssrf-blocklist",
+  "required": false,
+  "status": "skipped",
+  "reason": "Internal security refactor — no user-visible behavior. Both consumers now delegate to a single canonical ssrf-blocklist module. New SSRF vectors (IPv6 link-local, GCP metadata hostname) are blocked. Verified by 54 passing unit tests and 88 passing IPC validation tests.",
+  "assets": [],
+  "prMarkdown": ""
+}
