@@ -1,13 +1,3 @@
-/**
- * Scenario: gh-200-log-tail-no-overwrite
- *
- * Exercises the fix for initial log tail overwriting live SSE lines.
- * The LogViewer now uses setInitialRows which merges instead of replacing,
- * so live lines received while the tail request is pending are preserved.
- *
- * In the mock app, the LogViewer is behind a loop. The scenario verifies
- * the app renders correctly with the merge logic intact.
- */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import { runAssertions } from "../assertions.js";
@@ -20,7 +10,6 @@ type AssertionSpec = {
 export async function gh200LogTailNoOverwriteScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render
   await page.waitForTimeout(3000);
 
   const assertions: AssertionSpec[] = [

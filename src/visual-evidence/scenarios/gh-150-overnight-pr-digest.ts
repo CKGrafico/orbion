@@ -1,17 +1,3 @@
-/**
- * Scenario: gh-150-overnight-pr-digest
- *
- * Exercises the overnight PR digest grouping:
- *   1. App launches with mock data containing multiple PRs.
- *   2. A digest item grouping the PRs is visible (e.g., "3 PRs overnight").
- *   3. Verdict count badges are visible (safe/needs you/conflict).
- *   4. Expanding the digest reveals individual PR items.
- *   5. A risk-level chip is visible on an expanded child item.
- *
- * Uses mock mode (no real Electron environment needed). The mock
- * PrPollingService provides multiple PRs, which are grouped
- * into a single digest by the InboxService.
- */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import {
@@ -26,10 +12,8 @@ type AssertionSpec = {
 export async function gh150OvernightPrDigestScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render (inbox or cold-open)
   await page.waitForTimeout(3000);
 
-  // Navigate to inbox if not already there
   const inboxTab = page.getByRole("button", { name: /inbox/i });
   if ((await inboxTab.count()) > 0) {
     await inboxTab.first().click();
@@ -66,14 +50,12 @@ export async function gh150OvernightPrDigestScenario(ctx: ScenarioContext): Prom
     {
       description: "Expanding the digest reveals individual child PR items",
       run: async (p) => {
-        // Click the digest header to expand
         const digestHeader = p.locator(".digest-view-item-header, .digest-item-header").first();
         if ((await digestHeader.count()) > 0) {
           await digestHeader.click();
           await p.waitForTimeout(500);
         }
 
-        // Verify child items are now visible
         const body = await p.textContent("body");
         if (!body) {
           throw new Error("Page body is empty after expansion");

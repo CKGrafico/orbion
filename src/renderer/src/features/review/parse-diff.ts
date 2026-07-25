@@ -1,21 +1,8 @@
-/**
- * Pure diff-parsing utilities for the PR review mode diff viewer.
- *
- * Splits a unified diff string into structured file entries and per-file
- * diff sections for rendering. Handles standard `diff` and `git diff`
- * output formats.
- */
-
 import type { DiffFileEntry, BriefingSection } from "../../../../shared/ipc";
 
-// ── Types ─────────────────────────────────────────────────────────────
-
 export interface DiffHunkHeader {
-  /** The raw `@@ ... @@` line text. */
   text: string;
-  /** Line number in the old file. */
   oldStart: number;
-  /** Line number in the new file. */
   newStart: number;
 }
 
@@ -24,9 +11,7 @@ export type DiffLineType = "context" | "addition" | "removal" | "hunk-header";
 export interface DiffLine {
   type: DiffLineType;
   content: string;
-  /** Line number in the old file (for context and removal lines). */
   oldLineNo: number | null;
-  /** Line number in the new file (for context and addition lines). */
   newLineNo: number | null;
 }
 
@@ -35,13 +20,6 @@ export interface ParsedDiffFile {
   lines: DiffLine[];
 }
 
-// ── File list parsing ──────────────────────────────────────────────────
-
-/**
- * Parse a unified diff string into file entries with add/remove counts.
- * This is the same logic as the main process parser, but available
- * client-side for pre-parsing cached diffs.
- */
 export function parseDiffFileEntries(diff: string): DiffFileEntry[] {
   const files: DiffFileEntry[] = [];
   if (!diff || diff.trim().length === 0) return files;
@@ -90,18 +68,6 @@ export function parseDiffFileEntries(diff: string): DiffFileEntry[] {
   return files;
 }
 
-// ── Per-file diff parsing ─────────────────────────────────────────────
-
-/**
- * Parse a unified diff section into structured lines with line numbers.
- *
- * Handles:
- * - `@@ -a,b +c,d @@` hunk headers
- * - `+text` additions
- * - `-text` removals
- * - ` text` context
- * - No-newline-at-end-of-file markers
- */
 export function parseDiffLines(diff: string): DiffLine[] {
   const result: DiffLine[] = [];
   if (!diff || diff.trim().length === 0) return result;
@@ -111,7 +77,6 @@ export function parseDiffLines(diff: string): DiffLine[] {
   let newLineNo = 0;
 
   for (const line of lines) {
-    // Hunk header: @@ -oldStart,count +newStart,count @@
     const hunkMatch = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/.exec(line);
     if (hunkMatch) {
       oldLineNo = parseInt(hunkMatch[1], 10);
@@ -125,7 +90,6 @@ export function parseDiffLines(diff: string): DiffLine[] {
       continue;
     }
 
-    // Skip diff headers (diff --git, ---, +++, index, etc.)
     if (
       line.startsWith("diff --git") ||
       line.startsWith("--- ") ||
@@ -144,12 +108,10 @@ export function parseDiffLines(diff: string): DiffLine[] {
       continue;
     }
 
-    // No newline marker
     if (line === "\\ No newline at end of file") {
       continue;
     }
 
-    // Addition
     if (line.startsWith("+")) {
       result.push({
         type: "addition",
@@ -160,7 +122,6 @@ export function parseDiffLines(diff: string): DiffLine[] {
       continue;
     }
 
-    // Removal
     if (line.startsWith("-")) {
       result.push({
         type: "removal",
@@ -171,7 +132,6 @@ export function parseDiffLines(diff: string): DiffLine[] {
       continue;
     }
 
-    // Context line (may start with a space or be empty)
     if (line.startsWith(" ") || line === "") {
       result.push({
         type: "context",
@@ -185,10 +145,6 @@ export function parseDiffLines(diff: string): DiffLine[] {
   return result;
 }
 
-/**
- * Split a full diff string into per-file sections.
- * Returns a map of file path → raw diff section string.
- */
 export function splitDiffByFile(diff: string): Map<string, string> {
   const result = new Map<string, string>();
   if (!diff || diff.trim().length === 0) return result;
@@ -221,9 +177,6 @@ export function splitDiffByFile(diff: string): Map<string, string> {
   return result;
 }
 
-// ── Briefing view utilities ─────────────────────────────────────────────
-
-/** Compute totals across all briefing sections. */
 export function getBriefingTotals(
   sections: BriefingSection[],
 ): { totalFlaggedAdd: number; totalFlaggedDel: number; totalBoilerplateAdd: number; totalBoilerplateDel: number } {
@@ -247,7 +200,6 @@ export function getBriefingTotals(
   return { totalFlaggedAdd, totalFlaggedDel, totalBoilerplateAdd, totalBoilerplateDel };
 }
 
-/** Format a +N/-M stats string for a briefing section. */
 export function formatBriefingStats(additions: number, deletions: number): string {
   return `+${additions}/-${deletions}`;
 }

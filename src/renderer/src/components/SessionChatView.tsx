@@ -33,45 +33,17 @@ import { ToolCallInlineBlock } from "../chat/ToolCallInlineBlock";
 import { ToolCallsExpander } from "../chat/ToolCallsExpander";
 import { TurnFold } from "../chat/TurnFold";
 
-// ── Shared-task detection ──────────────────────────────────────────────────
-
-/**
- * Detect whether a chain-edit proposal modifies a task that is shared by
- * loops other than the one being edited.
- *
- * A task is "shared" when:
- * - It is the `taskId` on another loop, OR
- * - It is reachable via `onSuccessTaskId` / `onFailureTaskId` chains from
- *   another loop's task.
- *
- * Returns a `SharedTaskWarning` if any `update-task` operations in the
- * proposal target shared tasks, or `undefined` if no sharing is detected.
- */
 function detectSharedTaskWarning(
   editedLoopId: string,
   operationSummaries: ChainEditOperationSummary[],
   allLoops: LoopMeta[],
 ): SharedTaskWarning | undefined {
-  // Only "update-task" operations can modify shared tasks
   const updateOps = operationSummaries.filter((op) => op.kind === "update-task");
   if (updateOps.length === 0) return undefined;
 
-  // Collect all task IDs referenced by other loops.
-  // For each loop's taskId, walk the chain (onSuccess/onFailure) to find
-  // all transitively referenced task IDs. Since we don't have the full task
-  // definitions here (they're on the daemon), we rely on the loop's taskId
-  // as the entry point. The "shared" check is: is the taskId of another loop
-  // the same as a task being updated?
-  //
-  // We can only check direct taskId references at this level. Deeper chain
-  // references (onSuccessTaskId / onFailureTaskId) require fetching tasks
-  // from the daemon, which is asynchronous and not suitable for inline
-  // detection in the stream event handler. The MCP tool on the daemon side
-  // performs the full transitive check and includes sharedTaskWarning data
-  // in the proposal payload if deeper sharing exists.
-
-  // Best-effort: check if any other loop references the same taskId as
-  // the edited loop. This catches the common case of shared entry-point tasks.
+  // Best-effort: check if any other loop references the same taskId as the edited loop.
+  // Deep chain references (onSuccess/onFailure) require fetching tasks from the daemon;
+  // the MCP tool performs the full transitive check and includes sharedTaskWarning if needed.
   const editedLoop = allLoops.find((l) => l.id === editedLoopId);
   const editedTaskId = editedLoop?.taskId;
   if (!editedTaskId) return undefined;
@@ -131,37 +103,21 @@ interface SessionChatViewProps {
   reasoningEffort?: ReasoningEffort;
   environments: Array<{ id: string; name: string }>;
   reachability?: ReachabilityState;
-  /** Loops scoped to the session's home project x instance, for the summary bar. */
   loops: LoopMeta[];
-  /** All per-environment loops, for resolving loop-card rows. */
   perEnvLoops: Record<string, LoopMeta[]>;
-  /** Per-environment reachability map, for similar-loops computation. */
   fleetReachability?: Record<string, ReachabilityState>;
-  /** Per-environment projects, for resolving project names in similar-loop results. */
   perEnvProjects?: Record<string, import("../types").Project[]>;
-  /** The full environment instance, for log tail in loop cards. */
   instance?: Environment;
-  /** Whether this session is ephemeral (scratch). */
   isEphemeral?: boolean;
-  /** Callback to persist (save) an ephemeral session. */
   onPersistSession?: () => void;
-  /** Current turn count for this session (from ChatSession.turnCount). */
   turnCount?: number;
-  /** Callback when a user turn is sent (for turn-count tracking and auto-persist). */
   onTurnSent?: () => void;
-  /** Whether auto-persist just triggered (for the "kept — this became a session" notice). */
   autoPersistedJustNow?: boolean;
-  /** Callback when the user declines the auto-persist offer. */
   onDeclineAutoPersist?: () => void;
-  /** Callback to un-persist a session (make it ephemeral again, usually requires confirm). */
   onUnpersistSession?: () => void;
-  /** When true, this session has no home scope and the loop bar should render fleet-wide. */
   fleetMode?: boolean;
-  /** Fleet rollup data. Required when fleetMode is true. */
   fleetRollup?: FleetLoopRollup;
-  /** All loops with origin metadata, for fleet-mode segment-click handling. */
   fleetLoopsWithOrigin?: LoopWithOrigin[];
-  /** The project ID for the session's home project, used for pipeline label counts. */
   projectId?: string;
 }
 
@@ -207,7 +163,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialEnvRef = useRef<string | null>(null);
 
-  // ── Pipeline labels + counts for the loop summary bar ──────────────────
   const [pipelineLabels, setPipelineLabels] = useState<string[]>([]);
   const pipelineCounts = usePipelineCounts(
     fleetMode ? undefined : environmentId,
@@ -215,7 +170,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     reachability,
   );
 
-  // Load pipeline labels when the project changes
   useEffect(() => {
     if (!projectId || fleetMode) {
       setPipelineLabels([]);
@@ -228,17 +182,14 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     return () => { cancelled = true; };
   }, [projectId, fleetMode, configService]);
 
-  // ── Fleet-wide loops for similar-loop computation ────────────────────
   const fleetLoopsForSimilarity = useMemo(() => {
     if (!fleetReachability || !perEnvProjects) return fleetLoopsWithOrigin ?? [];
     return buildFleetLoopsWithOrigin(perEnvLoops, environments, perEnvProjects, fleetReachability);
   }, [perEnvLoops, environments, perEnvProjects, fleetReachability, fleetLoopsWithOrigin]);
 
-  // ── Auto-persist notice ──────────────────────────────────────────────
   const [showAutoPersistNotice, setShowAutoPersistNotice] = useState(false);
   const autoPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Show the "kept — this became a session" notice when auto-persist triggers
   useEffect(() => {
     if (autoPersistedJustNow) {
       setShowAutoPersistNotice(true);
@@ -252,14 +203,11 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     };
   }, [autoPersistedJustNow]);
 
-  // ── Reachability ──────────────────────────────────────────────────────
   const isReachable = reachability === "connected" || reachability === undefined || reachability === "reconnecting";
 
-  // ── Clear active turn and reload transcript on instance switch ───
   // When the environmentId changes (instance switch), any in-flight
   // streaming from the old instance should be abandoned and the transcript
   // should be reloaded to pick up the handoff divider message.
-  // Skip on initial mount (no switch has occurred yet).
   useEffect(() => {
     if (initialEnvRef.current === null) {
       initialEnvRef.current = environmentId;
@@ -273,7 +221,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     }
   }, [environmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-scroll on new content ──────────────────────────────────────
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -282,7 +229,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     }
   }, [rows]);
 
-  // ── Stream event subscription ───────────────────────────────────────
 
   useEffect(() => {
     const unsubscribe = agentService.onStreamEvent((event: AgentStreamEvent) => {
@@ -337,12 +283,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
               })),
             });
 
-            // ── Intercept chain-edit-proposal payloads from MCP tool output ──
-            // When the agent's MCP tool call returns a payload with
-            // `chainEditProposal: true`, parse it and insert a
-            // chain-edit-proposal row into the transcript for user approval.
-            // If the proposal modifies a task shared by other loops, include
-            // a SharedTaskWarning so the user can choose to fork or apply globally.
             if (event.status === "completed" && event.output) {
               try {
                 const parsed = JSON.parse(event.output);
@@ -350,8 +290,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                   const loopId = parsed.loopId ?? "";
                   const operationSummaries = Array.isArray(parsed.operationSummaries) ? parsed.operationSummaries as ChainEditOperationSummary[] : [];
 
-                  // Detect shared-task references: check if any "update-task" operation
-                  // targets a task that's referenced by other loops
                   const sharedTaskWarning = detectSharedTaskWarning(
                     loopId,
                     operationSummaries,
@@ -370,7 +308,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                   });
                 }
               } catch {
-                // Output is not JSON or doesn't contain a chain-edit proposal, ignore
               }
             }
           }
@@ -399,10 +336,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     };
   }, [agentService, appendAssistantContent, finishTurn, interruptTurn, turns, transcriptService]);
 
-  // ── Conversational intent detection ──────────────────────────────────
-  // Detect phrases like "keep this chat", "save this chat", "keep this",
-  // "save this conversation", etc. in the user's message. When detected
-  // in an ephemeral session, auto-persist the session.
   const CONVERSATIONAL_PERSIST_PATTERNS = [
     /\bkeep\s+(this\s+)?(chat|conversation|session)\b/i,
     /\bsave\s+(this\s+)?(chat|conversation|session)\b/i,
@@ -416,16 +349,13 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     return CONVERSATIONAL_PERSIST_PATTERNS.some((p) => p.test(text));
   }
 
-  // ── Send prompt handler ─────────────────────────────────────────────
 
   const handleSendPrompt = useCallback(
     (text: string) => {
-      // ── Conversational intent: persist the session if user says "keep this" ──
       if (isEphemeral && detectConversationalPersistIntent(text)) {
         onPersistSession?.();
       }
 
-      // ── Track turn count for auto-persist ──
       onTurnSent?.();
 
       const timestamp = Date.now();
@@ -485,7 +415,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [accessMode, addTurn, agentService, appendAssistantContent, environmentId, finishTurn, intl, opencodeSessionId, sessionId, model, reasoningEffort],
   );
 
-  // ── Interrupt handler ───────────────────────────────────────────────
 
   const handleInterrupt = useCallback(
     (turnId: string) => {
@@ -496,18 +425,15 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [agentService, environmentId, interruptTurn, opencodeSessionId],
   );
 
-  // ── Other handlers ──────────────────────────────────────────────────
 
   const handleResolveApproval = useCallback(
     (_approvalId: string, _decision: ApprovalDecision) => {
-      // Agent approvals are handled by the OpenCode runtime, not locally
     },
     [],
   );
 
   const handleAnswerQuestion = useCallback(
     (_questionId: string, _answer: string) => {
-      // Agent questions are handled by the OpenCode runtime, not locally
     },
     [],
   );
@@ -527,13 +453,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [],
   );
 
-  // ── Loop-bar segment click → summon matching loop cards ──────────────
 
-  /**
-   * After inserting loop cards, also produce failure diagnoses for any
-   * failed loops that appear in the summon. Fetches log tails, runs the
-   * local heuristic classifier, and inserts diagnosis rows.
-   */
+  /** Diagnose failed loops after inserting loop cards. */
   const diagnoseAndInsert = useCallback(
     async (failedLoops: LoopMeta[], envId: string, summonTimestamp: number) => {
       if (!instance || failedLoops.length === 0) return;
@@ -552,7 +473,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             summonTimestamp,
           });
         } catch {
-          // If log fetch fails, insert a generic diagnosis
           const diagnosis = diagnoseFailure(loop, "");
           insertFailureDiagnosis({
             loopId: loop.id,
@@ -571,12 +491,10 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
 
   const handleSegmentClick = useCallback(
     (kind: LoopSegmentKind) => {
-      // ── Pipeline segment click: fetch and display matching issues ──
       if (kind.startsWith("pipeline:")) {
         const label = kind.slice("pipeline:".length);
         if (!label) return;
 
-        // Create a synthetic turn to hold the issue list
         const timestamp = Date.now();
         const turnId = `pipeline-turn-${timestamp}`;
         const userMsgId = `pipeline-msg-${timestamp}-u`;
@@ -638,7 +556,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         return;
       }
 
-      // ── Fleet mode: match across all reachable instances ──
       if (fleetMode && fleetLoopsWithOrigin) {
         const matching = kind === "healthy"
           ? fleetLoopsWithOrigin.filter((lo) => lo.loop.status === "running" || lo.loop.status === "waiting")
@@ -647,9 +564,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         if (matching.length > 0) {
           const timestamp = Date.now();
 
-          // Group by environmentId so loop cards are inserted with the correct env context.
-          // Each card gets its originating environmentId so the card's actions (pause/stop/trigger)
-          // route to the right instance.
           const byEnv = new Map<string, LoopWithOrigin[]>();
           for (const lo of matching) {
             const existing = byEnv.get(lo.environmentId);
@@ -667,10 +581,8 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             );
           }
 
-          // Auto-diagnose failed loops (per-origin environment)
           const failedLoops = matching.filter((lo) => lo.loop.status === "failed");
           if (failedLoops.length > 0) {
-            // Diagnose each failed loop using its originating environment's instance
             const failedByEnv = new Map<string, LoopMeta[]>();
             for (const lo of failedLoops) {
               const existing = failedByEnv.get(lo.environmentId);
@@ -691,7 +603,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         return;
       }
 
-      // ── Standard (scoped) mode ──
       const matchingLoops = kind === "healthy"
         ? loops.filter((l) => l.status === "running" || l.status === "waiting")
         : loops.filter((l) => l.status === kind);
@@ -703,7 +614,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           environmentId,
         );
 
-        // Auto-diagnose failed loops
         const failedLoops = matchingLoops.filter((l) => l.status === "failed");
         if (failedLoops.length > 0) {
           void diagnoseAndInsert(failedLoops, environmentId, timestamp);
@@ -713,12 +623,10 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [fleetMode, fleetLoopsWithOrigin, loops, environmentId, insertLoopCards, diagnoseAndInsert, environments, infraService, intl, accessMode, addTurn, appendAssistantContent, finishTurn],
   );
 
-  // ── Loop proposal callbacks ───────────────────────────────────────────
 
   const handleProposalApproved = useCallback(
     (proposalId: string, loopId: string, envId: string) => {
       updateLoopProposalStatus(proposalId, "created", { createdLoopId: loopId });
-      // Insert a live loop card for the newly created loop
       insertLoopCards([loopId], envId);
     },
     [updateLoopProposalStatus, insertLoopCards],
@@ -738,42 +646,29 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [updateLoopProposalStatus],
   );
 
-  // ── Chain edit proposal callbacks ───────────────────────────────────────
 
   const handleChainEditApproved = useCallback(
     (proposalId: string, loopId: string, envId: string) => {
-      // Find the proposal row to extract the fork decision
       const chainEditRow = rows.find(
         (r): r is import("../chat/types").ChainEditProposalRow =>
           r.kind === "chain-edit-proposal" && r.proposalId === proposalId,
       );
       const forkStrategy = chainEditRow?.sharedTaskWarning?.decision ?? "change-all";
 
-      // Apply the chain edit by calling the MCP service with an apply flag.
-      // The MCP tool that produced the proposal will re-execute with the
-      // apply flag set, actually creating/updating the tasks on the daemon.
-      // If forkStrategy is "fork-copy", the daemon creates a new copy of
-      // any shared task and re-points only this loop's chain.
       void mcpService.callTool(envId, "apply_chain_edit", { proposalId, loopId, forkStrategy }).then((result) => {
         if (result.ok) {
           updateChainEditProposalStatus(proposalId, "applied");
-          // Invalidate chain cache so the LoopCard re-fetches tasks on next expand
           setChainVersion((prev) => prev + 1);
 
-          // ── Detect structural changes and offer to sibling loops ──
           if (chainEditRow) {
             const structuralOps = detectStructuralChanges(
               chainEditRow.operationSummaries,
               chainEditRow.proposedSteps,
             );
             if (structuralOps && structuralOps.length > 0) {
-              // Extract pre-edit topology from the proposed steps
-              // (the proposedSteps represent the POST-edit state; we need
-              // the pre-edit topology from the shape cache)
               void (async () => {
                 try {
                   const allShapes = await loopShapeCacheService.getAll();
-                  // Find the pre-edit shape for this loop
                   const preEditShape = allShapes.find(
                     (s) => s.loopId === loopId && s.environmentId === envId,
                   );
@@ -787,7 +682,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                     })),
                   };
 
-                  // Post-edit topology from the applied proposal's steps
                   const postEditTopology = extractTopology(chainEditRow.proposedSteps);
 
                   const structuralDiff = computeStructuralDiff(
@@ -797,7 +691,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                     postEditTopology,
                   );
 
-                  // Find sibling loops with matching pre-edit topology
                   const siblings = findSiblingLoops({
                     preEditTopology,
                     sourceEnvironmentId: envId,
@@ -807,7 +700,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                     perEnvProjects,
                   });
 
-                  // Filter out siblings that have already declined this fingerprint
                   for (const sibling of siblings) {
                     const alreadyDeclined = await siblingOfferService.isDeclined(
                       sibling.environmentId,
@@ -869,13 +761,11 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [updateChainEditProposalForkDecision],
   );
 
-  // ── Sibling offer callbacks ──────────────────────────────────────────
 
   const handleSiblingOfferApproved = useCallback(
     (offerId: string, siblingLoopId: string, siblingEnvId: string) => {
       updateSiblingOfferStatus(offerId, "applying");
 
-      // Find the offer row to extract the structural diff
       const offerRow = rows.find(
         (r): r is import("../chat/types").SiblingOfferRow =>
           r.kind === "sibling-offer" && r.offerId === offerId,
@@ -887,7 +777,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         return;
       }
 
-      // Apply the structural diff on the sibling instance via MCP
       void mcpService.callTool(siblingEnvId, "apply_structural_diff", {
         loopId: siblingLoopId,
         structuralDiff: {
@@ -914,7 +803,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
 
   const handleSiblingOfferDeclined = useCallback(
     (offerId: string, siblingLoopId: string, siblingEnvId: string, fingerprint: string) => {
-      // Persist the decline so it's not offered again
       void siblingOfferService.recordDecline(siblingEnvId, siblingLoopId, fingerprint);
       updateSiblingOfferStatus(offerId, "declined");
     },
@@ -928,11 +816,9 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [updateSiblingOfferStatus],
   );
 
-  // ── Fleet plan handlers ──────────────────────────────────────────────
 
   const handleFleetPlanApply = useCallback(
     (planId: string, checkedTargets: FleetPlanTarget[]) => {
-      // Mark unchecked targets as "skipped", then execute checked ones
       for (const target of checkedTargets) {
         updateFleetPlanTarget(planId, target.targetId, { status: "running" });
       }
@@ -942,7 +828,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
       void (async () => {
         for (const target of checkedTargets) {
           try {
-            // Find the environment for this target
             const env = environments.find((e) => e.id === target.environmentId);
             const instanceForTarget = env
               ? { ...instance, id: env.id, name: env.name }
@@ -956,7 +841,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
               continue;
             }
 
-            // Use the agent to execute the operation via MCP on the target instance
             const result = await mcpService.callTool(target.environmentId, "execute_fleet_operation", {
               description: target.operation,
               projectId: target.projectId,
@@ -981,7 +865,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
           }
         }
 
-        // Mark the plan as applied after all targets are done
         updateFleetPlanStatus(planId, "applied");
       })();
     },
@@ -990,7 +873,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
 
   const handleFleetPlanCancel = useCallback(
     (planId: string) => {
-      // Mark all pending targets as skipped
       const planRow = rows.find(
         (r): r is import("../chat/types").FleetPlanRow =>
           r.kind === "fleet-plan" && r.planId === planId,
@@ -1156,7 +1038,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 );
               case "approval-request":
               case "question-request":
-                // Agent approvals/questions are handled by the OpenCode runtime.
                 return null;
               case "instance-handoff":
                 return (
@@ -1175,7 +1056,6 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 const envLoops = perEnvLoops[row.environmentId] ?? loops;
                 const loop = envLoops.find((l) => l.id === row.loopId);
                 if (!loop) return null;
-                // In fleet mode, look up the origin (project + instance) for this card
                 const origin = fleetMode && fleetLoopsWithOrigin
                   ? fleetLoopsWithOrigin.find((lo) => lo.loop.id === row.loopId)
                   : undefined;

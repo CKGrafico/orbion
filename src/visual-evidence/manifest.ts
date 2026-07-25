@@ -1,14 +1,3 @@
-/**
- * Build and write the evidence.json manifest into the OpenSpec change's
- * `evidence/` folder.
- *
- * The manifest is the single source of truth for what evidence exists, whether
- * the scenario passed/failed/skipped, the assertions that were run, the final
- * asset sizes, and the PR markdown fragment the external Loop Engineering
- * workflow should paste into the pull request.
- *
- * On failure, NO manifest is written into the permanent evidence folder.
- */
 import fs from "node:fs";
 import path from "node:path";
 import type { VisualEvidenceConfig } from "./config.js";
@@ -42,7 +31,6 @@ function build(
   result: Pick<EvidenceResult, "changeId" | "required" | "status">,
   opts: BuildOptions,
 ): EvidenceManifest {
-  // Build a partial manifest sans prMarkdown first.
   const partial: Record<string, unknown> = {
     version: MANIFEST_VERSION,
     changeId: result.changeId,
@@ -60,7 +48,6 @@ function build(
 
   partial["prMarkdown"] = "";
 
-  // Generate PR markdown from the partial manifest, then attach it.
   const manifestBeforeMd = partial as unknown as EvidenceManifest;
   const prMarkdown = generatePrMarkdown(manifestBeforeMd, opts.repo, opts.sha);
   partial["prMarkdown"] = prMarkdown;
@@ -75,12 +62,6 @@ export function buildManifest(
   return build(result, opts);
 }
 
-/**
- * Build the prMarkdown and write the evidence.json manifest into the
- * permanent evidence folder.
- *
- * Returns the path to the written manifest.
- */
 export function writeManifest(
   repoRoot: string,
   changeId: string,
@@ -96,7 +77,6 @@ export function writeManifest(
   return target;
 }
 
-/** Serialize a manifest to JSON string (for CLI stdout / tests). */
 export function serializeManifest(manifest: EvidenceManifest): string {
   return JSON.stringify(manifest, null, 2);
 }

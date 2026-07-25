@@ -1,14 +1,3 @@
-/**
- * Scenario: gh-231-tailscale-cli-detection
- *
- * Exercises the fix for Tailscale CLI availability being cached forever.
- * The RuntimeHealthChip now re-checks CLI availability on focus/mount
- * rather than caching the first result for the entire session.
- *
- * In the mock app, the instance detail view shows the runtime health chip
- * which reflects the current runtime state (showing "Daemon" and "Runtime"
- * chips in the main header).
- */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
 import { runAssertions } from "../assertions.js";
@@ -21,7 +10,6 @@ type AssertionSpec = {
 export async function gh231TailscaleCliDetectionScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render
   await page.waitForTimeout(3000);
 
   const assertions: AssertionSpec[] = [
@@ -33,7 +21,6 @@ export async function gh231TailscaleCliDetectionScenario(ctx: ScenarioContext): 
         if (count === 0) {
           throw new Error("No runtime health chips visible in the instance header");
         }
-        // The chips should include "Daemon" and "Runtime"
         const chipTexts = await chips.allTextContents();
         const hasDaemon = chipTexts.some((t) => /daemon/i.test(t));
         const hasRuntime = chipTexts.some((t) => /runtime/i.test(t));
@@ -45,17 +32,13 @@ export async function gh231TailscaleCliDetectionScenario(ctx: ScenarioContext): 
     {
       description: "The runtime health chip reflects the current runtime state as available",
       run: async (p) => {
-        // The chip shows runtime availability status
-        // In mock mode, the runtime state defaults to "available"
         const runtimeChip = p.locator(".chip").filter({ hasText: /runtime/i }).first();
         if ((await runtimeChip.count()) > 0) {
-          // A runtime chip exists — the state is live, not stale-cached
           return;
         }
-        // Alternative: check for OK indicator via the green dot
         const chip = p.locator(".chip").first();
         if ((await chip.count()) > 0) {
-          return; // Chips are rendering with live state
+          return;
         }
         throw new Error("No runtime health chip visible");
       },
@@ -63,7 +46,6 @@ export async function gh231TailscaleCliDetectionScenario(ctx: ScenarioContext): 
     {
       description: "The instance detail shows CLI detection is fresh (not stale-cached)",
       run: async (p) => {
-        // The main header shows instance name + runtime chips
         const mainHeader = p.locator(".main-header").first();
         if ((await mainHeader.count()) > 0) {
           await ctx.captureCheckpoint(

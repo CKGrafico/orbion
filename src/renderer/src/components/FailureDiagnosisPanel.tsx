@@ -7,22 +7,14 @@ interface FailureDiagnosisPanelProps {
   row: FailureDiagnosisRow;
 }
 
-/**
- * Renders a failure diagnosis panel in the chat stream.
- * Shows the agent's interpretation of why a loop failed alongside
- * the raw exit/logs. Distinguishes "environment/target is down" from
- * "the command itself is broken" when logs support it.
- */
 export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): React.ReactNode {
   const intl = useIntl();
 
   const isEnvDown = isEnvironmentDownCategory(row.category);
   const panelCls = `failure-diagnosis-panel${isEnvDown ? " failure-diagnosis-panel--env-down" : ""}`;
 
-  // The summary/nextStep may be i18n keys (containing dots) or plain text.
-  // Try to format as i18n key first; if not found, use as-is.
+  // May be i18n keys (containing dots) or plain text; try i18n first.
   const formatText = (text: string): string => {
-    // Check if it looks like an i18n key (contains dots and no spaces)
     if (text.includes(".") && !text.includes(" ")) {
       try {
         return intl.formatMessage({ id: text });

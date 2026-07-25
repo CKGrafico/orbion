@@ -1,14 +1,8 @@
 /**
  * Assertion helpers for visual-evidence scenarios.
- *
- * All helpers use accessible selectors (roles, text, labels) and Playwright's
- * built-in auto-waiting. Avoid brittle fixed sleeps: use {@link expectVisibleText}
- * / {@link expectEnabled} which poll until the assertion holds or the timeout
- * fires.
- *
- * Each assertion returns void on success and throws an {@link AssertionFailure}
- * with a human-readable description on failure. The orchestrator (run.ts)
- * catches these to build the failed-step result.
+ * Uses accessible selectors (roles, text, labels) and Playwright auto-waiting.
+ * Avoid fixed sleeps; use expectVisibleText / expectEnabled which poll until
+ * the assertion holds or the timeout fires.
  */
 import { expect as pwExpect } from "@playwright/test";
 
@@ -145,9 +139,8 @@ export async function pressKey(
 }
 
 /**
- * Run a list of named assertion functions and return per-item results
- * instead of throwing on the first failure. Useful when the scenario wants
- * to gather multiple assertion outcomes before reporting.
+ * Run a list of named assertion functions, returning per-item results
+ * instead of throwing on the first failure.
  */
 export async function runAssertions(
   page: import("playwright").Page,

@@ -2,21 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Environment } from "../types";
 import { subscribeLogs } from "../api";
 
-/**
- * Stream connection state reported by useLiveLog.
- * - "connected"    — active SSE subscription, receiving data
- * - "reconnecting" — stream ended or errored; automatic reconnect pending
- * - "stopped"      — max retries exhausted or explicitly stopped
- */
 export type StreamState = "connected" | "reconnecting" | "stopped";
 
-/** Configuration for reconnect behavior. */
 export interface ReconnectOptions {
-  /** Maximum number of reconnect attempts (default 5). */
   maxRetries?: number;
-  /** Base delay in ms for exponential backoff (default 1000). */
   baseDelayMs?: number;
-  /** Maximum delay cap in ms (default 30000). */
   maxDelayMs?: number;
 }
 
@@ -24,20 +14,6 @@ const DEFAULT_MAX_RETRIES = 5;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_DELAY_MS = 30_000;
 
-/**
- * Hook that manages SSE log subscription with automatic reconnect.
- *
- * On stream `end` or `error`, the hook schedules a reconnect with
- * exponential backoff (capped at `maxDelayMs`). Unmounting, a change
- * in the environment/loopId, or an explicit `stop()` call cancels
- * any pending reconnect timer and unsubscribes.
- *
- * Guarantees:
- * - At most one active subscription at any time (no duplicates).
- * - No duplicate log rows: the `onLine` callback is only wired to
- *   the currently active subscription.
- * - Unmount during backoff cancels the timer (no dangling timeouts).
- */
 export function useLiveLog(
   env: Environment,
   loopId: string,
@@ -55,7 +31,6 @@ export function useLiveLog(
 
   const [streamState, setStreamState] = useState<StreamState>("connected");
 
-  // Refs to always have the latest callbacks without re-subscribing
   const onLineRef = useRef(onLine);
   onLineRef.current = onLine;
   const onEventRef = useRef(onEvent);
@@ -94,13 +69,10 @@ export function useLiveLog(
         if (!mountedRef.current) return;
         onLineRef.current(line);
       },
-      // onClose — called when stream ends (clean EOF or error)
       () => {
         if (!mountedRef.current) return;
-
         if (stoppedRef.current) return;
 
-        // Schedule reconnect with exponential backoff
         const attempt = attemptRef.current;
         if (attempt >= maxRetries) {
           setStreamState("stopped");
@@ -131,7 +103,6 @@ export function useLiveLog(
     }
   }, [env.id, env.activeEndpointId, loopId, maxRetries, baseDelayMs, maxDelayMs, doUnsubscribe, clearTimer]);
 
-  // (Re)subscribe when env/loopId changes
   useEffect(() => {
     stoppedRef.current = false;
     attemptRef.current = 0;
@@ -143,7 +114,6 @@ export function useLiveLog(
     };
   }, [subscribe, clearTimer, doUnsubscribe]);
 
-  // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {

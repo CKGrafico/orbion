@@ -1,16 +1,10 @@
 /**
- * FFmpeg detection + invocation wrapper.
- *
- * Pure I/O, no business logic. The caller (gif.ts) uses {@link detectFfmpeg}
- * to decide whether to attempt GIF conversion at all, and {@link runFfmpeg}
- * to execute. Both are safe to mock in tests.
+ * FFmpeg detection + invocation. Both functions are safe to mock in tests.
  */
 import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 
-/** Locate ffmpeg on PATH or in common install locations. Returns null if not found. */
 export function detectFfmpeg(): string | null {
-  // Try `which ffmpeg` / `where ffmpeg`
   try {
     const out = execFileSync(
       process.platform === "win32" ? "where" : "which",
@@ -20,7 +14,7 @@ export function detectFfmpeg(): string | null {
     const first = out.split(/\r?\n/)[0];
     if (first) return first;
   } catch {
-    // not on PATH
+    // ffmpeg not on PATH
   }
   const common = [
     "/usr/bin/ffmpeg",
@@ -40,8 +34,7 @@ export interface FfmpegRunResult {
 }
 
 /**
- * Spawn ffmpeg with the given args. Resolves on exit code 0.
- * Rejects with the stderr tail on non-zero exit.
+ * Spawn ffmpeg. Resolves on exit code 0, rejects with stderr tail on non-zero.
  */
 export function runFfmpeg(args: readonly string[], opts?: {
   timeoutMs?: number;

@@ -9,51 +9,25 @@ import type { StreamState } from "./useLiveLog";
 import { resolveTaskChain, TaskChainView } from "./TaskChainView";
 
 interface LoopCardProps {
-  /** The loop to display. Updated live from the loop store. */
   loop: LoopMeta;
-  /** Whether the instance hosting this loop is reachable. */
   reachability?: "connected" | "reconnecting" | "unreachable";
-  /** The environment-instance that hosts this loop. When provided, the card shows a log tail and action buttons. */
   instance?: Environment;
-  /** The scroll container element for IntersectionObserver rooting (enables auto-collapse when scrolled past). */
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
-  /** Monotonically increasing version counter. When incremented, the task chain cache is invalidated. */
   chainVersion?: number;
 }
 
-/** Pulse animation for running status dots. */
 const PULSING_STATUSES: Set<LoopStatus> = new Set(["running"]);
-
-/** Number of tail lines to fetch initially. */
 const LOG_TAIL_SIZE = 10;
-
-/** Maximum in-memory lines for the compact card log view. */
 const MAX_LOG_LINES = 50;
-
-/** How long the action result message stays visible (ms). */
 const RESULT_DISPLAY_MS = 2000;
-
-/** How long an error message stays visible (ms). */
 const ERROR_DISPLAY_MS = 4000;
 
-/** Loop action type for internal state tracking. */
 type LoopAction = "pause" | "resume" | "stop" | "trigger";
-
-/** Result of executing a loop action. */
 type ActionResult =
   | { kind: "success"; action: LoopAction }
   | { kind: "error"; message: string };
 
-/**
- * Determine which actions are available for a given loop status.
- * Rules per the spec:
- *   running  → Pause, Stop
- *   waiting  → Pause, Stop, Run Now
- *   paused   → Resume, Stop, Run Now
- *   stopped  → Run Now
- *   failed   → Stop, Run Now
- *   finished → (none)
- */
+/** running→Pause,Stop; waiting→Pause,Stop,RunNow; paused→Resume,Stop,RunNow; stopped→RunNow; failed→Stop,RunNow; finished→none */
 function getAvailableActions(status: LoopStatus): LoopAction[] {
   switch (status) {
     case "running":
@@ -71,13 +45,7 @@ function getAvailableActions(status: LoopStatus): LoopAction[] {
   }
 }
 
-/**
- * Determine which actions need confirmation before executing.
- * Stop always needs confirmation (clears schedule).
- * Pause of a running loop needs confirmation (interrupts active work).
- * Run Now on a stopped loop needs confirmation (re-schedules).
- * Resume and Run Now on a waiting loop execute immediately.
- */
+/** Stop always confirms; pause of running confirms; trigger on stopped confirms. */
 function needsConfirmation(action: LoopAction, status: LoopStatus): boolean {
   if (action === "stop") return true;
   if (action === "pause" && status === "running") return true;
@@ -85,7 +53,6 @@ function needsConfirmation(action: LoopAction, status: LoopStatus): boolean {
   return false;
 }
 
-/** Result label for a successful action. */
 function actionResultLabel(action: LoopAction): string {
   switch (action) {
     case "pause": return "loopCard.resultPaused";
@@ -95,7 +62,6 @@ function actionResultLabel(action: LoopAction): string {
   }
 }
 
-/** Button label for an action. */
 function actionButtonLabel(action: LoopAction): string {
   switch (action) {
     case "pause": return "loopCard.actionPause";
@@ -105,7 +71,6 @@ function actionButtonLabel(action: LoopAction): string {
   }
 }
 
-/** Confirmation title i18n key for an action that needs confirmation. */
 function confirmTitleKey(action: LoopAction): string {
   switch (action) {
     case "pause": return "loopCard.confirmPauseTitle";
@@ -115,7 +80,6 @@ function confirmTitleKey(action: LoopAction): string {
   }
 }
 
-/** Confirmation description i18n key for an action that needs confirmation. */
 function confirmDescriptionKey(action: LoopAction): string {
   switch (action) {
     case "pause": return "loopCard.confirmPauseDescription";
@@ -129,8 +93,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
   const intl = useIntl();
 
   // Defensive: the real API may omit array fields that the type declares as required
-  const safeLoop = useMemo(() => {
-    if (!loop) {
+  const safeLoop = useMemo(() => {    if (!loop) {
       console.error("[LoopCard] loop prop is undefined/null");
       return { id: "", status: "stopped" as LoopStatus, command: "", commandArgs: [], cwd: "", intervalHuman: "", maxRuns: null, runCount: 0, skippedCount: 0, lastExitCode: null, lastRunAt: null, nextRunAt: null, pid: null, runHistory: [], taskId: null };
     }
@@ -148,46 +111,37 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
 
   const name = safeLoop.description?.trim() || commandLine(safeLoop.command, safeLoop.commandArgs) || safeLoop.id;
 
-  // Next-run countdown
   const countdown = useNextRunCountdown(safeLoop.nextRunAt);
   const nextRunLabel = isReachable
     ? (countdown ?? (safeLoop.nextRunAt ? timeUntil(safeLoop.nextRunAt) : intl.formatMessage({ id: "loopCard.noNextRun" })))
     : intl.formatMessage({ id: "loopCard.unknown" });
 
-  // Exit code display
   const exitCodeLabel = safeLoop.lastExitCode === null
     ? "-"
     : String(safeLoop.lastExitCode);
 
-  // Run count display
   const runCountLabel = safeLoop.maxRuns
     ? `${safeLoop.runCount}/${safeLoop.maxRuns}`
     : String(safeLoop.runCount);
 
-  // Status dot color
   const dotColor = isReachable
     ? (STATUS_COLORS[safeLoop.status] ?? "var(--text-secondary)")
     : "var(--status-unknown)";
 
-  // Status label (shared between expanded header and collapsed one-liner)
   const statusLabel = isReachable
     ? intl.formatMessage({ id: `loopCard.status${safeLoop.status.charAt(0).toUpperCase()}${safeLoop.status.slice(1)}` })
     : intl.formatMessage({ id: "loopCard.statusUnknown" });
 
-  // ── Click-to-expand for collapsed cards ────────────────────────────────
   const handleCollapsedClick = useCallback((): void => {
     setIsScrolledPast(false);
-    // Scroll the card into view (centered) so it stays visible after expanding
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
 
-  // ── Action state ─────────────────────────────────────────────────────
   const [confirmingAction, setConfirmingAction] = useState<LoopAction | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionResult, setActionResult] = useState<ActionResult | null>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear result timer on unmount
   useEffect(() => {
     return () => {
       if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
@@ -230,7 +184,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
       setActionLoading(false);
     }
 
-    // Auto-clear result after timeout
     const duration = actionResult?.kind === "error" ? ERROR_DISPLAY_MS : RESULT_DISPLAY_MS;
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
     resultTimerRef.current = setTimeout(() => {
@@ -256,10 +209,8 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     }
   }, [confirmingAction, executeAction]);
 
-  // Available actions for this loop
   const availableActions = isReachable && instance ? getAvailableActions(safeLoop.status) : [];
 
-  // ── Task chain expansion ─────────────────────────────────────────────
   const [chainExpanded, setChainExpanded] = useState(false);
   const [chainTasks, setChainTasks] = useState<TaskDefinition[] | null>(null);
   const [chainLoading, setChainLoading] = useState(false);
@@ -276,7 +227,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     }
 
     if (chainTasks !== null) {
-      // Already fetched — just toggle
       setChainExpanded(true);
       return;
     }
@@ -299,16 +249,12 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     });
   }, [chainExpanded, chainTasks, instance, isReachable, safeLoop.taskId]);
 
-  // Whether the loop has a taskId (prerequisite for showing the expand affordance)
   const hasTaskChain = safeLoop.taskId != null && safeLoop.taskId !== "";
 
-  // ── Chain version invalidation ─────────────────────────────────────────
-  // When chainVersion changes (e.g., after a chain-edit proposal is applied),
-  // clear the cached chain tasks so the next expand fetches fresh data.
+  // When chainVersion changes, clear cached chain tasks so the next expand fetches fresh data.
   useEffect(() => {
     if (chainVersion !== undefined && chainVersion > 0) {
       setChainTasks(null);
-      // If the chain is currently expanded, re-fetch immediately
       if (chainExpanded && instance && isReachable) {
         setChainLoading(true);
         void fetchTasks(instance).then((res) => {
@@ -326,28 +272,18 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     }
   }, [chainVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Live log streaming ─────────────────────────────────────────────────
   const [logLines, setLogLines] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [streamState, setStreamState] = useState<StreamState | null>(null);
 
-  // Track whether the card is in the viewport
   const [isVisible, setIsVisible] = useState(true);
-  // Track whether the card has scrolled above the viewport (for auto-collapse)
   const [isScrolledPast, setIsScrolledPast] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
-  // Ref for the log content div (autoscroll target)
   const logContentRef = useRef<HTMLDivElement | null>(null);
 
-  // Track whether user has scrolled up (disable autoscroll)
   const autoScrollRef = useRef(true);
 
-  // ── IntersectionObserver for visibility + collapse gating ────────────
-  // When a scrollContainerRef is provided, we root the observer to the
-  // scroll container so we can detect when the card scrolls above the
-  // viewport (scrolled past → collapsed). Cards that are merely below the
-  // fold are not collapsed so they appear expanded when the user scrolls down.
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
@@ -359,8 +295,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
         setIsVisible(entry.isIntersecting);
 
         if (rootEl && !entry.isIntersecting) {
-          // Card is out of view. Determine direction: if the card's bottom
-          // edge is above the root's top edge, it was scrolled past (above).
           const rootBounds = entry.rootBounds;
           if (rootBounds) {
             const scrolledAbove = entry.boundingClientRect.bottom < rootBounds.top;
@@ -377,7 +311,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     return () => observer.disconnect();
   }, [scrollContainerRef]);
 
-  // ── Initial tail fetch ────────────────────────────────────────────────
   useEffect(() => {
     if (!instance || !isReachable) {
       setLogLines([]);
@@ -402,13 +335,9 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     };
   }, [instance?.id, instance?.activeEndpointId, safeLoop.id, isReachable]);
 
-  // ── SSE live subscription (visibility-gated) ──────────────────────────
-  // Cleanup ref for the current subscription
   const unsubRef = useRef<(() => void) | null>(null);
 
-  // Subscribe when visible + reachable + instance available, unsubscribe otherwise
   useEffect(() => {
-    // Tear down existing subscription
     if (unsubRef.current) {
       unsubRef.current();
       unsubRef.current = null;
@@ -419,7 +348,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
       return;
     }
 
-    // Only subscribe if the loop is running or waiting (active states that produce output)
     const isActive = safeLoop.status === "running" || safeLoop.status === "waiting";
     if (!isActive) {
       setStreamState((prev) => prev !== null ? null : prev);
@@ -437,10 +365,7 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
           return next.length > MAX_LOG_LINES ? next.slice(next.length - MAX_LOG_LINES) : next;
         });
       },
-      // onClose — stream ended or errored
       () => {
-        // The SSE stream for logs typically ends when the run finishes.
-        // Set to stopped so the UI reflects the stream is no longer active.
         setStreamState("stopped");
       },
     );
@@ -455,11 +380,9 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     };
   }, [isVisible, instance?.id, instance?.activeEndpointId, safeLoop.id, safeLoop.status, isReachable]);
 
-  // ── Autoscroll ────────────────────────────────────────────────────────
   const handleLogScroll = useCallback(() => {
     const el = logContentRef.current;
     if (!el) return;
-    // If user is within 30px of the bottom, keep autoscroll enabled
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
     autoScrollRef.current = atBottom;
   }, []);
@@ -476,11 +399,9 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // clipboard unavailable, ignore
     }
   };
 
-  // ── Card classes ───────────────────────────────────────────────────────
   const cardCls = [
     "loop-card",
     failed ? "loop-card--failed" : "",
@@ -488,16 +409,13 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
     isScrolledPast ? "loop-card--collapsed" : "",
   ].filter(Boolean).join(" ");
 
-  // Whether to render the log tail section
   const showLogTail = instance && isReachable && logLines.length > 0;
 
-  // Whether to show action buttons
   const showActions = availableActions.length > 0;
 
   return (
     <div className={cardCls} ref={cardRef}>
       {isScrolledPast ? (
-        /* ── Collapsed one-liner: status dot + name + status ── */
         <div className="loop-card-header" onClick={handleCollapsedClick} role="button" tabIndex={0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCollapsedClick(); }}
         >
@@ -516,7 +434,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
         </div>
       ) : (
         <>
-          {/* Header row: status dot + name */}
           <div className="loop-card-header">
             <span
               className={`dot loop-card-dot${isPulsing ? " loop-card-dot--pulse" : ""}`}
@@ -531,7 +448,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             </span>
           </div>
 
-          {/* Meta row: interval · runs · last exit · next run · expand chain */}
           <div className="loop-card-meta">
             <span className="loop-card-meta-item">
               <span className="loop-card-meta-label">{intl.formatMessage({ id: "loopCard.interval" })}</span>
@@ -577,12 +493,10 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             )}
           </div>
 
-          {/* Task chain expansion */}
           {chainExpanded && chainTasks !== null && (
             <TaskChainView steps={chainSteps} />
           )}
 
-          {/* Log tail: compact monospace output with copy affordance */}
           {showLogTail && (
             <div className="loop-card-log-tail">
               <div className="loop-card-log-tail-header">
@@ -618,7 +532,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             </div>
           )}
 
-          {/* Action result feedback */}
           {actionResult && (
             <div className={`loop-card-action-result${actionResult.kind === "error" ? " loop-card-action-result--error" : ""}`}>
               {actionResult.kind === "success"
@@ -627,7 +540,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             </div>
           )}
 
-          {/* Action buttons */}
           {showActions && !actionResult && (
             <div className="loop-card-actions">
               {availableActions.map((action) => (
@@ -643,7 +555,6 @@ export function LoopCard({ loop, reachability, instance, scrollContainerRef, cha
             </div>
           )}
 
-          {/* Confirmation overlay */}
           {confirmingAction && (
             <div className="loop-card-confirm-overlay">
               <div className="loop-card-confirm-content">

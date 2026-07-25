@@ -45,8 +45,6 @@ export function validateCliInputs(opts: { title?: string; body?: string; labels?
   }
 }
 
-// ── ghExec helper ────────────────────────────────────────────────────
-
 export interface GhExecOptions {
   args: string[];
   cli?: "gh" | "az";
@@ -55,7 +53,6 @@ export interface GhExecOptions {
   maxBuffer?: number;
   /** If true, return error when resolved CLI is not `gh`. */
   requireGh?: boolean;
-  /** If provided, validate inputs before executing. */
   validateInputs?: { title?: string; body?: string; labels?: string[]; repo?: string | undefined };
 }
 
@@ -63,12 +60,7 @@ export type GhExecResult =
   | { ok: true; stdout: string; stderr: string }
   | { ok: false; error: I18nMessage };
 
-/**
- * Execute a platform CLI command (gh or az) with unified error handling.
- *
- * Resolves the platform CLI, optionally validates inputs, runs execFile,
- * and maps ENOENT / general errors to I18nMessage results.
- */
+/** Resolves CLI, validates inputs, executes, and maps errors to I18nMessage. */
 export function ghExec(options: GhExecOptions): Promise<GhExecResult> {
   const {
     args,
@@ -117,10 +109,6 @@ export function ghExec(options: GhExecOptions): Promise<GhExecResult> {
   })();
 }
 
-/**
- * Execute `gh` CLI specifically, with all the standard error mapping.
- * Convenience wrapper around ghExec when you know it must be `gh`.
- */
 export function ghExecOnly(
   args: string[],
   i18nPrefix: GhExecOptions["i18nPrefix"],

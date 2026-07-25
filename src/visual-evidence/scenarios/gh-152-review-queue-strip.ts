@@ -1,15 +1,5 @@
 /**
- * Scenario: gh-152-review-queue-strip
- *
- * Exercises the review queue strip for PR batches:
- *   1. App launches into the inbox view with mock data.
- *   2. A PR awaiting review item is visible.
- *   3. Clicking the PR item opens review mode with a queue strip.
- *   4. The queue strip shows multiple PRs with verdict chips.
- *   5. Clicking a different PR in the strip switches the main area.
- *   6. The currently selected PR is highlighted in the strip.
- *
- * Uses mock mode (no real Electron environment needed).
+ * Exercises the review queue strip for PR batches. Uses mock mode.
  */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
@@ -26,10 +16,8 @@ type AssertionSpec = {
 export async function gh152ReviewQueueStripScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render (inbox or cold-open)
   await page.waitForTimeout(3000);
 
-  // Navigate to inbox if not already there
   const inboxTab = page.getByRole("button", { name: /inbox/i });
   if ((await inboxTab.count()) > 0) {
     await inboxTab.first().click();
@@ -70,7 +58,7 @@ export async function gh152ReviewQueueStripScenario(ctx: ScenarioContext): Promi
         if (rowCount < 2) {
           throw new Error(`Expected at least 2 PR rows in queue strip, found ${rowCount}`);
         }
-        // Check that at least one risk chip is visible
+        // At least one risk chip must be visible
         const chip = p.locator(".pr-risk-chip").first();
         if ((await chip.count()) === 0) {
           throw new Error("No verdict risk chips visible in the queue strip");
@@ -95,7 +83,7 @@ export async function gh152ReviewQueueStripScenario(ctx: ScenarioContext): Promi
         const totalCount = await allRows.count();
         void activeRows; // referenced for the active-count check below when totalCount > 1
         if (totalCount <= 1) {
-          // Only one PR; skip this assertion gracefully
+          // Only one PR; skip gracefully
           return;
         }
         // Click the last non-active row
@@ -105,7 +93,7 @@ export async function gh152ReviewQueueStripScenario(ctx: ScenarioContext): Promi
         }
         await nonActiveRows.last().click();
         await page.waitForTimeout(500);
-        // Verify the header updated (the new active row should exist)
+        // Verify the header updated
         const newActiveRows = p.locator(".review-queue-strip-row-active");
         if ((await newActiveRows.count()) === 0) {
           throw new Error("No active row after clicking a different PR");

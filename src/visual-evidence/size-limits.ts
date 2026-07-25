@@ -1,10 +1,6 @@
 /**
  * Pure size-limit checks for evidence assets.
- *
- * These functions never perform I/O; they operate over in-memory
- * {@link CaptureCandidate} (buffer + metadata) and the configured limits.
- * The orchestrator uses them to decide which assets to promote to
- * permanent OpenSpec evidence.
+ * No I/O — operates over in-memory candidates and configured limits.
  */
 import type {
   CaptureCandidate,
@@ -41,7 +37,7 @@ export function enforceSizeLimits(
 ): SizeVerdict {
   if (candidate.type === "screenshot") return enforceScreenshot(candidate, config);
   if (candidate.type === "gif") return enforceGif(candidate, config);
-  // Videos are never promoted to permanent evidence — always reject
+  // Videos are never promoted to permanent evidence
   return {
     ok: false,
     reason: "videos are temporary artifacts and must not be committed to permanent evidence",
@@ -88,11 +84,8 @@ function buildGifAsset(c: CaptureCandidate, relPath: string): GifAsset {
 }
 
 /**
- * Pick the final assets to promote to permanent evidence.
- *
- * The screenshot is always kept (when below screenshot.maxBytes). The GIF is
- * only kept when below gif.maxBytes; if it exceeded the hard cap, it is
- * dropped and the screenshot alone is committed.
+ * Pick final assets. Screenshot always kept (when below maxBytes);
+ * GIF only kept when below gif.maxBytes, otherwise dropped.
  */
 export function chooseFinalAssets(
   candidates: readonly CaptureCandidate[],
@@ -117,7 +110,7 @@ export function chooseFinalAssets(
       } else if (c.type === "video") {
         reasons.push(verdict.reason ?? "video not allowed");
       } else if (!screenshot) {
-        // Screenshot failed — still record the reason; we may have no screenshot at all
+        // Record the reason even if no screenshot at all
         reasons.push(verdict.reason ?? "screenshot too large");
       }
       continue;

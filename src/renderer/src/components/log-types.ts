@@ -1,8 +1,3 @@
-/**
- * Structured log row types for component-based log rendering.
- * Mirrors the TranscriptRow pattern from the chat system but tailored for loop output.
- */
-
 export type LogRowKind =
   | "run-header"
   | "tool-call"
@@ -54,10 +49,6 @@ export type LogRow =
   | PlainTextLogRow
   | ExitLogRow;
 
-/**
- * Structured event payload parsed from StreamEventPayload when kind === "event".
- * The daemon may emit these as JSON strings in the event stream.
- */
 export type LogEventType = "tool_call" | "markdown" | "approval";
 
 export interface ToolCallEvent {
@@ -88,19 +79,12 @@ export type LogEventPayload =
   | MarkdownEvent
   | ApprovalEvent;
 
-/**
- * A run segment groups LogRows belonging to a single run.
- */
 export interface RunSegment {
   runNumber: number;
   rows: LogRow[];
   expanded: boolean;
 }
 
-/**
- * Attempt to parse a stream event text as a structured LogEventPayload.
- * Returns null if the text is not valid JSON or does not match expected shapes.
- */
 export function parseLogEvent(text: string): LogEventPayload | null {
   try {
     const parsed = JSON.parse(text);
@@ -115,10 +99,6 @@ export function parseLogEvent(text: string): LogEventPayload | null {
   }
 }
 
-/**
- * Classify a plain text log line into a LogRow kind.
- * Returns the kind and extracted metadata.
- */
 export function classifyLogLine(line: string): { kind: LogRowKind; runNumber?: number; exitCode?: number } {
   const runMatch = line.match(/=== Run #(\d+)/);
   if (runMatch) {

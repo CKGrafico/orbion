@@ -1,8 +1,6 @@
-// Shared IPC contract between main, preload, and renderer.
 import type { LogEntry } from "./log.js";
 // All HTTP to loop-task environments runs in the MAIN process: the loop-task
-// daemon sends no CORS headers, so renderer fetch would be blocked, and
-// main-process fetch also works unchanged for environments on remote VMs.
+// daemon sends no CORS headers, so renderer fetch would be blocked.
 
 export interface I18nMessage {
   key: string;
@@ -36,8 +34,6 @@ export interface StreamEventPayload {
   text: string;
 }
 
-// ── Pairing & scoped sessions ──────────────────────────────────────
-
 export type SessionScope = "read-only" | "operate" | "admin";
 
 export interface SessionToken {
@@ -51,8 +47,6 @@ export interface PairingCodeExchangeResponse {
   token?: SessionToken;
   error?: string | I18nMessage;
 }
-
-// ── Config store (electron-store) ───────────────────────────────────
 
 export type EndpointKind = "direct" | "ssh" | "tailscale";
 
@@ -73,26 +67,17 @@ export type AgentRuntime = "opencode" | "claude";
 
 export type RuntimeState = "available" | "unavailable" | "unknown";
 
-/** A reasoning effort level supported by a model. */
 export type ReasoningEffort = "low" | "medium" | "high";
 
-/** A model offered by a runtime adapter, with availability metadata. */
 export interface ModelInfo {
-  /** Unique model identifier (e.g. "openai/gpt-4o", "anthropic/claude-3.5-sonnet"). */
   id: string;
-  /** Human-readable display name. */
   label: string;
-  /** The provider or runtime family (e.g. "openai", "anthropic"). */
   provider: string;
-  /** Whether this model can currently be used. */
   available: boolean;
-  /** Human-readable reason if unavailable. */
   unavailableReason?: string;
-  /** Reasoning effort levels this model supports (empty if unsupported). */
   reasoningEfforts?: ReasoningEffort[];
 }
 
-/** Result of listing models from a runtime adapter. */
 export interface ListModelsResult {
   ok: boolean;
   models?: ModelInfo[];
@@ -119,61 +104,41 @@ export interface Environment {
   infraOpenCode?: OpenCodeEndpoint | null;
 }
 
-// ── Bootstrap seed (portable config-home reach info) ──────────────────
-
 /** Parsed bootstrap seed: non-secret reach info for the config-home VM. */
 export interface BootstrapSeed {
-  /** Reach method: "ssh" or "direct". Maps to ReachMethod in the wizard. */
   kind: "ssh" | "direct";
   /** For SSH: "user@host:port". For direct: the URL. */
   target: string;
-  /** Environment name (from the VM's config). */
   name: string;
 }
 
-/** Result of exporting a bootstrap seed from the main-VM. */
 export type BootstrapSeedExportResult =
   | { ok: true; seed: string }
   | { ok: false; error: string | I18nMessage };
 
-/** Result of importing (parsing) a bootstrap seed string. */
 export type BootstrapSeedImportResult =
   | { ok: true; seed: BootstrapSeed }
   | { ok: false; error: string | I18nMessage };
 
-// ── Pull-canonical restore from config-home ───────────────────────────
-
-/** Whether a config-home VM has a config file available for restore. */
 export type RestoreAvailability =
   | { available: true; environmentCount: number; environmentNames: string[] }
   | { available: false; reason: string | I18nMessage };
 
-/** Result of a pull-canonical restore from the config-home VM. */
 export type PullRestoreResult =
   | { ok: true; restored: Environment[] }
   | { ok: false; error: string | I18nMessage };
 
-// ── Versioned config writes with stale-overwrite warning ──────────────
-
-/** A version stamp attached to every config write. */
 export interface ConfigStamp {
-  /** Wall-clock timestamp (Date.now()) of the last write. */
   timestamp: number;
-  /** Monotonically increasing revision counter. */
   revision: number;
 }
 
-/** Result of a stamp-checked write that detected a conflict. */
 export interface StaleConfigResult {
-  /** True when the file's current stamp is newer than the caller's last-known stamp. */
   stale: true;
-  /** The stamp on disk (newer than what the caller held). */
   currentStamp: ConfigStamp;
-  /** The stamp the caller held at the time of the write attempt. */
   knownStamp: ConfigStamp;
 }
 
-/** Result of a stamp-checked write: either a clean write or a stale conflict. */
 export type StampCheckedWriteResult =
   | { ok: true; stamp: ConfigStamp }
   | { ok: false; stale: StaleConfigResult };
@@ -182,7 +147,6 @@ export interface ConfigBridge {
   getEnvironments: () => Promise<Environment[]>;
   addEnvironment: (name: string, url: string, kind?: EndpointKind) => Promise<Environment>;
   removeEnvironment: (id: string) => Promise<void>;
-  /** Update mutable fields on an existing environment (name, agentRuntime). */
   updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }) => Promise<void>;
   addEndpoint: (environmentId: string, url: string, kind: EndpointKind) => Promise<AccessEndpoint | null>;
   removeEndpoint: (environmentId: string, endpointId: string) => Promise<void>;
@@ -213,39 +177,27 @@ export interface ConfigBridge {
   importBootstrapSeed: (seedString: string) => Promise<BootstrapSeedImportResult>;
   checkRestoreAvailable: () => Promise<RestoreAvailability>;
   pullRestore: () => Promise<PullRestoreResult>;
-  /** Get the current config stamp (timestamp + monotonic revision). */
   getConfigStamp: () => Promise<ConfigStamp>;
-  /** Stamp-checked write: update the main-VM designate only if the config is
-   *  not stale relative to `knownStamp`. Returns `StaleConfigResult` on conflict. */
   stampCheckedSetMainVm: (environmentId: string, knownStamp: ConfigStamp) => Promise<StampCheckedWriteResult>;
   /** Force-write the main-VM designate regardless of staleness (last-write-wins with explicit consent). */
   forceSetMainVm: (environmentId: string) => Promise<ConfigStamp>;
-  /** Sweep (delete) ephemeral sessions idle beyond the inactivity threshold. */
   sweepEphemeralSessions: (args: SweepEphemeralSessionsArgs) => Promise<SweepEphemeralSessionsResult>;
 }
-
-// ── Platform detection ─────────────────────────────────────────────────
 
 export type PlatformType = "github" | "ado" | "unknown";
 
 export interface DetectPlatformParams {
   environmentId: string;
   projectId?: string;
-  /** Working directory of the project on the VM (where `git remote -v` runs). */
   directory?: string;
-  /** Force re-detection even if a cached result exists. */
   force?: boolean;
 }
 
 export interface PlatformDetectionResult {
   platform: PlatformType;
-  /** The remote URLs that were classified (empty if detection failed). */
   remotes: string[];
-  /** Whether the result came from cache. */
   cached: boolean;
 }
-
-// ── Infra assistant ──────────────────────────────────────────────────
 
 export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff" | "get-pr-briefing" | "submit-pr-review" | "open-pr-in-browser";
 
@@ -253,7 +205,6 @@ export interface CreateIssueParams {
   title: string;
   body: string;
   labels?: string[];
-  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
   repo?: string;
 }
 
@@ -264,13 +215,9 @@ export interface CreateIssueResult {
 }
 
 export interface ListIssuesParams {
-  /** Filter by label (GitHub). Multiple labels comma-separated. */
   labels?: string;
-  /** Filter by state: "open" (default), "closed", "all". */
   state?: "open" | "closed" | "all";
-  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
   repo?: string;
-  /** Maximum number of issues to return (default 20). */
   limit?: number;
 }
 
@@ -299,11 +246,8 @@ export interface MachineStatusEntry {
 }
 
 export interface AddLabelParams {
-  /** Issue number on the platform. */
   issueNumber: number;
-  /** Label(s) to apply. */
   labels: string[];
-  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
   repo?: string;
 }
 
@@ -313,24 +257,17 @@ export interface AddLabelResult {
 }
 
 export interface EditIssueParams {
-  /** Issue number on the platform. */
   issueNumber: number;
-  /** New title. Omit to keep the current title. */
   title?: string;
-  /** New body/description. Omit to keep the current body. */
   body?: string;
-  /** Labels to ADD (appended to existing). */
   addLabels?: string[];
-  /** Labels to REMOVE from the issue. */
   removeLabels?: string[];
-  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
   repo?: string;
 }
 
 export interface EditIssueResult {
   platform: "github" | "ado";
   issueNumber: number;
-  /** Fields that were actually changed. */
   changes: {
     title?: boolean;
     body?: boolean;
@@ -340,13 +277,9 @@ export interface EditIssueResult {
 }
 
 export interface BulkRelabelParams {
-  /** Issue numbers to relabel. */
   issueNumbers: number[];
-  /** Labels to ADD (appended to existing). */
   addLabels: string[];
-  /** Labels to REMOVE from issues. */
   removeLabels?: string[];
-  /** GitHub repo in "owner/repo" format. Defaults to the current repository if available. */
   repo?: string;
 }
 
@@ -357,157 +290,96 @@ export interface BulkRelabelItemResult {
 }
 
 export interface BulkRelabelResult {
-  /** Per-item results showing exactly which succeeded and which failed. */
   items: BulkRelabelItemResult[];
-  /** Number of items that succeeded. */
   succeeded: number;
-  /** Number of items that failed. */
   failed: number;
 }
 
-// ── PRs awaiting review (GH CLI) ──────────────────────────────────────
-
-/** A single PR that is awaiting the user's review. */
 export interface PrAwaitingReviewItem {
-  /** PR number. */
   number: number;
-  /** PR title. */
   title: string;
-  /** Repository in "owner/repo" format. */
   repo: string;
-  /** PR author login. */
   author: string;
-  /** PR URL. */
   url: string;
-  /** ISO timestamp of PR creation. */
   createdAt: string;
-  /** ISO timestamp of last PR update. */
   updatedAt: string;
-  /** The HEAD SHA of the PR branch (used for verdict cache invalidation). */
+  /** Used for verdict cache invalidation. */
   headSha: string;
 }
 
-/** Risk level assigned by the local heuristic diff analysis engine. */
 export type PrRiskLevel = "low" | "medium" | "high" | "uncertain";
 
-/** A verdict produced by analyzing a PR diff. */
 export interface PrVerdict {
-  /** Human-readable one-line verdict. */
   verdict: string;
-  /** Risk level derived from the diff analysis. */
   riskLevel: PrRiskLevel;
 }
 
-/** The PR context carried into the review mode overlay. */
 export interface ReviewModeItem {
-  /** Repository in "owner/repo" format. */
   repo: string;
-  /** PR number. */
   number: number;
-  /** PR title. */
   title: string;
-  /** PR author login. */
   author: string;
-  /** PR URL. */
   url: string;
-  /** The HEAD SHA of the PR branch. */
   headSha: string;
-  /** Agent risk verdict (may be undefined while analyzing). */
   verdict?: PrVerdict;
 }
 
 export interface GetPrVerdictParams {
-  /** Repository in "owner/repo" format. */
   repo: string;
-  /** PR number. */
   number: number;
 }
 
 export interface GetPrVerdictResult {
-  /** The computed verdict. */
   verdict: PrVerdict;
 }
 
-// ── PR diff (GH CLI) ──────────────────────────────────────────────────
-
-/** A single changed file entry parsed from a PR diff. */
 export interface DiffFileEntry {
-  /** File path (the "b/" side from the diff header). */
   path: string;
-  /** Number of added lines in this file. */
   additions: number;
-  /** Number of removed lines in this file. */
   deletions: number;
-  /** Whether this file is a binary file. */
   isBinary: boolean;
 }
 
 export interface GetPrDiffParams {
-  /** Repository in "owner/repo" format. */
   repo: string;
-  /** PR number. */
   number: number;
-  /** Optional file path to fetch a single file's diff (on-demand loading). */
   path?: string;
 }
 
 export interface GetPrDiffResult {
-  /** The raw unified diff text. */
   diff: string;
-  /** Parsed file entries with stats. */
   files: DiffFileEntry[];
-  /** Whether the diff was truncated due to size limits. */
   truncated: boolean;
 }
 
-// ── PR briefing (heuristic analysis from diff content) ────────────────
-
-/** A collapsible group of boilerplate files (formatting, imports, lock files). */
 export interface BriefingFileGroup {
-  /** Human-readable group label (e.g. "formatting & imports", "lock files"). */
   label: string;
-  /** Total additions across all files in the group. */
   additions: number;
-  /** Total deletions across all files in the group. */
   deletions: number;
-  /** The files in this group. */
   files: DiffFileEntry[];
 }
 
-/** A section in the agent briefing: flagged (risky) or boilerplate (collapsible). */
 export interface BriefingSection {
-  /** Whether this section contains flagged/risky changes or boilerplate noise. */
   kind: "flagged" | "boilerplate";
-  /** Human-readable section title. */
   title: string;
-  /** Files in this section. */
   files: DiffFileEntry[];
-  /** For boilerplate sections: the collapsible group metadata. */
   group?: BriefingFileGroup;
 }
 
 export interface GetPrBriefingParams {
-  /** Repository in "owner/repo" format. */
   repo: string;
-  /** PR number. */
   number: number;
 }
 
 export interface GetPrBriefingResult {
-  /** Structured briefing sections (flagged and boilerplate). */
   sections: BriefingSection[];
-  /** One-line summary of the briefing (e.g. "3 flagged files: auth, config. +240/-30 formatting collapsed"). */
   summary: string;
-  /** Number of flagged files. */
   totalFlagged: number;
-  /** Number of boilerplate files. */
   totalBoilerplate: number;
 }
 
 export interface ListPrsAwaitingReviewParams {
-  /** GitHub repo in "owner/repo" format. Omit for all repos the CLI can see. */
   repo?: string;
-  /** Maximum number of PRs to return (default 30). */
   limit?: number;
 }
 
@@ -518,77 +390,44 @@ export interface ListPrsAwaitingReviewResult {
   truncated: boolean;
 }
 
-// ── PR review submission ────────────────────────────────────────────
-
-/** The type of review to submit on a PR. */
 export type PrReviewEvent = "APPROVE" | "REQUEST_CHANGES";
 
-/** Parameters for submitting a PR review. */
 export interface SubmitPrReviewParams {
-  /** Repository in "owner/repo" format. */
   repo: string;
-  /** PR number. */
   number: number;
-  /** The review event type. */
   event: PrReviewEvent;
-  /** Optional review comment body. Required for REQUEST_CHANGES on some platforms. */
   body?: string;
 }
 
-/** Result of submitting a PR review. */
 export interface SubmitPrReviewResult {
-  /** The platform that processed the review. */
   platform: "github" | "ado";
-  /** The PR number that was reviewed. */
   number: number;
-  /** The review event that was submitted. */
   event: PrReviewEvent;
 }
 
-// ── Open PR in system browser ────────────────────────────────────────
-
-/** Parameters for opening a PR URL in the system browser. */
 export interface OpenPrInBrowserParams {
-  /** The PR URL to open. */
   url: string;
 }
 
-// ── Cross-PR overlap detection ────────────────────────────────────────
-
-/** Overlap severity between two PRs in a batch. */
 export type OverlapKind = "conflict" | "duplicate" | "touching";
 
-/** Detected overlap between two PRs in a batch. */
 export interface PrOverlap {
-  /** Key of the first PR ("repo:number"). */
   prA: string;
-  /** Key of the second PR ("repo:number"). */
   prB: string;
-  /** Overlap classification. */
   kind: OverlapKind;
-  /** File paths shared between both PRs. */
   sharedFiles: string[];
-  /** Human-readable note (e.g. "Both modify auth/middleware.ts — potential merge conflict"). */
   note: string;
 }
 
-/** Entry in the suggested review order when overlaps exist. */
 export interface ReviewOrderEntry {
-  /** PR key ("repo:number"). */
   prKey: string;
-  /** PR number. */
   number: number;
-  /** Why this position in the order. */
   reason: string;
 }
 
-/** Result of overlap analysis for an entire PR batch. */
 export interface BatchOverlapResult {
-  /** All detected overlaps between pairs of PRs. */
   overlaps: PrOverlap[];
-  /** Suggested review order (empty if no overlaps). */
   suggestedOrder: ReviewOrderEntry[];
-  /** Overlap notes per PR key (for quick lookup by the queue strip). */
   perPrNotes: Map<string, string[]>;
 }
 
@@ -608,8 +447,6 @@ export interface InfraBridge {
   getStatus: () => Promise<{ mainVmId: string | null; connected: boolean }>;
   getPlatform: (environmentId: string, projectId: string) => Promise<PlatformType>;
 }
-
-// ── Connection supervisor ─────────────────────────────────────────────
 
 export type ConnectionPhase =
   | "offline"
@@ -634,8 +471,6 @@ export interface EndpointHealth {
   failureCount: number;
 }
 
-// ── Tailscale peer discovery ────────────────────────────────────────
-
 export interface TailscalePeer {
   hostName: string;
   dnsName: string;
@@ -649,8 +484,6 @@ export interface TailscalePeersResponse {
   peers: TailscalePeer[];
   error?: string;
 }
-
-// ── OpenCode server per-environment ──────────────────────────────────
 
 export type OpenCodeAuthState = "authenticated" | "unauthenticated" | "unknown";
 
@@ -673,8 +506,6 @@ export interface OpenCodeEndpoint {
 export type SetOpenCodeEndpointResult =
   | { ok: true }
   | { ok: false; reason: "encryption-unavailable" };
-
-// ── Add-VM wizard ───────────────────────────────────────────────────
 
 export type ReachMethod = "local" | "ssh";
 
@@ -707,10 +538,7 @@ export type VmWizardStep =
 export type VmWizardServiceStatus = "pending" | "skipped" | "already-running" | "installing" | "installed" | "started" | "failed";
 
 export interface VmWizardServiceSelection {
-  /**
-   * Per-tool install selections, keyed by tool id (e.g. "gh", "docker").
-   * See TOOL_DEFINITIONS in tool-definitions.ts for the canonical list.
-   */
+  /** Per-tool install selections, keyed by tool id. See TOOL_DEFINITIONS in tool-definitions.ts. */
   installTools: Record<string, boolean>;
 }
 
@@ -733,7 +561,6 @@ export interface VmWizardProbeResult {
   daemonPort: number | null;
   opencodeRunning: boolean;
   opencodePort: number | null;
-  /** Per-tool detection (true if already installed on the VM), keyed by tool id */
   installedTools: Record<string, boolean>;
   errorDetail: I18nMessage | null;
 }
@@ -744,9 +571,7 @@ export interface VmWizardLaunchResult {
   opencodePort: number | null;
   errorDetail: I18nMessage | null;
   logTail: string | null;
-  /** Mandatory service — always installed */
   loopTaskStatus: VmWizardServiceStatus;
-  /** Per-tool install status, keyed by tool id (e.g. "gh", "docker") */
   toolStatuses: Record<string, VmWizardServiceStatus>;
 }
 
@@ -772,9 +597,7 @@ export interface VmWizardProgress {
   pair?: VmWizardPairResult | null;
   consentPrompt?: I18nMessage | null;
   serviceSelection?: VmWizardServiceSelection | null;
-  /** Host key fingerprint for user verification (shown on host-key-verify step). */
   hostKeyFingerprint?: string | null;
-  /** The raw known_hosts line to write if the user accepts the key. */
   hostKeyLine?: string | null;
 }
 
@@ -795,8 +618,6 @@ export interface VmWizardBridge {
   respondHostKey: (accepted: boolean) => void;
 }
 
-// ── Conversational inbox ────────────────────────────────────────────
-
 export type InboxItemKind =
   | "breach"
   | "failed-loop"
@@ -808,10 +629,8 @@ export type InboxItemKind =
   | "pr-awaiting-review"
   | "digest";
 
-/** Broad notification category that groups item kinds for visual treatment. */
 export type NotificationType = "failure" | "finished" | "watch" | "digest";
 
-/** Map each InboxItemKind to its broad NotificationType. */
 export function kindToNotificationType(kind: InboxItemKind): NotificationType {
   switch (kind) {
     case "failed-loop":
@@ -830,7 +649,6 @@ export function kindToNotificationType(kind: InboxItemKind): NotificationType {
   }
 }
 
-/** Inline actions that can be performed on an inbox item without leaving the inbox. */
 export type InboxAction =
   | "run-now"
   | "pause"
@@ -839,54 +657,33 @@ export type InboxAction =
   | "dismiss"
   | "open-in-chat";
 
-/** Breakdown of digest child items by verdict risk bucket. */
 export interface DigestCounts {
-  /** PRs with low risk verdict ("safe"). */
   safe: number;
-  /** PRs with medium or high risk verdict ("needs you"). */
   needsYou: number;
-  /** PRs with uncertain verdict or no verdict yet ("conflict"). */
   conflict: number;
-  /** Total number of child items in the digest. */
   total: number;
 }
 
 export interface InboxItem {
   id: string;
   kind: InboxItemKind;
-  /** Broad notification category for icon/color treatment. */
   notificationType: NotificationType;
   environmentId: string;
   environmentName: string;
-  /** Loop ID when the item refers to a specific loop. */
   loopId?: string;
-  /** Human-readable description of the item. */
   title: string;
-  /** Short secondary detail (e.g. "5/10 runs", "exit 1"). */
   detail?: string;
-  /** ISO timestamp when the item was created or last updated. */
   occurredAt: string;
-  /** For prolonged-offline items: when the outage began. */
   outageSince?: string;
-  /** Whether the user has dismissed / acknowledged the item. */
   dismissed: boolean;
-  /** Actions available for this item, derived from its kind and loop status. */
   availableActions: InboxAction[];
-  /** Project ID for the item's loop (used to scope "Open in chat"). */
   projectId?: string;
-  /** PR number for pr-awaiting-review items. */
   prNumber?: number;
-  /** Repository in "owner/repo" format for pr-awaiting-review items. */
   prRepo?: string;
-  /** PR author login for pr-awaiting-review items. */
   prAuthor?: string;
-  /** PR URL for pr-awaiting-review items. */
   prUrl?: string;
-  /** Agent risk verdict for pr-awaiting-review items. */
   prVerdict?: PrVerdict;
-  /** IDs of child items bundled inside this digest. Only set when kind === "digest". */
   childItemIds?: string[];
-  /** Pre-computed verdict counts for digest items. Only set when kind === "digest". */
   digestCounts?: DigestCounts;
 }
 
@@ -899,18 +696,13 @@ export type InboxItemResolutionReason =
   | "pr-resolved";
 
 export interface ResolvedInboxItem {
-  /** The original inbox item data at the time of resolution. */
   item: InboxItem;
-  /** ISO timestamp when the item was auto-resolved. */
   resolvedAt: string;
-  /** Machine-readable reason the item resolved. */
   resolution: InboxItemResolutionReason;
 }
 
 export interface InboxQueryResult {
-  /** Markdown-formatted answer. */
   answer: string;
-  /** Items referenced in the answer (for click-through navigation). */
   references: InboxItem[];
 }
 
@@ -918,76 +710,48 @@ export interface InboxBridge {
   getItems: () => Promise<InboxItem[]>;
   dismissItem: (itemId: string) => Promise<void>;
   queryFleet: (question: string) => Promise<InboxQueryResult>;
-  /** Persist a resolved item to the Done archive. */
   resolveItem: (resolved: ResolvedInboxItem) => Promise<void>;
-  /** Get all resolved items (within retention window). */
   getResolvedItems: () => Promise<ResolvedInboxItem[]>;
-  /** Prune resolved items older than 30 days. */
   pruneResolvedItems: () => Promise<void>;
 }
-
-// ── Reachability (instance health layer, separate from loop status) ───
 
 /**
  * Instance reachability state, derived from tunnel + API health.
  * NEVER derived from loop exit codes.
- *
- * - "connected": the daemon API is reachable and responding.
- * - "reconnecting": tunnel/API is temporarily lost, auto-reconnect in progress.
- * - "unreachable": no path to the daemon (offline, blocked, or tunnel down).
  */
 export type ReachabilityState = "connected" | "reconnecting" | "unreachable";
 
-/** Timestamped reachability snapshot for an environment. */
 export interface ReachabilityStatus {
   environmentId: string;
   state: ReachabilityState;
-  /** ISO timestamp of the last state transition. */
   changedAt: string;
 }
 
 export interface ReachabilityBridge {
-  /** Get current reachability for a single environment. */
   getStatus: (environmentId: string) => Promise<ReachabilityStatus | null>;
-  /** Get current reachability for all environments. */
   getAll: () => Promise<ReachabilityStatus[]>;
-  /** Subscribe to reachability state changes. */
   onStatusChange: (cb: (status: ReachabilityStatus) => void) => () => void;
 }
 
-// ── Prolonged-outage escalation ────────────────────────────────────
-
 export interface OutageEscalation {
   environmentId: string;
-  /** ISO timestamp when the outage began. */
   since: string;
-  /** Elapsed ms since the outage began (at time of escalation). */
   durationMs: number;
 }
 
 export interface OutageBridge {
-  /** Subscribe to outage escalations (prolonged unreachability). */
   onEscalation: (cb: (event: OutageEscalation) => void) => () => void;
-  /** Subscribe to outage self-resolutions (reconnect after escalation). */
   onResolve: (cb: (environmentId: string) => void) => () => void;
-  /** Get current active escalated outages. */
   getEscalations: () => Promise<OutageEscalation[]>;
 }
-
-// ── Budget watch ────────────────────────────────────────────────────
 
 export interface BudgetWatch {
   id: string;
   scope: "loop" | "fleet";
-  /** Required when scope = "loop" — which loop to watch. */
   loopId?: string;
-  /** Required when scope = "loop" — which environment the loop belongs to. */
   environmentId?: string;
-  /** Max runs per day before the watch triggers. */
   threshold: number;
-  /** Opt-in auto-pause on breach. Never default. */
   autoPause: boolean;
-  /** Can be toggled off without deleting. */
   enabled: boolean;
   createdAt: string;
 }
@@ -1016,14 +780,10 @@ export interface BudgetBridge {
   dismissBreach: (breachId: string) => Promise<void>;
 }
 
-// ── Condition watch (ping-me-when) ────────────────────────────────────
-
-/** Conditions Orbion can actually observe. The agent must decline others. */
 export type WatchConditionKind =
   | "status-transition"
   | "reachability-change";
 
-/** Target for a watch: which loop/instance to monitor. */
 export type WatchTarget =
   | { kind: "loop"; loopId: string; environmentId: string }
   | { kind: "instance"; environmentId: string };
@@ -1050,67 +810,38 @@ export interface ConditionWatchBridge {
   tripWatch: (watchId: string) => Promise<void>;
 }
 
-// ── Chat sessions ────────────────────────────────────────────────────
-
-/** A chat session, optionally filed under a project in the sidebar.
- *  New sessions are ephemeral by default (persisted = false) and shown with
- *  an "unsaved" marker. Setting persisted = true makes the session a durable
- *  sidebar entry and hides the marker. */
+/** Ephemeral by default (persisted = false). Setting persisted = true makes the session a durable sidebar entry. */
 export interface ChatSession {
   id: string;
   title: string;
-  /** Project this session is filed under (project name, matching sidebar merge key). */
   projectName: string;
-  /** The environment (instance) this session is homed to. */
   environmentId: string;
-  /** The project's working directory on the home instance (derived from loops' cwd at creation). */
   workingDirectory: string;
-  /** The agent runtime currently active for this session. Defaults to the environment's agentRuntime. */
   activeRuntime: AgentRuntime;
-  /** The model ID currently selected for this session (e.g. "openai/gpt-4o"). Undefined means use runtime default. */
   activeModel?: string;
-  /** The reasoning effort level for this session. Undefined means use model default. */
   reasoningEffort?: ReasoningEffort;
-  /** Whether this session is persisted in the sidebar. False = ephemeral (scratch) chat.
-   *  Ephemeral chats are fully functional but not listed in the sidebar until persisted. */
   persisted?: boolean;
-  /** Number of user turns in this session (used for auto-persist depth threshold). */
   turnCount?: number;
-  /** ISO timestamp until which auto-persist offers are suppressed for this session.
-   *  When the user declines an auto-persist offer, this is set to the session's
-   *  createdAt timestamp of the next day, effectively silencing offers until reset. */
+  /** ISO timestamp until which auto-persist offers are suppressed.
+   *  When the user declines, this silences offers until reset. */
   declineAutoPersistUntil?: string;
-  /** Whether this session is pinned to the top of its project in the sidebar. */
   pinned?: boolean;
-  /** Whether this session was auto-created from clicking a loop (non-renameable). */
   isLoopChat?: boolean;
-  /** The loopId this session is linked to (when isLoopChat is true). */
   loopId?: string;
-  /** Manual sort order for drag-and-drop reordering within a project. Lower = higher. */
   sortOrder?: number;
-  /** ISO timestamp of last activity in this session. */
   lastActiveAt: string;
-  /** ISO timestamp when the session was created. */
   createdAt: string;
 }
 
-// ── Ephemeral session sweep ──────────────────────────────────────────
-
 export interface SweepEphemeralSessionsArgs {
-  /** The session currently open in the window — never swept. */
   activeSessionId: string | null;
-  /** Hours of inactivity before an ephemeral session is swept. */
   inactivityThresholdHours: number;
 }
 
 export interface SweepEphemeralSessionsResult {
-  /** IDs of sessions that were removed by the sweep. */
   removedSessionIds: string[];
 }
 
-// ── Transcript persistence (local, instance-independent) ────────────
-
-/** A persisted tool-call record within a transcript message. */
 export interface ToolCallRecord {
   id: string;
   kind: string;
@@ -1121,36 +852,25 @@ export interface ToolCallRecord {
   finishedAt?: number;
 }
 
-/** A single persisted message in a chat transcript. */
 export interface TranscriptMessage {
   id: string;
-  /** The ChatSession this message belongs to. */
   sessionId: string;
   role: "user" | "assistant" | "tool";
   content: string;
   toolCalls?: ToolCallRecord[];
   startedAt: number;
   finishedAt?: number;
-  /** ISO timestamp when this message was first persisted. */
   createdAt: string;
-  /** The environment (instance) that produced this message. Undefined for legacy messages. */
   environmentId?: string;
 }
 
 export interface TranscriptBridge {
-  /** Get all messages for a session, ordered by createdAt. */
   getMessages: (sessionId: string) => Promise<TranscriptMessage[]>;
-  /** Append a single message to a session. */
   appendMessage: (message: Omit<TranscriptMessage, "createdAt">) => Promise<TranscriptMessage>;
-  /** Append multiple messages atomically (for initial replay). */
   appendMessages: (messages: Array<Omit<TranscriptMessage, "createdAt">>) => Promise<TranscriptMessage[]>;
-  /** Update a specific message (for streaming content or status changes). */
   updateMessage: (messageId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>) => Promise<void>;
-  /** Delete all messages for a session. */
   deleteSession: (sessionId: string) => Promise<void>;
 }
-
-// ── Native OS notifications ─────────────────────────────────────────
 
 export type DeepLinkTarget =
   | { kind: "loop"; environmentId: string; loopId: string }
@@ -1162,9 +882,7 @@ export interface NotificationSendArgs {
   body: string;
   /** Tag prevents duplicate notifications for the same event. */
   tag?: string;
-  /** Deep-link target: clicking the notification navigates here. */
   deepLink?: DeepLinkTarget;
-  /** If true, skip the notification when the window is focused. */
   suppressIfFocused?: boolean;
 }
 
@@ -1175,10 +893,8 @@ export interface NotificationBridge {
   onClick: (cb: (deepLink: DeepLinkTarget) => void) => () => void;
 }
 
-// ── MCP (loop-task daemon MCP server) ───────────────────────────────
-
 /**
- * An MCP tool advertised by a loop-task daemon's MCP server.
+ * MCP tool advertised by a loop-task daemon's MCP server.
  * Tool names are discovered at runtime — never hard-coded or invented.
  */
 export interface McpToolInfo {
@@ -1187,24 +903,16 @@ export interface McpToolInfo {
   inputSchema?: unknown;
 }
 
-/**
- * Result of an MCP tool call routed through the main process.
- * On success, `data` contains the tool's return value.
- * On failure, `error` contains a human-readable message surfaced in chat.
- */
 export interface McpToolCallResult {
   ok: boolean;
   data?: unknown;
   error?: string | I18nMessage;
 }
 
-/**
- * Connection state for an environment's MCP server endpoint.
- * - "connected": tools are available and callable.
- * - "connecting": handshake / tool discovery in progress.
- * - "unreachable": MCP server not responding.
- * - "error": MCP server responded with an error (details in lastError).
- */
+/** - "connected": tools available and callable.
+ *  - "connecting": handshake / tool discovery in progress.
+ *  - "unreachable": MCP server not responding.
+ *  - "error": MCP server responded with an error. */
 export type McpConnectionState = "connected" | "connecting" | "unreachable" | "error";
 
 export interface McpConnectionStatus {
@@ -1216,37 +924,24 @@ export interface McpConnectionStatus {
 }
 
 export interface McpBridge {
-  /** Get the MCP connection status for an environment. */
   getStatus: (environmentId: string) => Promise<McpConnectionStatus>;
-  /** Connect (or reconnect) the MCP client to an environment's daemon. */
   connect: (environmentId: string) => Promise<McpConnectionStatus>;
-  /** Disconnect an environment's MCP client. */
   disconnect: (environmentId: string) => Promise<void>;
-  /** Call an MCP tool on an environment's daemon. Tool name must come from getStatus().tools. */
+  /** Tool name must come from getStatus().tools. */
   callTool: (environmentId: string, toolName: string, args: Record<string, unknown>) => Promise<McpToolCallResult>;
-  /** Subscribe to MCP connection status changes. */
   onStatusChange: (cb: (status: McpConnectionStatus) => void) => () => void;
 }
 
-// ── Agent streaming (OpenCode runtime) ────────────────────────────────
-
-/** Arguments for sending a prompt to the agent runtime. */
 export interface AgentSendPromptArgs {
   environmentId: string;
   prompt: string;
-  /** OpenCode session ID (if resuming an existing session). */
   sessionId?: string;
-  /** The Orbion chat session ID for correlating stream events. */
   chatSessionId: string;
-  /** The Orbion turn ID for correlating stream events. */
   turnId: string;
-  /** The model to use for this prompt (e.g. "openai/gpt-4o"). */
   model?: string;
-  /** The reasoning effort level for this prompt. */
   reasoningEffort?: ReasoningEffort;
 }
 
-/** A single streaming event from the agent runtime. */
 export type AgentStreamEvent =
   | { kind: "text-delta"; chatSessionId: string; turnId: string; text: string }
   | { kind: "tool-call-start"; chatSessionId: string; turnId: string; toolCallId: string; toolName: string; title: string }
@@ -1255,28 +950,19 @@ export type AgentStreamEvent =
   | { kind: "turn-error"; chatSessionId: string; turnId: string; error: string }
   | { kind: "turn-interrupted"; chatSessionId: string; turnId: string };
 
-/** Result of sending a prompt to the agent. */
 export interface AgentSendPromptResult {
   ok: boolean;
-  /** The OpenCode session ID that processed the prompt. */
   sessionId?: string;
   error?: string | I18nMessage;
 }
 
 export interface AgentBridge {
-  /** Send a prompt to the agent and begin streaming events. */
   sendPrompt: (args: AgentSendPromptArgs) => Promise<AgentSendPromptResult>;
-  /** Interrupt/abort an in-flight agent generation. Partial output is kept. */
   interrupt: (environmentId: string, sessionId?: string) => Promise<void>;
-  /** Subscribe to agent streaming events. */
   onStreamEvent: (cb: (event: AgentStreamEvent) => void) => () => void;
-  /** List available models from the runtime adapter for an environment. */
   listModels: (environmentId: string) => Promise<ListModelsResult>;
 }
 
-// ── Local loop-shape cache (fleet patterns, offline-capable) ─────────
-
-/** A single step in a task chain (no secrets). */
 export interface ChainStep {
   taskId: string;
   taskName: string;
@@ -1286,7 +972,6 @@ export interface ChainStep {
   onFailureTaskId: string | null;
 }
 
-/** Cached structural shape of a loop (no secrets, no runtime state). */
 export interface LoopShape {
   loopId: string;
   environmentId: string;
@@ -1300,27 +985,16 @@ export interface LoopShape {
 }
 
 export interface LoopShapeCacheBridge {
-  /** Get cached loop shapes for a specific environment. */
   getCached: (environmentId: string) => Promise<LoopShape[]>;
-  /** Get cached loop shapes for all environments. */
   getAll: () => Promise<LoopShape[]>;
-  /** Force-refresh cache for a specific environment from the daemon API. */
   refresh: (environmentId: string) => Promise<LoopShape[]>;
-  /** Subscribe to cache updates. */
   onUpdate: (cb: (shapes: LoopShape[]) => void) => () => void;
 }
 
-// ── Global settings (app-wide preferences) ──────────────────────────
-
-/** App-wide settings persisted to config. No instance-specific options. */
 export interface GlobalSettings {
-  /** UI color theme. */
   theme: "dark" | "light" | "system";
-  /** Default agent runtime for new VM wizard sessions. */
   defaultAgentRuntime: AgentRuntime;
-  /** Config-home environment ID (same as main-VM designate). Null means no config-home. */
   configHomeVmId: string | null;
-  /** Ephemeral chat inactivity threshold in hours. Controls the inactivity sweep. */
   ephemeralThresholdHours: number;
 }
 
@@ -1328,8 +1002,6 @@ export interface SettingsBridge {
   getSettings: () => Promise<GlobalSettings>;
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void>;
 }
-
-// ── Full IPC bridge ─────────────────────────────────────────────────
 
 export interface ConnectionBridge {
   getStatus: (environmentId: string) => Promise<ConnectionStatus | null>;
@@ -1347,9 +1019,7 @@ export interface OpenCodeBridge {
 }
 
 export interface SiblingDeclineBridge {
-  /** Check whether a specific (environmentId, loopId, fingerprint) combination has been declined. */
   isDeclined: (environmentId: string, loopId: string, fingerprint: string) => Promise<boolean>;
-  /** Record a decline. */
   recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) => Promise<void>;
 }
 

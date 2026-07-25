@@ -4,29 +4,18 @@ import type { ReachabilityState } from "../types";
 
 interface RuntimeOption {
   runtime: AgentRuntime;
-  /** Whether this runtime is available on the home instance. */
   available: boolean;
-  /** Human-readable reason when unavailable. */
   unavailableReason?: string;
 }
 
 interface AgentRuntimeSwitcherProps {
-  /** The currently selected runtime (from the session). */
   value: AgentRuntime;
-  /** The instance's default runtime (from the environment). */
   instanceDefault: AgentRuntime;
-  /** Reachability state of the home instance. */
   reachability: ReachabilityState | undefined;
-  /** Runtime state of the environment (coarse availability). */
   runtimeState: RuntimeState | undefined;
-  /** Called when the user picks a different runtime. */
   onChange: (runtime: AgentRuntime) => void;
 }
 
-/**
- * Derive the availability and reason for each runtime option given
- * the current health signals for the home instance.
- */
 function deriveOptions(
   instanceDefault: AgentRuntime,
   reachability: ReachabilityState | undefined,
@@ -35,22 +24,18 @@ function deriveOptions(
   const runtimes: AgentRuntime[] = ["opencode", "claude"];
 
   return runtimes.map((runtime) => {
-    // If the instance is unreachable, all runtimes are unavailable
     if (reachability === "unreachable" || reachability === "reconnecting") {
       return { runtime, available: false, unavailableReason: "Instance unreachable" };
     }
 
-    // The instance-default runtime is always considered available (we trust
-    // the provision step). The alternate may or may not be installed.
+    // Instance-default runtime is always considered available (trusted from provision).
+    // Alternate may or may not be installed; we have no live signal for it, so
+    // treat as potentially available unless overall runtimeState is "unavailable"
+    // (which implies neither is installed).
     if (runtime === instanceDefault) {
       return { runtime, available: true };
     }
 
-    // Alternate runtime: check runtimeState
-    // runtimeState reflects the *default* runtime on the env; for the alternate
-    // we have no live signal, so we treat it as potentially available unless
-    // the overall runtimeState is "unavailable" (which implies neither is
-    // installed). This is conservative but honest.
     if (runtimeState === "unavailable") {
       return { runtime, available: false, unavailableReason: "Not installed on this instance" };
     }

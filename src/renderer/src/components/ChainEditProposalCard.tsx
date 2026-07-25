@@ -6,38 +6,15 @@ import { TaskChainView } from "./TaskChainView";
 
 interface ChainEditProposalCardProps {
   row: ChainEditProposalRow;
-  /** The environment instance to apply chain edits on. */
   instance?: Environment;
-  /** Callback when the proposal is approved. The parent is responsible for
-   *  calling the MCP service to apply the edit, then calling onStatusChange
-   *  with "applied" or "error". */
   onApproved: (proposalId: string, loopId: string, environmentId: string) => void;
-  /** Callback when the proposal is rejected. */
   onRejected: (proposalId: string) => void;
-  /** Callback when the proposal status changes (e.g., applying, error). */
   onStatusChange: (proposalId: string, status: ChainEditProposalStatus, error?: string) => void;
-  /** Callback when the user chooses a fork strategy for a shared-task warning. */
   onForkDecision?: (proposalId: string, decision: "change-all" | "fork-copy") => void;
-  /** The session's home environment ID, for cross-scope detection. */
   homeEnvironmentId?: string;
-  /** All environments, for resolving the target instance name in cross-scope banner. */
   environments?: Array<{ id: string; name: string }>;
 }
 
-/**
- * A proposal card for chat-driven chain edits.
- *
- * When the agent (via MCP tools) proposes modifying a loop's task chain,
- * this card appears in the chat stream showing:
- * - A preview of the proposed chain (via TaskChainView)
- * - A summary of operations (e.g., "Add step: Run tests after Build")
- * - A shared-task warning if the edited task is referenced by other loops
- * - Approve / Reject buttons
- *
- * On approval, the parent (SessionChatView) calls the MCP service to
- * apply the chain edit. On rejection, the proposal is marked as rejected.
- * No form-based editing is provided — the chat is the editor.
- */
 export function ChainEditProposalCard({ row, instance, onApproved, onRejected, onStatusChange, onForkDecision, homeEnvironmentId, environments }: ChainEditProposalCardProps): React.ReactNode {
   const intl = useIntl();
 
@@ -48,7 +25,6 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
   const isError = row.status === "error";
   const isTerminal = isApplied || isRejected;
 
-  // Cross-scope detection: chain edit targets a non-home instance
   const isCrossScope = homeEnvironmentId != null && row.environmentId !== homeEnvironmentId;
   const targetEnvName = isCrossScope
     ? environments?.find((e) => e.id === row.environmentId)?.name ?? row.environmentId
@@ -64,9 +40,6 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
 
     onStatusChange(row.proposalId, "applying");
 
-    // The actual MCP tool calls to apply the chain edit are delegated
-    // to the parent component (SessionChatView) which has access to the
-    // MCP service. Signal approval so the parent can apply.
     onApproved(row.proposalId, row.loopId, row.environmentId);
   }, [instance, row, onApproved, onStatusChange]);
 
@@ -82,7 +55,6 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
     onForkDecision?.(row.proposalId, "fork-copy");
   }, [onForkDecision, row.proposalId]);
 
-  // Build the approve button label based on the fork decision
   const approveLabel = (() => {
     if (isApplying) return intl.formatMessage({ id: "chainEditProposal.applying" });
     if (warning?.decision === "fork-copy") return intl.formatMessage({ id: "chainEditProposal.approveFork" });

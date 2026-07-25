@@ -22,11 +22,7 @@ interface FleetShapedProposalCardProps {
   homeEnvironmentId?: string;
 }
 
-/**
- * Wrapper around LoopProposalCard that computes fleet-shaped adaptation
- * (shape matching + platform adaptation) asynchronously and passes enriched
- * provenance/adaptedFrom data to the card once resolved.
- */
+/** Wraps LoopProposalCard with async fleet-shaped adaptation (shape matching + platform adaptation). */
 export function FleetShapedProposalCard({
   row,
   instance,
@@ -43,7 +39,6 @@ export function FleetShapedProposalCard({
   const [provenance, setProvenance] = useState<string | null>(row.provenance);
   const [adaptedFrom, setAdaptedFrom] = useState<ShapeAdaptation | null | undefined>(row.adaptedFrom);
 
-  // Compute shape match + platform adaptation once when the row enters "pending" state
   useEffect(() => {
     if (row.status !== "pending" || row.provenance) return;
 
@@ -60,17 +55,14 @@ export function FleetShapedProposalCard({
         const sourceEnv = environments.find((e) => e.id === shapeMatch.shape.environmentId);
         const sourceEnvName = sourceEnv?.name ?? shapeMatch.shape.environmentId;
 
-        // Detect target platform
         let targetPlatform: PlatformType = "unknown";
         try {
           targetPlatform = await infraService.getPlatform(environmentId, row.projectId);
         } catch {
-          // Platform detection failure should not block the proposal
         }
 
         if (cancelled) return;
 
-        // Adapt the shape for the target platform
         const adapted = adaptShapeForPlatform(shapeMatch.shape, targetPlatform);
         const hadSubstitutions = adapted.substitutions.length > 0;
         const prov = buildProvenance(
@@ -92,7 +84,6 @@ export function FleetShapedProposalCard({
           });
         }
       } catch {
-        // Shape matching is best-effort; failures should not block the proposal
       }
     })();
 

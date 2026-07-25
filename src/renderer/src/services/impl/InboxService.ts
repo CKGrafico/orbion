@@ -40,19 +40,9 @@ function formatDuration(ms: number): string {
   return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
 }
 
-/** Minimum number of PR items to trigger digest grouping. */
 const DIGEST_MIN_PRS = 2;
 
-/**
- * Group pr-awaiting-review items into a digest when there are 2+ of them.
- * Individual PR items that belong to a digest are replaced by a single digest
- * item. When there is only 1 PR, it remains as an individual item.
- *
- * The digest summarises verdict counts in three buckets:
- * - safe: low risk
- * - needs you: medium or high risk
- * - conflict: uncertain or no verdict yet
- */
+/** Group pr-awaiting-review items into a digest when 2+. Verdicts: safe / needs you / conflict. */
 function groupPrsIntoDigest(
   items: InboxItem[],
   dismissedIds: Set<string>,
@@ -62,12 +52,10 @@ function groupPrsIntoDigest(
   const prItems = items.filter((i) => i.kind === "pr-awaiting-review");
   const nonPrItems = items.filter((i) => i.kind !== "pr-awaiting-review");
 
-  // If fewer than 2 PR items, don't create a digest
   if (prItems.length < DIGEST_MIN_PRS) {
     return items;
   }
 
-  // Compute verdict counts
   let safe = 0;
   let needsYou = 0;
   let conflict = 0;
@@ -79,7 +67,6 @@ function groupPrsIntoDigest(
     } else if (risk === "medium" || risk === "high") {
       needsYou++;
     } else {
-      // uncertain or no verdict
       conflict++;
     }
   }
@@ -100,7 +87,6 @@ function groupPrsIntoDigest(
   const digestTitle = `${prItems.length} PR${prItems.length !== 1 ? "s" : ""} overnight: ${parts.join(", ")}`;
   const childItemIds = prItems.map((p) => p.id);
 
-  // Use the most recent occurredAt from the child items
   const latestOccurredAt = prItems.reduce((latest, p) => {
     const t = new Date(p.occurredAt).getTime();
     return t > latest ? t : latest;
@@ -121,29 +107,16 @@ function groupPrsIntoDigest(
     digestCounts,
   };
 
-  // If the digest itself is dismissed, don't show it
   if (dismissedIds.has(digestItem.id)) {
-    // Still hide individual PR items that belong to the dismissed digest
     const visiblePrIds = new Set(childItemIds);
     const remainingPrs = prItems.filter((p) => !dismissedIds.has(p.id) && !visiblePrIds.has(p.id));
     return [...nonPrItems, ...remainingPrs];
   }
 
-  // Return non-PR items + the digest item (individual PRs are hidden inside the digest)
   return [...nonPrItems, digestItem];
 }
 
-/**
- * Determine the available inline actions for an inbox item based on its kind
- * and the loop's current status.
- *
- * Action mapping per the issue acceptance criteria:
- * - Failure (failed-loop): Run now, Pause, Open in chat
- * - Finished (finished-loop): Dismiss, Restart
- * - Watch (breach): Dismiss, Open in chat
- * - Offline (instance-offline, prolonged-offline): Dismiss only
- * - Pending-approval / Awaiting-input: Open in chat
- */
+/** Action mapping: failed→run/pause/chat, finished→dismiss/restart, breach→dismiss/chat, offline→dismiss, approval/input→chat. */
 function getAvailableActions(kind: InboxItem["kind"], _loopStatus?: LoopStatus): InboxAction[] {
   switch (kind) {
     case "failed-loop":
@@ -167,19 +140,7 @@ function getAvailableActions(kind: InboxItem["kind"], _loopStatus?: LoopStatus):
   }
 }
 
-/**
- * Build inbox items from live fleet data (ungrouped — before digest grouping).
- *
- * Items are derived (not persisted): they are computed on every call from
- * perEnvLoops, breaches, and health status. The only persisted state is
- * the set of dismissed item IDs.
- *
- * Prolonged-offline items (kind "prolonged-offline") appear only when
- * the main-process OutageTracker escalates an outage. They self-resolve
- * when the instance reconnects (the OutageTracker fires onResolve, which
- * clears the entry from escalatedOutages). Short outages under the
- * threshold (~10 min) never create an inbox item.
- */
+/** Items are derived from live fleet data (not persisted). Prolonged-offline appears only when the OutageTracker escalates (~10 min threshold). */
 function deriveItemsUngrouped(params: InboxBuildParams): InboxItem[] {
   const { perEnvLoops, perEnvHealth, environments, breaches, dismissedIds, escalatedOutages, prAwaitingReview, mainVmEnvironmentId, mainVmEnvironmentName, prVerdicts } = params;
   const items: InboxItem[] = [];
@@ -203,7 +164,7 @@ function deriveItemsUngrouped(params: InboxBuildParams): InboxItem[] {
     });
   }
 
-  // 2. PRs awaiting review (from the main VM's platform CLI)
+  // 2. PRs awaiting review
   if (mainVmEnvironmentId && prAwaitingReview.length > 0) {
     for (const pr of prAwaitingReview) {
       const itemId = `pr-awaiting-review:${pr.repo}:${pr.number}`;
@@ -232,11 +193,10 @@ function deriveItemsUngrouped(params: InboxBuildParams): InboxItem[] {
     }
   }
 
-  // 3. Loop-derived items across reachable instances
+  // 3. Loop-derived items
   for (const env of environments) {
     const health = perEnvHealth[env.id];
 
-    // Prolonged-offline takes precedence over instance-offline
     const escalated = escalatedOutages.get(env.id);
     if (escalated) {
       if (!dismissedIds.has(`prolonged-offline:${env.id}`)) {
@@ -254,12 +214,9 @@ function deriveItemsUngrouped(params: InboxBuildParams): InboxItem[] {
           availableActions: getAvailableActions("prolonged-offline"),
         });
       }
-      // Skip loop scanning for unreachable instances
       continue;
     }
 
-    // Short outages (under threshold) show as instance-offline
-    // — but only if they're actually showing offline in the health
     if (health === "offline" || health === "blocked" || health === "unknown") {
       if (!dismissedIds.has(`offline:${env.id}`)) {
         items.push({
@@ -280,9 +237,7 @@ function deriveItemsUngrouped(params: InboxBuildParams): InboxItem[] {
 
     const envLoops = perEnvLoops[env.id] ?? [];
     for (const loop of envLoops) {
-      // Finished loop: hit max-runs
       const isFinished = loop.maxRuns !== null && loop.runCount >= loop.maxRuns;
-      // Failed loop: last run exited non-zero
       const isFailed = loop.lastExitCode !== null && loop.lastExitCode !== 0;
 
       if (isFailed && !isFinished) {
@@ -325,26 +280,18 @@ function deriveItemsUngrouped(params: InboxBuildParams): InboxItem[] {
     }
   }
 
-  // Sort by occurredAt descending
   items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   return items;
 }
 
-/**
- * Build inbox items from live fleet data, with digest grouping applied.
- */
+/** Build inbox items with digest grouping applied. */
 function deriveItems(params: InboxBuildParams): InboxItem[] {
   const items = deriveItemsUngrouped(params);
   const { dismissedIds, mainVmEnvironmentId, mainVmEnvironmentName } = params;
   return groupPrsIntoDigest(items, dismissedIds, mainVmEnvironmentId, mainVmEnvironmentName);
 }
 
-/**
- * Answer a natural-language question about the fleet.
- *
- * This is a local, deterministic query engine (no LLM). It parses common
- * question patterns and formats a structured markdown answer with links.
- */
+/** Local deterministic query engine (no LLM) for natural-language fleet questions. */
 function answerFleetQuery(
   question: string,
   items: InboxItem[],
@@ -353,7 +300,6 @@ function answerFleetQuery(
   const q = question.toLowerCase().trim();
   const references: InboxItem[] = [];
 
-  // "what needs me" / "what needs attention" / "morning"
   const isNeedsMe =
     q.includes("needs me") ||
     q.includes("need me") ||
@@ -413,7 +359,6 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // "failed" / "failures" / "errors"
   const isFailedQuery =
     q.includes("fail") ||
     q.includes("error") ||
@@ -433,7 +378,6 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // "offline" / "disconnected" / "unreachable"
   const isOfflineQuery =
     q.includes("offline") ||
     q.includes("disconnected") ||
@@ -454,7 +398,6 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // "finished" / "completed" / "done" (loops that hit max-runs)
   const isFinishedQuery =
     q.includes("finished") ||
     q.includes("completed") ||
@@ -474,7 +417,6 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // "breaches" / "budget" / "over budget"
   const isBudgetQuery =
     q.includes("breach") ||
     q.includes("budget") ||
@@ -495,7 +437,6 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // "watches" / "watch" / "notifications" / "alerts"
   const isWatchQuery =
     q.includes("watch") ||
     q.includes("alert") ||
@@ -515,14 +456,12 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // "PR" / "pull request" / "review" / "reviews"
   const isPrQuery =
     q.includes("pr") ||
     q.includes("pull request") ||
     q.includes("review");
 
   if (isPrQuery) {
-    // Show digest summary if a PR digest exists, otherwise individual PR items
     const digestItems = items.filter((i) => i.kind === "digest" && i.childItemIds && i.childItemIds.length > 0);
     const prItems = items.filter((i) => i.kind === "pr-awaiting-review");
 
@@ -530,8 +469,7 @@ function answerFleetQuery(
       return { answer: "No PRs awaiting your review right now.", references: [] };
     }
 
-    if (digestItems.length > 0) {
-      const lines: string[] = [];
+    if (digestItems.length > 0) {      const lines: string[] = [];
       for (const digest of digestItems) {
         references.push(digest);
         const counts = digest.digestCounts;
@@ -542,7 +480,6 @@ function answerFleetQuery(
           if (counts.conflict > 0) countParts.push(`${counts.conflict} conflict${counts.conflict !== 1 ? "s" : ""}`);
         }
         lines.push(`**${digest.title}**\n`);
-        // Reference the child PRs too
         for (const childId of digest.childItemIds ?? []) {
           const child = prItems.find((p) => p.id === childId);
           if (child) {
@@ -564,7 +501,6 @@ function answerFleetQuery(
     return { answer: lines.join("\n"), references };
   }
 
-  // Fallback: general summary
   const { perEnvLoops, environments, perEnvHealth } = params;
   let totalLoops = 0;
   let totalRunning = 0;
@@ -617,10 +553,6 @@ export class InboxService implements IInboxService {
 
   async getDismissedIds(): Promise<string[]> {
     if (!window.api) return [];
-    // Dismissed IDs are tracked via inbox:dismissItem IPC
-    // We don't have a dedicated "get dismissed IDs" endpoint,
-    // so we piggyback on the main process config store.
-    // For now, the renderer tracks dismissed IDs locally.
     return [];
   }
 
@@ -636,7 +568,6 @@ export class InboxService implements IInboxService {
   getChildItems(digestItem: InboxItem, params: InboxBuildParams): InboxItem[] {
     if (digestItem.kind !== "digest" || !digestItem.childItemIds) return [];
 
-    // Re-derive the ungrouped PR items (before grouping)
     const allItems = deriveItemsUngrouped(params);
     const childIds = new Set(digestItem.childItemIds);
     return allItems.filter((i) => childIds.has(i.id));
@@ -671,9 +602,7 @@ export class InboxService implements IInboxService {
     const now = new Date().toISOString();
 
     for (const item of previousItems) {
-      // Skip if still active in current set
       if (currentIds.has(item.id)) continue;
-      // Skip if the user explicitly dismissed it (that's not auto-resolution)
       if (dismissedIds.has(item.id)) continue;
 
       resolved.push({
@@ -687,19 +616,15 @@ export class InboxService implements IInboxService {
   }
 
   async executeInboxAction(item: InboxItem, action: InboxAction): Promise<ApiResponse> {
-    // Dismiss is handled locally (no API call to loop-task)
     if (action === "dismiss") {
       await this.dismissItem(item.id);
       return { ok: true, status: 200 };
     }
 
-    // Open-in-chat is a navigation action, not an API call
-    // The caller handles it by navigating; we just confirm
     if (action === "open-in-chat") {
       return { ok: true, status: 200 };
     }
 
-    // All other actions require a loop ID and environment
     if (!item.loopId) {
       return { ok: false, status: 400, error: "Item has no loop reference" };
     }
@@ -729,7 +654,6 @@ export class InboxService implements IInboxService {
           method: "POST",
         });
       case "restart": {
-        // Restart = resume a stopped/finished loop, then trigger it
         const resumeResult = await this.getApiService().request({
           baseUrl,
           path: `/api/loops/${encodeURIComponent(item.loopId)}/resume`,

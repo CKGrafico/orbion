@@ -1,20 +1,8 @@
 /**
- * Convert a temporary webm recording into an optimized GIF.
- *
- * Strategy: ffmpeg two-pass palette workflow (palettegen → paletteuse) for
- * high-quality GIFs at modest sizes.
- *
- * Size enforcement (per config.gif.maxBytes):
- *   1. Reduce width (960 → 720 → 540)
- *   2. Reduce fps (10 → 8 → 6)
- *   3. Trim duration (cap at maxDurationSeconds)
- *   4. If still over the limit, return `null` — the caller falls back to
- *      screenshot-only evidence. We never commit an oversized GIF.
- *
- * Failure modes that return `null`:
- *   - ffmpeg binary not present
- *   - ffmpeg invocation fails
- *   - output exceeds maxBytes after the optimization ladder
+ * ffmpeg two-pass palette workflow for GIFs. Size enforcement ladder:
+ * reduce width → reduce fps → trim duration. Returns null when the GIF
+ * cannot fit within config.gif.maxBytes — the caller falls back to
+ * screenshot-only evidence and never commits an oversized GIF.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -32,9 +20,7 @@ export interface GifResult {
 }
 
 export interface GifOptions {
-  /** Trim the recording to at most this many seconds */
   maxDurationSeconds?: number;
-  /** Optional crop box [x, y, w, h] in source pixels */
   crop?: [number, number, number, number];
 }
 
@@ -51,8 +37,7 @@ function fileSize(p: string): number {
 }
 
 async function probeDuration(webmPath: string): Promise<number> {
-  // ffprobe would be ideal but we don't depend on it. Use ffmpeg -i and parse
-  // stderr "Duration: 00:00:05.20" line.
+  // ffprobe not available; parse duration from ffmpeg -i stderr
   try {
     const r = await runFfmpeg(["-i", webmPath], { timeoutMs: 15_000 });
     const m = r.stderr.match(/Duration:\s+(\d+):(\d+):(\d+\.\d+)/);
@@ -113,7 +98,6 @@ export async function generateGif(
 ): Promise<GifResult | null> {
   const ffmpeg = detectFfmpeg();
   if (!ffmpeg) {
-    // No ffmpeg — caller falls back to screenshot-only
     return null;
   }
   if (!fs.existsSync(webmPath)) {
@@ -131,12 +115,11 @@ export async function generateGif(
       try {
         await convert(webmPath, outPath, width, fps, durationCap, opts.crop);
       } catch {
-        // ffmpeg failed for this combination — try next
         continue;
       }
       const bytes = fileSize(outPath);
       if (bytes <= config.maxBytes) {
-        const height = Math.round((width * 9) / 16); // best-effort; ffmpeg may have changed it
+        const height = Math.round((width * 9) / 16);
         return {
           path: outPath,
           width,
@@ -149,7 +132,6 @@ export async function generateGif(
     }
   }
 
-  // Final attempt: smaller than any rung above
   if (config.maxWidth >= READABILITY_FLOOR_WIDTH) {
     try {
       await convert(webmPath, outPath, READABILITY_FLOOR_WIDTH, 6, durationCap, opts.crop);
@@ -165,11 +147,10 @@ export async function generateGif(
         };
       }
     } catch {
-      // give up
+      // fall through to cleanup
     }
   }
 
-  // Could not produce a GIF within the limit
   if (fs.existsSync(outPath)) {
     try {
       fs.unlinkSync(outPath);
@@ -180,7 +161,6 @@ export async function generateGif(
   return null;
 }
 
-/** Build a {@link GifAsset} descriptor from a {@link GifResult}. */
 export function gifAssetFromResult(r: GifResult, caption: string, evidenceRelPath: string): GifAsset {
   return {
     type: "gif",

@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 
-/**
- * Returns a human-readable, ticking label for how far in the future
- * `isoDate` is. Updates every 10 seconds to keep the countdown fresh.
- * Returns null when `isoDate` is null or already in the past.
- */
+/** Ticking countdown label for a future ISO date. Updates every 10s. Returns null if past or null. */
 export function useNextRunCountdown(isoDate: string | null): string | null {
   const [label, setLabel] = useState<string | null>(() => computeLabel(isoDate));
 

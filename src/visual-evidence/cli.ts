@@ -1,23 +1,11 @@
 #!/usr/bin/env node
 /**
- * Visual-evidence CLI entrypoint.
+ * Visual-evidence CLI.
  *
- * Usage:
- *   pnpm visual-evidence --change <change-id>
- *   pnpm visual-evidence --input .orbion/context/<change-id>.json
+ * Modes: ORBION_VISUAL_EVIDENCE_MODE=web (default, headless Chromium)
+ * or =electron (real app, needs GUI libs + xvfb on headless Linux).
  *
- * Default mode (ORBION_VISUAL_EVIDENCE_MODE=web): starts the Vite dev server
- * with the mock adapter and takes screenshots via headless Chromium. Works on
- * headless Linux without any GUI libraries or xvfb.
- *
- * Electron mode (ORBION_VISUAL_EVIDENCE_MODE=electron): builds and launches
- * the real Electron app. Requires system GUI libs + xvfb on headless Linux.
- *
- * Exit codes:
- *   0 — passed or correctly skipped
- *   1 — failed (scenario assertions failed)
- *   2 — blocked (input/launch scenario unresolvable)
- *   3 — invalid input
+ * Exit codes: 0=passed/skipped, 1=failed, 2=blocked, 3=invalid input.
  */
 import { parseArgs } from "node:util";
 import fs from "node:fs";
@@ -31,8 +19,7 @@ import { clearEvidenceDir } from "./store.js";
 import { evidenceExitCode } from "./exit-code.js";
 import type { RepoCoordinates } from "./types.js";
 
-/** Tracks the changeId currently being processed so the unhandled-rejection
- * handler can attribute the failure to the right change. */
+/** Attributed to the current change for the unhandled-rejection handler. */
 let pendingChangeId: string | null = null;
 
 interface ParsedArgs {
@@ -90,8 +77,7 @@ function resolveCurrentBranch(repoRoot: string): string | undefined {
 }
 
 function resolveRepo(): RepoCoordinates {
-  // The canonical repo is fixed per AGENTS.md; `gh repo view` would be the
-  // preferred source but we degrade gracefully when gh is unavailable.
+  // Degrades gracefully to hardcoded default when gh is unavailable
   try {
     const out = execFileSync(
       "gh",
@@ -130,7 +116,7 @@ async function main(): Promise<number> {
       return 3;
     }
     if (parsed.change) {
-      // --change is allowed alongside --input to override changeId
+      // --change overrides changeId in the input file
       const obj = inputObj as Record<string, unknown>;
       obj["changeId"] = parsed.change;
       inputObj = obj;
@@ -177,9 +163,9 @@ async function main(): Promise<number> {
         status: result.status,
       }, { repo, sha, reason: result.reason });
     } catch {
-      // best-effort
-    }
-    console.log(`Visual evidence: ${result.status.toUpperCase()} — ${result.reason}`);
+    // best-effort
+  }
+  console.log(`Visual evidence: ${result.status.toUpperCase()} — ${result.reason}`);
     return 0;
   }
 
@@ -195,7 +181,7 @@ async function main(): Promise<number> {
     return evidenceExitCode(result);
   }
 
-  // passed — re-generate prMarkdown anchored to the head SHA and emit stdout
+  // passed
   const prMarkdown = generatePrMarkdown(result, repo, sha);
   console.log(prMarkdown);
   console.error(`\nVisual evidence PASSED for ${result.changeId}.`);
@@ -217,16 +203,14 @@ main()
     process.exit(1);
   });
 
-// Catch async rejections that escape Playwright's internal dispatcher back into
-// the caller — particularly the "Process failed to launch!" error, which
-// Playwright emits on a Promise that is not awaited by `electron.launch()`.
-// Without this, the structured `failed` result we built in run.ts is skipped
-// because the unhandled rejection kills the process first.
+// Playwright emits "Process failed to launch!" on an un-awaited Promise from
+// electron.launch(). Without this handler the structured `failed` result in
+// run.ts is skipped because the unhandled rejection kills the process first.
 process.on("unhandledRejection", async (reason) => {
   const msg = reason instanceof Error ? reason.message : String(reason);
   console.error(`Visual evidence: unhandled rejection from Playwright/internal: ${msg}`);
   console.error("The Electron process failed to launch. On headless Linux, install the required system GUI libraries (see SKILL.md) and run under xvfb-run.");
-  // Best-effort: write a failed manifest so the audit trail is preserved.
+  // Best-effort: write a failed manifest so the audit trail is preserved
   try {
     const cfg = resolveConfig();
     const root = findRepoRoot();

@@ -1,13 +1,7 @@
 /**
- * Scenario: gh-166-global-settings-panel
- *
- * Exercises the Global Settings Panel: a deliberately thin settings surface
- * opened from the sidebar gear icon containing 5 app-wide options:
- * theme, default agent runtime, config-home VM, notification mute,
- * ephemeral threshold.
- *
- * In the mock app, the settings panel opens when the gear icon in the
- * sidebar footer is clicked.
+ * Exercises the Global Settings Panel opened from the sidebar gear icon.
+ * Contains theme, default agent runtime, config-home VM, notification mute,
+ * and ephemeral threshold settings.
  */
 import type { Page } from "playwright";
 import type { ScenarioContext, ScenarioResult } from "../scenario-registry.js";
@@ -21,7 +15,6 @@ type AssertionSpec = {
 export async function gh166GlobalSettingsPanelScenario(ctx: ScenarioContext): Promise<ScenarioResult> {
   const { window: page } = ctx;
 
-  // Wait for the app to render
   await page.waitForTimeout(3000);
 
   const assertions: AssertionSpec[] = [
@@ -32,7 +25,7 @@ export async function gh166GlobalSettingsPanelScenario(ctx: ScenarioContext): Pr
         if ((await sidebarFooter.count()) === 0) {
           throw new Error("Sidebar footer not visible");
         }
-        // The settings button is in the sidebar footer
+        // Settings button is in the sidebar footer
         const settingsBtn = sidebarFooter.locator("button").last();
         if ((await settingsBtn.count()) === 0) {
           throw new Error("Settings gear button not found in sidebar footer");
@@ -43,7 +36,7 @@ export async function gh166GlobalSettingsPanelScenario(ctx: ScenarioContext): Pr
       description: "Clicking the gear icon opens the settings drawer",
       run: async (p) => {
         const sidebarFooter = p.locator(".sidebar-footer").first();
-        // The settings button should be the gear (last button before OrbionMark)
+        // Gear should be the last button before OrbionMark
         const settingsBtn = sidebarFooter.locator("button").last();
         await settingsBtn.click();
         await page.waitForTimeout(500);
@@ -67,7 +60,7 @@ export async function gh166GlobalSettingsPanelScenario(ctx: ScenarioContext): Pr
           throw new Error("Settings drawer not visible");
         }
 
-        // Verify the settings rows exist
+        // Verify settings rows
         const rows = drawer.locator(".settings-row");
         const rowCount = await rows.count();
         if (rowCount < 5) {

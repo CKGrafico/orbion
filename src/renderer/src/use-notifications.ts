@@ -6,13 +6,6 @@ import { standaloneIntl } from "./i18n";
 import type { FleetItemStatus } from "./fleet-status";
 import { isNotifiableStatus } from "./fleet-status";
 
-/**
- * Hook that provides the notification service and a convenience method
- * for sending inbox-item notifications with deep-linking.
- *
- * Replaces the old createNotificationBridge pattern. All notification
- * delivery now goes through the main process via IPC.
- */
 export function useNativeNotifications(onNavigate?: (deepLink: DeepLinkTarget) => void): {
   notificationService: INotificationService;
   sendInboxNotification: (opts: {
@@ -28,7 +21,6 @@ export function useNativeNotifications(onNavigate?: (deepLink: DeepLinkTarget) =
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
 
-  // Subscribe to notification clicks for deep-linking
   useEffect(() => {
     const unsub = notificationService.onClick((deepLink) => {
       onNavigateRef.current?.(deepLink);

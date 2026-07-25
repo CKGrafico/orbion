@@ -2,18 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
  * Direct unit tests for useLogRows merge/dedup logic.
- *
- * Since @testing-library/react is not installed, we directly instantiate
- * the hook's internal logic via a lightweight driver that mimics React's
- * ref + state pattern. This avoids pulling in a React test renderer while
- * still providing full coverage of the core data-flow.
- *
- * The driver re-implements the exact same imperative logic from useLogRows
- * so that the test exercises the same code paths. If the hook changes,
+ * Uses a lightweight driver that mirrors the hook's imperative logic
+ * instead of a React test renderer. If the hook changes,
  * these tests and the driver must be updated in lockstep.
  */
 
-// ── Types (mirrored from log-types.ts) ───────────────────────────
 
 type LogRowKind = "run-header" | "tool-call" | "markdown" | "plain-text" | "exit";
 
@@ -28,7 +21,6 @@ type LogRow = RunHeaderLogRow | ToolCallLogRow | MarkdownLogRow | PlainTextLogRo
 
 interface RunSegment { runNumber: number; rows: LogRow[]; expanded: boolean }
 
-// ── Plucked classifyLogLine (same logic as log-types.ts) ────────
 
 function classifyLogLine(line: string): { kind: LogRowKind; runNumber?: number; exitCode?: number } {
   const runMatch = line.match(/=== Run #(\d+)/);
@@ -40,7 +32,6 @@ function classifyLogLine(line: string): { kind: LogRowKind; runNumber?: number; 
   return { kind: "plain-text" };
 }
 
-// ── Helper: build LogRow from a plain text line ──────────────────
 
 const MAX_ROWS = 2000;
 let rowIdCounter = 0;
@@ -58,7 +49,6 @@ function linesToRows(lines: string[]): LogRow[] {
   return rows;
 }
 
-// ── Dedupe key function (mirrors useLogRows.rowDedupeKey) ────────
 
 function rowDedupeKey(row: LogRow): string {
   switch (row.kind) {
@@ -71,7 +61,6 @@ function rowDedupeKey(row: LogRow): string {
   }
 }
 
-// ── Lightweight driver that mirrors useLogRows imperative logic ──
 
 class LogRowsDriver {
   rows: LogRow[] = [];
@@ -131,14 +120,12 @@ class LogRowsDriver {
   }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────
 
 function expectUniqueIds(driver: LogRowsDriver): void {
   const ids = driver.allIds();
   expect(new Set(ids).size).toBe(ids.length);
 }
 
-// ── Test suite ───────────────────────────────────────────────────
 
 describe("useLogRows — merge/dedup logic", () => {
   let d: LogRowsDriver;
@@ -160,7 +147,6 @@ describe("useLogRows — merge/dedup logic", () => {
     expect(d.plainTexts()).toEqual(["tail-a", "tail-b", "live-1", "live-2"]);
   });
 
-  // ── REGRESSION: the original bug (issue #200) ──────────────
 
   it("does NOT lose live lines when initial tail resolves after live events", () => {
     // Live SSE lines arrive before the tail request completes

@@ -1,16 +1,9 @@
 import type { LoopMeta, LoopStatus, LoopWithOrigin, FleetLoopRollup, Project } from "./types";
 import type { ReachabilityState } from "../shared/ipc";
 
-/**
- * Compute a fleet-wide rollup from per-environment loop data.
- *
- * Loops on unreachable instances are excluded from tallies — they are
- * "unknown" (greyed), not failed. This follows the reachability health
- * layer invariant: a dropped tunnel never reads as "everything failed."
- *
- * Loops on reconnecting instances are also excluded since their actual
- * state cannot be confirmed.
- */
+// Loops on unreachable/reconnecting instances are excluded from tallies —
+// they are "unknown" (greyed), not "failed". A dropped tunnel never reads
+// as "everything failed."
 export function computeFleetRollup(
   perEnvLoops: Record<string, LoopMeta[]>,
   environments: Array<{ id: string; name: string }>,
@@ -32,7 +25,6 @@ export function computeFleetRollup(
   for (const env of environments) {
     const envReachability = reachability[env.id];
 
-    // Skip unreachable / reconnecting instances — their loops are "unknown"
     if (envReachability === "unreachable" || envReachability === "reconnecting") {
       continue;
     }
@@ -41,7 +33,6 @@ export function computeFleetRollup(
     const envProjects = perEnvProjects[env.id] ?? [];
 
     for (const loop of envLoops) {
-      // Resolve the project name for this loop
       const project = envProjects.find((p) => p.id === (loop.projectId ?? "default"));
       const projectName = project?.name ?? "Default";
 

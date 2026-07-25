@@ -1,16 +1,9 @@
 /**
  * Tunnel registry — manages SSH port-forward tunnels for SSH-reach environments.
  *
- * When an environment has an SSH endpoint (kind === "ssh"), the main process
- * opens a local `-L` forward so the daemon's API port on the remote VM appears
- * on a local loopback port. All subsequent HTTP/SSE requests to that environment
- * use the forwarded local port as the effective base URL, so the existing
- * api:request / stream:subscribe plumbing works unchanged.
- *
- * Auto-reconnect: when an SSH tunnel process exits unexpectedly (network blip,
- * SSH keepalive timeout, etc.), the registry automatically retries reopening the
- * tunnel with exponential backoff (1 s → 2 s → 4 s → 8 s → 16 s cap), with
- * indefinite retry until connection is restored.
+ * Auto-reconnect: when an SSH tunnel process exits unexpectedly, the registry
+ * automatically retries reopening with exponential backoff (1 s → 2 s → 4 s →
+ * 8 s → 16 s cap), with indefinite retry until connection is restored.
  *
  * Security: forwarded ports bind to 127.0.0.1 only (SSH -L default).
  */
@@ -22,52 +15,40 @@ import { parseTarget, listSshHosts, validateSshHost } from "./ssh-config.js";
 
 const logger = createLogger("tunnel-registry");
 
-/** Port range for auto-assigned local tunnel ports. */
 const TUNNEL_PORT_MIN = 19000;
 const TUNNEL_PORT_MAX = 19999;
 
-/** Exponential backoff constants for tunnel auto-reconnect. */
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 16_000;
 
 let nextLocalPort = TUNNEL_PORT_MIN;
 
-/** Allocate the next available local port for a tunnel. */
 function allocateLocalPort(): number {
   const port = nextLocalPort;
   nextLocalPort = nextLocalPort >= TUNNEL_PORT_MAX ? TUNNEL_PORT_MIN : nextLocalPort + 1;
   return port;
 }
 
-/** Resolved SSH host info derived from an endpoint's sshTarget. */
 export interface ResolvedSshTarget {
   host: SshHost;
-  /** The remote daemon port extracted from the endpoint URL (default 8845). */
   remotePort: number;
 }
 
-/**
- * Registry entry — one per SSH endpoint that has an active tunnel.
- * Keyed by `${environmentId}:${endpointId}`.
- */
 interface TunnelEntry {
   environmentId: string;
   endpointId: string;
   tunnelId: string;
   localPort: number;
   remotePort: number;
-  /** Reconnect backoff state. Null when tunnel is connected or not retrying. */
   reconnect: ReconnectState | null;
 }
 
-/** Tracks exponential backoff state for a tunnel reconnect attempt. */
 interface ReconnectState {
   failureCount: number;
   backoffMs: number;
   retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
-/** Callback type for tunnel reconnection status changes. */
 export type TunnelReconnectCallback = (
   environmentId: string,
   endpointId: string,
@@ -78,26 +59,19 @@ let reconnectCallback: TunnelReconnectCallback | null = null;
 
 const registry = new Map<string, TunnelEntry>();
 
-/** Registry key for a tunnel entry. */
 function entryKey(environmentId: string, endpointId: string): string {
   return `${environmentId}:${endpointId}`;
 }
 
-/** Check if a tunnel's SSH process is still alive. */
 function activeTunnelProcessAlive(tunnelId: string): boolean {
   return isTunnelAlive(tunnelId);
 }
 
-/**
- * Parse an SSH endpoint's sshTarget and URL to derive the SshHost + remote port.
- *
- * - sshTarget is the label string (e.g. "root@my-vm:22") stored during wizard.
- * - url is the direct URL (e.g. "http://my-vm:8845") from which we extract the port.
- */
+/** Parse an SSH endpoint's sshTarget and URL to derive the SshHost + remote port.
+ *  sshTarget: "root@my-vm:22" format. URL: "http://my-vm:8845" for port extraction. */
 export function resolveSshTarget(endpoint: AccessEndpoint): ResolvedSshTarget | null {
   if (endpoint.kind !== "ssh" || !endpoint.sshTarget) return null;
 
-  // Try parsing the sshTarget as user@host[:port] format
   let host = parseTarget(endpoint.sshTarget);
 
   // Fallback: search known SSH hosts by label
@@ -108,14 +82,12 @@ export function resolveSshTarget(endpoint: AccessEndpoint): ResolvedSshTarget | 
 
   if (!host) return null;
 
-  // Validate for safety
   try {
     validateSshHost(host);
   } catch {
     return null;
   }
 
-  // Extract remote port from the endpoint URL (default 8845)
   let remotePort = 8845;
   try {
     const url = new URL(endpoint.url);
@@ -132,26 +104,18 @@ export function resolveSshTarget(endpoint: AccessEndpoint): ResolvedSshTarget | 
   return { host, remotePort };
 }
 
-/**
- * Open a tunnel for an SSH endpoint if one isn't already running.
- * Returns the local port the tunnel is forwarded to, or null on failure.
- *
- * If a tunnel for the same host+remotePort is already active, reuses it.
- */
+/** Open a tunnel for an SSH endpoint if one isn't already running. Reuses existing tunnels to the same host+remotePort. */
 export async function openTunnelForEndpoint(
   environmentId: string,
   endpoint: AccessEndpoint,
 ): Promise<number | null> {
   const key = entryKey(environmentId, endpoint.id);
 
-  // Already registered? Return the existing local port.
   const existing = registry.get(key);
   if (existing) {
-    // Check if the tunnel is actually still alive
     const stillRunning = activeTunnelProcessAlive(existing.tunnelId);
 
     if (stillRunning) {
-      // Clear any reconnect state from a previous cycle
       if (existing.reconnect) {
         if (existing.reconnect.retryTimer) {
           clearTimeout(existing.reconnect.retryTimer);
@@ -173,8 +137,6 @@ export async function openTunnelForEndpoint(
   const target = resolveSshTarget(endpoint);
   if (!target) return null;
 
-  // Check if a tunnel to the same host:remotePort is already running
-  // (could have been opened by another endpoint or the wizard).
   const existingTunnel = findExistingTunnel(target.host, target.remotePort);
   if (existingTunnel) {
     const entry: TunnelEntry = {
@@ -189,7 +151,6 @@ export async function openTunnelForEndpoint(
     return entry.localPort;
   }
 
-  // Allocate a local port and open a new tunnel.
   const localPort = allocateLocalPort();
   const tunnelId = getTunnelId(target.host, target.remotePort);
 
@@ -220,17 +181,12 @@ export async function openTunnelForEndpoint(
   return entry.localPort;
 }
 
-/**
- * Close the tunnel for a specific environment+endpoint.
- * Safe to call even if no tunnel exists.
- * Cancels any pending reconnect attempts.
- */
+/** Close the tunnel for a specific environment+endpoint. Cancels any pending reconnect attempts. */
 export function closeTunnelForEndpoint(environmentId: string, endpointId: string): void {
   const key = entryKey(environmentId, endpointId);
   const entry = registry.get(key);
   if (!entry) return;
 
-  // Cancel any pending reconnect timer
   if (entry.reconnect?.retryTimer) {
     clearTimeout(entry.reconnect.retryTimer);
   }
@@ -243,10 +199,7 @@ export function closeTunnelForEndpoint(environmentId: string, endpointId: string
   );
 }
 
-/**
- * Close all tunnels for a given environment (used on environment removal).
- * Cancels any pending reconnect attempts.
- */
+/** Close all tunnels for a given environment. Cancels any pending reconnect attempts. */
 export function closeTunnelsForEnvironment(environmentId: string): void {
   const keysToRemove: string[] = [];
   for (const [key, entry] of registry) {
@@ -263,19 +216,12 @@ export function closeTunnelsForEnvironment(environmentId: string): void {
   }
 }
 
-/**
- * Look up the forwarded local port for a given endpoint.
- * Returns null if no tunnel is registered.
- */
 export function getTunnelLocalPort(environmentId: string, endpointId: string): number | null {
   const entry = registry.get(entryKey(environmentId, endpointId));
   return entry?.localPort ?? null;
 }
 
-/**
- * Check if a local port corresponds to an active SSH tunnel.
- * Used by host validation to exempt loopback URLs that route through tunnels.
- */
+/** Used by host validation to exempt loopback URLs that route through tunnels. */
 export function isTunnelLocalPort(port: number): boolean {
   for (const entry of registry.values()) {
     if (entry.localPort === port) return true;
@@ -283,12 +229,8 @@ export function isTunnelLocalPort(port: number): boolean {
   return false;
 }
 
-/**
- * Resolve the effective API base URL for an endpoint.
- *
- * - For SSH endpoints with an active tunnel: `http://127.0.0.1:<localPort>`
- * - For all other endpoints: the endpoint's original URL unchanged.
- */
+/** - SSH endpoints with an active tunnel: `http://127.0.0.1:<localPort>`
+ *  - All other endpoints: the endpoint's original URL unchanged. */
 export function resolveEffectiveUrl(
   environmentId: string,
   endpoint: AccessEndpoint,
@@ -302,10 +244,6 @@ export function resolveEffectiveUrl(
   return endpoint.url;
 }
 
-/**
- * Get all environments that currently have active SSH tunnels.
- * Returns a set of environment IDs.
- */
 export function getTunneledEnvironmentIds(): Set<string> {
   const ids = new Set<string>();
   for (const entry of registry.values()) {
@@ -314,20 +252,13 @@ export function getTunneledEnvironmentIds(): Set<string> {
   return ids;
 }
 
-/**
- * Check if an SSH endpoint's tunnel is currently in reconnecting state.
- * Returns true if a reconnect attempt is in progress.
- */
 export function isTunnelReconnecting(environmentId: string, endpointId: string): boolean {
   const entry = registry.get(entryKey(environmentId, endpointId));
   return entry?.reconnect !== null && entry?.reconnect !== undefined;
 }
 
-/**
- * Close all tunnels (used on app quit).
- */
+/** Close all tunnels (used on app quit). */
 export function closeAllRegistryTunnels(): void {
-  // Cancel all pending reconnect timers
   for (const entry of registry.values()) {
     if (entry.reconnect?.retryTimer) {
       clearTimeout(entry.reconnect.retryTimer);
@@ -337,7 +268,6 @@ export function closeAllRegistryTunnels(): void {
   closeAllTunnels();
 }
 
-/** Register a callback for tunnel reconnection status changes. */
 export function onTunnelReconnect(cb: TunnelReconnectCallback): void {
   reconnectCallback = cb;
 }
@@ -353,12 +283,8 @@ export function forceKillAllRegistryTunnels(): void {
   forceKillAllTunnels();
 }
 
-/**
- * Handle an unexpected tunnel exit (called from ssh-tunnel.ts via onTunnelExit).
- * Starts a reconnect cycle with exponential backoff.
- */
+/** Handle an unexpected tunnel exit (called from ssh-tunnel.ts). Starts a reconnect cycle with exponential backoff. */
 function handleUnexpectedTunnelExit(event: TunnelExitEvent): void {
-  // Find the registry entry for this tunnel
   let matchingEntry: TunnelEntry | null = null;
   let matchingKey: string | null = null;
 
@@ -379,14 +305,12 @@ function handleUnexpectedTunnelExit(event: TunnelExitEvent): void {
     `Tunnel exited unexpectedly: ${event.tunnelId} (exit code ${event.exitCode ?? "unknown"}). Starting reconnect with backoff.`,
   );
 
-  // Start reconnect cycle
   const failureCount = (matchingEntry.reconnect?.failureCount ?? 0) + 1;
   const backoffMs = Math.min(
     INITIAL_BACKOFF_MS * Math.pow(2, failureCount - 1),
     MAX_BACKOFF_MS,
   );
 
-  // Clear any existing reconnect timer
   if (matchingEntry.reconnect?.retryTimer) {
     clearTimeout(matchingEntry.reconnect.retryTimer);
   }
@@ -397,7 +321,6 @@ function handleUnexpectedTunnelExit(event: TunnelExitEvent): void {
     retryTimer: null,
   };
 
-  // Notify listeners that we're reconnecting
   if (reconnectCallback) {
     reconnectCallback(matchingEntry.environmentId, matchingEntry.endpointId, true);
   }
@@ -418,7 +341,6 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
     const envId = entry.environmentId;
     const endpointId = entry.endpointId;
 
-    // Get the endpoint from the config store to resolve the SSH target
     try {
       const { getEnvironments } = await import("./config-store.js");
       const envs = getEnvironments();
@@ -426,7 +348,6 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
       const endpoint = env?.endpoints.find((e: { id: string }) => e.id === endpointId);
 
       if (!endpoint) {
-        // Environment or endpoint was removed while we were waiting
         const fresh = registry.get(key);
         if (fresh) {
           if (fresh.reconnect?.retryTimer) {
@@ -439,13 +360,11 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
 
       const result = await openTunnelForEndpoint(envId, endpoint);
 
-      // After openTunnelForEndpoint returns, the captured `entry` may be stale:
-      // openTunnelForEndpoint deletes the old entry and creates a new one in the
-      // registry when the tunnel process was dead. Look up the fresh entry instead.
+      // openTunnelForEndpoint may delete the old entry and create a new one
+      // when the tunnel process was dead. Look up the fresh entry instead.
       const freshEntry = registry.get(key);
 
       if (result !== null) {
-        // Success! Reset reconnect state on the FRESH registry entry
         if (freshEntry) {
           if (freshEntry.reconnect?.retryTimer) {
             clearTimeout(freshEntry.reconnect.retryTimer);
@@ -456,12 +375,10 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
           `Tunnel reconnected: ${freshEntry?.tunnelId ?? entry.tunnelId} to 127.0.0.1:${result}`,
         );
 
-        // Notify listeners that reconnect is complete
         if (reconnectCallback) {
           reconnectCallback(envId, endpointId, false);
         }
       } else {
-        // Failed again, schedule next retry on the fresh entry
         const currentFailureCount = (freshEntry?.reconnect?.failureCount ?? (entry.reconnect?.failureCount ?? 0)) + 1;
         const backoffMs = Math.min(
           INITIAL_BACKOFF_MS * Math.pow(2, currentFailureCount - 1),
@@ -484,7 +401,6 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
         scheduleTunnelReconnect(key, freshEntry ?? entry);
       }
     } catch {
-      // If import or anything fails, keep retrying
       const freshEntry = registry.get(key);
       const currentFailureCount = (freshEntry?.reconnect?.failureCount ?? (entry.reconnect?.failureCount ?? 0)) + 1;
       const backoffMs = Math.min(
@@ -505,13 +421,9 @@ function scheduleTunnelReconnect(key: string, entry: TunnelEntry): void {
   }, delay);
 }
 
-// Wire the tunnel exit callback immediately on module load
 onTunnelExit(handleUnexpectedTunnelExit);
 
-/**
- * Open tunnels for all SSH endpoints of a given environment.
- * Returns the local port for the *active* endpoint, or null.
- */
+/** Open tunnels for all SSH endpoints of a given environment. Returns the local port for the *active* endpoint, or null. */
 export async function openTunnelsForEnvironment(
   environmentId: string,
   endpoints: AccessEndpoint[],

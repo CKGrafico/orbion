@@ -7,19 +7,13 @@ import type { FailureCategory } from "./diagnoseFailure";
 
 const TOOL_CALLS_THRESHOLD = 3;
 
-/** A chat message is streaming if finishedAt is not set at all (undefined). */
 function isStreaming(finishedAt: number | undefined): boolean {
   return finishedAt === undefined;
 }
 
-/** A chat message is finished if finishedAt is set (a number). */
 function isFinished(finishedAt: number | undefined): boolean {
   return finishedAt !== undefined;
 }
-
-// ---------------------------------------------------------------------------
-// Conversion: ChatTurn ↔ TranscriptMessage
-// ---------------------------------------------------------------------------
 
 function toolCallToRecord(tc: ToolCall): ToolCallRecord {
   return {
@@ -74,26 +68,17 @@ function transcriptMessageToChatMessage(tm: TranscriptMessage): ChatMessage {
   };
 }
 
-/**
- * Check whether a transcript message is a system-generated handoff note
- * (e.g., instance switch, runtime switch, model switch).
- */
 function isSystemNoteMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("instance-switch-") || msg.id.startsWith("runtime-switch-") || msg.id.startsWith("model-switch-") || msg.id.startsWith("loop-summon-") || msg.id.startsWith("loop-proposal-") || msg.id.startsWith("chain-edit-proposal-") || msg.id.startsWith("sibling-offer-") || msg.id.startsWith("failure-diagnosis-") || msg.id.startsWith("pr-ref-") || msg.id.startsWith("fleet-plan-");
 }
 
-/**
- * Extract instance handoff data from an instance-switch transcript message.
- * The content format is "Switched from X to Y" or the legacy "Switched instance to X".
- */
+/** Parses "Switched from X to Y" or legacy "Switched instance to X". */
 function parseInstanceHandoff(msg: TranscriptMessage): { fromInstance: string; toInstance: string } | null {
   if (!msg.id.startsWith("instance-switch-")) return null;
-  // Try the new format: content has "from X to Y"
   const fromToMatch = msg.content.match(/from\s+(.+?)\s+to\s+(.+)/);
   if (fromToMatch) {
     return { fromInstance: fromToMatch[1].trim(), toInstance: fromToMatch[2].trim() };
   }
-  // Legacy format: "Switched instance to X" – we don't have fromInstance
   const toMatch = msg.content.match(/to\s+(.+)/);
   if (toMatch) {
     return { fromInstance: "", toInstance: toMatch[1].trim() };
@@ -101,20 +86,10 @@ function parseInstanceHandoff(msg: TranscriptMessage): { fromInstance: string; t
   return { fromInstance: "", toInstance: msg.content };
 }
 
-/**
- * Check whether a transcript message is a loop-card summon record
- * (produced when the user clicks a loop-summary-bar segment).
- * These use the convention: id starts with "loop-summon-", role "user",
- * and content is a JSON array of loop IDs.
- */
 function isLoopSummonMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("loop-summon-");
 }
 
-/**
- * Parse a loop-summon transcript message into an array of loop IDs.
- * Returns null if parsing fails.
- */
 function parseLoopSummon(msg: TranscriptMessage): { loopIds: string[]; environmentId: string } | null {
   try {
     const parsed = JSON.parse(msg.content);
@@ -127,18 +102,10 @@ function parseLoopSummon(msg: TranscriptMessage): { loopIds: string[]; environme
   }
 }
 
-/**
- * Check whether a transcript message is a loop-proposal record.
- * These use the convention: id starts with "loop-proposal-", role "user".
- */
 function isLoopProposalMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("loop-proposal-");
 }
 
-/**
- * Parse a loop-proposal transcript message into a LoopProposalRow.
- * Returns null if parsing fails.
- */
 function parseLoopProposalMessage(msg: TranscriptMessage): LoopProposalRow | null {
   try {
     const parsed = JSON.parse(msg.content);
@@ -178,18 +145,10 @@ function parseLoopProposalMessage(msg: TranscriptMessage): LoopProposalRow | nul
   }
 }
 
-/**
- * Check whether a transcript message is a sibling-offer record.
- * These use the convention: id starts with "sibling-offer-", role "user".
- */
 function isSiblingOfferMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("sibling-offer-");
 }
 
-/**
- * Parse a sibling-offer transcript message into a SiblingOfferRow.
- * Returns null if parsing fails.
- */
 function parseSiblingOfferMessage(msg: TranscriptMessage): SiblingOfferRow | null {
   try {
     const parsed = JSON.parse(msg.content);
@@ -212,18 +171,10 @@ function parseSiblingOfferMessage(msg: TranscriptMessage): SiblingOfferRow | nul
   }
 }
 
-/**
- * Check whether a transcript message is a failure-diagnosis record.
- * These use the convention: id starts with "failure-diagnosis-", role "user".
- */
 function isFailureDiagnosisMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("failure-diagnosis-");
 }
 
-/**
- * Parse a failure-diagnosis transcript message into a FailureDiagnosisRow.
- * Returns null if parsing fails.
- */
 function parseFailureDiagnosisMessage(msg: TranscriptMessage): FailureDiagnosisRow | null {
   try {
     const parsed = JSON.parse(msg.content);
@@ -244,18 +195,10 @@ function parseFailureDiagnosisMessage(msg: TranscriptMessage): FailureDiagnosisR
   }
 }
 
-/**
- * Check whether a transcript message is a chain-edit-proposal record.
- * These use the convention: id starts with "chain-edit-proposal-", role "user".
- */
 function isChainEditProposalMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("chain-edit-proposal-");
 }
 
-/**
- * Parse a chain-edit-proposal transcript message into a ChainEditProposalRow.
- * Returns null if parsing fails.
- */
 function parseChainEditProposalMessage(msg: TranscriptMessage): ChainEditProposalRow | null {
   try {
     const parsed = JSON.parse(msg.content);
@@ -287,18 +230,10 @@ function parseChainEditProposalMessage(msg: TranscriptMessage): ChainEditProposa
   }
 }
 
-/**
- * Check whether a transcript message is a PR reference card record.
- * These use the convention: id starts with "pr-ref-", role "user".
- */
 function isPrReferenceCardMessage(msg: TranscriptMessage): boolean {
   return msg.id.startsWith("pr-ref-");
 }
 
-/**
- * Parse a PR reference card transcript message into a PrReferenceCardRow.
- * Returns null if parsing fails.
- */
 function parsePrReferenceCardMessage(msg: TranscriptMessage): PrReferenceCardRow | null {
   try {
     const parsed = JSON.parse(msg.content);
@@ -354,26 +289,18 @@ function parseFleetPlanMessage(msg: TranscriptMessage): FleetPlanRow | null {
   }
 }
 
-/**
- * Group transcript messages into turns by pairing user and assistant messages.
- * Messages are assumed to arrive in order: user, assistant, user, assistant, ...
- * Tool messages (if any) are merged into the preceding assistant message.
- * System handoff notes (instance-switch-*, etc.) are skipped — they are rendered
- * as InstanceHandoffRow, not as chat turns.
- */
+/** Pair user+assistant into turns. System handoff notes are skipped. */
 function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
   const turns: ChatTurn[] = [];
   let currentUser: ChatMessage | null = null;
 
   for (const msg of messages) {
-    // Skip system notes — they are rendered as InstanceHandoffRow, not turns
     if (isSystemNoteMessage(msg)) continue;
 
     const chatMsg = transcriptMessageToChatMessage(msg);
 
     if (msg.role === "user") {
       if (currentUser && turns.length > 0) {
-        // Orphan user message without assistant; finalize previous turn
         turns[turns.length - 1] = {
           ...turns[turns.length - 1],
           interrupted: true,
@@ -382,9 +309,8 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
       }
       currentUser = chatMsg;
     } else if (msg.role === "assistant" || msg.role === "tool") {
-      if (!currentUser) continue; // No user message to pair with
+      if (!currentUser) continue;
 
-      // Merge tool messages into the assistant message's toolCalls
       if (msg.role === "tool") {
         const lastTurn = turns[turns.length - 1];
         if (lastTurn && lastTurn.userMessage.id === currentUser.id) {
@@ -411,7 +337,6 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
     }
   }
 
-  // Handle the case where a user message exists without a paired assistant
   if (currentUser) {
     turns.push({
       id: `turn-${currentUser.id}`,
@@ -432,14 +357,9 @@ function messagesToChatTurns(messages: TranscriptMessage[]): ChatTurn[] {
   return turns;
 }
 
-// ---------------------------------------------------------------------------
-// Row building
-// ---------------------------------------------------------------------------
-
 function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessage[] = [], loopSummonMessages: TranscriptMessage[] = [], loopProposalMessages: TranscriptMessage[] = [], chainEditProposalMessages: TranscriptMessage[] = [], siblingOfferMessages: TranscriptMessage[] = [], failureDiagnosisMessages: TranscriptMessage[] = [], prRefMessages: TranscriptMessage[] = [], fleetPlanMessages: TranscriptMessage[] = []): TranscriptRow[] {
   const rows: TranscriptRow[] = [];
 
-  // Build handoff rows from system note messages
   const handoffRows: Array<{ row: InstanceHandoffRow; timestamp: number }> = [];
   for (const msg of handoffMessages) {
     const handoff = parseInstanceHandoff(msg);
@@ -457,8 +377,6 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     }
   }
 
-  // Build loop-card rows from loop-summon messages
-  // Each loop-summon message can produce multiple LoopCardRows (one per loop ID)
   const loopCardRows: Array<{ row: LoopCardRow; timestamp: number }> = [];
   for (const msg of loopSummonMessages) {
     const summon = parseLoopSummon(msg);
@@ -473,13 +391,12 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
             loopId,
             environmentId: summon.environmentId,
           },
-          timestamp: msg.startedAt + i, // Ensure stable ordering within a summon
+          timestamp: msg.startedAt + i,
         });
       }
     }
   }
 
-  // Build loop-proposal rows from loop-proposal messages
   const loopProposalRows: Array<{ row: LoopProposalRow; timestamp: number }> = [];
   for (const msg of loopProposalMessages) {
     const proposalRow = parseLoopProposalMessage(msg);
@@ -488,7 +405,6 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     }
   }
 
-  // Build chain-edit-proposal rows from chain-edit-proposal messages
   const chainEditProposalRows: Array<{ row: ChainEditProposalRow; timestamp: number }> = [];
   for (const msg of chainEditProposalMessages) {
     const row = parseChainEditProposalMessage(msg);
@@ -497,28 +413,22 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     }
   }
 
-  // Build sibling-offer rows from sibling-offer messages
   const siblingOfferRows: Array<{ row: SiblingOfferRow; timestamp: number }> = [];
   for (const msg of siblingOfferMessages) {
     const row = parseSiblingOfferMessage(msg);
     if (row) {
-      // Place sibling offers right after their parent chain-edit proposal (1ms later for ordering)
       siblingOfferRows.push({ row, timestamp: msg.startedAt + 1 });
     }
   }
 
-  // Build failure-diagnosis rows from failure-diagnosis messages
   const failureDiagnosisRows: Array<{ row: FailureDiagnosisRow; timestamp: number }> = [];
   for (const msg of failureDiagnosisMessages) {
     const diagnosisRow = parseFailureDiagnosisMessage(msg);
     if (diagnosisRow) {
-      // Place the diagnosis right after its associated loop card:
-      // use a timestamp 1ms after the loop-summon timestamp (encoded in the message ID)
       failureDiagnosisRows.push({ row: diagnosisRow, timestamp: msg.startedAt + 1 });
     }
   }
 
-  // Build PR reference card rows from pr-ref messages
   const prRefRows: Array<{ row: PrReferenceCardRow; timestamp: number }> = [];
   for (const msg of prRefMessages) {
     const prRefRow = parsePrReferenceCardMessage(msg);
@@ -527,7 +437,6 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     }
   }
 
-  // Build fleet-plan rows from fleet-plan messages
   const fleetPlanRows: Array<{ row: FleetPlanRow; timestamp: number }> = [];
   for (const msg of fleetPlanMessages) {
     const fpRow = parseFleetPlanMessage(msg);
@@ -536,7 +445,6 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     }
   }
 
-  // Build turn-based rows with timestamps for interleaving
   const turnRows: Array<{ rows: TranscriptRow[]; timestamp: number }> = [];
   for (const turn of turns) {
     const turnRowsList: TranscriptRow[] = [];
@@ -621,7 +529,6 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
     turnRows.push({ rows: turnRowsList, timestamp: turn.userMessage.startedAt });
   }
 
-  // Merge turn groups, handoff dividers, loop-card rows, loop-proposal rows, chain-edit-proposal rows, failure-diagnosis rows, PR reference card rows, and fleet-plan rows by timestamp
   type MergeItem = { kind: "turn"; rows: TranscriptRow[]; timestamp: number } | { kind: "handoff"; row: InstanceHandoffRow; timestamp: number } | { kind: "loop-card"; row: LoopCardRow; timestamp: number } | { kind: "loop-proposal"; row: LoopProposalRow; timestamp: number } | { kind: "chain-edit-proposal"; row: ChainEditProposalRow; timestamp: number } | { kind: "sibling-offer"; row: SiblingOfferRow; timestamp: number } | { kind: "failure-diagnosis"; row: FailureDiagnosisRow; timestamp: number } | { kind: "pr-reference-card"; row: PrReferenceCardRow; timestamp: number } | { kind: "fleet-plan"; row: FleetPlanRow; timestamp: number };
   const merged: MergeItem[] = [
     ...turnRows.map((t) => ({ kind: "turn" as const, rows: t.rows, timestamp: t.timestamp })),
@@ -661,10 +568,6 @@ function buildRowsFromTurns(turns: ChatTurn[], handoffMessages: TranscriptMessag
   return rows;
 }
 
-// ---------------------------------------------------------------------------
-// useTranscript hook
-// ---------------------------------------------------------------------------
-
 export function useTranscript(sessionId: string | null) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [handoffMessages, setHandoffMessages] = useState<TranscriptMessage[]>([]);
@@ -684,8 +587,6 @@ export function useTranscript(sessionId: string | null) {
   const PERSIST_DEBOUNCE_MS = 300;
   const turnsRef = useRef<ChatTurn[]>([]);
 
-  // ── Debounced persistence ──────────────────────────────────────────
-
   const persistUserMessage = useCallback(
     (sessionId: string, msg: ChatMessage) => {
       if (!transcriptService) return;
@@ -699,11 +600,9 @@ export function useTranscript(sessionId: string | null) {
     (_sessionId: string, msgId: string, updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>) => {
       if (!transcriptService) return;
 
-      // Debounce rapid streaming updates
       const existing = persistTimerRef.current.get(msgId);
       if (existing) clearTimeout(existing);
 
-      // For content updates during streaming, debounce
       if ("content" in updates && !("finishedAt" in updates)) {
         persistTimerRef.current.set(
           msgId,
@@ -713,7 +612,6 @@ export function useTranscript(sessionId: string | null) {
           }, PERSIST_DEBOUNCE_MS),
         );
       } else {
-        // For finishedAt or toolCalls updates, persist immediately
         void transcriptService.updateMessage(msgId, updates);
       }
     },
@@ -728,8 +626,6 @@ export function useTranscript(sessionId: string | null) {
     },
     [transcriptService],
   );
-
-  // ── Load from session ──────────────────────────────────────────────
 
   useEffect(() => {
     if (!sessionId || sessionId === loadedSessionRef.current) return;
@@ -772,9 +668,6 @@ export function useTranscript(sessionId: string | null) {
     };
   }, [sessionId, transcriptService]);
 
-  // ── Row rebuild helpers ────────────────────────────────────────────
-
-  // Keep turnsRef in sync for use in effects
   turnsRef.current = turns;
 
   const rebuildRows = useCallback((newTurns: ChatTurn[]): TranscriptRow[] => {
@@ -783,7 +676,6 @@ export function useTranscript(sessionId: string | null) {
     return newRows;
   }, [handoffMessages, loopSummonMessages, loopProposalMessages, chainEditProposalMessages, siblingOfferMessages, failureDiagnosisMessages, prRefMessages, fleetPlanMessages]);
 
-  // Rebuild rows when handoffMessages, loopSummonMessages, loopProposalMessages, chainEditProposalMessages, siblingOfferMessages, failureDiagnosisMessages, prRefMessages, or fleetPlanMessages changes
   useEffect(() => {
     const newRows = buildRowsFromTurns(turnsRef.current, handoffMessages, loopSummonMessages, loopProposalMessages, chainEditProposalMessages, siblingOfferMessages, failureDiagnosisMessages, prRefMessages, fleetPlanMessages);
     setRows(newRows);
@@ -799,8 +691,6 @@ export function useTranscript(sessionId: string | null) {
     },
     [rebuildRows],
   );
-
-  // ── Turn mutations (with persistence) ──────────────────────────────
 
   const toggleTurnCollapse = useCallback(
     (turnId: string) => {
@@ -859,7 +749,6 @@ export function useTranscript(sessionId: string | null) {
     (turn: ChatTurn) => {
       setTurnsAndRebuild((prev) => [...prev, turn]);
 
-      // Persist both messages
       if (sessionId) {
         persistUserMessage(sessionId, turn.userMessage);
         persistAssistantMessage(sessionId, turn.assistantMessage);
@@ -893,7 +782,6 @@ export function useTranscript(sessionId: string | null) {
         });
         rebuildRows(next);
 
-        // Persist the content update (debounced)
         if (sessionId) {
           const turn = next.find((t) => t.id === turnId);
           if (turn) {
@@ -926,7 +814,6 @@ export function useTranscript(sessionId: string | null) {
         });
         rebuildRows(next);
 
-        // Persist the finish
         if (sessionId) {
           const turn = next.find((t) => t.id === turnId);
           if (turn) {
@@ -960,7 +847,6 @@ export function useTranscript(sessionId: string | null) {
         });
         rebuildRows(next);
 
-        // Persist the finish
         if (sessionId) {
           const turn = next.find((t) => t.id === turnId);
           if (turn) {
@@ -1031,13 +917,6 @@ export function useTranscript(sessionId: string | null) {
     [],
   );
 
-  /**
-   * Insert loop cards into the transcript when the user clicks a
-   * loop-summary-bar segment. Each call creates a persisted "loop-summon"
-   * system message (role "user", id starting with "loop-summon-") whose
-   * content is JSON { loopIds, environmentId }. The buildRowsFromTurns
-   * function hydrates these into LoopCardRow entries on reload.
-   */
   const insertLoopCards = useCallback(
     (loopIds: string[], environmentId: string) => {
       if (!sessionId || loopIds.length === 0) return;
@@ -1055,22 +934,14 @@ export function useTranscript(sessionId: string | null) {
         environmentId,
       };
 
-      // Persist the summon message
       void transcriptService.appendMessage(message).then((persisted) => {
-        // Add to local state so the UI updates immediately
         setLoopSummonMessages((prev) => [...prev, persisted]);
       });
     },
     [sessionId, transcriptService],
   );
 
-  /**
-   * Insert a failure diagnosis into the transcript. This creates a persisted
-   * "failure-diagnosis" system message (role "user", id starting with "failure-diagnosis-")
-   * whose content is JSON with the diagnosis fields.
-   * The timestamp is set to match the loop-summon timestamp so the diagnosis
-   * row appears right after the associated loop card (1ms later for ordering).
-   */
+  /** summonTimestamp is used for ordering relative to the parent loop-summon. */
   const insertFailureDiagnosis = useCallback(
     (params: {
       loopId: string;
@@ -1104,7 +975,6 @@ export function useTranscript(sessionId: string | null) {
         environmentId: params.environmentId,
       };
 
-      // Persist the diagnosis message
       void transcriptService.appendMessage(message).then((persisted) => {
         setFailureDiagnosisMessages((prev) => [...prev, persisted]);
       });
@@ -1112,11 +982,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Insert a loop proposal into the transcript. This creates a persisted
-   * "loop-proposal" system message (role "user", id starting with "loop-proposal-")
-   * whose content is JSON with the proposal fields.
-   */
   const insertLoopProposal = useCallback(
     (proposal: Omit<LoopProposalRow, "id" | "kind" | "turnId">) => {
       if (!sessionId) return;
@@ -1152,7 +1017,6 @@ export function useTranscript(sessionId: string | null) {
         environmentId: proposal.environmentId,
       };
 
-      // Persist the proposal message
       void transcriptService.appendMessage(message).then((persisted) => {
         setLoopProposalMessages((prev) => [...prev, persisted]);
       });
@@ -1160,10 +1024,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Update a loop proposal's status in the persisted transcript.
-   * Finds and updates the corresponding loop-proposal message content.
-   */
   const updateLoopProposalStatus = useCallback(
     (proposalId: string, status: LoopProposalStatus, extras?: { createdLoopId?: string; error?: string }) => {
       if (!sessionId) return;
@@ -1181,7 +1041,6 @@ export function useTranscript(sessionId: string | null) {
               ...(extras?.error != null ? { error: extras.error } : {}),
             };
             const newContent = JSON.stringify(newParsed);
-            // Persist the update
             void transcriptService.updateMessage(msg.id, { content: newContent });
             return { ...msg, content: newContent };
           } catch {
@@ -1194,11 +1053,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Insert a chain-edit proposal into the transcript. This creates a persisted
-   * "chain-edit-proposal" system message (role "user", id starting with "chain-edit-proposal-")
-   * whose content is JSON with the proposal fields including proposedSteps and operationSummaries.
-   */
   const insertChainEditProposal = useCallback(
     (proposal: Omit<ChainEditProposalRow, "id" | "kind" | "turnId">) => {
       if (!sessionId) return;
@@ -1227,7 +1081,6 @@ export function useTranscript(sessionId: string | null) {
         environmentId: proposal.environmentId,
       };
 
-      // Persist the proposal message
       void transcriptService.appendMessage(message).then((persisted) => {
         setChainEditProposalMessages((prev) => [...prev, persisted]);
       });
@@ -1235,10 +1088,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Update a chain-edit proposal's status in the persisted transcript.
-   * Finds and updates the corresponding chain-edit-proposal message content.
-   */
   const updateChainEditProposalStatus = useCallback(
     (proposalId: string, status: ChainEditProposalStatus, extras?: { error?: string }) => {
       if (!sessionId) return;
@@ -1255,7 +1104,6 @@ export function useTranscript(sessionId: string | null) {
               ...(extras?.error != null ? { error: extras.error } : {}),
             };
             const newContent = JSON.stringify(newParsed);
-            // Persist the update
             void transcriptService.updateMessage(msg.id, { content: newContent });
             return { ...msg, content: newContent };
           } catch {
@@ -1268,11 +1116,7 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Update the fork decision on a chain-edit proposal's shared-task warning.
-   * The decision ("change-all" | "fork-copy") is stored inside the
-   * sharedTaskWarning object within the persisted chain-edit-proposal message.
-   */
+  /** Decision is "change-all" (modify shared task in place) or "fork-copy" (clone the task for this loop only). */
   const updateChainEditProposalForkDecision = useCallback(
     (proposalId: string, decision: "change-all" | "fork-copy") => {
       if (!sessionId) return;
@@ -1291,7 +1135,6 @@ export function useTranscript(sessionId: string | null) {
               },
             };
             const newContent = JSON.stringify(newParsed);
-            // Persist the update
             void transcriptService.updateMessage(msg.id, { content: newContent });
             return { ...msg, content: newContent };
           } catch {
@@ -1304,11 +1147,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Insert a sibling offer into the transcript. This creates a persisted
-   * "sibling-offer" system message (role "user", id starting with "sibling-offer-")
-   * whose content is JSON with the offer fields.
-   */
   const insertSiblingOffer = useCallback(
     (offer: Omit<SiblingOfferRow, "id" | "kind" | "turnId">) => {
       if (!sessionId) return;
@@ -1337,7 +1175,6 @@ export function useTranscript(sessionId: string | null) {
         environmentId: offer.siblingEnvironmentId,
       };
 
-      // Persist the offer message
       void transcriptService.appendMessage(message).then((persisted) => {
         setSiblingOfferMessages((prev) => [...prev, persisted]);
       });
@@ -1345,10 +1182,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Update a sibling offer's status in the persisted transcript.
-   * Finds and updates the corresponding sibling-offer message content.
-   */
   const updateSiblingOfferStatus = useCallback(
     (offerId: string, status: SiblingOfferStatus, extras?: { error?: string }) => {
       if (!sessionId) return;
@@ -1365,7 +1198,6 @@ export function useTranscript(sessionId: string | null) {
               ...(extras?.error != null ? { error: extras.error } : {}),
             };
             const newContent = JSON.stringify(newParsed);
-            // Persist the update
             void transcriptService.updateMessage(msg.id, { content: newContent });
             return { ...msg, content: newContent };
           } catch {
@@ -1378,7 +1210,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /** Force a reload of the transcript from the persistence layer. */
   const reloadTranscript = useCallback(() => {
     if (!sessionId) return;
     loadedSessionRef.current = null;
@@ -1406,15 +1237,9 @@ export function useTranscript(sessionId: string | null) {
       setRows(buildRowsFromTurns(hydratedTurns, handoffs, loopSummons, loopProposals, chainEditProposals, siblingOffers, failureDiagnoses, prRefs, fleetPlans));
       loadedSessionRef.current = sessionId;
     }).catch(() => {
-      // Ignore errors
     });
   }, [sessionId, transcriptService]);
 
-  /**
-   * Insert a PR reference card into the transcript. This creates a persisted
-   * "pr-ref" system message (role "user", id starting with "pr-ref-")
-   * whose content is JSON with the PR reference card fields.
-   */
   const insertPrReferenceCard = useCallback(
     (params: Omit<PrReferenceCardRow, "id" | "kind" | "turnId">) => {
       if (!sessionId) return;
@@ -1439,7 +1264,6 @@ export function useTranscript(sessionId: string | null) {
         finishedAt: timestamp,
       };
 
-      // Persist the PR reference card message
       void transcriptService.appendMessage(message).then((persisted) => {
         setPrRefMessages((prev) => [...prev, persisted]);
       });
@@ -1447,11 +1271,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Insert a fleet plan card into the transcript. This creates a persisted
-   * "fleet-plan" system message (role "user", id starting with "fleet-plan-")
-   * whose content is JSON with the fleet plan fields.
-   */
   const insertFleetPlan = useCallback(
     (params: Omit<FleetPlanRow, "id" | "kind" | "turnId">) => {
       if (!sessionId) return;
@@ -1475,7 +1294,6 @@ export function useTranscript(sessionId: string | null) {
         finishedAt: timestamp,
       };
 
-      // Persist the fleet plan message
       void transcriptService.appendMessage(message).then((persisted) => {
         setFleetPlanMessages((prev) => [...prev, persisted]);
       });
@@ -1483,10 +1301,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Update a fleet plan's status in the persisted transcript.
-   * Finds and updates the corresponding fleet-plan message content.
-   */
   const updateFleetPlanStatus = useCallback(
     (planId: string, status: FleetPlanStatus, extras?: { error?: string }) => {
       if (!sessionId) return;
@@ -1503,7 +1317,6 @@ export function useTranscript(sessionId: string | null) {
               ...(extras?.error != null ? { error: extras.error } : {}),
             };
             const newContent = JSON.stringify(newParsed);
-            // Persist the update
             void transcriptService.updateMessage(msg.id, { content: newContent });
             return { ...msg, content: newContent };
           } catch {
@@ -1516,10 +1329,6 @@ export function useTranscript(sessionId: string | null) {
     [sessionId, transcriptService],
   );
 
-  /**
-   * Update a specific target's status or checked state in a fleet plan.
-   * Finds the fleet-plan message by planId and updates the matching target.
-   */
   const updateFleetPlanTarget = useCallback(
     (planId: string, targetId: string, updates: Partial<Pick<FleetPlanTarget, "status" | "checked" | "error">>) => {
       if (!sessionId) return;
@@ -1535,7 +1344,6 @@ export function useTranscript(sessionId: string | null) {
             );
             const newParsed = { ...parsed, targets: newTargets };
             const newContent = JSON.stringify(newParsed);
-            // Persist the update
             void transcriptService.updateMessage(msg.id, { content: newContent });
             return { ...msg, content: newContent };
           } catch {

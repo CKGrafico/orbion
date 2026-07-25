@@ -22,17 +22,8 @@ interface LoopSnapshot {
   projectId?: string;
 }
 
-/**
- * Hook that detects loop state transitions between poll cycles.
- *
- * Compares the previous per-loop snapshot to the current one and fires
- * the given callback for each newly-observed failure or finishing event.
- *
- * On first load (no previous snapshot), transitions are NOT emitted, to
- * avoid flooding the inbox with items for loops that were already
- * failed/finished when the app started. The InboxService handles those
- * via its normal derivation.
- */
+// On first load (no previous snapshot), transitions are NOT emitted to avoid
+// flooding the inbox with items for loops already failed/finished at startup.
 export function useLoopTransitions(
   perEnvLoops: Record<string, LoopMeta[]>,
   onTransition: (transition: LoopTransition) => void,
@@ -69,8 +60,7 @@ export function useLoopTransitions(
         const wasFinished = prev.maxRuns !== null && prev.runCount >= prev.maxRuns;
 
         // Finished takes precedence: a loop that hit max-runs is "finished"
-        // even if its last exit was non-zero. This matches the inbox derivation
-        // where finished-loop > failed-loop when both apply.
+        // even if its last exit was non-zero.
         if (isNowFinished && !wasFinished) {
           onTransitionRef.current({
             environmentId: envId,
@@ -84,7 +74,6 @@ export function useLoopTransitions(
             projectId: loop.projectId,
           });
         } else if (isNowFailed && !wasFailed) {
-          // Failure transition: loop became failed (was not failed before, and not finished)
           onTransitionRef.current({
             environmentId: envId,
             loopId: loop.id,

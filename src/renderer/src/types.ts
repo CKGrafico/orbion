@@ -70,9 +70,7 @@ export interface Environment {
 
 export type EnvironmentHealth = "unknown" | "ok" | "offline" | "connecting" | "backoff" | "blocked";
 
-/** A loop paired with its fleet-local origin metadata.
- *  Used when rendering fleet-wide loop bars and cards so each loop
- *  can be attributed to its project + instance. */
+/** Loops paired with fleet-local origin metadata for rendering fleet-wide loop bars and cards. */
 export interface LoopWithOrigin {
   loop: LoopMeta;
   environmentId: string;
@@ -80,14 +78,9 @@ export interface LoopWithOrigin {
   projectName: string;
 }
 
-/** Fleet-wide rollup computed from all reachable instances.
- *  Excludes loops on unreachable instances (they are "unknown",
- *  not failed) from counts, per the reachability health layer. */
+/** Fleet-wide rollup. Excludes unreachable instances from counts. */
 export interface FleetLoopRollup {
-  /** All loops from reachable instances, each tagged with its origin. */
   loopsWithOrigin: LoopWithOrigin[];
-  /** Deduplicated project count across reachable instances. */
   projectCount: number;
-  /** Per-status counts across the fleet (unreachable loops excluded). */
   counts: Record<LoopStatus, number>;
 }

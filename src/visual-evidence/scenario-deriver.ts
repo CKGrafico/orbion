@@ -1,18 +1,8 @@
 /**
- * Derive a visual-validation scenario from the available context.
- *
- * Priority order (highest wins):
- *   1. Explicit scenario instructions (from EvidenceInput)
- *   2. Acceptance criteria (from the OpenSpec proposal/archive)
- *   3. OpenSpec proposal body
- *   4. OpenSpec tasks
- *   5. Issue description (from EvidenceInput)
- *   6. Changed UI files
- *   7. Existing application tests / behavior
- *
- * The deriver is deliberately conservative: when context is insufficient to
- * build a meaningful scenario, it returns `blocked` rather than fabricating
- * a scenario that an autonomous agent cannot actually execute.
+ * Derive a visual-validation scenario. Priority: explicit instructions >
+ * acceptance criteria > proposal body > tasks > issue description >
+ * changed UI files. Returns `blocked` when context is insufficient to build
+ * an executable scenario.
  */
 import type {
   ChangeContext,
@@ -42,16 +32,14 @@ function fromAcceptanceCriteria(criteria: readonly string[]): Scenario | null {
 
 function extractStepsFromProposal(proposal: string | undefined): Scenario | null {
   if (!proposal) return null;
-  // Find the body under "## Solution" / "### Approach" / "### What" — i.e.,
-  // everything from the line after the heading until the next same-or-higher
-  // level heading or end of document.
+  // Extract body under ## Solution / ### Approach / ### What headings
   const lines = proposal.split("\n");
   let inSection = false;
   const bodyLines: string[] = [];
   for (const line of lines) {
     const isHeading = /^#{1,6}\s+/.test(line);
     if (isHeading) {
-      if (inSection) break; // Next heading ends the section
+      if (inSection) break;
       if (/^#{2,3}\s+(?:Solution|Approach|What)\b/i.test(line)) {
         inSection = true;
       }
@@ -62,7 +50,6 @@ function extractStepsFromProposal(proposal: string | undefined): Scenario | null
   const body = bodyLines.join("\n");
   const bodyOrProposal = body.length > 0 ? body : proposal;
 
-  // Pull numbered list items (1. 2. 3.) or bullet items
   const stepLines = bodyOrProposal.split("\n");
   const steps: string[] = [];
   for (const line of stepLines) {
@@ -107,7 +94,6 @@ function fromIssue(ctx: EvidenceInput): Scenario | null {
 
 function fromChangedUiFiles(files: readonly string[]): Scenario | null {
   if (files.length === 0) return null;
-  // Only useful when the files are renderer paths
   const uiFiles = files.filter((f) =>
     /src\/renderer\/|components\/|features\//i.test(f),
   );
@@ -122,7 +108,6 @@ export function deriveScenario(
   ctx: ChangeContext,
   input: EvidenceInput,
 ): ScenarioDerivation {
-  // 1. Explicit scenario
   if (input.scenario && input.scenario.steps.length > 0) {
     return {
       scenario: fromInstruction(input.scenario),
@@ -131,31 +116,26 @@ export function deriveScenario(
     };
   }
 
-  // 2. Acceptance criteria
   const fromAc = fromAcceptanceCriteria(ctx.acceptanceCriteria);
   if (fromAc) {
     return { scenario: fromAc, source: "acceptance criteria", blocked: false };
   }
 
-  // 3. Proposal
   const fromProp = extractStepsFromProposal(ctx.proposal);
   if (fromProp) {
     return { scenario: fromProp, source: "proposal", blocked: false };
   }
 
-  // 4. Tasks
   const fromTaskList = fromTasks(ctx.tasks);
   if (fromTaskList) {
     return { scenario: fromTaskList, source: "tasks", blocked: false };
   }
 
-  // 5. Issue
   const fromIssueCtx = fromIssue(input);
   if (fromIssueCtx) {
     return { scenario: fromIssueCtx, source: "issue description", blocked: false };
   }
 
-  // 6. Changed UI files
   const files = input.changedFiles ?? ctx.affectedFiles;
   const fromFiles = fromChangedUiFiles(files);
   if (fromFiles) {

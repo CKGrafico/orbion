@@ -6,28 +6,17 @@ export interface PlatformDetection {
   remotes: string[];
 }
 
-/**
- * Classify the hosting platform from a set of git remote URLs.
- *
- * Recognised patterns:
- * - **GitHub**: `github.com` in HTTPS or SSH form.
- * - **Azure DevOps**: `dev.azure.com` or `ssh.dev.azure.com`.
- *
- * If *any* remote matches a known platform, that platform is returned.
- * If remotes match *multiple* known platforms, the first match wins
- * (in the order: github → ado).
- * Unknown or empty remotes yield `"unknown"`.
- */
+/** If *any* remote matches a known platform, that platform is returned.
+ *  If remotes match *multiple* known platforms, the first match wins (in order: github → ado).
+ *  Unknown or empty remotes yield `"unknown"`. */
 export function classifyPlatform(remoteUrls: string[]): PlatformType {
   for (const url of remoteUrls) {
     const lower = url.toLowerCase();
 
-    // GitHub: https://github.com/... or git@github.com:...
     if (lower.includes("github.com")) {
       return "github";
     }
 
-    // Azure DevOps: https://dev.azure.com/... or ssh://git@ssh.dev.azure.com/...
     if (lower.includes("dev.azure.com") || lower.includes("ssh.dev.azure.com")) {
       return "ado";
     }
@@ -36,19 +25,7 @@ export function classifyPlatform(remoteUrls: string[]): PlatformType {
   return "unknown";
 }
 
-/**
- * Parse `git remote -v` output into an array of unique remote URLs.
- *
- * Input format (one line per remote per direction):
- * ```
- * origin  https://github.com/org/repo.git (fetch)
- * origin  https://github.com/org/repo.git (push)
- * upstream        git@github.com:org/repo.git (fetch)
- * ```
- *
- * Returns unique URLs only (deduped — fetch and push with the same URL
- * produce one entry).
- */
+/** Parse `git remote -v` output into unique remote URLs (deduped — fetch and push with the same URL produce one entry). */
 export function parseGitRemoteOutput(output: string): string[] {
   const urls = new Set<string>();
 
@@ -56,7 +33,6 @@ export function parseGitRemoteOutput(output: string): string[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Format: <name>\t<url> (fetch|push)
     const tabIdx = trimmed.indexOf("\t");
     if (tabIdx === -1) continue;
 
@@ -70,19 +46,13 @@ export function parseGitRemoteOutput(output: string): string[] {
   return [...urls];
 }
 
-/** Session-scoped cache: `${environmentId}:${projectId}` → detected platform. */
 export const platformCache = new Map<string, PlatformType>();
 
 export function platformCacheKey(environmentId: string, projectId: string): string {
   return `${environmentId}:${projectId}`;
 }
 
-/**
- * Detect the hosting platform by inspecting git remotes in a directory.
- * Returns both the classified platform and the parsed remote URLs from
- * a single `git remote -v` execution.
- * Falls back to `{ platform: "unknown", remotes: [] }` on failure.
- */
+/** Detect the hosting platform by inspecting git remotes. Falls back to `{ platform: "unknown", remotes: [] }` on failure. */
 export function detectPlatform(directory: string): Promise<PlatformDetection> {
   return new Promise((resolve) => {
     execFile("git", ["remote", "-v"], { cwd: directory, timeout: 10_000 }, (err, stdout) => {

@@ -1,34 +1,11 @@
-/**
- * Shared shell script constants for SSH operations.
- *
- * These fragments are embedded into the probe and launch scripts
- * that Orbion executes on remote hosts over SSH.
- */
-
-/**
- * Node.js binary resolution fragment.
- *
- * Sets `node_path` to the absolute path of the discovered `node` binary,
- * or leaves it empty when no node is found. Resolution order:
- *
- *   1. PATH-resolved `node` (via `command -v`)
- *   2. Version-manager directories (nvm, fnm, asdf, mise, volta),
- *      scanned in order, picking the latest semver match per directory
- *
- * Consumers compose their own output on top (probe: NODE_FOUND/NODE_NOT_FOUND,
- * launch: NODE_FOUND/INSTALL_NODE_FIRST).
- *
- * IMPORTANT: This fragment intentionally omits `set -e` so the caller
- * controls error-handling semantics.
- */
+/** Node.js binary resolution: 1) PATH `node` via `command -v`, 2) version-manager dirs (nvm/fnm/asdf/mise/volta) → latest semver.
+ *  IMPORTANT: omits `set -e` so the caller controls error-handling semantics. */
 export const NODE_RESOLVE_SCRIPT = `
-# Try PATH node first
 node_path=""
 if command -v node >/dev/null 2>&1; then
   node_path="$(command -v node)"
 fi
 
-# Check version managers
 for manager_dir in \\
   "\${HOME}/.nvm/versions/node" \\
   "\${HOME}/.local/share/fnm/node-versions" \\

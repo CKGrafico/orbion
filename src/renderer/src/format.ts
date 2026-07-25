@@ -3,14 +3,6 @@ import type { ConnectionStatus } from "../../shared/ipc";
 import type { LoopStatus, RunRecord, EnvironmentHealth } from "./types";
 import { standaloneIntl, translateMessage } from "./i18n";
 
-// Status palette matches the loop-task TUI theme so both products read the same.
-// All 6 loop-task states are represented with distinct colors:
-//   running  = lime-green (active work)
-//   waiting  = blue (idle between runs)
-//   paused   = amber (schedule kept, can resume)
-//   stopped  = warm-amber (schedule cleared, must re-create)
-//   failed   = red (non-zero exit)
-//   finished = green (hit max-runs, success)
 export const STATUS_COLORS: Record<LoopStatus, string> = {
   running: "var(--status-running)",
   waiting: "var(--status-waiting)",
@@ -59,9 +51,6 @@ export function hostLabel(baseUrl: string): string {
   }
 }
 
-// ── Run activity summary (derived from runHistory) ─────────────────
-
-/** Count how many runs started today (local midnight). */
 export function runsToday(runHistory: RunRecord[] | undefined): number {
   if (!runHistory) return 0;
   const startOfToday = new Date();
@@ -70,7 +59,6 @@ export function runsToday(runHistory: RunRecord[] | undefined): number {
   return runHistory.filter((r) => new Date(r.startedAt).getTime() >= todayMs).length;
 }
 
-/** Average duration (ms) of completed runs; null if none have durations. */
 export function avgDuration(runHistory: RunRecord[] | undefined): number | null {
   if (!runHistory) return null;
   const completed = runHistory.filter((r) => r.duration !== null);
@@ -79,14 +67,12 @@ export function avgDuration(runHistory: RunRecord[] | undefined): number | null 
   return Math.round(total / completed.length);
 }
 
-/** Last run duration (ms); null if the most recent run has no duration. */
 export function lastRunDuration(runHistory: RunRecord[] | undefined): number | null {
   if (!runHistory || runHistory.length === 0) return null;
   const last = runHistory[runHistory.length - 1];
   return last.duration;
 }
 
-/** Format a duration in ms to a compact human-readable string. */
 export function formatDurationShort(ms: number | null): string {
   if (ms === null) return standaloneIntl.formatMessage({ id: "format.emptyValue" });
   if (ms < 1000) return `${ms}ms`;

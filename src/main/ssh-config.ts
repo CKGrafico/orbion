@@ -12,15 +12,11 @@ interface RawHost {
   IdentityFile?: string;
 }
 
-// ─── SSH Input Validation ────────────────────────────────────────────
-// Prevents shell injection / argument injection by rejecting values that
-// contain whitespace, shell metacharacters, or leading dashes (which
-// could be interpreted as SSH flags).
-//
-// - hostname:  letters, digits, dots, hyphens (not leading).  No spaces.
+// SSH input validation: prevents shell/argument injection by rejecting values
+// containing whitespace, shell metacharacters, or leading dashes (SSH flags).
+// - hostname:  letters, digits, dots, hyphens (not leading). No spaces.
 // - username:  letters, digits, underscores, hyphens (not leading).
-// - identityFile: filesystem path — alphanumerics, / _ . - ~
-//   Must not start with a dash.
+// - identityFile: alphanumerics, / _ . - ~  Must not start with a dash.
 
 const HOSTNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9.-]*$/;
 const USERNAME_RE = /^[a-zA-Z0-9_][a-zA-Z0-9_-]*$/;
@@ -33,10 +29,7 @@ export class SshValidationError extends Error {
   }
 }
 
-/**
- * Validate an SshHost's fields for safe use in SSH argument construction.
- * Throws SshValidationError if any field contains disallowed characters.
- */
+/** Validate an SshHost's fields for safe use in SSH argument construction. */
 export function validateSshHost(host: SshHost): void {
   if (!host.hostName || !HOSTNAME_RE.test(host.hostName)) {
     throw new SshValidationError("hostName", host.hostName);
@@ -132,7 +125,6 @@ export function listSshHosts(): SshHost[] {
       label: `${user}@${hostName}${port !== 22 ? `:${port}` : ""}`,
     };
 
-    // Skip hosts with dangerous characters in any field
     try {
       validateSshHost(host);
     } catch {
@@ -157,7 +149,6 @@ export function parseTarget(target: string): SshHost | null {
     label: target.trim(),
   };
 
-  // Reject if user or hostName contains dangerous characters
   try {
     validateSshHost(host);
   } catch {
@@ -189,20 +180,15 @@ export function buildSshArgs(host: SshHost, command: string): string[] {
   return args;
 }
 
-// ─── Known hosts management ──────────────────────────────────────────
-// Host key verification replaces the insecure StrictHostKeyChecking=accept-new
-// with explicit user confirmation on first connection, followed by
-// standard known_hosts verification on all subsequent connections.
+// Known hosts management: host key verification replaces the insecure
+// StrictHostKeyChecking=accept-new with explicit user confirmation on
+// first connection, followed by standard known_hosts verification.
 
-/** Return the path to the user's ~/.ssh/known_hosts file. */
 export function knownHostsPath(): string {
   return path.join(os.homedir(), ".ssh", "known_hosts");
 }
 
-/**
- * Check if a host already has an entry in ~/.ssh/known_hosts.
- * Uses `ssh-keygen -F` for reliable matching (handles hashed known_hosts).
- */
+/** Uses `ssh-keygen -F` for reliable matching (handles hashed known_hosts). */
 export function isHostInKnownHosts(hostName: string, port: number): boolean {
   const searchKey = port === 22 ? hostName : `[${hostName}]:${port}`;
 
@@ -219,10 +205,7 @@ export function isHostInKnownHosts(hostName: string, port: number): boolean {
   }
 }
 
-/**
- * Append a verified host key line to ~/.ssh/known_hosts.
- * Creates the ~/.ssh/ directory (mode 0700) and known_hosts file if absent.
- */
+/** Creates the ~/.ssh/ directory (mode 0700) and known_hosts file if absent. */
 export function appendToKnownHosts(keyLine: string): void {
   const sshDir = path.join(os.homedir(), ".ssh");
   const khPath = knownHostsPath();
@@ -231,25 +214,17 @@ export function appendToKnownHosts(keyLine: string): void {
     fs.mkdirSync(sshDir, { recursive: true, mode: 0o700 });
   }
 
-  // Ensure the line ends with a newline
   const line = keyLine.endsWith("\n") ? keyLine : `${keyLine}\n`;
 
   fs.appendFileSync(khPath, line, { encoding: "utf8", mode: 0o644 });
 }
 
-/** Result of fetching a host key via ssh-keyscan. */
 export interface HostKeyResult {
-  /** Raw keyscan output lines (e.g. "[host]:port ssh-ed25519 AAAA...") */
   rawLines: string;
-  /** Human-readable fingerprint (e.g. "SHA256:abc123..."), null if unavailable */
   fingerprint: string | null;
 }
 
-/**
- * Fetch the host key for a host:port using ssh-keyscan.
- * This is safe: ssh-keyscan does not authenticate or open an SSH session.
- * Returns null if the host is unreachable or keyscan fails.
- */
+/** Safe: ssh-keyscan does not authenticate or open an SSH session. Returns null if the host is unreachable. */
 export async function fetchHostKey(hostName: string, port: number): Promise<HostKeyResult | null> {
   if (!HOSTNAME_RE.test(hostName)) return null;
 
@@ -271,7 +246,6 @@ export async function fetchHostKey(hostName: string, port: number): Promise<Host
 
   if (!rawLines) return null;
 
-  // Derive the human-readable fingerprint via ssh-keygen -lf -
   let fingerprint: string | null = null;
   try {
     fingerprint = await new Promise<string | null>((resolve) => {
@@ -285,7 +259,6 @@ export async function fetchHostKey(hostName: string, port: number): Promise<Host
         const first = stdout.trim().split("\n")[0]?.trim() ?? null;
         resolve(first);
       });
-      // Feed the keyscan output as stdin to ssh-keygen
       proc.stdin?.end(rawLines);
     });
   } catch {

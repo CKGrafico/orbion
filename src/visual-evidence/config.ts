@@ -1,27 +1,19 @@
 /**
  * Visual-evidence configuration.
- *
- * Defaults are tuned for the Orbion Electron app (1280×720 window, WebP
- * screenshots, 10fps GIFs). A repo-level override file at
- * `.orbion/visual-evidence.json` is deep-merged over the defaults when
- * present. Environment variables prefixed `ORBION_VISUAL_EVIDENCE_*`
- * override individual scalar fields for CI.
+ * Defaults tuned for Orbion (1280×720, WebP, 10fps GIFs).
+ * Override: `.orbion/visual-evidence.json` (deep-merged) or
+ * `ORBION_VISUAL_EVIDENCE_*` env vars.
  */
 import fs from "node:fs";
 import path from "node:path";
 
-// ── Public config shape ────────────────────────────────────────────────
+// ── Public config shape ──
 
 export interface ScreenshotConfig {
-  /** "webp" preferred; "png" when transparency or pixel-perfect clarity is required */
   preferredFormat: "webp" | "png";
-  /** WebP quality 1-100 (ignored for PNG) */
   quality: number;
-  /** Maximum pixel width; larger captures are downscaled */
   maxWidth: number;
-  /** Soft target — try to get under this; not a hard cap */
   targetBytes: number;
-  /** Hard cap — never commit a screenshot larger than this */
   maxBytes: number;
 }
 
@@ -31,7 +23,6 @@ export interface GifConfig {
   fps: number;
   targetBytes: number;
   maxBytes: number;
-  /** Trim the recording to at most this many seconds */
   maxDurationSeconds: number;
 }
 
@@ -44,13 +35,12 @@ export interface VisualEvidenceConfig {
   window: WindowConfig;
   screenshot: ScreenshotConfig;
   gif: GifConfig;
-  /** Where raw PNG / webm / traces / frames live — gitignored, never committed */
+  /** Gitignored temp dir; never committed */
   temporaryDirectory: string;
-  /** Name of the permanent evidence subfolder inside the OpenSpec change */
   evidenceDirectoryName: string;
 }
 
-// ── Defaults ───────────────────────────────────────────────────────────
+// ── Defaults ──
 
 export const DEFAULT_CONFIG: VisualEvidenceConfig = {
   window: {
@@ -61,22 +51,22 @@ export const DEFAULT_CONFIG: VisualEvidenceConfig = {
     preferredFormat: "webp",
     quality: 82,
     maxWidth: 1280,
-    targetBytes: 153_600, // 150 KB
-    maxBytes: 307_200, // 300 KB
+    targetBytes: 153_600,
+    maxBytes: 307_200,
   },
   gif: {
     enabled: true,
     maxWidth: 960,
     fps: 10,
-    targetBytes: 1_048_576, // 1 MB
-    maxBytes: 2_097_152, // 2 MB
+    targetBytes: 1_048_576,
+    maxBytes: 2_097_152,
     maxDurationSeconds: 10,
   },
   temporaryDirectory: ".tmp/visual-evidence",
   evidenceDirectoryName: "evidence",
 };
 
-// ── Loader ─────────────────────────────────────────────────────────────
+// ── Loader ──
 
 const CONFIG_FILE_CANDIDATES = [
   ".orbion/visual-evidence.json",
@@ -91,7 +81,7 @@ function readRepoConfig(repoRoot: string): Partial<VisualEvidenceConfig> | null 
         const raw = fs.readFileSync(abs, "utf8");
         return JSON.parse(raw) as Partial<VisualEvidenceConfig>;
       } catch {
-        // Malformed config file — ignore it and fall through to env + defaults
+        // Malformed config — fall through to env + defaults
         return null;
       }
     }

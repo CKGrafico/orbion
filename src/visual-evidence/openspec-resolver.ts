@@ -1,11 +1,8 @@
 /**
- * Locate the active OpenSpec change and read its proposal/tasks/archive context.
- *
- * Active changes live at the top level of `openspec/changes/<id>/`. The
- * `archive/` subfolder holds already-archived changes and is excluded. This
- * mirrors the `openspec-archive-change` skill's `mv changeRoot →
- * archive/YYYY-MM-DD-<name>/` convention, so any `evidence/` subfolder we
- * create inside the active change moves together with the archive.
+ * Locate the active OpenSpec change and read its proposal/tasks/archive.
+ * Active changes live at `openspec/changes/<id>/`; the `archive/` subfolder
+ * is excluded. Any `evidence/` subfolder created inside the active change
+ * moves together with the archive.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -42,7 +39,7 @@ export function archivedChangeRoot(repoRoot: string, changeId: string): string |
   return match ? path.join(archived, match) : null;
 }
 
-/** List active (non-archived) change IDs from `openspec/changes/`. */
+/** List active (non-archived) change IDs. */
 export function listActiveChanges(repoRoot: string): string[] {
   const dir = changesDir(repoRoot);
   if (!fs.existsSync(dir)) return [];
@@ -54,10 +51,8 @@ export function listActiveChanges(repoRoot: string): string[] {
 }
 
 /**
- * Resolve the active change directory for a given ID.
- *
- * @throws OpenSpecResolutionError when the id is missing/ambiguous or the
- *   folder does not exist or is already archived.
+ * Resolve the active change directory.
+ * @throws OpenSpecResolutionError when id is missing/ambiguous, missing, or archived.
  */
 export function resolveActiveChange(repoRoot: string, changeId?: string): string {
   const active = listActiveChanges(repoRoot);
@@ -76,7 +71,7 @@ export function resolveActiveChange(repoRoot: string, changeId?: string): string
 
   if (active.includes(changeId)) return changeRoot(repoRoot, changeId);
 
-  // Maybe it's already archived
+  // Maybe already archived
   const archived = path.join(changesDir(repoRoot), "archive");
   if (fs.existsSync(archived)) {
     const archivedNames = fs
@@ -98,7 +93,7 @@ export function resolveActiveChange(repoRoot: string, changeId?: string): string
   );
 }
 
-// ── Markdown section parsing ───────────────────────────────────────────
+// ── Markdown section parsing ──
 
 function readIfExists(file: string): string | undefined {
   if (fs.existsSync(file)) return fs.readFileSync(file, "utf8");
@@ -106,10 +101,8 @@ function readIfExists(file: string): string | undefined {
 }
 
 function extractSection(md: string, heading: string): string | null {
-  // Find a heading line and capture everything from the NEXT line until the
-  // next same-or-higher-level heading, or end of document. We avoid the
-  // regex `$` anchor (which matches end-of-line, leaving the capture empty)
-  // by scanning line-by-line.
+  // Scan line-by-line to avoid relying on `$` anchors (which match end-of-line
+  // and leave the capture empty).
   const lines = md.split("\n");
   const headingRe = new RegExp(`^#{1,6}\\s+${escapeRegex(heading)}\\b\\s*$`, "i");
   const nextHeadingRe = /^#{1,6}\s+/;
@@ -142,7 +135,7 @@ function parseAcceptanceCriteria(proposal: string | undefined, archive: string |
     if (!section) continue;
     return splitListItems(section).map((l) => l.replace(/^\[[ xX]\]\s*/, "").trim());
   }
-  // As a fallback, extract any `- [ ]` / `- [x]` items anywhere in proposal
+  // Fallback: extract checkbox items anywhere in proposal
   if (proposal) {
     const items = proposal
       .split("\n")
@@ -169,11 +162,11 @@ function parseAffectedFiles(proposal: string | undefined, archive: string | unde
       extractSection(md, "Files Modified") ??
       extractSection(md, "Scope");
     if (!section) continue;
-    // Strip trailing descriptions after em-dash (—), en-dash (—), or " -- ":
+    // Strip trailing descriptions after em/en-dash or " -- ":
     // keep only the path token before the separator.
     const items = splitListItems(section)
       .map((l) => {
-        // Stop at the first em-dash / en-dash / " -- " / " - "
+        // Stop at first em/en-dash / " -- " / " - "
         const cut = l.replace(/\s+[—–-].*$/, "").replace(/\s+--.*$/, "").trim();
         return cut;
       })
@@ -221,7 +214,7 @@ export function readChangeContext(
   };
 }
 
-/** Compute the path of the evidence folder inside an active or archived change. */
+/** Evidence folder path inside an active or archived change. */
 export function evidenceDir(repoRoot: string, changeId: string, evidenceDirectoryName: string): string {
   const active = changeRoot(repoRoot, changeId);
   const root = fs.existsSync(active) ? active : archivedChangeRoot(repoRoot, changeId);
