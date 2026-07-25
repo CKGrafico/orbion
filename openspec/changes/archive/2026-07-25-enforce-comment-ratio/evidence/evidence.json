@@ -1,0 +1,10 @@
+{
+  "status": "skipped",
+  "reason": "Code hygiene change (comment cleanup only). No user-visible UI changes. Automated comment ratio check added as build gate.",
+  "changeId": "enforce-comment-ratio",
+  "tasksCompleted": "12/12",
+  "verification": {
+    "typecheck": "pass",
+    "check:comments": "pass"
+  }
+}
