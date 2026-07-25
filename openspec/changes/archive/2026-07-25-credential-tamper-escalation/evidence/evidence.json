@@ -1,0 +1,47 @@
+{
+  "changeId": "credential-tamper-escalation",
+  "issueRef": "#338",
+  "capturedAt": "2026-07-25T19:10:00Z",
+  "status": "passed",
+  "evidence": [
+    {
+      "type": "test",
+      "description": "getSessionToken catches CredentialTamperedError and sets authState to tampered",
+      "result": "passed"
+    },
+    {
+      "type": "test",
+      "description": "getSessionToken invokes onCredentialTampered callback on tampering",
+      "result": "passed"
+    },
+    {
+      "type": "test",
+      "description": "getSshKeyPassphrase catches CredentialTamperedError and sets authState to tampered",
+      "result": "passed"
+    },
+    {
+      "type": "test",
+      "description": "getSshKeyPassphrase invokes onCredentialTampered callback on tampering",
+      "result": "passed"
+    },
+    {
+      "type": "gate",
+      "description": "pnpm typecheck — zero errors",
+      "result": "passed"
+    },
+    {
+      "type": "gate",
+      "description": "pnpm check:comments — all files ≤ 10%",
+      "result": "passed"
+    }
+  ],
+  "filesChanged": [
+    "src/shared/ipc.ts",
+    "src/main/config-store.ts",
+    "src/main/security-audit-log.ts",
+    "src/main/index.ts",
+    "src/renderer/src/components/InstanceSettingsPanel.tsx",
+    "src/renderer/src/i18n/en.json",
+    "tests/credential-vault.test.ts"
+  ]
+}
