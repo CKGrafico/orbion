@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { logger, createLogger } from "./logger.js";
-import { isHostAllowed, isUrlAllowedForFetch } from "./ssrf-blocklist.js";
+import { isHostAllowed, isUrlAllowedForFetch, isAllowedBaseUrl } from "./ssrf-blocklist.js";
 import type { LogEntry } from "../shared/log.js";
 import type {
   ApiRequestArgs,
@@ -335,15 +335,6 @@ function showEncryptionWarning(): void {
     message: "Password storage requires a keychain.",
     detail: "Install libsecret on Linux or ensure a keychain is available on your system. Your password was not saved.",
   });
-}
-
-function isAllowedBaseUrl(baseUrl: string): boolean {
-  try {
-    const url = new URL(baseUrl);
-    return isUrlAllowedForFetch(url, { allowLoopback: true });
-  } catch {
-    return false;
-  }
 }
 
 function isEffectiveUrlAllowed(effectiveUrl: string): { allowed: boolean; host: string } {

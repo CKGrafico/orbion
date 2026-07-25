@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isHostAllowed, isUrlAllowedForFetch } from "../src/main/ssrf-blocklist.js";
+import { isHostAllowed, isUrlAllowedForFetch, isAllowedBaseUrl } from "../src/main/ssrf-blocklist.js";
 
 describe("isHostAllowed", () => {
   it("rejects AWS metadata endpoint 169.254.169.254", () => {
@@ -33,16 +33,25 @@ describe("isHostAllowed", () => {
     expect(isHostAllowed("metadata.google.internal", { allowLoopback: true })).toBe(false);
   });
 
+  it("rejects Azure metadata hostname metadata.azure.internal", () => {
+    expect(isHostAllowed("metadata.azure.internal")).toBe(false);
+    expect(isHostAllowed("metadata.azure.internal", { allowLoopback: true })).toBe(false);
+  });
+
   it("rejects IPv6 link-local fe80::/10 addresses", () => {
-    expect(isHostAllowed("fe80::1")).toBe(false);
-    expect(isHostAllowed("fe80::1234:5678")).toBe(false);
-    expect(isHostAllowed("fe8f::1")).toBe(false);
-    expect(isHostAllowed("fe80::1", { allowLoopback: true })).toBe(false);
+    expect(isHostAllowed("[fe80::1]")).toBe(false);
+    expect(isHostAllowed("[fe80::1234:5678]")).toBe(false);
+    expect(isHostAllowed("[fe8f::1]")).toBe(false);
+    expect(isHostAllowed("[fe80::1]", { allowLoopback: true })).toBe(false);
   });
 
   it("allows non-link-local IPv6 addresses starting with fe9+", () => {
     expect(isHostAllowed("fe90::1")).toBe(true);
     expect(isHostAllowed("fee0::1")).toBe(true);
+  });
+
+  it("does not treat bare fe80 hostname (no brackets) as IPv6 link-local", () => {
+    expect(isHostAllowed("fe80::1")).toBe(true);
   });
 
   it("rejects localhost when allowLoopback is false (default)", () => {
@@ -104,6 +113,10 @@ describe("isHostAllowed", () => {
     expect(isHostAllowed("Metadata.Google.Internal")).toBe(false);
   });
 
+  it("is case-insensitive for metadata.azure.internal", () => {
+    expect(isHostAllowed("Metadata.Azure.Internal")).toBe(false);
+  });
+
   it("does not reject 169.255.x.x (not link-local)", () => {
     expect(isHostAllowed("169.255.0.1")).toBe(true);
   });
@@ -139,9 +152,54 @@ describe("isUrlAllowedForFetch", () => {
     expect(isUrlAllowedForFetch(new URL("http://metadata.google.internal/computeMetadata/v1/"), { allowLoopback: true })).toBe(false);
   });
 
+  it("rejects metadata.azure.internal regardless of allowLoopback", () => {
+    expect(isUrlAllowedForFetch(new URL("http://metadata.azure.internal/metadata/instance?api-version=2021-02-01"))).toBe(false);
+    expect(isUrlAllowedForFetch(new URL("http://metadata.azure.internal/metadata/instance?api-version=2021-02-01"), { allowLoopback: true })).toBe(false);
+  });
+
   it("rejects IPv6 link-local regardless of allowLoopback", () => {
     expect(isUrlAllowedForFetch(new URL("http://[fe80::1]/"))).toBe(false);
     expect(isUrlAllowedForFetch(new URL("http://[fe80::1]/"), { allowLoopback: true })).toBe(false);
+  });
+});
+
+describe("isAllowedBaseUrl", () => {
+  it("allows valid https URLs to public hosts", () => {
+    expect(isAllowedBaseUrl("https://example.com")).toBe(true);
+  });
+
+  it("allows valid http URLs to public hosts", () => {
+    expect(isAllowedBaseUrl("http://8.8.8.8")).toBe(true);
+  });
+
+  it("rejects invalid URLs", () => {
+    expect(isAllowedBaseUrl("not-a-url")).toBe(false);
+  });
+
+  it("rejects non-http protocols", () => {
+    expect(isAllowedBaseUrl("ftp://example.com")).toBe(false);
+  });
+
+  it("rejects metadata IPs", () => {
+    expect(isAllowedBaseUrl("http://169.254.169.254")).toBe(false);
+    expect(isAllowedBaseUrl("http://169.254.169.254", { allowLoopback: true })).toBe(false);
+  });
+
+  it("rejects cloud metadata hostnames", () => {
+    expect(isAllowedBaseUrl("http://metadata.google.internal")).toBe(false);
+    expect(isAllowedBaseUrl("http://metadata.azure.internal")).toBe(false);
+  });
+
+  it("rejects localhost without allowLoopback", () => {
+    expect(isAllowedBaseUrl("http://localhost:8080")).toBe(false);
+  });
+
+  it("allows localhost with allowLoopback", () => {
+    expect(isAllowedBaseUrl("http://localhost:8080", { allowLoopback: true })).toBe(true);
+  });
+
+  it("allows loopback 127.0.0.1 with allowLoopback", () => {
+    expect(isAllowedBaseUrl("http://127.0.0.1:8080", { allowLoopback: true })).toBe(true);
   });
 });
 
@@ -153,8 +211,9 @@ describe("IPC validation and fetch path parity", () => {
     { host: "169.254.100.50", allowLoopback: false, expected: false },
     { host: "[fd00:ec2::254]", allowLoopback: false, expected: false },
     { host: "metadata.google.internal", allowLoopback: false, expected: false },
-    { host: "fe80::1", allowLoopback: false, expected: false },
-    { host: "fe8f::1", allowLoopback: false, expected: false },
+    { host: "metadata.azure.internal", allowLoopback: false, expected: false },
+    { host: "[fe80::1]", allowLoopback: false, expected: false },
+    { host: "[fe8f::1]", allowLoopback: false, expected: false },
     { host: "localhost", allowLoopback: false, expected: false },
     { host: "127.0.0.1", allowLoopback: false, expected: false },
     { host: "127.0.0.2", allowLoopback: false, expected: false },
@@ -167,7 +226,8 @@ describe("IPC validation and fetch path parity", () => {
     { host: "169.254.169.253", allowLoopback: true, expected: false },
     { host: "[fd00:ec2::254]", allowLoopback: true, expected: false },
     { host: "metadata.google.internal", allowLoopback: true, expected: false },
-    { host: "fe80::1", allowLoopback: true, expected: false },
+    { host: "metadata.azure.internal", allowLoopback: true, expected: false },
+    { host: "[fe80::1]", allowLoopback: true, expected: false },
     { host: "8.8.8.8", allowLoopback: false, expected: true },
     { host: "example.com", allowLoopback: false, expected: true },
     { host: "100.64.0.1", allowLoopback: false, expected: true },

@@ -14,12 +14,18 @@ Two independent blocklist implementations protect different trust boundaries but
 Gaps in both:
 - No IPv6 link-local (`fe80::/10`) block
 - No GCP metadata DNS hostname block (`metadata.google.internal`)
-- No Azure IMDS DNS hostname block
+- No Azure IMDS DNS hostname block (`metadata.azure.internal`)
 - Opposite polarity makes accidental negation easy
 
 ## Fix
-1. Extract single `src/main/ssrf-blocklist.ts` with one canonical `isUrlAllowedForFetch(url, options)`
+1. Extract single `src/main/ssrf-blocklist.ts` with `isHostAllowed`, `isUrlAllowedForFetch`, `isAllowedBaseUrl`
 2. Both consumers import from canonical module — no duplicated logic
-3. Block IPv6 link-local, cloud provider DNS metadata hostnames, future SSRF vectors in one place
-4. Use allowlist polarity consistently — `true` = allowed — documented why in comment
+3. Block IPv6 link-local (bracket-aware), cloud provider DNS metadata hostnames (GCP + Azure), future SSRF vectors in one place
+4. Use allowlist polarity consistently — `true` = allowed
 5. Parity test: both call paths produce same allow/deny for comprehensive test URL set
+
+## Verification
+- 69 host-blocklist tests pass (including metadata.azure.internal, isAllowedBaseUrl, parity)
+- 88 IPC validation tests pass
+- `pnpm typecheck` clean
+- `pnpm check:comments` clean

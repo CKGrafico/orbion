@@ -3,7 +3,7 @@
   "changeId": "unify-ssrf-blocklist",
   "required": true,
   "status": "passed",
-  "reason": "142 unit tests pass (54 host-blocklist + 88 IPC validation). Canonical ssrf-blocklist.ts unifies both consumers. IPv6 link-local, GCP metadata hostname, cloud metadata IPs all blocked. Typecheck + comment-ratio clean.",
-  "assets": [],
+  "reason": "157 unit tests pass (69 host-blocklist + 88 IPC validation). Canonical ssrf-blocklist.ts unifies both consumers. IPv6 link-local (bracket-aware), GCP + Azure metadata hostnames, cloud metadata IPs all blocked. isAllowedBaseUrl extracted. Typecheck + comment-ratio clean.",
+  "assets": ["test-output.txt"],
   "prMarkdown": ""
 }

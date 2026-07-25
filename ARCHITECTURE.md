@@ -51,6 +51,7 @@ orbion/
 │   │   ├── transcript-store.ts # Per-session chat transcript file storage
 │   │   ├── sse-parser.ts     # Spec-compliant SSE stream parser (eventsource-parser)
 │   │   ├── diff-analyzer.ts   # Heuristic PR diff risk analysis (verdict + risk level + briefing classification)
+│   │   ├── ssrf-blocklist.ts   # Canonical SSRF host validation (isHostAllowed, isUrlAllowedForFetch, isAllowedBaseUrl)
 │   │   └── ssh-probe.ts        # SSH VM, Node 20+, loop-task, and daemon probing
 │   ├── preload/
 │   │   └── index.ts            # contextBridge → window.api (typed IPC surface)
@@ -557,13 +558,18 @@ keys, writes them into electron-store, and clears the keys. The renderer's
   an internal-only `InternalOpenCodeEndpoint` type and is stripped before
   environments are sent to the renderer via IPC.
 - **URL validation:** the main process rejects any base URL that is not
-  `http:`/`https:` before making a request. Additionally, `isAllowedHost()`
-  blocks cloud metadata IPs (169.254.169.254, 169.254.169.253, fd00:ec2::254),
-  the full 169.254.0.0/16 link-local range, and loopback addresses
-  (127.0.0.0/8, ::1, localhost) at request time. Loopback is exempted when
-  the effective URL resolves to a port with an active SSH tunnel in the
-  tunnel registry. The IPC boundary also rejects blocklisted hosts at
-  environment registration time.
+  `http:`/`https:` before making a request. A canonical SSRF blocklist module
+  (`src/main/ssrf-blocklist.ts`) exports `isHostAllowed`, `isUrlAllowedForFetch`,
+  and `isAllowedBaseUrl`. It blocks cloud metadata IPs (169.254.169.254,
+  169.254.169.253, fd00:ec2::254), the full 169.254.0.0/16 link-local range,
+  cloud metadata DNS hostnames (`metadata.google.internal`,
+  `metadata.azure.internal`), and IPv6 link-local (fe80::/10). Loopback
+  addresses (127.0.0.0/8, ::1, localhost) are blocked by default but allowed
+  when explicitly opted in via `allowLoopback: true`. At request time,
+  loopback is exempted when the effective URL resolves to a port with an active
+  SSH tunnel in the tunnel registry. The IPC boundary also rejects blocklisted
+  hosts at environment registration time. Allowlist polarity (`true` = allowed)
+  is used consistently across both call paths.
 - **Markdown sanitization:** all markdown rendered via `MarkdownContent.tsx`
   passes through `rehype-sanitize`, which strips `<script>`, `<iframe>`,
   event handlers (`onerror`, `onclick`, etc.), and `javascript:` URLs.

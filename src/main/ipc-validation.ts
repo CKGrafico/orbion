@@ -12,7 +12,7 @@ import { ipcMain } from "electron";
 import { isAllowedApiOperation, isAllowedStreamPath } from "../shared/daemon-allowlist.js";
 import type { InfraAction } from "../shared/ipc.js";
 import { createLogger } from "./logger.js";
-import { isHostAllowed } from "./ssrf-blocklist.js";
+import { isAllowedBaseUrl as isCanonicalAllowedBaseUrl } from "./ssrf-blocklist.js";
 
 const logger = createLogger("ipc-validation");
 
@@ -50,12 +50,7 @@ function isValidHttpUrl(v: unknown): v is string {
 
 function isBlocklistedUrl(v: unknown): boolean {
   if (!isString(v)) return false;
-  try {
-    const url = new URL(v);
-    return !isHostAllowed(url.hostname, { allowLoopback: true });
-  } catch {
-    return false;
-  }
+  return !isCanonicalAllowedBaseUrl(v, { allowLoopback: true });
 }
 
 export function isAllowedPath(v: unknown): v is string {

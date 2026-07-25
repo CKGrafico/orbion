@@ -1,0 +1,11 @@
+RUN  v4.1.10 /home/azureuser/projects/orbion
+
+ ✓ tests/host-blocklist.test.ts (69 tests) 13ms
+   ✓ isHostAllowed (30 tests)
+   ✓ isUrlAllowedForFetch (8 tests)
+   ✓ isAllowedBaseUrl (8 tests)
+   ✓ IPC validation and fetch path parity (26 tests — includes metadata.azure.internal)
+
+ Test Files  1 passed (1)
+      Tests  69 passed (69)
+   Duration  235ms
