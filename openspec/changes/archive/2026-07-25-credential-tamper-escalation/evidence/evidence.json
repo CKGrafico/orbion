@@ -4,7 +4,7 @@
   "issueRef": "#338",
   "required": true,
   "status": "passed",
-  "capturedAt": "2026-07-25T19:22:00Z",
+  "capturedAt": "2026-07-25T19:25:00Z",
   "scenario": {
     "title": "Credential tampering escalates with notification and audit log instead of silent degradation",
     "steps": [
