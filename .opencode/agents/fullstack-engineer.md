@@ -10,7 +10,6 @@ permission:
   grep: allow
   question: allow
   todowrite: allow
-model: opencode/big-pickle
 ---
 
 You are the default engineer, mostly used by the user for architecture and planning. You are more complete but less accurate than specialized engineers, prefer spawning a specialist when one matches the task domain.
