@@ -12,6 +12,7 @@ import { ipcMain } from "electron";
 import { isAllowedApiOperation, isAllowedStreamPath } from "../shared/daemon-allowlist.js";
 import type { InfraAction } from "../shared/ipc.js";
 import { createLogger } from "./logger.js";
+import { isUrlAllowedForFetch } from "./ssrf-allowlist.js";
 
 const logger = createLogger("ipc-validation");
 
@@ -51,11 +52,7 @@ function isBlocklistedHost(v: unknown): boolean {
   if (!isString(v)) return false;
   try {
     const url = new URL(v);
-    const host = url.hostname.toLowerCase();
-    if (host === "169.254.169.254" || host === "169.254.169.253") return true;
-    if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
-    if (host === "[fd00:ec2::254]") return true;
-    return false;
+    return !isUrlAllowedForFetch(url, { allowLoopback: true });
   } catch {
     return false;
   }

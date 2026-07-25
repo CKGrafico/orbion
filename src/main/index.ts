@@ -113,6 +113,7 @@ import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus, destroyA
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent, respondHostKey } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
 import { validateIpc, safeHandle, IpcValidationError, checkLogRateLimit } from "./ipc-validation.js";
+import { isUrlAllowedForFetch } from "./ssrf-allowlist.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
 import { OutageTracker } from "./outage-tracker.js";
@@ -337,29 +338,7 @@ function showEncryptionWarning(): void {
 }
 
 function isAllowedHost(url: URL, allowLoopback: boolean): boolean {
-  const host = url.hostname.toLowerCase();
-
-  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") {
-    return allowLoopback;
-  }
-
-  if (host === "169.254.169.254" || host === "169.254.169.253") {
-    return false;
-  }
-
-  if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) {
-    return false;
-  }
-
-  if (host === "[fd00:ec2::254]") {
-    return false;
-  }
-
-  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
-    return allowLoopback;
-  }
-
-  return true;
+  return isUrlAllowedForFetch(url, { allowLoopback });
 }
 
 function isAllowedBaseUrl(baseUrl: string): boolean {

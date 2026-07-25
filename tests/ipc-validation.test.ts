@@ -362,6 +362,22 @@ describe("blocklisted host validation", () => {
   it("rejects config:addEndpoint with arbitrary link-local URL", () => {
     expect(() => validateIpc("config:addEndpoint", ["env-1", "http://169.254.0.1:8845", "ssh"])).toThrow(IpcValidationError);
   });
+
+  it("rejects config:addEnvironment with IPv6 link-local URL", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://[fe80::1]/api", undefined])).toThrow(IpcValidationError);
+  });
+
+  it("rejects config:addEndpoint with IPv6 link-local URL", () => {
+    expect(() => validateIpc("config:addEndpoint", ["env-1", "http://[fe80::1]/api", "ssh"])).toThrow(IpcValidationError);
+  });
+
+  it("rejects config:addEnvironment with GCP metadata DNS hostname", () => {
+    expect(() => validateIpc("config:addEnvironment", ["my-env", "http://metadata.google.internal/computeMetadata/v1/", undefined])).toThrow(IpcValidationError);
+  });
+
+  it("rejects config:addEndpoint with GCP metadata DNS hostname", () => {
+    expect(() => validateIpc("config:addEndpoint", ["env-1", "http://metadata.google.internal./computeMetadata/v1/", "ssh"])).toThrow(IpcValidationError);
+  });
 });
 
 // ── log:write validator ────────────────────────────────────────────────
