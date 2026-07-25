@@ -2,7 +2,6 @@ import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { logger, createLogger } from "./logger.js";
-import { isHostAllowed, isUrlAllowedForFetch, isAllowedBaseUrl } from "./ssrf-blocklist.js";
 import type { LogEntry } from "../shared/log.js";
 import type {
   ApiRequestArgs,
@@ -114,6 +113,7 @@ import { getOpenCodeStatus, refreshOpenCodeStatus, clearOpenCodeStatus, destroyA
 import { listSshHosts as vmListSshHosts, runWizard, cancelWizard, respondConsent, respondServiceSelection, respondRuntimeConsent, respondHostKey } from "./vm-wizard.js";
 import { msg } from "./i18n.js";
 import { validateIpc, safeHandle, IpcValidationError, checkLogRateLimit } from "./ipc-validation.js";
+import { isUrlAllowedForFetch } from "./ssrf-allowlist.js";
 import { setMainWindow, getMainWindow } from "./main-window.js";
 import { NotificationService } from "./notification-service.js";
 import { OutageTracker } from "./outage-tracker.js";
@@ -337,11 +337,21 @@ function showEncryptionWarning(): void {
   });
 }
 
+function isAllowedBaseUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    return isUrlAllowedForFetch(url, { allowLoopback: true });
+  } catch {
+    return false;
+  }
+}
+
 function isEffectiveUrlAllowed(effectiveUrl: string): { allowed: boolean; host: string } {
   try {
     const url = new URL(effectiveUrl);
     const host = url.hostname.toLowerCase();
-    if (!isHostAllowed(host, { allowLoopback: false })) {
+    if (!isUrlAllowedForFetch(url, { allowLoopback: false })) {
       if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
         const port = parseInt(url.port, 10);
         if (port && isTunnelLocalPort(port)) {

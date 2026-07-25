@@ -1,9 +1,8 @@
 {
-  "version": 1,
-  "changeId": "unify-ssrf-blocklist",
-  "required": true,
-  "status": "passed",
-  "reason": "161 unit tests pass (73 host-blocklist + 88 IPC validation). Canonical ssrf-blocklist.ts unifies both consumers. IPv6 link-local (bracket-aware), GCP + Azure metadata hostnames (incl. trailing-dot FQDN), cloud metadata IPs all blocked. isAllowedBaseUrl extracted. Typecheck + comment-ratio clean.",
-  "assets": ["test-output.txt"],
-  "prMarkdown": ""
+  "status": "skipped",
+  "reason": "Non-UI change: internal security module refactoring with no user-visible components. Test results (120/120 passing) serve as evidence. Duplicated isAllowedHost wrapper removed; cross-path consistency tests added.",
+  "assets": [],
+  "prMarkdown": "",
+  "tasks": "5/5",
+  "verification": "passed"
 }

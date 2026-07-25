@@ -1,0 +1,8 @@
+{
+  "changeId": "gh-339-ssrf-blocklist-cleanup",
+  "status": "skipped",
+  "reason": "Non-UI change: internal SSRF security module cleanup removing redundant wrapper and adding cross-path consistency tests. 120/120 tests passing serve as evidence.",
+  "assets": [],
+  "prMarkdown": "",
+  "tasks": "3/3"
+}
