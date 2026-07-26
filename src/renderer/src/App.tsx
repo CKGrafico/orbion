@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort, ReviewModeItem, GlobalSettings } from "../../shared/ipc";
-import type { Environment, EnvironmentHealth, LoopMeta, Project, FleetLoopRollup, LoopWithOrigin } from "./types";
+import type { ConnectionStatus, EndpointHealth, OpenCodeConnectionStatus, BudgetBreach, DeepLinkTarget, OutageEscalation, ReachabilityState, ChatSession, AgentRuntime, BootstrapSeed, RestoreAvailability, PullRestoreResult, ModelInfo, ReasoningEffort, ReviewModeItem, GlobalSettings, PrAwaitingReviewItem, PrVerdict, StaleConfigResult } from "../../shared/ipc";
+import type { Environment, EnvironmentHealth, LoopMeta, Project, FleetLoopRollup } from "./types";
 import type { FleetItemStatus } from "./fleet-status";
 import { rollUpEnvironmentStatus, isNotifiableStatus } from "./fleet-status";
 import { loopStatusToFleetItem } from "./fleet-mapping";
@@ -48,6 +48,7 @@ type View =
   | { kind: "inbox" }
   | { kind: "instance" }
   | { kind: "project"; projectId: string }
+  | { kind: "loop"; loopId: string }
   | { kind: "session"; sessionId: string };
 
 function phaseToHealth(phase: ConnectionStatus["phase"]): EnvironmentHealth {
@@ -76,7 +77,7 @@ export function App(): React.ReactNode {
 }
 
 function AppInner(): React.ReactNode {
-  const { environments, selectedId, mainVm, loaded, select, remove, update, addEndpoint, removeEndpoint, setActiveEndpoint, removeSessionToken, setMainVm, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
+  const { environments, selectedId, mainVm, loaded, select, remove, update, addEndpoint, removeEndpoint, setActiveEndpoint, removeSessionToken, stampCheckedSetMainVm, forceSetMainVm, reload } = useEnvironments();
   const { t } = useTranslation();
   const [connectionService] = useInject<IConnectionService>(cid.IConnectionService);
   const [openCodeService] = useInject<IOpenCodeService>(cid.IOpenCodeService);
@@ -99,7 +100,7 @@ function AppInner(): React.ReactNode {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
-  const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
+  const [endpointHealth] = useState<Record<string, EndpointHealth[]>>({});
   const [openCodeStatus, setOpenCodeStatus] = useState<Record<string, OpenCodeConnectionStatus>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
@@ -109,8 +110,8 @@ function AppInner(): React.ReactNode {
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
   const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
   const [inboxDismissedIds, setInboxDismissedIds] = useState<Set<string>>(new Set());
-  const [prAwaitingReview, setPrAwaitingReview] = useState<import("../../../shared/ipc").PrAwaitingReviewItem[]>([]);
-  const [prVerdicts, setPrVerdicts] = useState<Map<string, import("../../../shared/ipc").PrVerdict>>(new Map());
+  const [prAwaitingReview, setPrAwaitingReview] = useState<PrAwaitingReviewItem[]>([]);
+  const [prVerdicts, setPrVerdicts] = useState<Map<string, PrVerdict>>(new Map());
   /** Currently active PR review mode item, or null when not in review mode */
   const [reviewModeItem, setReviewModeItem] = useState<ReviewModeItem | null>(null);
   /** Restore offer: availability from the config-home VM */
@@ -118,7 +119,7 @@ function AppInner(): React.ReactNode {
   /** Whether the restore offer is showing */
   const [restoreOfferOpen, setRestoreOfferOpen] = useState(false);
   /** Stale config warning: holds the StaleConfigResult when a stamp-checked write detects conflict */
-  const [staleConfigResult, setStaleConfigResult] = useState<import("../../../shared/ipc").StaleConfigResult | null>(null);
+  const [staleConfigResult, setStaleConfigResult] = useState<StaleConfigResult | null>(null);
   /** The environment ID pending a set-main-VM when a stale conflict occurred */
   const [staleConfigEnvId, setStaleConfigEnvId] = useState<string | null>(null);
   /** The currently viewed chat session id (drives active-session highlighting in sidebar) */
@@ -145,7 +146,7 @@ function AppInner(): React.ReactNode {
   useEffect(() => {
     void configService.getChatSessions().then((s) => {
       // Detect auto-persist transitions (session was ephemeral, now persisted)
-      setPrevPersistedState((prev) => {
+      setPrevPersistedState(() => {
         const next: Record<string, boolean> = {};
         for (const session of s) {
           next[session.id] = session.persisted ?? false;
@@ -170,7 +171,7 @@ function AppInner(): React.ReactNode {
       }
       return;
     }
-    void window.api.settings.getSettings().then((s) => {
+    void window.api.settings.getSettings().then((s: GlobalSettings) => {
       setGlobalSettings(s);
     });
   }, []);
@@ -684,21 +685,6 @@ function AppInner(): React.ReactNode {
     return result;
   }, [environments, perEnvLoops, reachability]);
 
-  const unreadEnvs = useMemo<Set<string>>(() => {
-    const ids = new Set<string>();
-    for (const env of environments) {
-      const envLoops = perEnvLoops[env.id] ?? [];
-      const hasUnread = envLoops.some((l) => {
-        if (l.status !== "running" && l.lastRunAt) {
-          return isUnread(l.id, new Date(l.lastRunAt).getTime());
-        }
-        return false;
-      });
-      if (hasUnread) ids.add(env.id);
-    }
-    return ids;
-  }, [environments, perEnvLoops, isUnread]);
-
   // Compute inbox item count for the sidebar badge
   const inboxItemCount = useMemo(() => inboxService.buildItems(inboxBuildParams).length, [inboxService, inboxBuildParams]);
 
@@ -722,15 +708,6 @@ function AppInner(): React.ReactNode {
     }
     prevFleetStatus.current = { ...fleetStatus };
   }, [fleetStatus, environments, sendInboxNotification, mutedEnvs]);
-
-  const handleToggleMute = useCallback((environmentId: string) => {
-    setMutedEnvs((prev) => {
-      const next = new Set(prev);
-      if (next.has(environmentId)) next.delete(environmentId);
-      else next.add(environmentId);
-      return next;
-    });
-  }, []);
 
   // Stable keys for per-environment polling effect dependencies
   const envEndpointsKey = useMemo(
@@ -868,10 +845,6 @@ function AppInner(): React.ReactNode {
     setView(newView);
   }, []);
 
-  const handleRetry = useCallback((id: string): void => {
-    void connectionService.retry(id);
-  }, [connectionService]);
-
   const handleRemove = (id: string): void => {
     const env = environments.find((e) => e.id === id);
     const wasMainVm = env?.role === "main-vm";
@@ -885,10 +858,6 @@ function AppInner(): React.ReactNode {
     if (wasMainVm && environments.filter((e) => e.id !== id).length > 0) {
       setPickMainVmOpen(true);
     }
-  };
-
-  const handleSetEndpoint = (environmentId: string, endpointId: string): void => {
-    setActiveEndpoint(environmentId, endpointId);
   };
 
   const handleVmWizardDone = (_environmentId: string, _environmentName: string, _daemonUrl: string): void => {
@@ -983,7 +952,7 @@ function AppInner(): React.ReactNode {
   }, [stampCheckedSetMainVm]);
 
   /** Pull-remote from the config-home VM as stale resolution. */
-  const handleStalePullRemote = useCallback(async (): Promise<import("../../../shared/ipc").PullRestoreResult> => {
+  const handleStalePullRemote = useCallback(async (): Promise<PullRestoreResult> => {
     const result = await configService.pullRestore();
     if (result.ok) {
       await reload();

@@ -1,7 +1,7 @@
 import { injectable } from "inversify-hooks";
 import { cid, container } from "inversify-hooks";
 import type { IReviewModeService, IInfraService, IInboxService } from "../interfaces";
-import type { ReviewModeItem, InfraActionResult, InboxItem, InboxItemResolutionReason, BatchOverlapResult, PrOverlap, GetPrDiffResult, DiffFileEntry, PrRiskLevel } from "../../../../shared/ipc";
+import type { ReviewModeItem, InfraActionResult, InboxItem, InboxItemResolutionReason, BatchOverlapResult, GetPrDiffResult, DiffFileEntry } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import { detectBatchOverlaps, type PrFileSet } from "../../features/review/detect-overlaps";
 

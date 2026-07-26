@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cid, useInject } from "inversify-hooks";
-import type { Environment, OpenCodeEndpoint } from "./types";
+import type { Environment, OpenCodeEndpoint, AgentRuntime, StampCheckedWriteResult } from "./types";
 import type { EndpointKind } from "../../shared/ipc";
 import { trimTrailingSlash } from "../../shared/utils";
 import type { IConfigService, ILogService } from "./services/interfaces";
@@ -34,7 +34,7 @@ export function useEnvironments(): {
   select: (id: string | null) => void;
   add: (name: string, baseUrl: string, kind?: EndpointKind) => Promise<Environment>;
   remove: (id: string) => void;
-  update: (id: string, updates: { name?: string; agentRuntime?: import("../../../shared/ipc").AgentRuntime }) => void;
+  update: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime }) => void;
   addEndpoint: (environmentId: string, url: string, kind: EndpointKind) => void;
   removeEndpoint: (environmentId: string, endpointId: string) => void;
   setActiveEndpoint: (environmentId: string, endpointId: string) => void;
@@ -42,7 +42,7 @@ export function useEnvironments(): {
   setOpenCodeEndpoint: (environmentId: string, url: string, password: string | null) => void;
   setMainVm: (environmentId: string) => void;
   /** Stamp-checked set-main-VM: returns a StaleConfigResult if config was modified elsewhere. */
-  stampCheckedSetMainVm: (environmentId: string) => Promise<import("../../../shared/ipc").StampCheckedWriteResult>;
+  stampCheckedSetMainVm: (environmentId: string) => Promise<StampCheckedWriteResult>;
   /** Force-write the main-VM designate regardless of staleness. */
   forceSetMainVm: (environmentId: string) => Promise<void>;
   reload: () => Promise<void>;
@@ -112,7 +112,7 @@ export function useEnvironments(): {
   );
 
   const updateFn = useCallback(
-    (id: string, updates: { name?: string; agentRuntime?: import("../../../shared/ipc").AgentRuntime }) => {
+    (id: string, updates: { name?: string; agentRuntime?: AgentRuntime }) => {
       void configService.updateEnvironment(id, updates).then(async () => {
         setEnvironments(await configService.getEnvironments());
       }).catch((err) => handleConfigError(logService, "updateEnvironment", err));
@@ -180,7 +180,7 @@ export function useEnvironments(): {
   );
 
   const stampCheckedSetMainVmFn = useCallback(
-    async (environmentId: string): Promise<import("../../../shared/ipc").StampCheckedWriteResult> => {
+    async (environmentId: string): Promise<StampCheckedWriteResult> => {
       const stamp = await configService.getConfigStamp();
       const result = await configService.stampCheckedSetMainVm(environmentId, stamp);
       if (result.ok) {

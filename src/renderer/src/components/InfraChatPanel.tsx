@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
-import type { ChatTurn, AccessMode } from "../types";
+import type { ChatTurn, AccessMode } from "../chat/types";
 import type { InfraActionArgs, MachineStatusEntry, CreateIssueResult, ListIssuesResult, AddLabelResult, EditIssueResult, BulkRelabelResult, IssueCard } from "../../../shared/ipc";
 import type { IInfraService, IConfigService } from "../services/interfaces";
 import { useTranscript } from "../chat/useTranscript";
@@ -59,10 +59,7 @@ function formatIssueStack(t: TFunction, data: unknown): string {
     : undefined;
 
   const lines: string[] = [
-    t(
-      { id: "issues.stackTitle" },
-      { count: result.issues.length, label: labelFilter ?? false, state: "open" },
-    ),
+    t("issues.stackTitle", { count: result.issues.length, label: labelFilter ?? false, state: "open" }),
     "",
   ];
 

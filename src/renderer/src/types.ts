@@ -1,6 +1,6 @@
-import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult } from "../../shared/ipc";
+import type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult, Environment } from "../../shared/ipc";
 
-export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult };
+export type { EndpointKind, TailscalePeer, TailscalePeersResponse, EnvironmentAuthState, EnvironmentRole, SessionScope, PairingCodeExchangeResponse, OpenCodeAuthState, OpenCodeErrorKind, OpenCodeConnectionStatus, OpenCodeEndpoint, I18nMessage, AccessEndpoint, ReachabilityState, AgentRuntime, RuntimeState, ModelInfo, ReasoningEffort, ListModelsResult, Environment };
 
 export type LoopStatus = "running" | "waiting" | "paused" | "stopped" | "failed" | "finished";
 
@@ -53,19 +53,6 @@ export interface TaskDefinition {
   onSuccessTaskId: string | null;
   onFailureTaskId: string | null;
   createdAt: string;
-}
-
-export interface Environment {
-  id: string;
-  name: string;
-  role?: EnvironmentRole;
-  agentRuntime?: AgentRuntime;
-  runtimeState?: RuntimeState;
-  endpoints: AccessEndpoint[];
-  activeEndpointId: string | null;
-  authState?: EnvironmentAuthState;
-  opencode?: OpenCodeEndpoint | null;
-  infraOpenCode?: OpenCodeEndpoint | null;
 }
 
 export type EnvironmentHealth = "unknown" | "ok" | "offline" | "connecting" | "backoff" | "blocked";

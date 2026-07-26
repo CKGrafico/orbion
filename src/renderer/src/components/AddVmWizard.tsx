@@ -278,7 +278,7 @@ export function AddVmWizard(props: {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleCancel(); }}>
+    <Dialog open={true} onOpenChange={(isOpen) => { if (!isOpen) handleCancel(); }}>
       <DialogContent className="max-w-[860px] max-h-[calc(100vh-80px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("vmWizard.title")}</DialogTitle>

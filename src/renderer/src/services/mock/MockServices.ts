@@ -16,7 +16,6 @@ import type {
   StreamEventPayload,
   PairingCodeExchangeResponse,
   OpenCodeEndpoint,
-  SessionScope,
   SetOpenCodeEndpointResult,
   PlatformType,
   SshHost,
@@ -28,8 +27,6 @@ import type {
   InboxAction,
   InboxQueryResult,
   ResolvedInboxItem,
-  InboxItemResolutionReason,
-  ConditionWatch,
   DeepLinkTarget,
   NotificationSendArgs,
   OutageEscalation,
@@ -55,12 +52,9 @@ import type {
   PrAwaitingReviewItem,
   PrVerdict,
   ReviewModeItem,
-  DiffFileEntry,
   GetPrDiffResult,
-  BriefingSection,
-  GetPrBriefingResult,
   SubmitPrReviewResult,
-  OpenPrInBrowserParams,
+  BatchOverlapResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
@@ -1334,7 +1328,7 @@ export class MockInboxService implements IInboxService {
     return allItems.filter((i) => childIds.has(i.id));
   }
 
-  queryFleet(question: string, params: InboxBuildParams): InboxQueryResult {
+  queryFleet(_question: string, params: InboxBuildParams): InboxQueryResult {
     const items = this.buildItems(params);
     if (items.length === 0) {
       return { answer: "All clear! Nothing needs your attention right now.", references: [] };
@@ -2086,6 +2080,14 @@ export class MockReviewModeService implements IReviewModeService {
     return () => {
       this.listeners.delete(cb);
     };
+  }
+
+  getOverlapResult(): BatchOverlapResult | null {
+    return null;
+  }
+
+  onOverlapUpdate(cb: (result: BatchOverlapResult | null) => void): () => void {
+    return () => {};
   }
 }
 

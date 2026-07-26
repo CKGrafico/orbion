@@ -30,7 +30,6 @@ export function FleetPlanCard({
   onCancel,
   onStatusChange,
   onTargetCheckedChange,
-  onTargetStatusChange,
 }: FleetPlanCardProps): React.ReactNode {
   const { t } = useTranslation();
 
