@@ -53,7 +53,9 @@ import type {
   PrVerdict,
   ReviewModeItem,
   GetPrDiffResult,
-  SubmitPrReviewResult,
+  DiffFileEntry,
+  GetPrBriefingResult,
+  InboxItemResolutionReason,
   BatchOverlapResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
@@ -2086,7 +2088,7 @@ export class MockReviewModeService implements IReviewModeService {
     return null;
   }
 
-  onOverlapUpdate(cb: (result: BatchOverlapResult | null) => void): () => void {
+  onOverlapUpdate(_cb: (result: BatchOverlapResult | null) => void): () => void {
     return () => {};
   }
 }

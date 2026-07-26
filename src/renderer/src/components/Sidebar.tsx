@@ -17,11 +17,11 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { timeAgo, healthTooltip } from "../format";
 import { cid, useInject } from "inversify-hooks";
 import type { IConfigService } from "../services/interfaces";
+import i18n from "i18next";
 
 type View =
   | { kind: "inbox" }
@@ -158,7 +158,7 @@ export function Sidebar(props: {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Dropdown menu for sessions (move, rename, pin/unpin)
-  const [dropdownMenuSession, setDropdownMenuSession] = useState<{
+  const [_dropdownMenuSession, setDropdownMenuSession] = useState<{
     sessionId: string;
     currentProjectName: string;
     isLoopChat: boolean;
@@ -490,7 +490,7 @@ export function Sidebar(props: {
                     onSelect(primaryInstance.envId);
                     onNavigate({ kind: "project", projectId: primaryInstance.projectId });
                   }}
-                  title={healthTooltip(intl, h, cs)}
+                  title={healthTooltip(i18n, h, cs)}
                 >
                   <TreeNodeChevron
                     expanded={projectExpanded}

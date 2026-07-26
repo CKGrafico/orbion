@@ -105,7 +105,7 @@ function buildNote(
 function formatPrNote(
   kind: OverlapKind,
   otherNumber: number,
-  sharedFiles: string[],
+  _sharedFiles: string[],
 ): string {
   switch (kind) {
     case "conflict":

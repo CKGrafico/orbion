@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 /**
  * Direct unit tests for useLogRows merge/dedup logic.
@@ -18,8 +18,6 @@ interface PlainTextLogRow extends BaseLogRow { kind: "plain-text"; text: string 
 interface ExitLogRow extends BaseLogRow { kind: "exit"; exitCode: number }
 
 type LogRow = RunHeaderLogRow | ToolCallLogRow | MarkdownLogRow | PlainTextLogRow | ExitLogRow;
-
-interface RunSegment { runNumber: number; rows: LogRow[]; expanded: boolean }
 
 
 function classifyLogLine(line: string): { kind: LogRowKind; runNumber?: number; exitCode?: number } {
@@ -57,7 +55,7 @@ function rowDedupeKey(row: LogRow): string {
     case "exit": return `ex:${row.exitCode}`;
     case "tool-call": return `tc:${row.toolKind}:${row.title}:${row.status}`;
     case "markdown": return `md:${row.content.slice(0, 80)}`;
-    default: return row.id;
+    default: return (row as { id: string }).id;
   }
 }
 

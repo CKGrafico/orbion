@@ -100,11 +100,11 @@ function AppInner(): React.ReactNode {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
-  const [endpointHealth] = useState<Record<string, EndpointHealth[]>>({});
+  const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
   const [openCodeStatus, setOpenCodeStatus] = useState<Record<string, OpenCodeConnectionStatus>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
-  const [mutedEnvs, setMutedEnvs] = useState<Set<string>>(new Set<string>());
+  const [mutedEnvs] = useState<Set<string>>(new Set<string>());
   const [perEnvLoops, setPerEnvLoops] = useState<Record<string, LoopMeta[]>>({});
   const [perEnvProjects, setPerEnvProjects] = useState<Record<string, Project[]>>({});
   const [daemonSettings, setDaemonSettings] = useState<DaemonSettings | null>(null);
@@ -310,7 +310,7 @@ function AppInner(): React.ReactNode {
     return () => clearInterval(timer);
   }, [configService, activeSessionId]);
 
-  const { isUnread, markVisited } = useUnreadTracker();
+  const { markVisited } = useUnreadTracker();
 
   // Deep-link navigation handler for notification clicks
   const handleNotificationNavigate = useCallback((deepLink: DeepLinkTarget) => {
@@ -578,9 +578,9 @@ function AppInner(): React.ReactNode {
   useEffect(() => {
     const unsub = connectionService.onEndpointHealthChange(
       (environmentId: string, health: EndpointHealth[]) => {
-        setEndpointHealth((prev) => {
+        setEndpointHealth((prev: Record<string, EndpointHealth[]>) => {
           const existing = prev[environmentId];
-          if (existing && existing.length === health.length && existing.every((h, i) => h.endpointId === health[i].endpointId && h.phase === health[i].phase)) {
+          if (existing && existing.length === health.length && existing.every((h: EndpointHealth, i: number) => h.endpointId === health[i].endpointId && h.phase === health[i].phase)) {
             return prev;
           }
           return { ...prev, [environmentId]: health };

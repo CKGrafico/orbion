@@ -77,7 +77,7 @@ function formatIssueStack(t: TFunction, data: unknown): string {
   return lines.join("\n");
 }
 
-export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): React.ReactNode {
+export function InfraChatPanel({ mainVmName }: InfraChatPanelProps): React.ReactNode {
   const { t } = useTranslation();
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
   const [configService] = useInject<IConfigService>(cid.IConfigService);
@@ -86,7 +86,6 @@ export function InfraChatPanel({ mainVmId, mainVmName }: InfraChatPanelProps): R
     rows,
     toggleTurnCollapse,
     toggleToolExpand,
-    collapseAllFinishedTurns,
     expandAllTurns,
     addTurn,
     appendAssistantContent,

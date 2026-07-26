@@ -53,6 +53,7 @@
   PrVerdict,
   ReviewModeItem,
   BatchOverlapResult,
+  SessionScope,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 

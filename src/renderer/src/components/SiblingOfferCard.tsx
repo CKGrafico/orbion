@@ -13,7 +13,7 @@ interface SiblingOfferCardProps {
   homeEnvironmentId?: string;
 }
 
-export function SiblingOfferCard({ row, instance, onApproved, onDeclined, onStatusChange, homeEnvironmentId }: SiblingOfferCardProps): React.ReactNode {
+export function SiblingOfferCard({ row, onApproved, onDeclined, onStatusChange, homeEnvironmentId }: SiblingOfferCardProps): React.ReactNode {
   const { t } = useTranslation();
 
   const isPending = row.status === "pending";

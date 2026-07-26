@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
-import type { ReviewModeItem, PrRiskLevel, BatchOverlapResult } from "../../../../shared/ipc";
+import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
 import { GitPullRequest, X, ExternalLink, CheckCircle2, MessageCircleWarning, Loader2, AlertTriangle, MessageSquare } from "lucide-react";
 import { ReviewQueueStrip } from "./ReviewQueueStrip";
 import { ReviewDiffView } from "./ReviewDiffView";
@@ -45,16 +45,18 @@ export function ReviewModeOverlay({ onDiscussInChat }: { onDiscussInChat?: (item
   if (!activeItem) return null;
 
   return (
-    <ReviewModeContent item={activeItem} onExit={handleExit} />
+    <ReviewModeContent item={activeItem} onExit={handleExit} onDiscussInChat={onDiscussInChat} />
   );
 }
 
 function ReviewModeContent({
   item,
   onExit,
+  onDiscussInChat,
 }: {
   item: ReviewModeItem;
   onExit: () => void;
+  onDiscussInChat?: (item: ReviewModeItem) => void;
 }): React.ReactNode {
   const { t } = useTranslation();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
@@ -63,7 +65,7 @@ function ReviewModeContent({
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [overlapVersion, setOverlapVersion] = useState(0);
+  const [_overlapVersion, setOverlapVersion] = useState(0);
 
   // Subscribe to overlap updates to trigger re-renders
   useEffect(() => {
@@ -141,7 +143,7 @@ function ReviewModeContent({
   }, [batchItems, reviewModeService]);
 
   return (
-    <Dialog open={true} onOpenChange={() => handleExit()}>
+    <Dialog open={true} onOpenChange={() => onExit()}>
       <DialogTitle className="sr-only">{t("reviewMode.dialogLabel")}</DialogTitle>
       <DialogDescription className="sr-only">{t("reviewMode.dialogLabel")}</DialogDescription>
       <DialogContent className="fixed inset-0 max-w-none h-full w-full rounded-none border-0 p-0">

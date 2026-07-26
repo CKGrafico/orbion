@@ -5,7 +5,7 @@ import type { ReachabilityState } from "../../shared/ipc";
 
 export function detectStructuralChanges(
   operationSummaries: ChainEditOperationSummary[],
-  proposedSteps: ChainStep[],
+  _proposedSteps: ChainStep[],
 ): StructuralOp[] | null {
   const structuralOps: StructuralOp[] = [];
 
@@ -97,9 +97,9 @@ export function fingerprintStructuralChange(ops: StructuralOp[]): string {
 export function extractTopology(steps: ChainStep[]): ChainTopology {
   return {
     steps: steps.map((s) => ({
-      taskName: s.task.name.trim() || s.task.command,
-      onSuccessTaskId: s.task.onSuccessTaskId,
-      onFailureTaskId: s.task.onFailureTaskId,
+      taskName: s.taskName.trim() || s.command,
+      onSuccessTaskId: s.onSuccessTaskId,
+      onFailureTaskId: s.onFailureTaskId,
     })),
   };
 }

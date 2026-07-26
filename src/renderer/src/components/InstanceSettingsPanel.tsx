@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentRuntime, Environment, EndpointKind, AccessEndpoint } from "../../../shared/ipc";
-import { Settings, Trash2, Plus, Check, Globe, Terminal } from "lucide-react";
+import type { AgentRuntime, Environment, EndpointKind } from "../../../shared/ipc";
+import { Settings, Trash2, Plus, Check, Globe, Terminal, X } from "lucide-react";
 import { translateMessage } from "../i18n";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";

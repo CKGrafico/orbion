@@ -1,4 +1,4 @@
-import type { ChainStep } from "../components/TaskChainView";
+import type { ChainStep } from "../../../shared/ipc";
 import type { SimilarLoopMatch } from "../fleet-similarity";
 import type { ShapeAdaptation } from "../fleet-shape-adapt";
 import type { StructuralDiff, SiblingOfferStatus } from "../../../shared/sibling-offer-types";
