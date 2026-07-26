@@ -519,6 +519,14 @@ describe("validateIpc log:write", () => {
   it("rejects context with Symbol value", () => {
     expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { sym: Symbol("x") as unknown as string } }])).toThrow(IpcValidationError);
   });
+
+  it("accepts context with nested serializable array", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { items: [1, "two", true, null] } }])).not.toThrow();
+  });
+
+  it("rejects context with function in nested array", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { items: [1, (() => {}) as unknown as string] } }])).toThrow(IpcValidationError);
+  });
 });
 
 // ── checkLogRateLimit ──────────────────────────────────────────────────

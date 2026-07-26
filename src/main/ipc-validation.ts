@@ -180,6 +180,44 @@ export function checkLogRateLimit(senderId: number): void {
   }
 }
 
+// ── Serializable value validation ───────────────────────────────────
+
+function isSerializablePrimitive(v: unknown): boolean {
+  return v === null || v === undefined || typeof v === "string" || typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v));
+}
+
+function validateSerializableValues(obj: Record<string, unknown>, prefix: string, depth = 0): string[] {
+  if (depth > 10) return [`${prefix} exceeds maximum nesting depth`];
+  const issues: string[] = [];
+  for (const [key, val] of Object.entries(obj)) {
+    const path = `${prefix}.${key}`;
+    if (isSerializablePrimitive(val)) continue;
+    if (Array.isArray(val)) {
+      for (let i = 0; i < val.length; i++) {
+        const item = val[i];
+        if (isSerializablePrimitive(item)) continue;
+        if (isObject(item)) {
+          issues.push(...validateSerializableValues(item, `${path}[${i}]`, depth + 1));
+        } else if (Array.isArray(item)) {
+          issues.push(...validateSerializableValues({ "": item }, `${path}[${i}]`, depth + 1));
+        } else {
+          issues.push(`${path}[${i}] contains a non-serializable value`);
+        }
+        if (issues.length > 5) return issues;
+      }
+      continue;
+    }
+    if (isObject(val)) {
+      issues.push(...validateSerializableValues(val, path, depth + 1));
+      if (issues.length > 5) return issues;
+      continue;
+    }
+    issues.push(`${path} contains a non-serializable value`);
+    if (issues.length > 5) return issues;
+  }
+  return issues;
+}
+
 // ── Per-channel validators ────────────────────────────────────────────
 
 const ENDPOINT_KINDS = ["direct", "ssh", "tailscale"] as const;
@@ -825,16 +863,8 @@ const validators: Record<string, Validator> = {
     if (e.context !== undefined && !isObject(e.context))
       issues.push("context must be an object if provided");
     if (isObject(e.context)) {
-      for (const [key, val] of Object.entries(e.context)) {
-        if (val !== undefined) {
-          try {
-            JSON.stringify(val);
-          } catch {
-            issues.push(`context.${key} contains a non-serializable value`);
-            break;
-          }
-        }
-      }
+      const contextIssues = validateSerializableValues(e.context, "context");
+      issues.push(...contextIssues);
     }
     return issues;
   },
