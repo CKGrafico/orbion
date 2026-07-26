@@ -35,6 +35,12 @@ describe("isAllowedPath", () => {
   it("rejects double-encoded sequences", () => {
     expect(isAllowedPath("/api/%252e%252e/etc/passwd")).toBe(false);
   });
+  it("rejects URL-encoded slash %2F", () => {
+    expect(isAllowedPath("/api/loops/abc%2Fdef")).toBe(false);
+  });
+  it("rejects URL-encoded slash %2f (lowercase)", () => {
+    expect(isAllowedPath("/api/loops/abc%2fsecret")).toBe(false);
+  });
 });
 
 // ── api:request allowlist enforcement ─────────────────────────────────

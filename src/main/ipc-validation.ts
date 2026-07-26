@@ -69,6 +69,7 @@ export function isAllowedPath(v: unknown): v is string {
   // Reject raw encoded dot forms (%2e, %2E) and double-encoding (%25)
   if (/%2e/i.test(v)) return false;
   if (/%25/i.test(v)) return false;
+  if (/%2f/i.test(v)) return false;
   return true;
 }
 

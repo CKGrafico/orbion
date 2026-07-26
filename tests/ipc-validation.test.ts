@@ -99,6 +99,16 @@ describe("isAllowedPath", () => {
     expect(isAllowedPath("/api/admin%2esecrets")).toBe(false);
   });
 
+  // ── Invalid: URL-encoded slash ──────────────────────────────
+
+  it("rejects URL-encoded slash %2F in path", () => {
+    expect(isAllowedPath("/api/loops/abc%2Fdef")).toBe(false);
+  });
+
+  it("rejects URL-encoded slash %2f (lowercase) in path", () => {
+    expect(isAllowedPath("/api/loops/abc%2fsecret")).toBe(false);
+  });
+
   // ── Invalid: malformed encoding ─────────────────────────────
 
   it("rejects malformed percent encoding", () => {
@@ -154,6 +164,11 @@ describe("validateIpc api:request path validation", () => {
 
   it("rejects api:request with double-encoded traversal", () => {
     const args = [{ ...validArgs()[0], path: "/api/%252e%252e/admin" }];
+    expect(() => validateIpc("api:request", args)).toThrow(IpcValidationError);
+  });
+
+  it("rejects api:request with URL-encoded slash %2F", () => {
+    const args = [{ ...validArgs()[0], path: "/api/loops/abc%2Fdef" }];
     expect(() => validateIpc("api:request", args)).toThrow(IpcValidationError);
   });
 

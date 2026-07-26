@@ -142,6 +142,14 @@ describe("isAllowedApiOperation — negative tests", () => {
   it("rejects GET /api/loops/{id}/pause (wrong method — pause is POST only)", () => {
     expect(isAllowedApiOperation("GET", "/api/loops/abc-123/pause")).toBe(false);
   });
+
+  it("accepts GET /api/loops/abc%2Fdef at regex level (blocked by isAllowedPath upstream)", () => {
+    expect(isAllowedApiOperation("GET", "/api/loops/abc%2Fdef")).toBe(true);
+  });
+
+  it("accepts GET /api/loops/abc%2fsecret at regex level (blocked by isAllowedPath upstream)", () => {
+    expect(isAllowedApiOperation("GET", "/api/loops/abc%2fsecret")).toBe(true);
+  });
 });
 
 // ── Stream allowlist tests ────────────────────────────────────────────
