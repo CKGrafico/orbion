@@ -635,4 +635,4 @@ export async function readRemoteLog(host: SshHost, hash: string): Promise<string
   return sshResult.stdout.trim() || null;
 }
 
-export { hashForHost, validateHash };
+export { assertSafePort, hashForHost, validateHash };

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { getEnvironments } from "./config-store.js";
 import { createLogger } from "./logger.js";
+import { assertSafePort } from "./ssh-launch.js";
 import { buildSshArgs, parseTarget } from "./ssh-config.js";
 
 const logger = createLogger("agent-runtime-recovery");
@@ -43,6 +44,12 @@ async function startViaSsh(environmentId: string, port: number): Promise<boolean
 
   if (!host) {
     logger.warn(`OpenCode unavailable for ${environmentId}; no SSH endpoint is configured for recovery`);
+    return false;
+  }
+
+  try {
+    assertSafePort(port, "opencodePort");
+  } catch {
     return false;
   }
 

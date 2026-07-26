@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "No user-visible UI changed. This is a backend/main-process security fix: assertSafePort guard added before shell interpolation in startViaSsh(). No UI to capture.",
+  "assets": [],
+  "prMarkdown": "**Shell injection fix applied.**\n\n- Added `assertSafePort(port, \"opencodePort\")` guard in `startViaSsh()` before shell command construction\n- Exported `assertSafePort` from `ssh-launch.ts` for reuse\n- Returns `false` on validation failure (graceful, no crash)\n- Tasks: 2/2 complete\n- Verification: pnpm typecheck ✓, pnpm test ✓ (795 passed), pnpm build ✓"
+}
