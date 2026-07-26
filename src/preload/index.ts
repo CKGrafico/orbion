@@ -453,8 +453,9 @@ const bridge: LoopTaskBridge = {
   },
 
   log: {
-    write: (entry: LogEntry) =>
-      void ipcRenderer.invoke("log:write", entry),
+    write: (entry: LogEntry) => {
+      ipcRenderer.invoke("log:write", entry).catch(() => {});
+    },
   },
 
   credential: {
