@@ -188,6 +188,7 @@ function parseFailureDiagnosisMessage(msg: TranscriptMessage): FailureDiagnosisR
       category: parsed.category ?? "unknown",
       summary: parsed.summary ?? "",
       nextStep: parsed.nextStep ?? "",
+      params: parsed.params,
       confidence: parsed.confidence ?? "low",
     };
   } catch {
@@ -949,8 +950,8 @@ export function useTranscript(sessionId: string | null) {
       category: FailureCategory;
       summary: string;
       nextStep: string;
+      params?: Record<string, string | number>;
       confidence: "high" | "medium" | "low";
-      /** The timestamp of the parent loop-summon message, for ordering. */
       summonTimestamp: number;
     }) => {
       if (!sessionId) return;
@@ -968,6 +969,7 @@ export function useTranscript(sessionId: string | null) {
           category: params.category,
           summary: params.summary,
           nextStep: params.nextStep,
+          params: params.params,
           confidence: params.confidence,
         }),
         startedAt: params.summonTimestamp,

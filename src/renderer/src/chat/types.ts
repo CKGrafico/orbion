@@ -152,6 +152,7 @@ export interface FailureDiagnosisRow extends BaseRow {
   category: FailureCategory;
   summary: string;
   nextStep: string;
+  params?: Record<string, string | number>;
   confidence: "high" | "medium" | "low";
 }
 
