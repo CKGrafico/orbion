@@ -493,6 +493,32 @@ describe("validateIpc log:write", () => {
   it("rejects entry with array context", () => {
     expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: [1, 2, 3] }])).toThrow(IpcValidationError);
   });
+
+  it("accepts context with serializable values", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { str: "hello", num: 42, bool: true, nil: null, nested: { a: 1 } } }])).not.toThrow();
+  });
+
+  it("accepts context with undefined value", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { key: undefined } }])).not.toThrow();
+  });
+
+  it("rejects context with function value", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { fn: (() => {}) as unknown as string } }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects context with circular reference", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: circular }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects context with BigInt value", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { big: BigInt(9007199254740991) as unknown as number } }])).toThrow(IpcValidationError);
+  });
+
+  it("rejects context with Symbol value", () => {
+    expect(() => validateIpc("log:write", [{ level: "info", message: "msg", context: { sym: Symbol("x") as unknown as string } }])).toThrow(IpcValidationError);
+  });
 });
 
 // ── checkLogRateLimit ──────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { logger, createLogger } from "./logger.js";
-import type { LogEntry } from "../shared/log.js";
+import type { LogEntry, SerializableValue } from "../shared/log.js";
 import type {
   ApiRequestArgs,
   ApiResponse,
@@ -1331,7 +1331,7 @@ process.on("exit", () => {
 
 const SENSITIVE_LOG_CONTEXT_KEY = /password|secret|token|credential|authorization|cookie/i;
 
-function formatLogContext(context: Record<string, unknown> | undefined): string {
+function formatLogContext(context: Record<string, SerializableValue> | undefined): string {
   if (!context) return "";
   try {
     const serialized = JSON.stringify(context, (key, value: unknown) =>

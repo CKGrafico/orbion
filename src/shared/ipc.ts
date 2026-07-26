@@ -16,6 +16,7 @@ export interface ApiRequestArgs {
   timeoutMs?: number;
 }
 
+/** Generic API response. T must be structured-clone-serializable when crossing IPC. */
 export interface ApiResponse<T = unknown> {
   ok: boolean;
   status: number;
@@ -901,11 +902,12 @@ export interface NotificationBridge {
 export interface McpToolInfo {
   name: string;
   description?: string;
-  inputSchema?: unknown;
+  inputSchema?: Record<string, unknown>;
 }
 
 export interface McpToolCallResult {
   ok: boolean;
+  /** Must be structured-clone-serializable when crossing IPC. */
   data?: unknown;
   error?: string | I18nMessage;
 }

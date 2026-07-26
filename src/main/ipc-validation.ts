@@ -824,6 +824,18 @@ const validators: Record<string, Validator> = {
     }
     if (e.context !== undefined && !isObject(e.context))
       issues.push("context must be an object if provided");
+    if (isObject(e.context)) {
+      for (const [key, val] of Object.entries(e.context)) {
+        if (val !== undefined) {
+          try {
+            JSON.stringify(val);
+          } catch {
+            issues.push(`context.${key} contains a non-serializable value`);
+            break;
+          }
+        }
+      }
+    }
     return issues;
   },
 
