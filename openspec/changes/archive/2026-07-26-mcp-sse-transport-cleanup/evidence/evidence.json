@@ -1,0 +1,7 @@
+{
+  "changeId": "mcp-sse-transport-cleanup",
+  "status": "skipped",
+  "reason": "Main-process SSE transport bug fix with no user-visible UI changes. No screenshot or visual evidence applicable.",
+  "assets": [],
+  "prMarkdown": "Tasks: 3/3 completed. Verification: typecheck passed, 784 tests passed, build passed. Commits: cdea5aa (propose), 40a9649 (apply), 68d28f5 (archive)."
+}
