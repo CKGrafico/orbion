@@ -710,6 +710,7 @@ export interface InboxQueryResult {
 
 export interface InboxBridge {
   getItems: () => Promise<InboxItem[]>;
+  getDismissedIds: () => Promise<string[]>;
   dismissItem: (itemId: string) => Promise<void>;
   queryFleet: (question: string) => Promise<InboxQueryResult>;
   resolveItem: (resolved: ResolvedInboxItem) => Promise<void>;

@@ -553,7 +553,7 @@ export class InboxService implements IInboxService {
 
   async getDismissedIds(): Promise<string[]> {
     if (!window.api) return [];
-    return [];
+    return window.api.inbox.getDismissedIds();
   }
 
   async dismissItem(itemId: string): Promise<void> {

@@ -901,6 +901,7 @@ const validators: Record<string, Validator> = {
 
   // ── Inbox ────────────────────────────────────────────────────
   "inbox:getItems": () => [],
+  "inbox:getDismissedIds": () => [],
   "inbox:getResolvedItems": () => [],
   "inbox:pruneResolvedItems": () => [],
   "inbox:dismissItem": (args) => {
