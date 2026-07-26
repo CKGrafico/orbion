@@ -297,7 +297,7 @@ function sanitizeEnvironmentForSync(env: EnvironmentWithFingerprint): Environmen
         const safeEp: Record<string, unknown> = {};
         for (const epKey of Object.keys(ep)) {
           if (SAFE_ENDPOINT_KEYS.has(epKey)) {
-            safeEp[epKey] = (ep as Record<string, unknown>)[epKey];
+            safeEp[epKey] = (ep as unknown as Record<string, unknown>)[epKey];
           }
         }
         return safeEp;
@@ -308,7 +308,7 @@ function sanitizeEnvironmentForSync(env: EnvironmentWithFingerprint): Environmen
         const safeE: Record<string, unknown> = {};
         for (const eKey of Object.keys(endpoint)) {
           if (SAFE_OPENCODE_ENDPOINT_KEYS.has(eKey)) {
-            safeE[eKey] = (endpoint as Record<string, unknown>)[eKey];
+            safeE[eKey] = (endpoint as unknown as Record<string, unknown>)[eKey];
           }
         }
         result[key] = safeE;
@@ -316,7 +316,7 @@ function sanitizeEnvironmentForSync(env: EnvironmentWithFingerprint): Environmen
         result[key] = endpoint;
       }
     } else {
-      (result as Record<string, unknown>)[key] = (env as Record<string, unknown>)[key];
+      (result as Record<string, unknown>)[key] = (env as unknown as Record<string, unknown>)[key];
     }
   }
 

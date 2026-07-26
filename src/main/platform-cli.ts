@@ -46,7 +46,7 @@ export function checkPlatformCli(): Promise<CliCheckResult | null> {
  */
 export async function resolvePlatformCli(
   preferredCli: "gh" | "az" | null,
-  i18nPrefix: "issues" | "editIssue" | "labels",
+  i18nPrefix: "issues" | "editIssue" | "labels" | "review",
 ): Promise<{ cli: "gh" | "az" } | { error: I18nMessage }> {
   const cliCheck = await checkPlatformCli();
 

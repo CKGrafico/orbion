@@ -21,35 +21,33 @@ function mockCliResult(result: {
   gh?: { authenticated: boolean; notFound?: boolean };
   az?: { authenticated: boolean; notFound?: boolean };
 }) {
-  mockExecFile.mockImplementation((cmd: string, _args: string[], optsOrCb: any, cb?: any) => {
-    const callback = typeof optsOrCb === "function" ? optsOrCb : cb;
+  mockExecFile.mockImplementation(((cmd: string, _args: readonly string[] | null | undefined, optsOrCb: unknown, cb?: unknown) => {
+    const callback = typeof optsOrCb === "function" ? optsOrCb as (error: NodeJS.ErrnoException | null, stdout?: string, stderr?: string) => void : cb as (error: NodeJS.ErrnoException | null, stdout?: string, stderr?: string) => void;
 
     if (cmd === "gh") {
       if (result.gh?.notFound) {
         const err = new Error("not found") as NodeJS.ErrnoException;
         err.code = "ENOENT";
-        callback!(err as any);
+        callback(err);
       } else if (result.gh?.authenticated) {
-        callback!(null, "", "");
+        callback(null, "", "");
       } else {
-        // gh found but not authenticated (not ENOENT)
         const err = new Error("auth required") as NodeJS.ErrnoException;
-        callback!(err as any, undefined, "not authenticated");
+        callback(err, undefined, "not authenticated");
       }
     } else if (cmd === "az") {
       if (result.az?.notFound) {
         const err = new Error("not found") as NodeJS.ErrnoException;
         err.code = "ENOENT";
-        callback!(err as any);
+        callback(err);
       } else if (result.az?.authenticated) {
-        callback!(null, "", "");
+        callback(null, "", "");
       } else {
-        // az found but not authenticated (not ENOENT)
         const err = new Error("auth required") as NodeJS.ErrnoException;
-        callback!(err as any, undefined, "not authenticated");
+        callback(err, undefined, "not authenticated");
       }
     }
-  });
+  }) as typeof execFile);
 }
 
 beforeEach(() => {

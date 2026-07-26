@@ -21,7 +21,10 @@ export async function parseSseStream(
 
   const decoder = new TextDecoder();
 
-  for await (const chunk of body) {
-    parser.feed(decoder.decode(chunk as Uint8Array, { stream: true }));
+  const reader = body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parser.feed(decoder.decode(value, { stream: true }));
   }
 }

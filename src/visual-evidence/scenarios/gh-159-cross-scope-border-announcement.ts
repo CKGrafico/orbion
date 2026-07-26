@@ -145,12 +145,10 @@ export async function gh159CrossScopeBorderAnnouncementScenario(ctx: ScenarioCon
     {
       description: "The cross-scope i18n keys are registered (crossScope.badge resolves to a non-key string)",
       run: async (p) => {
-        const hasI18n = await p.evaluate(() => {
-          // Check that the i18n key resolves to a real string (not the key itself)
+        await p.evaluate(() => {
           const el = document.createElement("span");
           el.textContent = "crossScope.badge";
-          const text = el.textContent;
-          return text === "crossScope.badge"; // If key stays unchanged, i18n is not loaded
+          return el.textContent === "crossScope.badge";
         });
         // Structural check: verify the app rendered (i18n keys are bundled)
         const keysExist = await p.evaluate(() => {

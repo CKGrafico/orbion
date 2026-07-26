@@ -100,10 +100,10 @@ export function ghExec(options: GhExecOptions): Promise<GhExecResult> {
             resolve({ ok: false, error: msg(`${i18nPrefix}.noPlatformCli`) });
             return;
           }
-          resolve({ ok: false, error: msg(`${i18nPrefix}.cliError`, { detail: stderr || err.message }) });
+          resolve({ ok: false, error: msg(`${i18nPrefix}.cliError`, { detail: String(stderr) || err.message }) });
           return;
         }
-        resolve({ ok: true, stdout, stderr });
+        resolve({ ok: true, stdout: String(stdout), stderr: String(stderr) });
       });
     });
   })();

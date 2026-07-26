@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
-import type { TranscriptMessage, ToolCallRecord } from "../shared/ipc.js";
+import type { TranscriptMessage } from "../shared/ipc.js";
 import { createLogger } from "./logger.js";
 
 const logger = createLogger("transcript-store");

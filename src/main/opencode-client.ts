@@ -1,7 +1,6 @@
 import { createOpencodeClient, OpencodeClient } from "@opencode-ai/sdk";
 import type {
   OpenCodeConnectionStatus,
-  OpenCodeEndpoint,
 } from "../shared/ipc.js";
 import type { InternalOpenCodeEndpoint } from "./config-store.js";
 import { compareSemver, trimTrailingSlash } from "../shared/utils.js";
@@ -141,7 +140,7 @@ async function probeWithClient(
 
     const message =
       err instanceof Error && err.name === "AbortError"
-        ? msg("vmWizard.mainOpenCodeTimeout")
+        ? msg("vmWizard.mainOpenCodeTimeout").key
         : err instanceof Error
           ? err.message
           : String(err);

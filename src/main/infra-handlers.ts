@@ -7,7 +7,6 @@ import type {
   ListIssuesParams,
   ListIssuesResult,
   IssueCard,
-  PlatformType,
   PlatformDetectionResult,
   AddLabelParams,
   AddLabelResult,
@@ -23,7 +22,6 @@ import type {
   GetPrVerdictResult,
   GetPrDiffParams,
   GetPrDiffResult,
-  DiffFileEntry,
   GetPrBriefingParams,
   GetPrBriefingResult,
   SubmitPrReviewParams,
@@ -44,7 +42,7 @@ export interface InfraHandlerDeps {
   getMainVm: () => Environment | null;
   getEnvironments: () => Environment[];
   resolveActiveUrl: (endpoints: Environment["endpoints"], activeEndpointId: string | null) => string | null;
-  handleApiRequest: (args: { baseUrl: string; path: string; method: string; body?: unknown }) => Promise<ApiResponse>;
+  handleApiRequest: (args: { baseUrl: string; path: string; method: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown }) => Promise<ApiResponse>;
   /** Get the ConnectionSupervisor status phase for an environment, or null if no supervisor. */
   getSupervisorPhase: (environmentId: string) => string | null;
 }

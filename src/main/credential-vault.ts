@@ -37,7 +37,7 @@ const credentialStore = new Store<CredentialVaultSchema>({
 
 const vaultKeyStore = new Store<VaultKeySchema>({
   name: "credential-vault-key",
-  defaults: {},
+  defaults: { encryptedKey: "" },
 });
 
 function getVaultKey(): Buffer {

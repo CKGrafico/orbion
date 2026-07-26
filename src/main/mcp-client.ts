@@ -368,7 +368,7 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
   } catch (err) {
     const message =
       err instanceof Error && err.name === "AbortError"
-        ? msg("mcp.connectionTimedOut")
+        ? msg("mcp.connectionTimedOut").key
         : err instanceof Error
           ? err.message
           : String(err);

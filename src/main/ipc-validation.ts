@@ -191,6 +191,7 @@ const INFRA_ACTIONS = ["machine-status", "clone-repo", "create-issue", "detect-p
 // shared type but omitted from INFRA_ACTIONS, this assignment will fail.
 // This prevents the validation/implementation drift described in issue #219.
 const _infraActionsExhaustive: InfraAction[] = [...INFRA_ACTIONS];
+void _infraActionsExhaustive;
 const CONSENT_DECISIONS = ["install", "skip"] as const;
 const AGENT_RUNTIMES = ["opencode", "claude"] as const;
 const REACH_METHODS = ["local", "ssh"] as const;

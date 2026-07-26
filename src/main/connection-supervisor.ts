@@ -83,7 +83,7 @@ export function isNetworkDownError(message: string | I18nMessage): boolean {
 
 export class ConnectionSupervisor {
   private phase: ConnectionPhase = "offline";
-  private lastError: string | null = null;
+  private lastError: string | I18nMessage | null = null;
   private errorClass: ErrorClass | null = null;
   private failureCount = 0;
   private backoffMs = INITIAL_BACKOFF_MS;

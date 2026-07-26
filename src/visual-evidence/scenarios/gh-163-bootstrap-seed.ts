@@ -56,7 +56,7 @@ export async function gh163BootstrapSeedScenario(ctx: ScenarioContext): Promise<
     },
     {
       description: "The ColdOpen component provides an Import seed button when no environments exist",
-      run: async (p) => {
+      run: async (_p) => {
         await ctx.captureCheckpoint(
           "cold-open-seed",
           "App with seed export/import support (Import seed appears on ColdOpen when no envs)",

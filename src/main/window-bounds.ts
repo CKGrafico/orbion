@@ -20,9 +20,12 @@ export function validateBounds(parsed: unknown): WindowBounds | null {
 
   const p = parsed as Record<string, unknown>;
 
-  if (p.width <= 0 || p.width > MAX_WIDTH || p.height <= 0 || p.height > MAX_HEIGHT) return null;
+  const w = p.width as number;
+  const h = p.height as number;
 
-  const result: WindowBounds = { width: p.width, height: p.height };
+  if (w <= 0 || w > MAX_WIDTH || h <= 0 || h > MAX_HEIGHT) return null;
+
+  const result: WindowBounds = { width: w, height: h };
 
   if (typeof p.x === "number") {
     result.x = p.x >= COORD_MIN && p.x <= COORD_MAX ? p.x : undefined;

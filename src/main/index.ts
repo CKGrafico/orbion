@@ -98,7 +98,6 @@ import {
   appendMessage as transcriptAppendMessage,
   appendMessages as transcriptAppendMessages,
   updateMessage as transcriptUpdateMessage,
-  updateMessageInSession as transcriptUpdateMessageInSession,
   deleteSession as transcriptDeleteSession,
 } from "./transcript-store.js";
 import {
