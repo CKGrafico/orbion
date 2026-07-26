@@ -52,7 +52,7 @@
         "run",
         "--agent",
         "fullstack-engineer",
-        "/plan-goal First, load all skills available for your current agent. Then run: git fetch origin && git rebase origin/main. If there are conflicts, resolve them preferring the incoming main changes. Then complete all remaining work for this issue. Inspect the current repository state. If there is an unfinished OpenSpec change, partial implementation, or failing validation related to this issue, continue and finish that work. If no related work exists, plan and implement the issue. Before finishing, run these exact verification commands through raw execution: rtk proxy pnpm typecheck, rtk proxy pnpm test, and rtk proxy pnpm build. Do not stop until all three commands exit 0, and fix every failure they report. Preserve correct existing work. Work on a feature branch. Never explore or read files outside the current repository root. Do not push or perform any GitHub actions. Never ask for confirmation. Archive the completed change and generate visual evidence. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
+        "/plan-goal Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}. Before finishing run rtk proxy pnpm typecheck, rtk proxy pnpm test, and rtk proxy pnpm build. Do not push or perform any GitHub actions. Never ask for confirmation. Archive the completed change and generate visual evidence."
       ],
       "onSuccessTaskId": "dev-verify",
       "onFailureTaskId": "dev-fail",
