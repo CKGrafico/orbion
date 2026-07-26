@@ -52,7 +52,7 @@
         "run",
         "--agent",
         "fullstack-engineer",
-        "/plan-goal Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}. Before finishing run rtk proxy pnpm typecheck, rtk proxy pnpm test, and rtk proxy pnpm build. Archive the completed change and generate visual evidence, then stop on the feature branch. Do not merge the feature branch into main, switch to main, push, or perform any GitHub actions. Never ask for confirmation."
+        "/plan-goal Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}. Create a feature branch on git and work on this. Before finishing run rtk proxy pnpm typecheck, rtk proxy pnpm test, and rtk proxy pnpm build. Archive the completed change and generate visual evidence, then stop on the feature branch. Do not merge the feature branch into main, switch to main, push, or perform any GitHub actions. Never ask for confirmation."
       ],
       "onSuccessTaskId": "dev-verify",
       "onFailureTaskId": "dev-fail",
