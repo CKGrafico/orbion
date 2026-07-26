@@ -227,7 +227,7 @@ export function closeTunnel(tunnelId: string): void {
     handle.process.kill();
     handle.killTimer = setTimeout(() => {
       handle.killTimer = null;
-      if (handle.process.exitCode === null) {
+      if (activeTunnels.has(tunnelId) && handle.process.exitCode === null) {
         handle.process.kill("SIGKILL");
       }
     }, SIGKILL_TIMEOUT_MS);
@@ -243,7 +243,7 @@ export function closeAllTunnels(): void {
       handle.process.kill();
       handle.killTimer = setTimeout(() => {
         handle.killTimer = null;
-        if (handle.process.exitCode === null) {
+        if (activeTunnels.has(id) && handle.process.exitCode === null) {
           handle.process.kill("SIGKILL");
         }
       }, SIGKILL_TIMEOUT_MS);

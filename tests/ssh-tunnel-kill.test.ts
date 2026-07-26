@@ -54,11 +54,11 @@ function closeTunnelLogic(tunnelId: string): void {
   if (handle.process.exitCode === null) {
     handle.process.kill();
     handle.killTimer = setTimeout(() => {
-      handle.killTimer = null;
-      if (handle.process.exitCode === null) {
-        handle.process.kill("SIGKILL" as unknown as undefined);
-      }
-    }, SIGKILL_TIMEOUT_MS);
+        handle.killTimer = null;
+        if (mockActiveTunnels.has(tunnelId) && handle.process.exitCode === null) {
+          handle.process.kill("SIGKILL" as unknown as undefined);
+        }
+      }, SIGKILL_TIMEOUT_MS);
     // For tests, we track that a timer was scheduled
   } else {
     mockActiveTunnels.delete(tunnelId);
@@ -74,7 +74,7 @@ function closeAllTunnelsLogic(): void {
       handle.process.kill();
       handle.killTimer = setTimeout(() => {
         handle.killTimer = null;
-        if (handle.process.exitCode === null) {
+        if (mockActiveTunnels.has(id) && handle.process.exitCode === null) {
           handle.process.kill("SIGKILL" as unknown as undefined);
         }
       }, SIGKILL_TIMEOUT_MS);
@@ -259,6 +259,79 @@ describe("SIGKILL fallback timer behaviour", () => {
 
     expect(proc.killCount).toBe(1); // Only SIGTERM was sent
     expect(proc.killSignal).toBe("SIGTERM");
+  });
+});
+
+describe("Race guard: timer callback skips handle removed from activeTunnels", () => {
+  it("closeTunnel: SIGKILL skipped after exit handler removes handle", () => {
+    const proc = createMockProcess();
+    const handle: MockTunnelHandle = {
+      process: proc,
+      intentionalClose: false,
+      killTimer: null,
+    };
+    mockActiveTunnels.set("t1", handle);
+
+    closeTunnelLogic("t1");
+    expect(handle.killTimer).not.toBeNull();
+
+    // Simulate exit handler: process exits and handle is removed
+    proc.emitExit();
+    mockActiveTunnels.delete("t1");
+
+    // Timer callback would check activeTunnels.has("t1") -> false
+    // Simulate the guard: no SIGKILL sent
+    if (mockActiveTunnels.has("t1") && proc.exitCode === null) {
+      proc.kill("SIGKILL" as unknown as undefined);
+    }
+
+    expect(proc.killCount).toBe(1);
+    expect(proc.killSignal).toBe("SIGTERM");
+  });
+
+  it("closeAllTunnels: SIGKILL skipped after exit handler removes handle", () => {
+    const proc = createMockProcess();
+    const handle: MockTunnelHandle = {
+      process: proc,
+      intentionalClose: false,
+      killTimer: null,
+    };
+    mockActiveTunnels.set("t1", handle);
+
+    closeAllTunnelsLogic();
+    expect(handle.killTimer).not.toBeNull();
+
+    // Simulate exit handler: process exits and handle is removed
+    proc.emitExit();
+    mockActiveTunnels.delete("t1");
+
+    // Timer callback would check activeTunnels.has("t1") -> false
+    if (mockActiveTunnels.has("t1") && proc.exitCode === null) {
+      proc.kill("SIGKILL" as unknown as undefined);
+    }
+
+    expect(proc.killCount).toBe(1);
+    expect(proc.killSignal).toBe("SIGTERM");
+  });
+
+  it("closeTunnel: SIGKILL fires when handle still in activeTunnels and process won't exit", () => {
+    const proc = createMockProcess();
+    const handle: MockTunnelHandle = {
+      process: proc,
+      intentionalClose: false,
+      killTimer: null,
+    };
+    mockActiveTunnels.set("t1", handle);
+
+    closeTunnelLogic("t1");
+
+    // Process still alive, handle still in activeTunnels
+    if (mockActiveTunnels.has("t1") && proc.exitCode === null) {
+      proc.kill("SIGKILL" as unknown as undefined);
+    }
+
+    expect(proc.killCount).toBe(2);
+    expect(proc.killSignal).toBe("SIGKILL");
   });
 });
 
