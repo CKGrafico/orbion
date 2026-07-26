@@ -1,0 +1,16 @@
+{
+  "changeId": "fix-batch-overlap-result-map-ipc",
+  "status": "skipped",
+  "reason": "Type-level bug fix (Map to Record) with no user-visible UI change. The app renders identically before and after. No visual evidence needed.",
+  "assets": [],
+  "verification": {
+    "typecheck": "passed",
+    "test": "passed (784/784)",
+    "build": "passed"
+  },
+  "tasks": {
+    "completed": 4,
+    "total": 4
+  },
+  "prMarkdown": "## Evidence: Fix BatchOverlapResult.perPrNotes IPC Serialization\n\n**Status:** Skipped — type-level bug fix, no user-visible UI change.\n\n### Verification\n- ✅ `pnpm typecheck` passed\n- ✅ `pnpm test` passed (784/784)\n- ✅ `pnpm build` passed\n\n### Tasks\n- 4/4 completed\n\n### Changes\n- `src/shared/ipc.ts` — `perPrNotes: Map<string, string[]>` → `Record<string, string[]>`\n- `src/renderer/src/features/review/detect-overlaps.ts` — `new Map()` → plain object\n- `src/renderer/src/features/review/ReviewQueueStrip.tsx` — `.get(key)` → bracket access\n- `src/renderer/src/services/impl/ReviewModeService.ts` — `new Map()` → `{}`"
+}
