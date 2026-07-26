@@ -84,13 +84,13 @@ export function getCredential(reference: string): string | null {
     const hmac = computeHmac(reference, record.encryptedValue);
     credentials[reference] = { encryptedValue: record.encryptedValue, hmac };
     credentialStore.set("credentials", credentials);
-    logger.info("Credential entry migrated to include integrity check:", reference);
+    logger.info("Credential entry migrated to include integrity check");
   } else {
     const expected = computeHmac(reference, record.encryptedValue);
     const expectedBuf = Buffer.from(expected, "utf8");
     const actualBuf = Buffer.from(record.hmac, "utf8");
     if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
-      logger.error("Credential integrity check failed:", reference);
+      logger.error("Credential integrity check failed");
       throw new CredentialTamperedError(reference);
     }
   }
@@ -121,7 +121,7 @@ export function pruneOrphanCredentials(activeReferences: ReadonlySet<string>): n
 
   if (orphans.length === 0) return 0;
 
-  logger.warn(`Pruning ${orphans.length} orphaned credential(s):`, orphans);
+  logger.warn(`Pruning ${orphans.length} orphaned credential(s)`);
 
   for (const key of orphans) {
     delete credentials[key];
