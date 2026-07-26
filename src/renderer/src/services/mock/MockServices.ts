@@ -59,6 +59,7 @@ import type {
   BatchOverlapResult,
 } from "../../../../shared/ipc";
 import { kindToNotificationType } from "../../../../shared/ipc";
+import type { SerializableValue } from "../../../../shared/log";
 import type { LoopMeta, Project, TaskDefinition } from "../../types";
 import type {
   IConfigService,
@@ -2095,16 +2096,16 @@ export class MockReviewModeService implements IReviewModeService {
 
 @injectable()
 export class MockLogService implements ILogService {
-  debug(message: string, context?: Record<string, unknown>): void {
+  debug(message: string, context?: Record<string, SerializableValue>): void {
     console.debug("[mock]", message, context ?? "");
   }
-  info(message: string, context?: Record<string, unknown>): void {
+  info(message: string, context?: Record<string, SerializableValue>): void {
     console.log("[mock]", message, context ?? "");
   }
-  warn(message: string, context?: Record<string, unknown>): void {
+  warn(message: string, context?: Record<string, SerializableValue>): void {
     console.warn("[mock]", message, context ?? "");
   }
-  error(message: string, context?: Record<string, unknown>): void {
+  error(message: string, context?: Record<string, SerializableValue>): void {
     console.error("[mock]", message, context ?? "");
   }
 }

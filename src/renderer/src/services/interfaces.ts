@@ -55,6 +55,7 @@
   BatchOverlapResult,
   SessionScope,
 } from "../../../shared/ipc";
+import type { SerializableValue } from "../../../shared/log";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 
 export interface IConfigService {
@@ -264,8 +265,8 @@ export interface IReviewModeService {
 }
 
 export interface ILogService {
-  debug(message: string, context?: Record<string, unknown>): void;
-  info(message: string, context?: Record<string, unknown>): void;
-  warn(message: string, context?: Record<string, unknown>): void;
-  error(message: string, context?: Record<string, unknown>): void;
+  debug(message: string, context?: Record<string, SerializableValue>): void;
+  info(message: string, context?: Record<string, SerializableValue>): void;
+  warn(message: string, context?: Record<string, SerializableValue>): void;
+  error(message: string, context?: Record<string, SerializableValue>): void;
 }

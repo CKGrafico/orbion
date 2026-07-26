@@ -356,7 +356,7 @@ export async function connectMcp(environmentId: string): Promise<McpConnectionSt
       return statusFromSession(getSession(environmentId)!);
     }
 
-    const toolsData = toolsResult.result as { tools?: Array<{ name: string; description?: string; inputSchema?: unknown }> } | undefined;
+    const toolsData = toolsResult.result as { tools?: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }> } | undefined;
     const tools: McpToolInfo[] = (toolsData?.tools ?? []).map((t) => ({
       name: t.name,
       description: t.description,

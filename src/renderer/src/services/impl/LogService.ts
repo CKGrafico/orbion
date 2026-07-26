@@ -1,27 +1,27 @@
 import { injectable } from "inversify-hooks";
-import type { LogEntry } from "../../../../shared/log";
+import type { LogEntry, SerializableValue } from "../../../../shared/log";
 import type { ILogService } from "../interfaces";
 
 @injectable()
 export class LogService implements ILogService {
-  private write(level: LogEntry["level"], message: string, context?: Record<string, unknown>): void {
+  private write(level: LogEntry["level"], message: string, context?: Record<string, SerializableValue>): void {
     const entry: LogEntry = { level, message, context, module: "renderer" };
     window.api?.log?.write(entry);
   }
 
-  debug(message: string, context?: Record<string, unknown>): void {
+  debug(message: string, context?: Record<string, SerializableValue>): void {
     this.write("debug", message, context);
   }
 
-  info(message: string, context?: Record<string, unknown>): void {
+  info(message: string, context?: Record<string, SerializableValue>): void {
     this.write("info", message, context);
   }
 
-  warn(message: string, context?: Record<string, unknown>): void {
+  warn(message: string, context?: Record<string, SerializableValue>): void {
     this.write("warn", message, context);
   }
 
-  error(message: string, context?: Record<string, unknown>): void {
+  error(message: string, context?: Record<string, SerializableValue>): void {
     this.write("error", message, context);
   }
 }
