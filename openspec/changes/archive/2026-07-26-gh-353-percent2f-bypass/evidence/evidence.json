@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "Security fix in main-process IPC validation layer — no user-visible UI change",
+  "assets": [],
+  "prMarkdown": ""
+}
