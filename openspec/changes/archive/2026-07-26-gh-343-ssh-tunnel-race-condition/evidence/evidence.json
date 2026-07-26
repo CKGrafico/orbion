@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "No user-visible UI changes. Bug fix in main-process SSH tunnel killTimer callbacks only.",
+  "assets": [],
+  "prMarkdown": "Tasks: 5/5 completed. Verification: typecheck passed, 784 tests passed, build passed. Commits: propose, apply, archive."
+}
