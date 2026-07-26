@@ -20,7 +20,6 @@ tasks:
         && git rebase origin/main
     onSuccessTaskId: dev-pick
     onFailureTaskId: dev-clean-dirty
-    maxRuns: 5
 
   - id: dev-clean-dirty
     name: "Recovery: dirty tree, reset and return to main"
@@ -52,7 +51,6 @@ tasks:
         printf "%s\n" "$body"
     onSuccessTaskId: dev-implement
     onFailureTaskId: dev-nothing
-    maxRuns: 5
 
   - id: dev-implement
     name: "Implement: opencode /plan-goal"
@@ -72,7 +70,6 @@ tasks:
         Never ask for confirmation.
     onSuccessTaskId: dev-verify
     onFailureTaskId: dev-fail
-    maxRuns: 5
 
   - id: dev-verify
     name: "Verify: typecheck + tests + build"
@@ -115,7 +112,6 @@ tasks:
         change and generate visual evidence.
     onSuccessTaskId: dev-verify
     onFailureTaskId: dev-fail
-    maxRuns: 5
 
   - id: dev-commit
     name: "Stage and commit all changes"
@@ -125,7 +121,6 @@ tasks:
       - 'git add -A && git commit -m "fix: resolve #{{number}} {{title}}" || true'
     onSuccessTaskId: dev-pr
     onFailureTaskId: null
-    maxRuns: 5
 
   - id: dev-pr
     name: "Create PR; auto-merge bugs only"
@@ -146,7 +141,6 @@ tasks:
         && printf '{"prUrl":"%s","isBug":%s}\n' "$PR_URL" "$IS_BUG"
     onSuccessTaskId: dev-complete
     onFailureTaskId: dev-fail-merge
-    maxRuns: 5
 
   - id: dev-complete
     name: "Finalize issue and return to main"
@@ -165,7 +159,6 @@ tasks:
         && git checkout -- . && git clean -fd && git switch main
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 5
 
   - id: dev-fail-merge
     name: "Recovery: retry bug merge, otherwise leave for review"
@@ -188,7 +181,6 @@ tasks:
         && git checkout -- . && git clean -fd && git switch main
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 5
 
   - id: dev-fail
     name: "Recovery: reset hard + relabel issue for human review"
@@ -201,7 +193,6 @@ tasks:
         --remove-label code:doing
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 5
 
   - id: dev-nothing
     name: "No tasks to pick"
@@ -211,28 +202,37 @@ tasks:
     silentChain: true
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 5
 
 diagram: |
   flowchart TD
+      devStart("Start<br/>Begin development cycle") --> devPreflight
       devPreflight["Preflight<br/>Clean tree + sync main"] -->|✓| devPick
       devPreflight -.->|✗| devCleanDirty
-      devCleanDirty["Recovery<br/>Reset dirty tree + resync (maxRuns=1)"] -->|✓| devPick
-      devPick["Pick issue<br/>Select oldest code:pick"] -->|✓| devImplement
+      devCleanDirty("Recovery<br/>Reset dirty tree + resync (maxRuns=1)") -->|✓| devPick
+      devPick["Select<br/>Oldest code:pick issue"] -->|✓| devImplement
       devPick -.->|✗| devNothing
-      devImplement["Implement<br/>AI: opencode /planGoal"] -->|✓| devVerify
+      devImplement("Implement<br/>AI: opencode /plan-goal") -->|✓| devVerify
       devImplement -.->|✗| devFail
-      devVerify["Verify<br/>Typecheck + tests + build"] -->|✓| devCommit
+      devVerify["Verify<br/>Typecheck + tests + build<br/>↻5"] -->|✓| devCommit
       devVerify -.->|✗| devFix
-      devFix["Fix<br/>Resolve verification failures"] -->|✓| devVerify
+      devFix("Fix<br/>Resolve verification failures") -->|✓| devVerify
       devFix -.->|✗| devFail
-      devCommit["Commit<br/>Stage and commit changes"] -->|✓| devPr
-      devPr["Create PR<br/>Push + squash merge"] -->|✓| devComplete
+      devCommit("Commit<br/>Stage and commit changes") -->|✓| devPr
+      devPr["PR<br/>Push + squash merge"] -->|✓| devComplete
       devPr -.->|✗| devFailMerge
-      devComplete["Complete<br/>Close issue + return to main"] -->|✓| finalNode(("End"))
-      devFailMerge["Retry merge<br/>Admin merge or leave for review"] -->|✓| finalNode(("End"))
-      devFail["Fail recovery<br/>Reset + relabel for review"] -->|✓| finalNode(("End"))
-      devNothing["Idle<br/>No issues to pick"] -->|✓| finalNode(("End"))
-      style devPreflight fill:#e1f5fe
-      class devNothing silent
-      classDef silent strokeDasharray:5 5,fill:#fef9e7
+      devComplete(("Complete<br/>Close issue + return to main"))
+      devFailMerge(("Merge Fail<br/>Admin merge or leave for review"))
+      devFail(("Fail<br/>Reset + relabel for review"))
+      devNothing(("Idle<br/>No issues to pick"))
+      classDef start fill:#ffffff,stroke:#172033,stroke-width:2px,color:#172033
+      classDef action fill:#eef0ff,stroke:#554cff,stroke-width:2px,color:#172033
+      classDef decision fill:#fff8e8,stroke:#c75b00,stroke-width:2px,color:#172033
+      classDef idle fill:#202c40,stroke:#738198,stroke-width:2px,color:#ffffff
+      classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
+      classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
+      class devStart start
+      class devCleanDirty,devImplement,devFix,devCommit action
+      class devPreflight,devPick,devVerify,devPr decision
+      class devNothing idle
+      class devFail,devFailMerge failure
+      class devComplete success

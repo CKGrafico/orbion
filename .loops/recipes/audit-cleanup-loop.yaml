@@ -18,7 +18,6 @@ tasks:
         && git rebase origin/main
     onSuccessTaskId: audit-select
     onFailureTaskId: null
-    maxRuns: 5
 
   - id: audit-select
     name: "Select oldest open audit:report issue"
@@ -35,7 +34,6 @@ tasks:
         printf '%s\n' "$body"
     onSuccessTaskId: audit-ai
     onFailureTaskId: audit-branches
-    maxRuns: 5
 
   - id: audit-ai
     name: "AI: check referenced issues and close report if all resolved"
@@ -58,7 +56,6 @@ tasks:
         confirmation.
     onSuccessTaskId: audit-branches
     onFailureTaskId: audit-branches
-    maxRuns: 5
 
   - id: audit-branches
     name: "AI: delete stale local and remote branches"
@@ -79,14 +76,25 @@ tasks:
         confirmation.
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 1
 
 diagram: |
   flowchart TD
-      auditPreflight["Preflight<br/>Clean tree + sync main"] -->|✓| auditSelect
-      auditSelect["Select report<br/>Oldest open audit:report issue"] -->|✓| auditAi
-      auditSelect -.->|✗| auditBranches
-      auditAi["AI: close resolved reports<br/>Check referenced issues"] -->|✓| auditBranches
-      auditAi -.->|✗| auditBranches
-      auditBranches["AI: prune stale branches<br/>Delete local + remote"] -->|✓| finalNode(("End"))
-      style auditPreflight fill:#e1f5fe
+      cleanupStart("Start<br/>Begin audit cleanup cycle") --> cleanupPreflight
+      cleanupPreflight["Preflight<br/>Clean tree + sync main"] -->|✓| cleanupSelect
+      cleanupPreflight -.->|✗| cleanupEnd
+      cleanupSelect["Select report<br/>Oldest open audit:report issue"] -->|✓| cleanupAi
+      cleanupSelect -.->|✗| branchCleanup
+      cleanupAi("AI: close resolved reports<br/>Check referenced issues") -->|✓| branchCleanup
+      cleanupAi -.->|✗| branchCleanup
+      branchCleanup("AI: prune stale branches<br/>Delete local + remote")
+      cleanupEnd(("End<br/>Preflight failed"))
+      classDef start fill:#ffffff,stroke:#172033,stroke-width:2px,color:#172033
+      classDef action fill:#eef0ff,stroke:#554cff,stroke-width:2px,color:#172033
+      classDef decision fill:#fff8e8,stroke:#c75b00,stroke-width:2px,color:#172033
+      classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
+      classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
+      class cleanupStart start
+      class cleanupAi,branchCleanup action
+      class cleanupPreflight,cleanupSelect decision
+      class cleanupEnd failure
+      class branchCleanup success

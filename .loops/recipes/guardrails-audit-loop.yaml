@@ -21,7 +21,6 @@ tasks:
         && git rebase origin/main
     onSuccessTaskId: audit-lock
     onFailureTaskId: null
-    maxRuns: 3
 
   - id: audit-lock
     name: "Check no audit already running"
@@ -34,7 +33,6 @@ tasks:
         test "$count" -eq 0 || exit 75
     onSuccessTaskId: audit-audit
     onFailureTaskId: audit-nothing
-    maxRuns: 3
 
   - id: audit-audit
     name: "AI: audit random area against guardrails"
@@ -71,7 +69,6 @@ tasks:
         && git checkout -- . && git clean -fd && exit 0 || exit 1
     onSuccessTaskId: null
     onFailureTaskId: audit-audit
-    maxRuns: 3
 
   - id: audit-fail
     name: "Recovery: cleanup audit:doing state"
@@ -86,7 +83,6 @@ tasks:
         done; git checkout -- . && git clean -fd; exit 0
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 3
 
   - id: audit-nothing
     name: "Audit already in progress"
@@ -96,19 +92,30 @@ tasks:
     silentChain: true
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 3
 
 diagram: |
   flowchart TD
-      auditPreflight["Preflight<br/>Clean tree + sync main (maxRuns=3)"] -->|✓| auditLock
-      auditLock["Check lock<br/>No audit already running (maxRuns=3)"] -->|✓| auditAudit
+      auditStart("Start<br/>Begin guardrails audit cycle") --> auditPreflight
+      auditPreflight["Preflight<br/>Clean tree + sync main"] -->|✓| auditLock
+      auditPreflight -.->|✗| auditFail
+      auditLock["Check lock<br/>No audit already running"] -->|✓| auditAudit
       auditLock -.->|✗| auditNothing
-      auditAudit["AI: audit area<br/>Audit against guardrails + create issues (maxRuns=3)"] -->|✓| auditVerify
+      auditAudit("AI: audit area<br/>Audit against guardrails + create issues<br/>↻3") -->|✓| auditVerify
       auditAudit -.->|✗| auditFail
-      auditVerify["Verify<br/>At least 1 new bug issue created (maxRuns=3)"] -->|✓| finalNode(("End"))
+      auditVerify["Verify<br/>At least 1 new bug issue created"] -->|✓| auditComplete
       auditVerify -.->|✗| auditAudit
-      auditFail["Recovery<br/>Cleanup audit:doing state (maxRuns=3)"] -->|✓| finalNode(("End"))
-      auditNothing["Idle<br/>Audit already in progress (maxRuns=3)"] -->|✓| finalNode(("End"))
-      style auditPreflight fill:#e1f5fe
-      class auditNothing silent
-      classDef silent strokeDasharray:5 5,fill:#fef9e7
+      auditComplete(("Complete<br/>Audit finished successfully"))
+      auditFail(("Fail<br/>Cleanup audit:doing state"))
+      auditNothing(("Idle<br/>Audit already in progress"))
+      classDef start fill:#ffffff,stroke:#172033,stroke-width:2px,color:#172033
+      classDef action fill:#eef0ff,stroke:#554cff,stroke-width:2px,color:#172033
+      classDef decision fill:#fff8e8,stroke:#c75b00,stroke-width:2px,color:#172033
+      classDef idle fill:#202c40,stroke:#738198,stroke-width:2px,color:#ffffff
+      classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
+      classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
+      class auditStart start
+      class auditAudit action
+      class auditPreflight,auditLock,auditVerify decision
+      class auditNothing idle
+      class auditFail failure
+      class auditComplete success

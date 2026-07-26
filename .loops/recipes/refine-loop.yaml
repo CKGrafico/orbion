@@ -23,7 +23,6 @@ tasks:
         printf "%s\n" "$body"
     onSuccessTaskId: ref-refine
     onFailureTaskId: ref-nothing
-    maxRuns: 5
 
   - id: ref-refine
     name: "AI: /plan-story to rewrite issue as grounded user story"
@@ -64,7 +63,6 @@ tasks:
         && git checkout -- . && git clean -fd && exit 0 || exit 1
     onSuccessTaskId: null
     onFailureTaskId: ref-refine
-    maxRuns: 5
 
   - id: ref-fail
     name: "Recovery: relabel issue back to refine:pick"
@@ -74,7 +72,6 @@ tasks:
       - "gh issue edit {{number}} --add-label refine:pick --remove-label refine:doing"
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 5
 
   - id: ref-nothing
     name: "No issues to refine"
@@ -84,18 +81,28 @@ tasks:
     silentChain: true
     onSuccessTaskId: null
     onFailureTaskId: null
-    maxRuns: 5
 
 diagram: |
   flowchart TD
-      refPick["Pick issue<br/>Select oldest refine:pick"] -->|✓| refRefine
+      refStart("Start<br/>Begin refinement cycle") --> refPick
+      refPick["Select<br/>Oldest refine:pick issue"] -->|✓| refRefine
       refPick -.->|✗| refNothing
-      refRefine["Refine<br/>AI: /planStory to rewrite as user story"] -->|✓| refVerify
+      refRefine("Refine<br/>AI: /planStory to rewrite as user story<br/>↻5") -->|✓| refVerify
       refRefine -.->|✗| refFail
-      refVerify["Verify<br/>Issue has refine:questions or refine:done"] -->|✓| finalNode(("End"))
+      refVerify["Verify<br/>Issue has refine:questions or refine:done"] -->|✓| refComplete
       refVerify -.->|✗| refRefine
-      refFail["Recovery<br/>Relabel issue back to refine:pick"] -->|✓| finalNode(("End"))
-      refNothing["Idle<br/>No issues to refine"] -->|✓| finalNode(("End"))
-      style refPick fill:#e1f5fe
-      class refNothing silent
-      classDef silent strokeDasharray:5 5,fill:#fef9e7
+      refComplete(("Complete<br/>Issue refined successfully"))
+      refFail(("Fail<br/>Relabel issue back to refine:pick"))
+      refNothing(("Idle<br/>No issues to refine"))
+      classDef start fill:#ffffff,stroke:#172033,stroke-width:2px,color:#172033
+      classDef action fill:#eef0ff,stroke:#554cff,stroke-width:2px,color:#172033
+      classDef decision fill:#fff8e8,stroke:#c75b00,stroke-width:2px,color:#172033
+      classDef idle fill:#202c40,stroke:#738198,stroke-width:2px,color:#ffffff
+      classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
+      classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
+      class refStart start
+      class refRefine action
+      class refPick,refVerify decision
+      class refNothing idle
+      class refFail failure
+      class refComplete success
