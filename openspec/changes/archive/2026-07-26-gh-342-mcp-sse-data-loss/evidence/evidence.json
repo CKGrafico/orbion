@@ -1,0 +1,8 @@
+{
+  "changeId": "gh-342-mcp-sse-data-loss",
+  "status": "skipped",
+  "reason": "Main-process SSE stream parsing fix. No user-visible UI changes. Backend-only data integrity bug.",
+  "assets": [],
+  "prMarkdown": "**Fix: MCP SSE stream data loss on partial lines**\n\n- Hoisted `dataBuffer` outside the while loop so it persists across iterations\n- Added flush of remaining `dataBuffer` after stream closes\n- Node typecheck: passed\n- Build: passed\n- Tests: 780/781 passed (1 pre-existing HMAC timing test timeout, unrelated)",
+  "capturedAt": "2026-07-26T10:15:00Z"
+}
