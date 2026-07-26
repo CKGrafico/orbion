@@ -127,6 +127,20 @@ describe("isUrlAllowedForFetch", () => {
     expect(check("something.google.internal", false)).toBe(true);
   });
 
+  it("rejects Azure metadata DNS hostname", () => {
+    expect(check("metadata.azure.internal", false)).toBe(false);
+    expect(check("metadata.azure.internal", true)).toBe(false);
+  });
+
+  it("rejects Azure metadata DNS hostname with trailing dot", () => {
+    expect(check("metadata.azure.internal.", false)).toBe(false);
+    expect(check("metadata.azure.internal.", true)).toBe(false);
+  });
+
+  it("allows unrelated azure internal hostname", () => {
+    expect(check("something.azure.internal", false)).toBe(true);
+  });
+
   it("rejects IPv6 link-local uppercase form", () => {
     expect(check("[FE80::1]", false)).toBe(false);
   });
@@ -142,6 +156,8 @@ describe("cross-path SSRF consistency", () => {
     { host: "[FE80::1]", blocked: true },
     { host: "metadata.google.internal", blocked: true },
     { host: "metadata.google.internal.", blocked: true },
+    { host: "metadata.azure.internal", blocked: true },
+    { host: "metadata.azure.internal.", blocked: true },
     { host: "localhost", blocked: false },
     { host: "127.0.0.1", blocked: false },
     { host: "[::1]", blocked: false },
@@ -157,6 +173,7 @@ describe("cross-path SSRF consistency", () => {
       "[fd00:ec2::254]",
       "[fe80::1]",
       "metadata.google.internal",
+      "metadata.azure.internal",
     ];
     for (const host of blockedHosts) {
       const url = `http://${host}/api`;
