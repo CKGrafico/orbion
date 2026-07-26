@@ -65,6 +65,7 @@ import {
   addBudgetBreach,
   dismissBudgetBreach,
   pruneOldBreaches,
+  getInboxDismissedIds,
   dismissInboxItem,
   addResolvedItem,
   getResolvedItems,
@@ -1110,6 +1111,11 @@ app.whenReady().then(() => {
     // We return an empty array here; the real assembly happens in the renderer.
     // This channel exists so the dismiss state is queryable via IPC.
     return [];
+  });
+
+  safeHandle("inbox:getDismissedIds", (): string[] => {
+    validateIpc("inbox:getDismissedIds", []);
+    return getInboxDismissedIds();
   });
 
   safeHandle("inbox:dismissItem", async (_event, ...rawArgs): Promise<void> => {

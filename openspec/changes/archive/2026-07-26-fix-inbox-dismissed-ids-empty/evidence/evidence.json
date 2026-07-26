@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "fix-inbox-dismissed-ids-empty",
+  "required": true,
+  "status": "skipped",
+  "reason": "Data-persistence bugfix (wiring getDismissedIds through IPC). No scenario runner registered for this change-id. Behavioral effect (dismissed items persist across restarts) is not screenshot-demonstrable without a custom Playwright scenario. Verification: pnpm typecheck ✓, pnpm test 795/795 ✓, pnpm build ✓, pnpm check:comments ✓.",
+  "assets": [],
+  "prMarkdown": "## Verification Evidence\n\n**Change:** fix-inbox-dismissed-ids-empty — Wire getDismissedIds through IPC stack\n\n**Status:** skipped (no scenario runner; behavioral data-persistence fix)\n\n| Check | Result |\n|-------|--------|\n| pnpm typecheck | ✅ No errors |\n| pnpm test | ✅ 795/795 passed |\n| pnpm build | ✅ Clean build |\n| pnpm check:comments | ✅ All files ≤10% |\n\n**Commits:**\n- `6d757af` fix: wire getDismissedIds through IPC stack\n- `1642ac5` fix: reduce HMAC timing-test iterations and increase timeout\n- `5466fce` archive: fix InboxService.getDismissedIds() returning empty array\n"
+}

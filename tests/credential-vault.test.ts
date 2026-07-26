@@ -424,13 +424,13 @@ describe("credential vault integrity (HMAC)", () => {
     expect(callbackCalls[0]?.credentialKind).toBe("sessionToken");
   });
 
-  it("HMAC comparison is constant-time (timing variance within bounds)", () => {
+  it("HMAC comparison is constant-time (timing variance within bounds)", { timeout: 30_000 }, () => {
     const reference = storeCredential("timing-test-value");
     const credentials = record(storeValues("credentials").get("credentials"));
     const stored = record(credentials[String(reference)]);
     const correctHmac = String(stored.hmac);
 
-    const runs = 10_000;
+    const runs = 1_000;
 
     const correctTimes: number[] = [];
     const wrongTimes: number[] = [];

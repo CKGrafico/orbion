@@ -266,6 +266,8 @@ const bridge: LoopTaskBridge = {
   inbox: {
     getItems: () =>
       ipcRenderer.invoke("inbox:getItems") as Promise<InboxItem[]>,
+    getDismissedIds: () =>
+      ipcRenderer.invoke("inbox:getDismissedIds") as Promise<string[]>,
     dismissItem: (itemId: string) =>
       ipcRenderer.invoke("inbox:dismissItem", itemId) as Promise<void>,
     queryFleet: (question: string) =>
