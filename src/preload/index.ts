@@ -49,6 +49,8 @@ import type {
   LoopShape,
   GlobalSettings,
   SecurityAuditEvent,
+  EndpointKind,
+  AgentRuntime,
 } from "../shared/ipc.js";
 import type { LogEntry } from "../shared/log.js";
 
@@ -73,12 +75,12 @@ const bridge: LoopTaskBridge = {
 
   config: {
     getEnvironments: () => ipcRenderer.invoke("config:getEnvironments"),
-    addEnvironment: (name: string, url: string, kind?: string) =>
+    addEnvironment: (name: string, url: string, kind?: EndpointKind) =>
       ipcRenderer.invoke("config:addEnvironment", name, url, kind),
     removeEnvironment: (id: string) => ipcRenderer.invoke("config:removeEnvironment", id),
-    updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: string; sshControlTarget?: string | null }) =>
+    updateEnvironment: (id: string, updates: { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }) =>
       ipcRenderer.invoke("config:updateEnvironment", id, updates) as Promise<void>,
-    addEndpoint: (environmentId: string, url: string, kind: string) =>
+    addEndpoint: (environmentId: string, url: string, kind: EndpointKind) =>
       ipcRenderer.invoke("config:addEndpoint", environmentId, url, kind),
     removeEndpoint: (environmentId: string, endpointId: string) =>
       ipcRenderer.invoke("config:removeEndpoint", environmentId, endpointId),
