@@ -52,7 +52,7 @@
         "run",
         "--agent",
         "fullstack-engineer",
-        "First, load all skills available for your current agent. Then complete all remaining work for this issue. Inspect the current repository state. If there is an unfinished OpenSpec change, partial implementation, or failing validation related to this issue, continue and finish that work. If no related work exists, execute /plan-goal to plan and implement the issue. Preserve correct existing work. Work on a feature branch. Never explore or read files outside the current repository root. Do not push or perform any GitHub actions. Never ask for confirmation. Archive the completed change and generate visual evidence. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
+        "First, load all skills available for your current agent. Then run: git fetch origin && git rebase origin/main. If there are conflicts, resolve them preferring the incoming main changes. Then complete all remaining work for this issue. Inspect the current repository state. If there is an unfinished OpenSpec change, partial implementation, or failing validation related to this issue, continue and finish that work. If no related work exists, execute /plan-goal to plan and implement the issue. Before finishing, run pnpm typecheck and fix any errors. Preserve correct existing work. Work on a feature branch. Never explore or read files outside the current repository root. Do not push or perform any GitHub actions. Never ask for confirmation. Archive the completed change and generate visual evidence. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
       ],
       "onSuccessTaskId": "dev-verify",
       "onFailureTaskId": "dev-fail",
