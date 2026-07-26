@@ -8,41 +8,36 @@ export interface SsrfAllowOptions {
 const CLOUD_METADATA_DNS_HOSTS = new Set([
   "metadata.google.internal",
   "metadata.google.internal.",
+  "metadata.azure.internal",
+  "metadata.azure.internal.",
 ]);
 
-export function isUrlAllowedForFetch(url: URL, options?: SsrfAllowOptions): boolean {
+export function isHostAllowed(hostname: string, options?: SsrfAllowOptions): boolean {
   const allowLoopback = options?.allowLoopback ?? false;
-  const host = url.hostname.toLowerCase();
+  const host = hostname.toLowerCase();
 
-  if (isLoopbackHost(host)) {
-    return allowLoopback;
-  }
-
-  if (isCloudMetadataIp(host)) {
-    return false;
-  }
-
-  if (isLinkLocalRange(host)) {
-    return false;
-  }
-
-  if (isAwsIpv6Metadata(host)) {
-    return false;
-  }
-
-  if (isIpv6LinkLocal(host)) {
-    return false;
-  }
-
-  if (isCloudMetadataDns(host)) {
-    return false;
-  }
-
-  if (isLoopbackRange(host)) {
-    return allowLoopback;
-  }
-
+  if (isLoopbackHost(host)) return allowLoopback;
+  if (isCloudMetadataIp(host)) return false;
+  if (isLinkLocalRange(host)) return false;
+  if (isAwsIpv6Metadata(host)) return false;
+  if (isIpv6LinkLocal(host)) return false;
+  if (isCloudMetadataDns(host)) return false;
+  if (isLoopbackRange(host)) return allowLoopback;
   return true;
+}
+
+export function isUrlAllowedForFetch(url: URL, options?: SsrfAllowOptions): boolean {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  return isHostAllowed(url.hostname, options);
+}
+
+export function isAllowedBaseUrl(baseUrl: string, options?: SsrfAllowOptions): boolean {
+  try {
+    const url = new URL(baseUrl);
+    return isUrlAllowedForFetch(url, options);
+  } catch {
+    return false;
+  }
 }
 
 function isLoopbackHost(host: string): boolean {

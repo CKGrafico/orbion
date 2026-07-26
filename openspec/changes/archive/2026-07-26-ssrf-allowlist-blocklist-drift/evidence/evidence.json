@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "Internal main-process SSRF security fix. No user-visible UI changes. Verified via typecheck (clean), test suite (795/795 pass), and build (success).",
+  "assets": [],
+  "prMarkdown": "## SSRF Allowlist/Blocklist Drift — Azure metadata host\n\n- Tasks: 5/5 completed\n- Verification: passed (typecheck, test, build all clean)\n- Commits: 54e0ec2 (propose), 93e88c5 (1.1), fba75dc (1.2), fb00a07 (1.3), c6b931c (2.1)\n- Test: 795/795 passing including new Azure metadata DNS test cases\n- Change: Azure metadata DNS hosts (`metadata.azure.internal`, `metadata.azure.internal.`) added to `ssrf-allowlist.ts`. Blocklist module deleted. IPC validation consolidated to single source of truth."
+}
