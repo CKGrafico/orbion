@@ -143,12 +143,12 @@ describe("isAllowedApiOperation — negative tests", () => {
     expect(isAllowedApiOperation("GET", "/api/loops/abc-123/pause")).toBe(false);
   });
 
-  it("accepts GET /api/loops/abc%2Fdef at regex level (blocked by isAllowedPath upstream)", () => {
-    expect(isAllowedApiOperation("GET", "/api/loops/abc%2Fdef")).toBe(true);
+  it("rejects GET /api/loops/abc%2Fdef (URL-encoded slash)", () => {
+    expect(isAllowedApiOperation("GET", "/api/loops/abc%2Fdef")).toBe(false);
   });
 
-  it("accepts GET /api/loops/abc%2fsecret at regex level (blocked by isAllowedPath upstream)", () => {
-    expect(isAllowedApiOperation("GET", "/api/loops/abc%2fsecret")).toBe(true);
+  it("rejects GET /api/loops/abc%2fsecret (URL-encoded slash lowercase)", () => {
+    expect(isAllowedApiOperation("GET", "/api/loops/abc%2fsecret")).toBe(false);
   });
 });
 
@@ -183,6 +183,14 @@ describe("isAllowedStreamPath — negative tests", () => {
 
   it("rejects /api/loops/{id}/exec/stream (arbitrary command stream)", () => {
     expect(isAllowedStreamPath("/api/loops/abc-123/exec/stream")).toBe(false);
+  });
+
+  it("rejects /api/loops/abc%2Fdef/logs/stream (URL-encoded slash)", () => {
+    expect(isAllowedStreamPath("/api/loops/abc%2Fdef/logs/stream")).toBe(false);
+  });
+
+  it("rejects /api/loops/abc%2fsecret/logs/stream (URL-encoded slash lowercase)", () => {
+    expect(isAllowedStreamPath("/api/loops/abc%2fsecret/logs/stream")).toBe(false);
   });
 });
 
