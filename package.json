@@ -71,11 +71,5 @@
     "vite": "^7.0.0",
     "vitest": "^4.1.10",
     "zod": "^4.4.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild"
-    ]
   }
 }
