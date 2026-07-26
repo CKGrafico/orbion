@@ -121,6 +121,10 @@ async function sseRpcRequest(
   params?: unknown,
   timeoutMs: number = MCP_TIMEOUT_MS,
 ): Promise<JsonRpcResponse> {
+  if (transport.closed) {
+    throw new Error("SSE transport is closed");
+  }
+
   if (!transport.postEndpoint) {
     throw new Error("SSE transport not ready: no POST endpoint received yet");
   }
@@ -239,6 +243,7 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
           }
         } catch (err) {
           if (!transport.closed) {
+            transport.closed = true;
             for (const [, pending] of transport.pending) {
               clearTimeout(pending.timer);
               pending.reject(new Error("SSE stream closed unexpectedly"));
