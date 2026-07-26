@@ -3,7 +3,6 @@
   AccessEndpoint,
   AgentRuntime,
   EndpointKind,
-  SessionScope,
   PairingCodeExchangeResponse,
   OpenCodeEndpoint,
   SetOpenCodeEndpointResult,
@@ -29,8 +28,6 @@
   InboxAction,
   InboxQueryResult,
   ResolvedInboxItem,
-  InboxItemResolutionReason,
-  ConditionWatch,
   DeepLinkTarget,
   NotificationSendArgs,
   OutageEscalation,
@@ -56,7 +53,7 @@
   PrVerdict,
   ReviewModeItem,
   BatchOverlapResult,
-  PrOverlap,
+  SessionScope,
 } from "../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth } from "../types";
 

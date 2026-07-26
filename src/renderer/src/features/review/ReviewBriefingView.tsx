@@ -37,7 +37,7 @@ export function ReviewBriefingView(): React.ReactNode {
   const activeItem = reviewModeService.getActiveItem();
 
   // Force re-renders when overlap data changes
-  const [overlapVersion, setOverlapVersion] = useState(0);
+  const [_overlapVersion, setOverlapVersion] = useState(0);
   useEffect(() => {
     return reviewModeService.onOverlapUpdate(() => {
       setOverlapVersion((v) => v + 1);

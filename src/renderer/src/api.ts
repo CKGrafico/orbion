@@ -1,4 +1,4 @@
-import { cid, container, useInject } from "inversify-hooks";
+import { cid, container } from "inversify-hooks";
 import type { ApiResponse, StreamEventPayload } from "../../shared/ipc";
 import type { Environment, LoopMeta, Project, TaskDefinition } from "./types";
 import type { IApiService, IStreamService } from "./services/interfaces";

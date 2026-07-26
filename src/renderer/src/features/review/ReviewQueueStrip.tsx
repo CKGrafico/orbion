@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
-import type { ReviewModeItem, PrRiskLevel, BatchOverlapResult } from "../../../../shared/ipc";
+import type { ReviewModeItem, PrRiskLevel } from "../../../../shared/ipc";
 import { GitPullRequest, CheckCircle2, AlertTriangle } from "lucide-react";
 
 /** Color class for PR risk level chip */
@@ -24,7 +24,7 @@ export function ReviewQueueStrip(): React.ReactNode {
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
 
   // Force re-renders when overlap data changes
-  const [overlapVersion, setOverlapVersion] = useState(0);
+  const [_overlapVersion, setOverlapVersion] = useState(0);
   useEffect(() => {
     return reviewModeService.onOverlapUpdate(() => {
       setOverlapVersion((v) => v + 1);

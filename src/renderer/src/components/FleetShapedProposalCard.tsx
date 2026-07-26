@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { LoopProposalRow, LoopProposalStatus } from "../chat/types";
 import type { ShapeAdaptation } from "../fleet-shape-adapt";
-import type { Environment, PlatformType, LoopShape } from "../../../shared/ipc";
+import type { Environment, PlatformType } from "../../../shared/ipc";
 import type { ILoopShapeCacheService, IInfraService } from "../services/interfaces";
 import type { SimilarLoopMatch } from "../fleet-similarity";
 import { LoopProposalCard } from "./LoopProposalCard";

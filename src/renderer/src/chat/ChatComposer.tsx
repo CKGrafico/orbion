@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AccessMode, ApprovalDecision, ApprovalRequest, ChatTurn, QuestionRequest } from "./types";
+import type { AccessMode, ApprovalDecision, ChatTurn } from "./types";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { QuestionPanel } from "./QuestionPanel";
 import { Square, ArrowUp, Bookmark, BookmarkCheck } from "lucide-react";

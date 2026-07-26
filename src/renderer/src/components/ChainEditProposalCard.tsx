@@ -1,8 +1,8 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChainEditProposalRow, ChainEditProposalStatus } from "../chat/types";
-import type { Environment } from "../types";
-import { TaskChainView } from "./TaskChainView";
+import type { Environment, TaskDefinition } from "../types";
+import { TaskChainView, type ChainStep as ViewChainStep } from "./TaskChainView";
 
 interface ChainEditProposalCardProps {
   row: ChainEditProposalRow;
@@ -34,6 +34,24 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
   const hasWarning = warning != null && warning.referencingLoops.length > 0;
   const needsDecision = hasWarning && warning.decision === null;
   const hasDecision = hasWarning && warning.decision !== null;
+
+  const viewSteps = useMemo<ViewChainStep[]>(() =>
+    row.proposedSteps.map((s, i) => ({
+      task: {
+        id: s.taskId,
+        name: s.taskName,
+        command: s.command,
+        commandArgs: s.commandArgs,
+        onSuccessTaskId: s.onSuccessTaskId,
+        onFailureTaskId: s.onFailureTaskId,
+        createdAt: "",
+      } satisfies TaskDefinition,
+      stepNumber: i + 1,
+      branchType: null,
+      parentHasBranch: false,
+      depth: 0,
+    })),
+  [row.proposedSteps]);
 
   const handleApprove = useCallback((): void => {
     if (!instance) return;
@@ -153,12 +171,12 @@ export function ChainEditProposalCard({ row, instance, onApproved, onRejected, o
       )}
 
       {/* Proposed chain preview */}
-      {row.proposedSteps.length > 0 && (
+      {viewSteps.length > 0 && (
         <div className="chain-edit-proposal-chain-preview">
           <div className="chain-edit-proposal-chain-label">
             {t("chainEditProposal.previewLabel")}
           </div>
-          <TaskChainView steps={row.proposedSteps} />
+          <TaskChainView steps={viewSteps} />
         </div>
       )}
 

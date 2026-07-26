@@ -55,7 +55,6 @@ export function FleetActivityReadout(props: {
       if (health === "offline" || health === "blocked" || health === "unknown") continue;
 
       const envLoops = perEnvLoops[env.id] ?? [];
-      const envReachability = reachability?.[env.id];
 
       // Find agent loops; if none, use all loops as fallback
       const agentLoops = envLoops.filter(isAgentLoop);

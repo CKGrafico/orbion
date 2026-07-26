@@ -1,5 +1,5 @@
 import type { LoopMeta, LoopStatus, LoopWithOrigin, FleetLoopRollup, Project } from "./types";
-import type { ReachabilityState } from "../shared/ipc";
+import type { ReachabilityState } from "../../shared/ipc";
 
 // Loops on unreachable/reconnecting instances are excluded from tallies —
 // they are "unknown" (greyed), not "failed". A dropped tunnel never reads

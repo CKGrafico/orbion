@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
  * overwrite-anyway (force the write, last-write-wins).
  */
 export function StaleConfigWarning({
-  staleResult,
+  staleResult: _staleResult,
   onPullRemote,
   onOverwriteAnyway,
   onCancel,

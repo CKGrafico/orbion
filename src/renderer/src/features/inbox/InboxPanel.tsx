@@ -5,7 +5,7 @@ import type { IInboxService, InboxBuildParams } from "../../services/interfaces"
 import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem, PrVerdict, PrRiskLevel } from "../../../../shared/ipc";
 import type { BudgetBreach } from "../../../../shared/ipc";
 import type { LoopMeta, EnvironmentHealth, Environment } from "../../types";
-import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare, ChevronRight, ChevronDown, Layers, GitPullRequest, ExternalLink } from "lucide-react";
+import { ArrowUp, CheckCircle2, Inbox, X, Search, Play, Pause, RotateCw, MessageSquare, ExternalLink } from "lucide-react";
 import { Suspense } from "react";
 import { MarkdownContent } from "../../chat/MarkdownContent";
 import { timeAgo } from "../../format";
@@ -332,8 +332,8 @@ function DigestItemRowPanel({
   buildParams,
   onClick,
   onDismiss,
-  onExecuteAction,
-  onOpenInChat,
+  onExecuteAction: _onExecuteAction,
+  onOpenInChat: _onOpenInChat,
 }: {
   item: InboxItem;
   buildParams: InboxBuildParams;

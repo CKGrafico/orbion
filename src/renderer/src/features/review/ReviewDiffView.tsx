@@ -79,7 +79,7 @@ export function ReviewDiffView(): React.ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [activeItem?.repo, activeItem?.number, infraService, intl]);
+  }, [activeItem?.repo, activeItem?.number, infraService]);
 
   // When selectedPath changes, load that file's diff if not cached
   useEffect(() => {
@@ -160,7 +160,7 @@ export function ReviewDiffView(): React.ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [selectedPath, activeItem?.repo, activeItem?.number, fullDiff, diffCache, infraService, intl]);
+  }, [selectedPath, activeItem?.repo, activeItem?.number, fullDiff, diffCache, infraService]);
 
   const handleSelectFile = useCallback((path: string) => {
     setSelectedPath(path);

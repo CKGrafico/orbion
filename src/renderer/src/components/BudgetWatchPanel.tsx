@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BudgetWatch, BudgetBreach } from "../../../shared/ipc";
 import type { Environment, LoopMeta } from "../types";
-import { Clock, Play, Trash2, Plus } from "lucide-react";
+import { Clock, Play, Trash2, Plus, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 

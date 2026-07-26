@@ -5,17 +5,15 @@ import type { ChatTurn, AccessMode, ApprovalDecision, ToolCall, ChainEditProposa
 import type { AgentStreamEvent, ReasoningEffort, ReachabilityState } from "../../../shared/ipc";
 import type { IAgentService, IMcpService, ITranscriptService, IConfigService, IInfraService, ILoopShapeCacheService, ISiblingOfferService } from "../services/interfaces";
 import type { LoopMeta, Environment, LoopWithOrigin, FleetLoopRollup } from "../types";
-import type { StructuralOp } from "../../../shared/sibling-offer-types";
 import { useTranscript } from "../chat/useTranscript";
 import { diagnoseFailure } from "../chat/diagnoseFailure";
 import { computeSimilarLoops } from "../fleet-similarity";
-import { matchShapeToFleetIntent, adaptShapeForPlatform, buildProvenance } from "../fleet-shape-adapt";
+
 import { detectStructuralChanges, findSiblingLoops, computeStructuralDiff, extractTopology } from "../fleet-structural-diff";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
 import { usePipelineCounts } from "./usePipelineCounts";
 import { LoopCard } from "./LoopCard";
-import { LoopProposalCard } from "./LoopProposalCard";
 import { FleetShapedProposalCard } from "./FleetShapedProposalCard";
 import { ChainEditProposalCard } from "./ChainEditProposalCard";
 import { SiblingOfferCard } from "./SiblingOfferCard";
@@ -121,7 +119,7 @@ interface SessionChatViewProps {
   projectId?: string;
 }
 
-export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, fleetReachability, perEnvProjects, instance, isEphemeral = false, onPersistSession, turnCount, onTurnSent, autoPersistedJustNow, onDeclineAutoPersist, onUnpersistSession, fleetMode, fleetRollup, fleetLoopsWithOrigin, projectId }: SessionChatViewProps): React.ReactNode {
+export function SessionChatView({ sessionId, environmentId, environmentName, activeRuntime, model, reasoningEffort, environments, reachability, loops, perEnvLoops, fleetReachability, perEnvProjects, instance, isEphemeral = false, onPersistSession, onTurnSent, autoPersistedJustNow, onDeclineAutoPersist, onUnpersistSession, fleetMode, fleetRollup, fleetLoopsWithOrigin, projectId }: SessionChatViewProps): React.ReactNode {
   const { t } = useTranslation();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [mcpService] = useInject<IMcpService>(cid.IMcpService);
@@ -143,14 +141,12 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     reloadTranscript,
     insertLoopCards,
     insertFailureDiagnosis,
-    insertLoopProposal,
     updateLoopProposalStatus,
     insertChainEditProposal,
     updateChainEditProposalStatus,
     updateChainEditProposalForkDecision,
     insertSiblingOffer,
     updateSiblingOfferStatus,
-    insertFleetPlan,
     updateFleetPlanStatus,
     updateFleetPlanTarget,
   } = useTranscript(sessionId);
@@ -902,20 +898,13 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
     [updateFleetPlanTarget],
   );
 
-  const handleFleetPlanTargetStatusChange = useCallback(
-    (planId: string, targetId: string, status: FleetPlanTargetStatus, error?: string) => {
-      updateFleetPlanTarget(planId, targetId, { status, ...(error ? { error } : {}) });
-    },
-    [updateFleetPlanTarget],
-  );
-
   return (
     <div className="session-chat-panel">
       {!isReachable ? (
         <div className="unreachable-banner">
           <WifiOff size={13} />
           {t(
-            reachability === "reconnecting" ? "unreachableBanner.reconnecting" : "unreachableBanner.unreachable",
+            "unreachableBanner.unreachable",
             { instance: environmentName },
           )}
         </div>
@@ -1079,7 +1068,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                         }
                       </span>
                     ) : null}
-                    <LoopCard loop={loop} reachability={reachability} instance={originEnv ?? instance} scrollContainerRef={scrollRef} chainVersion={chainVersion} />
+                    <LoopCard loop={loop} reachability={reachability} instance={instance} scrollContainerRef={scrollRef} chainVersion={chainVersion} />
                   </div>
                 );
               }
@@ -1158,13 +1147,12 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
                 return (
                   <div key={row.id} className="transcript-fleet-plan">
                     <FleetPlanCard
-                      row={row}
-                      onApply={handleFleetPlanApply}
-                      onCancel={handleFleetPlanCancel}
-                      onStatusChange={handleFleetPlanStatusChange}
-                      onTargetCheckedChange={handleFleetPlanTargetCheckedChange}
-                      onTargetStatusChange={handleFleetPlanTargetStatusChange}
-                    />
+                       row={row}
+                       onApply={handleFleetPlanApply}
+                       onCancel={handleFleetPlanCancel}
+                       onStatusChange={handleFleetPlanStatusChange}
+                       onTargetCheckedChange={handleFleetPlanTargetCheckedChange}
+                     />
                   </div>
                 );
               }

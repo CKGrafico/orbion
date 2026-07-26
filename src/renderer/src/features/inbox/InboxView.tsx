@@ -417,13 +417,13 @@ export function InboxView({
 /** Expandable digest row that shows grouped PR items */
 function DigestViewItemRow({
   item,
-  projectLookup,
-  environments,
+  projectLookup: _projectLookup,
+  environments: _environments,
   buildParams,
   onClick,
   onDismiss,
-  onExecuteAction,
-  onOpenInChat,
+  onExecuteAction: _onExecuteAction,
+  onOpenInChat: _onOpenInChat,
 }: {
   item: InboxItem;
   projectLookup: Map<string, string>;
@@ -438,7 +438,7 @@ function DigestViewItemRow({
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [expanded, setExpanded] = useState(false);
   const [childItems, setChildItems] = useState<InboxItem[]>([]);
-  const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
+  const [executingAction] = useState<InboxAction | null>(null);
 
   // Load child items when expanded
   useEffect(() => {
@@ -453,23 +453,6 @@ function DigestViewItemRow({
   const handleToggleExpand = useCallback(() => {
     setExpanded((prev) => !prev);
   }, []);
-
-  const handleAction = useCallback(async (action: InboxAction, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (executingAction) return;
-
-    if (action === "open-in-chat") {
-      onOpenInChat(item);
-      return;
-    }
-
-    setExecutingAction(action);
-    try {
-      await onExecuteAction(item, action);
-    } finally {
-      setExecutingAction(null);
-    }
-  }, [executingAction, item, onExecuteAction, onOpenInChat]);
 
   // Build verdict count badges
   const countBadges: React.ReactNode[] = [];

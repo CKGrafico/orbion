@@ -1,5 +1,5 @@
 import { injectable } from "inversify-hooks";
-import type { IPrPollingService, IInfraService, IConfigService } from "../interfaces";
+import type { IPrPollingService, IInfraService } from "../interfaces";
 import type { PrAwaitingReviewItem, ListPrsAwaitingReviewResult } from "../../../../shared/ipc";
 import { cid, container } from "inversify-hooks";
 
@@ -11,10 +11,6 @@ export class PrPollingService implements IPrPollingService {
   private listeners: ((prs: PrAwaitingReviewItem[]) => void)[] = [];
   private timerId: ReturnType<typeof setInterval> | null = null;
   private isPolling = false;
-
-  private getConfigService(): IConfigService {
-    return container.get<IConfigService>(cid.IConfigService as unknown as string);
-  }
 
   private getInfraService(): IInfraService {
     return container.get<IInfraService>(cid.IInfraService as unknown as string);

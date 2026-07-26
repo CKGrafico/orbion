@@ -1,9 +1,11 @@
-import type { ChainStep } from "../components/TaskChainView";
+import type { ChainStep } from "../../../shared/ipc";
 import type { SimilarLoopMatch } from "../fleet-similarity";
 import type { ShapeAdaptation } from "../fleet-shape-adapt";
-import type { StructuralDiff, SiblingCandidate, SiblingOfferStatus } from "../../../shared/sibling-offer-types";
+import type { StructuralDiff, SiblingOfferStatus } from "../../../shared/sibling-offer-types";
 import type { PrVerdict } from "../../../shared/ipc";
 import type { FailureCategory } from "./diagnoseFailure";
+
+export type { SiblingOfferStatus };
 
 export type ToolCallStatus = "running" | "completed" | "error";
 

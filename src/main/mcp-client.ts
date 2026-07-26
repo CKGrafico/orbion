@@ -213,8 +213,9 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
         }
       };
 
-      (async () => {
+       (async () => {
         try {
+          let dataBuffer = "";
           while (!transport.closed) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -223,7 +224,6 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
             const lines = buffer.split("\n");
             buffer = lines.pop() ?? "";
 
-            let dataBuffer = "";
             for (const line of lines) {
               if (line.startsWith("data:")) {
                 dataBuffer += line.slice(5).trim();
@@ -233,6 +233,9 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
               }
               processLine(line);
             }
+          }
+          if (dataBuffer) {
+            processData(dataBuffer);
           }
         } catch (err) {
           if (!transport.closed) {

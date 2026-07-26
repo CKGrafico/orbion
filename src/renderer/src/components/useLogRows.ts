@@ -102,7 +102,7 @@ export function useLogRows() {
       liveRowsBeforeTailRef.current = [...liveRowsBeforeTailRef.current, ...newRows];
     }
 
-    setSegments((prev) => {
+    setSegments((_prev) => {
       const newSegs = rebuildSegments(rowsRef.current);
       const newExpanded = new Set<number>();
       for (const seg of newSegs) {
@@ -150,7 +150,7 @@ export function useLogRows() {
       liveRowsBeforeTailRef.current = [...liveRowsBeforeTailRef.current, newRow];
     }
 
-    setSegments((prev) => {
+    setSegments((_prev) => {
       const newSegs = rebuildSegments(rowsRef.current);
       const newExpanded = new Set<number>();
       for (const seg of newSegs) {
@@ -168,7 +168,7 @@ export function useLogRows() {
       case "exit": return `ex:${row.exitCode}`;
       case "tool-call": return `tc:${row.toolKind}:${row.title}:${row.status}`;
       case "markdown": return `md:${row.content.slice(0, 80)}`;
-      default: return row.id;
+      default: return (row as { id: string }).id;
     }
   }, []);
 
@@ -211,7 +211,7 @@ export function useLogRows() {
     tailPendingRef.current = false;
     liveRowsBeforeTailRef.current = [];
 
-    setSegments((prev) => {
+    setSegments((_prev) => {
       const expandedRuns = expandedRunsRef.current;
       const segs: RunSegment[] = [];
       let currentRows: LogRow[] = [];
