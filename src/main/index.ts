@@ -1324,11 +1324,11 @@ app.on("window-all-closed", () => {
   for (const tracker of endpointTrackers.values()) tracker.destroy();
   endpointTrackers.clear();
   destroyAllOpenCodeStatus();
-  closeAllRegistryTunnels();
+  void closeAllRegistryTunnels();
   if (process.platform !== "darwin") app.quit();
 });
-app.on("before-quit", () => {
-  closeAllRegistryTunnels();
+app.on("before-quit", async () => {
+  await closeAllRegistryTunnels();
 });
 
 process.on("exit", () => {

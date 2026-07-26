@@ -258,14 +258,14 @@ export function isTunnelReconnecting(environmentId: string, endpointId: string):
 }
 
 /** Close all tunnels (used on app quit). */
-export function closeAllRegistryTunnels(): void {
+export async function closeAllRegistryTunnels(): Promise<void> {
   for (const entry of registry.values()) {
     if (entry.reconnect?.retryTimer) {
       clearTimeout(entry.reconnect.retryTimer);
     }
   }
   registry.clear();
-  closeAllTunnels();
+  await closeAllTunnels();
 }
 
 export function onTunnelReconnect(cb: TunnelReconnectCallback): void {
