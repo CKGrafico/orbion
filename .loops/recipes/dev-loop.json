@@ -67,7 +67,7 @@
         "openspec list --json | python3 -c \"import sys,json; data=json.load(sys.stdin); exit(0 if len(data.get('changes',[]))==0 else 1)\" && pnpm typecheck && pnpm test"
       ],
       "onSuccessTaskId": "dev-commit",
-      "onFailureTaskId": "dev-implement",
+      "onFailureTaskId": "dev-fail",
       "maxRuns": 5
     },
     {
