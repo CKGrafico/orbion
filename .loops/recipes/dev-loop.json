@@ -64,7 +64,7 @@
       "command": "sh",
       "commandArgs": [
         "-c",
-        "pnpm typecheck && pnpm test && pnpm build"
+        "openspec list --json | python3 -c \"import sys,json; data=json.load(sys.stdin); exit(0 if len(data.get('changes',[]))==0 else 1)\" && pnpm typecheck && pnpm test && pnpm build"
       ],
       "onSuccessTaskId": "dev-commit",
       "onFailureTaskId": "dev-fix",
@@ -78,7 +78,7 @@
         "run",
         "--agent",
         "fullstack-engineer",
-        "First, load all skills available for your current agent. Verification failed on the current issue branch. Stay on the current feature branch and preserve all existing work. Inspect git status, the current diff, and the verification failures, then fix all unfinished or broken work. After each fix, rerun this exact verification command: pnpm typecheck && pnpm test && pnpm build. Do not stop after fixing the first failure; repeat the full command until it exits 0 or you can no longer make progress. Do not reset, clean, switch branches, rebase, create another branch, push, perform GitHub actions, create a PR, or archive the change. Never ask for confirmation. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
+        "First, load all skills available for your current agent. Verification failed on the current issue branch. Stay on the current feature branch and preserve all existing work. Inspect git status, the current diff, and the verification failures, then fix all unfinished or broken work. After each fix, rerun this exact verification command: openspec list --json | python3 -c \"import sys,json; data=json.load(sys.stdin); exit(0 if len(data.get('changes',[]))==0 else 1)\" && pnpm typecheck && pnpm test && pnpm build. Do not stop after fixing the first failure; repeat the full command until it exits 0 or you can no longer make progress. Do not reset, clean, switch branches, rebase, create another branch, push, perform GitHub actions, create a PR, or archive the change. Never ask for confirmation. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
       ],
       "onSuccessTaskId": "dev-verify",
       "onFailureTaskId": "dev-fail",
