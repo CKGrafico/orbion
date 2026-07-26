@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "use-react-i18next",
+  "required": false,
+  "status": "skipped",
+  "reason": "Library migration from react-intl to react-i18next. No user-visible behavior changed — all message keys resolve to the same English strings. Dependency-only refactor with identical runtime output.",
+  "assets": [],
+  "prMarkdown": ""
+}
