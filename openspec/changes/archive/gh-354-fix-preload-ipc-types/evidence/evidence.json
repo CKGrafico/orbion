@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "changeId": "gh-354-fix-preload-ipc-types",
+  "required": false,
+  "status": "skipped",
+  "reason": "Type-only fix in the preload bridge. No user-visible UI changes. The fix replaces string with discriminated union types (EndpointKind, AgentRuntime) in parameter signatures — compile-time enforcement only.",
+  "assets": [],
+  "prMarkdown": ""
+}
