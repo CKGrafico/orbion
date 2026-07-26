@@ -2,7 +2,7 @@
 
 ## Modified Requirements
 
-### Requirement: Cloud metadata IPs SHALL be rejected (MODIFIED)
+### Requirement: Cloud metadata IPs SHALL be rejected
 
 The cloud-provider DNS metadata hostname list SHALL include Azure IMDS hostnames: `metadata.azure.internal` and `metadata.azure.internal.`.
 

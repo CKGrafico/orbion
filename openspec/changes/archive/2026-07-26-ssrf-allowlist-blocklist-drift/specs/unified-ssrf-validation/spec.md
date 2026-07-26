@@ -2,7 +2,7 @@
 
 ## Modified Requirements
 
-### Requirement: SSRF host validation SHALL use a single canonical module (MODIFIED)
+### Requirement: SSRF host validation SHALL use a single canonical module
 
 The system SHALL implement all SSRF host-validation logic in `src/main/ssrf-allowlist.ts`. `src/main/ssrf-blocklist.ts` SHALL NOT exist. Both `ipc-validation.ts` and `index.ts` SHALL import and call the canonical function from `ssrf-allowlist.ts` only.
 
@@ -10,7 +10,7 @@ The system SHALL implement all SSRF host-validation logic in `src/main/ssrf-allo
 - **WHEN** `validateIpc` processes a `config:addEnvironment` or `config:addEndpoint` call with a URL containing a blocked host
 - **THEN** the validation SHALL call `isAllowedBaseUrl` imported from `ssrf-allowlist.js` and reject the request when it returns `false`
 
-### Requirement: Cloud-provider DNS metadata hostnames SHALL be blocked (MODIFIED)
+### Requirement: Cloud-provider DNS metadata hostnames SHALL be blocked
 
 The system SHALL reject `metadata.google.internal`, `metadata.google.internal.`, `metadata.azure.internal`, and `metadata.azure.internal.`.
 
