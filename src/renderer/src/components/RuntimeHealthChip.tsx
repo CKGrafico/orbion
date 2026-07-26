@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { Environment, EnvironmentHealth, ReachabilityState, RuntimeState } from "../types";
 import type { OpenCodeConnectionStatus } from "../../../shared/ipc";
 import { deriveRuntimeHealth, RUNTIME_HEALTH_COLORS, type RuntimeHealthState } from "../runtime-health";
@@ -19,11 +19,11 @@ export function RuntimeHealthChip(props: {
   runtimeState: RuntimeState | undefined;
 }): React.ReactNode {
   const { environment, health, reachability, openCodeStatus, runtimeState } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const info = deriveRuntimeHealth(environment, health, reachability, openCodeStatus, runtimeState);
   const color = RUNTIME_HEALTH_COLORS[info.state];
-  const label = intl.formatMessage({ id: STATE_LABEL_KEYS[info.state] });
+  const label = t(STATE_LABEL_KEYS[info.state]);
 
   return (
     <span

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { Environment } from "../types";
 import { fetchLogs } from "../api";
 import { useLogRows } from "./useLogRows";
@@ -17,7 +17,7 @@ export function LogViewer(props: {
   runHistory?: RunRecord[];
 }): React.ReactNode {
   const { instance, loopId, runHistory } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const { segments, appendLines, appendEvent, setInitialRows, toggleSegment, reset } = useLogRows();
   const [follow, setFollow] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -103,7 +103,7 @@ export function LogViewer(props: {
   return (
     <div className="card">
       <div className="card-header">
-        <span className="overline">{intl.formatMessage({ id: "logs.title" })}</span>
+        <span className="overline">{t("logs.title")}</span>
         <span className="spacer" />
         <StreamStateIndicator
           streamState={streamState}
@@ -113,7 +113,7 @@ export function LogViewer(props: {
           onStop={stop}
         />
         <button className="toggle" onClick={() => void copyAll()}>
-          {copied ? `${intl.formatMessage({ id: "logs.copied" })} ✓` : intl.formatMessage({ id: "logs.copy" })}
+          {copied ? `${t("logs.copied")} ✓` : t("logs.copy")}
         </button>
       </div>
 
@@ -123,7 +123,7 @@ export function LogViewer(props: {
 
       <div className="log-viewer" ref={paneRef} onWheel={() => setFollow(false)}>
         {segments.length === 0 ? (
-          <span style={{ color: "var(--text-muted)" }}>{intl.formatMessage({ id: "logs.noOutput" })}</span>
+          <span style={{ color: "var(--text-muted)" }}>{t("logs.noOutput")}</span>
         ) : (
           segments.map((segment) => (
             <div key={`seg-${segment.runNumber}`} data-run-number={segment.runNumber}>
@@ -152,12 +152,12 @@ function StreamStateIndicator(props: {
   onStop: () => void;
 }): React.ReactNode {
   const { streamState, follow, onToggleFollow, onReconnect, onStop } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (streamState === "reconnecting") {
     return (
       <button className="toggle reconnecting" onClick={onStop}>
-        {`\u21BB ${intl.formatMessage({ id: "logs.reconnecting" })}`}
+        {`\u21BB ${t("logs.reconnecting")}`}
       </button>
     );
   }
@@ -165,7 +165,7 @@ function StreamStateIndicator(props: {
   if (streamState === "stopped") {
     return (
       <button className="toggle stopped" onClick={onReconnect}>
-        {`\u2717 ${intl.formatMessage({ id: "logs.disconnected" })}`}
+        {`\u2717 ${t("logs.disconnected")}`}
       </button>
     );
   }
@@ -174,8 +174,8 @@ function StreamStateIndicator(props: {
   return (
     <button className={`toggle${follow ? " on" : ""}`} onClick={onToggleFollow}>
       {follow
-        ? `\u25CF ${intl.formatMessage({ id: "logs.following" })}`
-        : intl.formatMessage({ id: "logs.follow" })}
+        ? `\u25CF ${t("logs.following")}`
+        : t("logs.follow")}
     </button>
   );
 }

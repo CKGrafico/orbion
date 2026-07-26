@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IInboxService, InboxBuildParams } from "../../services/interfaces";
 import type { InboxItem, InboxAction, InboxQueryResult, OutageEscalation, ResolvedInboxItem, PrAwaitingReviewItem, PrVerdict, PrRiskLevel } from "../../../../shared/ipc";
@@ -44,13 +44,13 @@ function riskChipClass(riskLevel: PrRiskLevel): string {
 
 /** Render the verdict and risk chip for a PR inbox item */
 function PrVerdictDisplayPanel({ verdict }: { verdict?: PrVerdict }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (!verdict) {
     return (
       <span className="inbox-item-verdict">
         <span className="pr-risk-chip pr-risk-chip-pending">
-          {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
+          {t("inbox.prVerdict.analyzing")}
         </span>
       </span>
     );
@@ -59,7 +59,7 @@ function PrVerdictDisplayPanel({ verdict }: { verdict?: PrVerdict }): React.Reac
   return (
     <span className="inbox-item-verdict">
       <span className={riskChipClass(verdict.riskLevel)}>
-        {intl.formatMessage({ id: `inbox.prRisk.${verdict.riskLevel}` })}
+        {t(`inbox.prRisk.${verdict.riskLevel}`)}
       </span>
       <span className="inbox-item-verdict-text">{verdict.verdict}</span>
     </span>
@@ -80,7 +80,7 @@ export function InboxPanel({
   onDismissItem,
   onOpenInChat,
 }: InboxPanelProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [queryText, setQueryText] = useState("");
@@ -203,7 +203,7 @@ export function InboxPanel({
     <div className="inbox-panel">
       <div className="inbox-header">
         <Inbox size={14} />
-        <span className="overline">{intl.formatMessage({ id: "inbox.title" })}</span>
+        <span className="overline">{t("inbox.title")}</span>
         {activeItemCount > 0 && !showDone ? (
           <span className="chip inbox-count">{activeItemCount}</span>
         ) : null}
@@ -212,13 +212,13 @@ export function InboxPanel({
             className={`inbox-tab ${!showDone ? "inbox-tab-active" : ""}`}
             onClick={() => setShowDone(false)}
           >
-            {intl.formatMessage({ id: "inbox.tabActive" })}
+            {t("inbox.tabActive")}
           </button>
           <button
             className={`inbox-tab ${showDone ? "inbox-tab-active" : ""}`}
             onClick={() => setShowDone(true)}
           >
-            {intl.formatMessage({ id: "inbox.tabDone" })}
+            {t("inbox.tabDone")}
           </button>
         </div>
       </div>
@@ -274,7 +274,7 @@ export function InboxPanel({
 
             {items.length === 0 && queryTurns.length === 0 ? (
               <div className="inbox-empty">
-                <p>{intl.formatMessage({ id: "inbox.emptyMessage" })}</p>
+                <p>{t("inbox.emptyMessage")}</p>
               </div>
             ) : null}
           </>
@@ -287,13 +287,12 @@ export function InboxPanel({
                   <ResolvedItemRow
                     key={ri.item.id}
                     resolved={ri}
-                    intl={intl}
                   />
                 ))}
               </div>
             ) : (
               <div className="inbox-empty">
-                <p>{intl.formatMessage({ id: "inbox.doneEmptyMessage" })}</p>
+                <p>{t("inbox.doneEmptyMessage")}</p>
               </div>
             )}
           </>
@@ -306,7 +305,7 @@ export function InboxPanel({
           <Search size={13} className="inbox-composer-icon" />
           <textarea
             className="inbox-composer-input"
-            placeholder={intl.formatMessage({ id: "inbox.queryPlaceholder" })}
+            placeholder={t("inbox.queryPlaceholder")}
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -315,7 +314,7 @@ export function InboxPanel({
           />
           <button
             className="inbox-composer-send"
-            title={intl.formatMessage({ id: "inbox.sendQuery" })}
+            title={t("inbox.sendQuery")}
             onClick={handleSubmitQuery}
             disabled={!queryText.trim() || isQuerying}
           >
@@ -343,7 +342,7 @@ function DigestItemRowPanel({
   onExecuteAction: (item: InboxItem, action: InboxAction) => Promise<void>;
   onOpenInChat: (item: InboxItem) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [expanded, setExpanded] = useState(false);
   const [childItems, setChildItems] = useState<InboxItem[]>([]);
@@ -362,21 +361,21 @@ function DigestItemRowPanel({
     if (counts.safe > 0) {
       countBadges.push(
         <span key="safe" className="digest-count-badge digest-count-safe">
-          {counts.safe} {intl.formatMessage({ id: "inbox.digest.safe" })}
+          {counts.safe} {t("inbox.digest.safe")}
         </span>,
       );
     }
     if (counts.needsYou > 0) {
       countBadges.push(
         <span key="needsYou" className="digest-count-badge digest-count-needs-you">
-          {counts.needsYou} {intl.formatMessage({ id: "inbox.digest.needsYou" })}
+          {counts.needsYou} {t("inbox.digest.needsYou")}
         </span>,
       );
     }
     if (counts.conflict > 0) {
       countBadges.push(
         <span key="conflict" className="digest-count-badge digest-count-conflict">
-          {counts.conflict} {intl.formatMessage({ id: "inbox.digest.conflict" })}
+          {counts.conflict} {t("inbox.digest.conflict")}
         </span>,
       );
     }
@@ -398,7 +397,7 @@ function DigestItemRowPanel({
         <div className="inbox-item-actions">
           <button
             className="icon-btn inbox-item-dismiss"
-            title={intl.formatMessage({ id: "inbox.action.dismiss" })}
+            title={t("inbox.action.dismiss")}
             onClick={(e) => {
               e.stopPropagation();
               onDismiss(item.id);
@@ -444,7 +443,7 @@ function InboxItemRow({
   onExecuteAction: (item: InboxItem, action: InboxAction) => Promise<void>;
   onOpenInChat: (item: InboxItem) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
 
   const typeIcon = item.notificationType === "failure" ? "!" : item.notificationType === "finished" ? "✓" : item.notificationType === "watch" ? "!" : item.notificationType === "digest" ? "≡" : "?";
@@ -487,7 +486,7 @@ function InboxItemRow({
   };
 
   const actionLabel = (action: InboxAction): string => {
-    return intl.formatMessage({ id: `inbox.action.${action}` });
+    return t(`inbox.action.${action}`);
   };
 
   // Filter out dismiss — it already has its own button position
@@ -533,7 +532,7 @@ function InboxItemRow({
           {item.availableActions.includes("dismiss") ? (
             <button
               className="icon-btn inbox-item-dismiss"
-              title={intl.formatMessage({ id: "inbox.action.dismiss" })}
+              title={t("inbox.action.dismiss")}
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(item.id);
@@ -546,7 +545,7 @@ function InboxItemRow({
           {item.prUrl ? (
             <button
               className="icon-btn inbox-item-open-web"
-              title={intl.formatMessage({ id: "inbox.action.openOnWeb" })}
+              title={t("inbox.action.openOnWeb")}
               onClick={(e) => {
                 e.stopPropagation();
                 window.open(item.prUrl, "_blank");
@@ -564,13 +563,12 @@ function InboxItemRow({
 /** Resolved inbox item row for the Done view */
 function ResolvedItemRow({
   resolved,
-  intl,
 }: {
   resolved: ResolvedInboxItem;
-  intl: ReturnType<typeof useIntl>;
 }): React.ReactNode {
+  const { t } = useTranslation();
   const { item, resolvedAt, resolution } = resolved;
-  const reasonText = intl.formatMessage({ id: `inbox.resolution.${resolution}` });
+  const reasonText = t(`inbox.resolution.${resolution}`);
   const resolvedAgo = timeAgo(resolvedAt);
 
   return (

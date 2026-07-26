@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { BudgetWatch, BudgetBreach } from "../../../shared/ipc";
 import type { Environment, LoopMeta } from "../types";
 import { Clock, Play, Trash2, Plus } from "lucide-react";
@@ -33,7 +33,7 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
     onResumeLoop,
     onClose,
   } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
 
   const activeBreaches = breaches.filter((b) => !b.dismissed);
@@ -44,20 +44,20 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
         <SheetHeader>
           <SheetTitle>
             <Clock size={14} className="inline mr-2" />
-            {intl.formatMessage({ id: "budget.title" })}
+            {t("budget.title")}
           </SheetTitle>
-          <SheetDescription>{intl.formatMessage({ id: "budget.title" })}</SheetDescription>
+          <SheetDescription>{t("budget.title")}</SheetDescription>
         </SheetHeader>
 
         <p className="budget-panel-description">
-          {intl.formatMessage({ id: "budget.description" })}
+          {t("budget.description")}
         </p>
 
         {/* Breach inbox */}
         {activeBreaches.length > 0 ? (
           <div className="budget-section">
             <div className="budget-section-header">
-              <span className="overline">{intl.formatMessage({ id: "budget.breachTitle" })}</span>
+              <span className="overline">{t("budget.breachTitle")}</span>
             </div>
             <div className="budget-breach-list">
               {activeBreaches.map((breach) => (
@@ -73,7 +73,7 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
                   {breach.autoPaused ? (
                     <button
                       className="btn budget-breach-action"
-                      title={intl.formatMessage({ id: "budget.resumeLoop" })}
+                      title={t("budget.resumeLoop")}
                       onClick={() => onResumeLoop(breach.environmentId, breach.loopId)}
                     >
                       <Play size={12} />
@@ -81,7 +81,7 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
                   ) : null}
                   <button
                     className="icon-btn budget-breach-dismiss"
-                    title={intl.formatMessage({ id: "budget.dismissBreach" })}
+                    title={t("budget.dismissBreach")}
                     onClick={() => onDismissBreach(breach.id)}
                   >
                     <X size={12} />
@@ -95,20 +95,20 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
         {/* Watches list */}
         <div className="budget-section">
           <div className="budget-section-header">
-            <span className="overline">{intl.formatMessage({ id: "budget.title" })}</span>
+            <span className="overline">{t("budget.title")}</span>
             <span className="spacer" />
             <button
               className="btn budget-add-btn"
               onClick={() => setShowForm((v) => !v)}
             >
               <Plus size={12} />
-              {intl.formatMessage({ id: "budget.addWatch" })}
+              {t("budget.addWatch")}
             </button>
           </div>
 
           {watches.length === 0 ? (
             <div className="budget-empty">
-              <p>{intl.formatMessage({ id: "budget.noWatchesDescription" })}</p>
+              <p>{t("budget.noWatchesDescription")}</p>
             </div>
           ) : (
             <div className="budget-watch-list">
@@ -117,14 +117,14 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
                 const envLoops = watch.environmentId ? (perEnvLoops[watch.environmentId] ?? []) : [];
                 const loop = watch.loopId ? envLoops.find((l) => l.id === watch.loopId) : null;
                 const scopeLabel = watch.scope === "fleet"
-                  ? intl.formatMessage({ id: "budget.fleetLabel" })
+                  ? t("budget.fleetLabel")
                   : (loop?.description?.trim() || watch.loopId || "");
 
                 return (
                   <div key={watch.id} className={`budget-watch-row${!watch.enabled ? " disabled" : ""}`}>
                     <button
                       className="budget-watch-toggle"
-                      title={watch.enabled ? intl.formatMessage({ id: "budget.enabled" }) : intl.formatMessage({ id: "budget.disabled" })}
+                      title={watch.enabled ? t("budget.enabled") : t("budget.disabled")}
                       onClick={() => onToggleWatch(watch.id, !watch.enabled)}
                     >
                       <span className={`budget-toggle-dot${watch.enabled ? " on" : ""}`} />
@@ -139,7 +139,7 @@ export function BudgetWatchPanel(props: BudgetWatchPanelProps): React.ReactNode 
                     </div>
                     <button
                       className="icon-btn"
-                      title={intl.formatMessage({ id: "budget.removeWatch" })}
+                      title={t("budget.removeWatch")}
                       onClick={() => onRemoveWatch(watch.id)}
                     >
                       <Trash2 size={12} />
@@ -172,7 +172,7 @@ function AddWatchForm(props: {
   onCancel: () => void;
 }): React.ReactNode {
   const { environments, perEnvLoops, onAdd, onCancel } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const [scope, setScope] = useState<"loop" | "fleet">("loop");
   const [environmentId, setEnvironmentId] = useState<string>(environments[0]?.id ?? "");
@@ -188,17 +188,17 @@ function AddWatchForm(props: {
 
     const thresholdNum = parseInt(threshold, 10);
     if (isNaN(thresholdNum) || thresholdNum <= 0) {
-      setError(intl.formatMessage({ id: "budget.invalidThreshold" }));
+      setError(t("budget.invalidThreshold"));
       return;
     }
 
     if (scope === "loop") {
       if (!loopId) {
-        setError(intl.formatMessage({ id: "budget.loopRequired" }));
+        setError(t("budget.loopRequired"));
         return;
       }
       if (!environmentId) {
-        setError(intl.formatMessage({ id: "budget.environmentRequired" }));
+        setError(t("budget.environmentRequired"));
         return;
       }
     }
@@ -217,19 +217,19 @@ function AddWatchForm(props: {
   return (
     <div className="budget-form">
       <div className="budget-form-row">
-        <label className="budget-form-label">{intl.formatMessage({ id: "budget.scopeLabel" })}</label>
+        <label className="budget-form-label">{t("budget.scopeLabel")}</label>
         <div className="budget-form-scope-toggle">
           <button
             className={`budget-form-scope-btn${scope === "loop" ? " active" : ""}`}
             onClick={() => setScope("loop")}
           >
-            {intl.formatMessage({ id: "budget.scopeLoop" })}
+            {t("budget.scopeLoop")}
           </button>
           <button
             className={`budget-form-scope-btn${scope === "fleet" ? " active" : ""}`}
             onClick={() => setScope("fleet")}
           >
-            {intl.formatMessage({ id: "budget.scopeFleet" })}
+            {t("budget.scopeFleet")}
           </button>
         </div>
       </div>
@@ -237,7 +237,7 @@ function AddWatchForm(props: {
       {scope === "loop" ? (
         <>
           <div className="budget-form-row">
-            <label className="budget-form-label">{intl.formatMessage({ id: "budget.environmentLabel" })}</label>
+            <label className="budget-form-label">{t("budget.environmentLabel")}</label>
             <select
               className="budget-form-select"
               value={environmentId}
@@ -249,13 +249,13 @@ function AddWatchForm(props: {
             </select>
           </div>
           <div className="budget-form-row">
-            <label className="budget-form-label">{intl.formatMessage({ id: "budget.loopIdLabel" })}</label>
+            <label className="budget-form-label">{t("budget.loopIdLabel")}</label>
             <select
               className="budget-form-select"
               value={loopId}
               onChange={(e) => setLoopId(e.target.value)}
             >
-              <option value="">{intl.formatMessage({ id: "budget.loopIdPlaceholder" })}</option>
+              <option value="">{t("budget.loopIdPlaceholder")}</option>
               {envLoops.map((loop) => (
                 <option key={loop.id} value={loop.id}>
                   {loop.description?.trim() || loop.id}
@@ -267,13 +267,13 @@ function AddWatchForm(props: {
       ) : null}
 
       <div className="budget-form-row">
-        <label className="budget-form-label">{intl.formatMessage({ id: "budget.thresholdLabel" })}</label>
+        <label className="budget-form-label">{t("budget.thresholdLabel")}</label>
         <input
           className="budget-form-input"
           type="number"
           min="1"
           value={threshold}
-          placeholder={intl.formatMessage({ id: "budget.thresholdPlaceholder" })}
+          placeholder={t("budget.thresholdPlaceholder")}
           onChange={(e) => setThreshold(e.target.value)}
         />
       </div>
@@ -285,10 +285,10 @@ function AddWatchForm(props: {
             checked={autoPause}
             onChange={(e) => setAutoPause(e.target.checked)}
           />
-          <span>{intl.formatMessage({ id: "budget.autoPauseLabel" })}</span>
+          <span>{t("budget.autoPauseLabel")}</span>
         </label>
         <span className="budget-form-checkbox-desc">
-          {intl.formatMessage({ id: "budget.autoPauseDescription" })}
+          {t("budget.autoPauseDescription")}
         </span>
       </div>
 
@@ -296,10 +296,10 @@ function AddWatchForm(props: {
 
       <div className="budget-form-actions">
         <Button variant="outline" onClick={onCancel}>
-          {intl.formatMessage({ id: "vmWizard.cancel" })}
+          {t("vmWizard.cancel")}
         </Button>
         <Button onClick={handleSubmit}>
-          {intl.formatMessage({ id: "budget.addWatch" })}
+          {t("budget.addWatch")}
         </Button>
       </div>
     </div>

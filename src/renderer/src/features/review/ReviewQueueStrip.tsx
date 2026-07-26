@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
 import type { ReviewModeItem, PrRiskLevel, BatchOverlapResult } from "../../../../shared/ipc";
@@ -20,7 +20,7 @@ function prKey(repo: string, number: number): string {
 }
 
 export function ReviewQueueStrip(): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
 
   // Force re-renders when overlap data changes
@@ -45,10 +45,10 @@ export function ReviewQueueStrip(): React.ReactNode {
   }
 
   return (
-    <div className="review-queue-strip" role="list" aria-label={intl.formatMessage({ id: "reviewMode.queueLabel" })}>
+    <div className="review-queue-strip" role="list" aria-label={t("reviewMode.queueLabel")}>
       <div className="review-queue-strip-header">
         <span className="review-queue-strip-title">
-          {intl.formatMessage({ id: "reviewMode.queueTitle" }, { count: batchItems.length })}
+          {t("reviewMode.queueTitle", { count: batchItems.length })}
         </span>
       </div>
       <div className="review-queue-strip-list">
@@ -82,7 +82,7 @@ export function ReviewQueueStrip(): React.ReactNode {
                 {item.verdict ? (
                   <span className="review-queue-strip-row-verdict">
                     <span className={riskChipClass(item.verdict.riskLevel)}>
-                      {intl.formatMessage({ id: `inbox.prRisk.${item.verdict.riskLevel}` })}
+                      {t(`inbox.prRisk.${item.verdict.riskLevel}`)}
                     </span>
                     <span className="review-queue-strip-row-verdict-text">
                       {item.verdict.verdict}
@@ -91,7 +91,7 @@ export function ReviewQueueStrip(): React.ReactNode {
                 ) : (
                   <span className="review-queue-strip-row-verdict">
                     <span className="pr-risk-chip pr-risk-chip-pending">
-                      {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
+                      {t("inbox.prVerdict.analyzing")}
                     </span>
                   </span>
                 )}

@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { EnvironmentHealth, LoopMeta } from "../types";
 import type { ReachabilityState } from "../../../shared/ipc";
 import { loopStatusToFleetItem } from "../fleet-mapping";
@@ -40,7 +40,7 @@ export function FleetHealthFooter(props: {
     onSelectEnvironment,
     reachability,
   } = props;
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const {
     instanceCount,
@@ -138,10 +138,7 @@ export function FleetHealthFooter(props: {
   return (
     <div className="fleet-health-footer">
       <span className="fleet-health-summary">
-        {intl.formatMessage(
-          { id: "fleetHealth.instancesConnected" },
-          { total: instanceCount, connected: connectedCount },
-        )}
+        {t("fleetHealth.instancesConnected", { total: instanceCount, connected: connectedCount })}
       </span>
 
       {failedCount > 0 ? (
@@ -151,20 +148,15 @@ export function FleetHealthFooter(props: {
           title={
             failedCount === 1
               ? failedLoopDetails[0].loopDescription
-              : intl.formatMessage(
-                  { id: "fleetHealth.loopsFailing" },
-                  { count: failedCount },
-                )
+              : t("fleetHealth.loopsFailing", { count: failedCount })
           }
         >
           <AlertTriangle size={11} />
           <span>
             {failedCount === 1
-              ? intl.formatMessage({ id: "fleetHealth.loopFailing" })
-              : intl.formatMessage(
-                  { id: "fleetHealth.loopsFailing" },
-                  { count: failedCount },
-                )}
+              ? t("fleetHealth.loopFailing")
+              : t("fleetHealth.loopsFailing", { count: failedCount })
+            }
           </span>
         </button>
       ) : null}
@@ -176,20 +168,15 @@ export function FleetHealthFooter(props: {
           title={
             unreachableCount === 1
               ? unreachableEnvDetails[0].envName
-              : intl.formatMessage(
-                  { id: "fleetHealth.unreachablePlural" },
-                  { count: unreachableCount },
-                )
+              : t("fleetHealth.unreachablePlural", { count: unreachableCount })
           }
         >
           <WifiOff size={11} />
           <span>
             {unreachableCount === 1
-              ? intl.formatMessage({ id: "fleetHealth.unreachable" })
-              : intl.formatMessage(
-                  { id: "fleetHealth.unreachablePlural" },
-                  { count: unreachableCount },
-                )}
+              ? t("fleetHealth.unreachable")
+              : t("fleetHealth.unreachablePlural", { count: unreachableCount })
+            }
           </span>
         </button>
       ) : null}

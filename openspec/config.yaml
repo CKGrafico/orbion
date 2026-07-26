@@ -7,7 +7,7 @@ context: |
 
   Tech stack: TypeScript (strict), React 19, Electron 37, electron-vite 4,
   Vite 7. Tailwind CSS v4 + shadcn/ui (new-york style) as the primary
-  component library, Feature-Sliced Design, inversify DI, and react-intl
+  component library, Feature-Sliced Design, inversify DI, and react-i18next
   i18n.
 
   Build system: pnpm (Node >= 20), pnpm-lock.yaml. Scripts: dev, dev:web,

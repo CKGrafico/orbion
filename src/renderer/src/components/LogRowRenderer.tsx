@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { LogRow, RunHeaderLogRow, ToolCallLogRow, MarkdownLogRow, PlainTextLogRow, ExitLogRow } from "./log-types";
 import { MarkdownContent } from "../chat/MarkdownContent";
 import { ChevronRight, ChevronDown } from "lucide-react";
@@ -22,12 +22,12 @@ const STATUS_GLYPHS: Record<string, string> = {
 };
 
 export function RunHeaderRow({ row, expanded, onToggle }: { row: RunHeaderLogRow; expanded: boolean; onToggle: () => void }) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   return (
     <button className="run-card-header" onClick={onToggle}>
       <span className="run-card-chevron">{expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</span>
       <span className="run-card-label">
-        {intl.formatMessage({ id: "logRows.runHeader" }, { number: row.runNumber })}
+        {t("logRows.runHeader", { number: row.runNumber })}
       </span>
       {row.timestamp && <span className="run-card-timestamp">{row.timestamp}</span>}
     </button>
@@ -35,7 +35,7 @@ export function RunHeaderRow({ row, expanded, onToggle }: { row: RunHeaderLogRow
 }
 
 function ToolCallLogRowComponent({ row }: { row: ToolCallLogRow }) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const icon = TOOL_ICONS[row.toolKind] ?? "⚙️";
   const statusGlyph = STATUS_GLYPHS[row.status] ?? "●";
@@ -49,7 +49,7 @@ function ToolCallLogRowComponent({ row }: { row: ToolCallLogRow }) {
           <span className="log-tool-call-duration">{row.duration}ms</span>
         )}
         <span className={`log-tool-call-status log-tool-call-status-${row.status}`}>
-          {statusGlyph} {intl.formatMessage({ id: `logRows.${row.status}` })}
+          {statusGlyph} {t(`logRows.${row.status}`)}
         </span>
         <span className="log-tool-call-chevron">{expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
       </button>
@@ -57,7 +57,7 @@ function ToolCallLogRowComponent({ row }: { row: ToolCallLogRow }) {
         <div className="log-tool-call-output">
           <div className="log-tool-call-output-header">
             <span className="log-tool-call-output-label">
-              {intl.formatMessage({ id: "logRows.output" })}
+              {t("logRows.output")}
             </span>
           </div>
           <pre>{row.output}</pre>
@@ -80,11 +80,11 @@ function PlainTextRowComponent({ row }: { row: PlainTextLogRow }) {
 }
 
 function ExitRowComponent({ row }: { row: ExitLogRow }) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const isOk = row.exitCode === 0;
   return (
     <div className={`log-exit-row ${isOk ? "log-exit-ok" : "log-exit-bad"}`}>
-      {intl.formatMessage({ id: "logRows.exitCode" }, { code: row.exitCode })}
+      {t("logRows.exitCode", { code: row.exitCode })}
       {row.duration != null && ` · ${row.duration}ms`}
     </div>
   );

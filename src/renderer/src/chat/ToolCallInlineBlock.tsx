@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { ToolCall } from "./types";
 import { KIND_ICONS, STATUS_GLYPHS } from "./MarkdownContent";
 
@@ -20,7 +20,7 @@ export function ToolCallInlineBlock({
   onToggleExpand,
   rowId,
 }: ToolCallRowProps) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [outputExpanded, setOutputExpanded] = useState(false);
   const icon = KIND_ICONS[toolCall.kind] ?? "⚙️";
   const statusGlyph = STATUS_GLYPHS[toolCall.status] ?? "·";
@@ -71,7 +71,7 @@ export function ToolCallInlineBlock({
         <div className="tool-call-output">
           <div className="tool-call-output-header">
             <span className="tool-call-output-label">
-              {intl.formatMessage({ id: "chat.output" })}
+              {t("chat.output")}
             </span>
           </div>
           <pre>{displayOutput}</pre>
@@ -81,11 +81,8 @@ export function ToolCallInlineBlock({
               onClick={handleToggleOutput}
             >
               {outputExpanded
-                ? intl.formatMessage({ id: "chat.showLess" })
-                : intl.formatMessage(
-                    { id: "chat.showMore" },
-                    { lines: outputLines.length },
-                  )}
+                ? t("chat.showLess")
+                : t("chat.showMore", { lines: outputLines.length })}
             </button>
           )}
         </div>

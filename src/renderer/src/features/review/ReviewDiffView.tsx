@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IInfraService, IReviewModeService } from "../../services/interfaces";
 import type { DiffFileEntry, InfraActionResult, GetPrDiffResult } from "../../../../shared/ipc";
@@ -14,7 +14,7 @@ interface FileDiffCache {
 }
 
 export function ReviewDiffView(): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
 
@@ -55,7 +55,7 @@ export function ReviewDiffView(): React.ReactNode {
           setLoadError(
             typeof result.error === "string"
               ? result.error
-              : intl.formatMessage({ id: "reviewMode.diffView.loadError" }),
+              : t("reviewMode.diffView.loadError"),
           );
           return;
         }
@@ -73,7 +73,7 @@ export function ReviewDiffView(): React.ReactNode {
       .catch(() => {
         if (cancelled) return;
         setLoading(false);
-        setLoadError(intl.formatMessage({ id: "reviewMode.diffView.loadError" }));
+        setLoadError(t("reviewMode.diffView.loadError"));
       });
 
     return () => {
@@ -129,7 +129,7 @@ export function ReviewDiffView(): React.ReactNode {
             next.set(selectedPath, {
               lines: [],
               loading: false,
-              error: intl.formatMessage({ id: "reviewMode.diffView.loadError" }),
+              error: t("reviewMode.diffView.loadError"),
             });
             return next;
           });
@@ -151,7 +151,7 @@ export function ReviewDiffView(): React.ReactNode {
           next.set(selectedPath, {
             lines: [],
             loading: false,
-            error: intl.formatMessage({ id: "reviewMode.diffView.loadError" }),
+            error: t("reviewMode.diffView.loadError"),
           });
           return next;
         });
@@ -187,7 +187,7 @@ export function ReviewDiffView(): React.ReactNode {
       <div className="review-diff-view">
         <div className="review-diff-loader">
           <Loader2 size={16} className="spin" />
-          <span>{intl.formatMessage({ id: "reviewMode.diffView.loading" })}</span>
+          <span>{t("reviewMode.diffView.loading")}</span>
         </div>
       </div>
     );
@@ -210,7 +210,7 @@ export function ReviewDiffView(): React.ReactNode {
       <div className="review-diff-file-list">
         <div className="review-diff-file-list-header">
           <span className="review-diff-file-list-title">
-            {intl.formatMessage({ id: "reviewMode.diffView.filesChanged" })} ({files.length})
+            {t("reviewMode.diffView.filesChanged")} ({files.length})
           </span>
           <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: 11, fontFamily: "var(--font-mono)" }}>
             <span className="review-diff-file-item-additions">+{totalAdditions}</span>
@@ -242,7 +242,7 @@ export function ReviewDiffView(): React.ReactNode {
         )}
         {truncated && (
           <div className="review-diff-truncated">
-            {intl.formatMessage({ id: "reviewMode.diffView.truncated" })}
+            {t("reviewMode.diffView.truncated")}
           </div>
         )}
         <DiffContentPane
@@ -295,12 +295,12 @@ function DiffContentPane({
   file: DiffFileEntry | null;
   diffCache: FileDiffCache | undefined;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (!file) {
     return (
       <div className="review-diff-empty">
-        {intl.formatMessage({ id: "reviewMode.diffView.noFileSelected" })}
+        {t("reviewMode.diffView.noFileSelected")}
       </div>
     );
   }
@@ -309,7 +309,7 @@ function DiffContentPane({
     return (
       <div className="review-diff-binary-label">
         <File size={24} className="review-diff-binary-icon" />
-        {intl.formatMessage({ id: "reviewMode.diffView.binaryFile" })}
+        {t("reviewMode.diffView.binaryFile")}
       </div>
     );
   }
@@ -318,7 +318,7 @@ function DiffContentPane({
     return (
       <div className="review-diff-loader">
         <Loader2 size={16} className="spin" />
-        <span>{intl.formatMessage({ id: "reviewMode.diffView.loading" })}</span>
+        <span>{t("reviewMode.diffView.loading")}</span>
       </div>
     );
   }

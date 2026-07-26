@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IReviewModeService } from "../../services/interfaces";
 import type { ReviewModeItem, PrRiskLevel, BatchOverlapResult } from "../../../../shared/ipc";
@@ -56,7 +56,7 @@ function ReviewModeContent({
   item: ReviewModeItem;
   onExit: () => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
   const [activeTab, setActiveTab] = useState<ReviewTab>("briefing");
   const [submitting, setSubmitting] = useState<"APPROVE" | "REQUEST_CHANGES" | null>(null);
@@ -142,8 +142,8 @@ function ReviewModeContent({
 
   return (
     <Dialog open={true} onOpenChange={() => handleExit()}>
-      <DialogTitle className="sr-only">{intl.formatMessage({ id: "reviewMode.dialogLabel" })}</DialogTitle>
-      <DialogDescription className="sr-only">{intl.formatMessage({ id: "reviewMode.dialogLabel" })}</DialogDescription>
+      <DialogTitle className="sr-only">{t("reviewMode.dialogLabel")}</DialogTitle>
+      <DialogDescription className="sr-only">{t("reviewMode.dialogLabel")}</DialogDescription>
       <DialogContent className="fixed inset-0 max-w-none h-full w-full rounded-none border-0 p-0">
       <div className="review-mode-container">
         {/* Header */}
@@ -158,21 +158,21 @@ function ReviewModeContent({
               <span className="review-mode-title">{item.title}</span>
             </div>
             <span className="review-mode-author">
-              {intl.formatMessage({ id: "reviewMode.byAuthor" }, { author: item.author })}
+              {t("reviewMode.byAuthor", { author: item.author })}
             </span>
             {item.verdict ? (
               <span className={riskChipClass(item.verdict.riskLevel)}>
-                {intl.formatMessage({ id: `inbox.prRisk.${item.verdict.riskLevel}` })}
+                {t(`inbox.prRisk.${item.verdict.riskLevel}`)}
               </span>
             ) : (
               <span className="pr-risk-chip pr-risk-chip-pending">
-                {intl.formatMessage({ id: "inbox.prVerdict.analyzing" })}
+                {t("inbox.prVerdict.analyzing")}
               </span>
             )}
             {isDisposed && (
               <span className="review-mode-disposed-badge">
                 <CheckCircle2 size={12} />
-                {intl.formatMessage({ id: "reviewMode.disposed" })}
+                {t("reviewMode.disposed")}
               </span>
             )}
           </div>
@@ -184,13 +184,13 @@ function ReviewModeContent({
                   className={`review-mode-tab-btn${activeTab === "briefing" ? " review-mode-tab-btn-active" : ""}`}
                   onClick={() => setActiveTab("briefing")}
                 >
-                  {intl.formatMessage({ id: "reviewMode.briefing.tabLabel" })}
+                  {t("reviewMode.briefing.tabLabel")}
                 </button>
                 <button
                   className={`review-mode-tab-btn${activeTab === "raw-diff" ? " review-mode-tab-btn-active" : ""}`}
                   onClick={() => setActiveTab("raw-diff")}
                 >
-                  {intl.formatMessage({ id: "reviewMode.briefing.rawDiffTab" })}
+                  {t("reviewMode.briefing.rawDiffTab")}
                 </button>
               </div>
 
@@ -199,7 +199,7 @@ function ReviewModeContent({
                 <>
                   <button
                     className="review-mode-action-btn review-mode-action-approve"
-                    title={intl.formatMessage({ id: "reviewMode.approve" })}
+                    title={t("reviewMode.approve")}
                     onClick={handleApprove}
                     disabled={submitting !== null}
                   >
@@ -208,42 +208,42 @@ function ReviewModeContent({
                     ) : (
                       <CheckCircle2 size={12} />
                     )}
-                    <span>{intl.formatMessage({ id: "reviewMode.approve" })}</span>
+                    <span>{t("reviewMode.approve")}</span>
                   </button>
                   <button
                     className="review-mode-action-btn review-mode-action-request-changes"
-                    title={intl.formatMessage({ id: "reviewMode.requestChanges" })}
+                    title={t("reviewMode.requestChanges")}
                     onClick={toggleCommentInput}
                     disabled={submitting !== null}
                   >
                     <MessageCircleWarning size={12} />
-                    <span>{intl.formatMessage({ id: "reviewMode.requestChanges" })}</span>
+                    <span>{t("reviewMode.requestChanges")}</span>
                   </button>
                 </>
               )}
 
               <button
                 className="review-mode-action-btn review-mode-action-open"
-                title={intl.formatMessage({ id: "reviewMode.openOnWeb" })}
+                title={t("reviewMode.openOnWeb")}
                 onClick={handleOpenOnWeb}
               >
                 <ExternalLink size={12} />
-                <span>{intl.formatMessage({ id: "reviewMode.openOnWeb" })}</span>
+                <span>{t("reviewMode.openOnWeb")}</span>
               </button>
               {onDiscussInChat ? (
                 <button
                   className="review-mode-action-btn review-mode-action-discuss"
-                  title={intl.formatMessage({ id: "reviewMode.discussInChat" })}
+                  title={t("reviewMode.discussInChat")}
                   onClick={() => onDiscussInChat(item)}
                 >
                   <MessageSquare size={12} />
-                  <span>{intl.formatMessage({ id: "reviewMode.discussInChat" })}</span>
+                  <span>{t("reviewMode.discussInChat")}</span>
                 </button>
               ) : null}
             </div>
             <button
               className="icon-btn review-mode-close"
-              title={intl.formatMessage({ id: "reviewMode.close" })}
+              title={t("reviewMode.close")}
               onClick={onExit}
             >
               <X size={16} />
@@ -256,7 +256,7 @@ function ReviewModeContent({
           <div className="review-mode-comment-bar">
             <textarea
               className="review-mode-comment-input"
-              placeholder={intl.formatMessage({ id: "reviewMode.commentPlaceholder" })}
+              placeholder={t("reviewMode.commentPlaceholder")}
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               rows={2}
@@ -271,14 +271,14 @@ function ReviewModeContent({
                 {submitting === "REQUEST_CHANGES" ? (
                   <Loader2 size={14} className="spin" />
                 ) : null}
-                {intl.formatMessage({ id: "reviewMode.submitRequestChanges" })}
+                {t("reviewMode.submitRequestChanges")}
               </button>
               <button
                 className="review-mode-comment-cancel"
                 onClick={() => { setShowCommentInput(false); setCommentText(""); setSubmitError(null); }}
                 disabled={submitting !== null}
               >
-                {intl.formatMessage({ id: "reviewMode.cancelComment" })}
+                {t("reviewMode.cancelComment")}
               </button>
             </div>
           </div>
@@ -296,10 +296,7 @@ function ReviewModeContent({
           <div className="review-order-banner">
             <AlertTriangle size={14} className="review-order-banner-icon" />
             <span className="review-order-banner-text">
-              {intl.formatMessage(
-                { id: "reviewMode.overlap.bannerTitle" },
-                { count: overlapResult.overlaps.length },
-              )}
+              {t("reviewMode.overlap.bannerTitle", { count: overlapResult.overlaps.length })}
               {" — "}
               {overlapResult.suggestedOrder.map((entry, idx) => (
                 <span key={entry.prKey}>
@@ -316,7 +313,7 @@ function ReviewModeContent({
             <button
               className="review-order-banner-dismiss"
               onClick={() => setBannerDismissed(true)}
-              aria-label={intl.formatMessage({ id: "reviewMode.overlap.dismissBanner" })}
+              aria-label={t("reviewMode.overlap.dismissBanner")}
             >
               <X size={12} />
             </button>

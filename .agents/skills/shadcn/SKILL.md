@@ -24,7 +24,7 @@ Build React UI components using shadcn/ui — accessible primitives backed by Ra
 
 4. **Orbion design tokens are the source of truth.** The shadcn CSS variables in `globals.css` are mapped to Orbion's navy/lime palette. Do not override these values inline. Use the semantic variables (`bg-background`, `text-foreground`, `bg-primary`, etc.) or Tailwind utilities that resolve to them.
 
-5. **All user-facing copy through react-intl.** shadcn components receive `intl.formatMessage` results as `children` or `label` props, not hardcoded strings (GR-STYLE-005).
+5. **All user-facing copy through react-i18next.** shadcn components receive `t()` results as `children` or `label` props, not hardcoded strings (GR-STYLE-005).
 
 6. **Use "new-york" style conventions.** The project uses the new-york variant. When adding or customizing components, follow its density and spacing patterns.
 

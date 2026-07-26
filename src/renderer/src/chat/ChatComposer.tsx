@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { AccessMode, ApprovalDecision, ApprovalRequest, ChatTurn, QuestionRequest } from "./types";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { QuestionPanel } from "./QuestionPanel";
@@ -41,7 +41,7 @@ export function ChatComposer({
   onPersistSession,
   onUnpersistSession,
 }: ChatComposerProps) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localDraft, setLocalDraft] = useState("");
 
@@ -125,26 +125,26 @@ export function ChatComposer({
         {isEphemeral ? (
           <div className="composer-ephemeral-row">
             <span className="composer-ephemeral-marker">
-              {intl.formatMessage({ id: "session.ephemeralMarker" })}
+              {t("session.ephemeralMarker")}
             </span>
             <button
               className="composer-persist-btn"
-              title={intl.formatMessage({ id: "session.persistAction" })}
+              title={t("session.persistAction")}
               onClick={onPersistSession}
             >
               <Bookmark size={11} />
-              {intl.formatMessage({ id: "session.persistAction" })}
+              {t("session.persistAction")}
             </button>
           </div>
         ) : (
           <div className="composer-ephemeral-row">
             <button
               className="composer-persist-btn composer-persist-btn-active"
-              title={intl.formatMessage({ id: "session.unpersistAction" })}
+              title={t("session.unpersistAction")}
               onClick={onUnpersistSession}
             >
               <BookmarkCheck size={11} />
-              {intl.formatMessage({ id: "session.persistedMarker" })}
+              {t("session.persistedMarker")}
             </button>
           </div>
         )}
@@ -153,16 +153,16 @@ export function ChatComposer({
             <button
               className={`mode-chip ${accessMode === "supervised" ? "active" : ""}`}
               onClick={() => onAccessModeChange("supervised")}
-              title={intl.formatMessage({ id: "chat.supervisedTitle" })}
+              title={t("chat.supervisedTitle")}
             >
-              {intl.formatMessage({ id: "chat.supervised" })}
+              {t("chat.supervised")}
             </button>
             <button
               className={`mode-chip ${accessMode === "full" ? "active" : ""}`}
               onClick={() => onAccessModeChange("full")}
-              title={intl.formatMessage({ id: "chat.fullAccessTitle" })}
+              title={t("chat.fullAccessTitle")}
             >
-              {intl.formatMessage({ id: "chat.fullAccess" })}
+              {t("chat.fullAccess")}
             </button>
           </div>
         </div>
@@ -172,8 +172,8 @@ export function ChatComposer({
             ref={textareaRef}
             className="composer-textarea"
             placeholder={isReachable
-              ? intl.formatMessage({ id: "chat.sendPlaceholder" })
-              : intl.formatMessage({ id: "chat.sendPlaceholderUnreachable" })}
+              ? t("chat.sendPlaceholder")
+              : t("chat.sendPlaceholderUnreachable")}
             value={currentDraft}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
@@ -183,7 +183,7 @@ export function ChatComposer({
           {isRunning ? (
             <button
               className="composer-stop-btn"
-              title={intl.formatMessage({ id: "chat.stopTurn" })}
+              title={t("chat.stopTurn")}
               onClick={() => activeTurnId && onInterrupt(activeTurnId)}
             >
               <Square size={12} />
@@ -191,7 +191,7 @@ export function ChatComposer({
           ) : (
             <button
               className="composer-send-btn"
-              title={intl.formatMessage({ id: "chat.sendPrompt" })}
+              title={t("chat.sendPrompt")}
               onClick={handleSend}
               disabled={!currentDraft.trim() || !isReachable}
             >

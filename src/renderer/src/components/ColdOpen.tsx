@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { OrbionMark } from "./OrbionMark";
 import { decodeBootstrapSeed } from "../../../shared/utils";
 import type { BootstrapSeed } from "../../../shared/ipc";
@@ -18,7 +18,7 @@ export function ColdOpen({
   onAddVm: () => void;
   onImportSeed: (seed: BootstrapSeed) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [showSeedInput, setShowSeedInput] = useState(false);
   const [seedString, setSeedString] = useState("");
   const [seedError, setSeedError] = useState(false);
@@ -47,28 +47,28 @@ export function ColdOpen({
     <div className="cold-open">
       <OrbionMark size={40} />
       <h2 className="cold-open-headline">
-        {intl.formatMessage({ id: "coldOpen.headline" })}
+        {t("coldOpen.headline")}
       </h2>
       <p className="cold-open-copy">
-        {intl.formatMessage({ id: "coldOpen.copy" })}
+        {t("coldOpen.copy")}
       </p>
       <div className="cold-open-actions">
         <Button className="cold-open-btn" onClick={onAddVm}>
-          {intl.formatMessage({ id: "coldOpen.addFirstMachine" })}
+          {t("coldOpen.addFirstMachine")}
         </Button>
         <Button variant="outline" className="cold-open-btn" onClick={handleImportClick}>
-          {intl.formatMessage({ id: "coldOpen.importSeed" })}
+          {t("coldOpen.importSeed")}
         </Button>
       </div>
       {showSeedInput && (
         <div className="cold-open-seed-dialog">
           <h3 className="cold-open-seed-title">
-            {intl.formatMessage({ id: "coldOpen.importSeedTitle" })}
+            {t("coldOpen.importSeedTitle")}
           </h3>
           <Input
             className="cold-open-seed-input"
             type="text"
-            placeholder={intl.formatMessage({ id: "coldOpen.importSeedPlaceholder" })}
+            placeholder={t("coldOpen.importSeedPlaceholder")}
             value={seedString}
             onChange={(e) => {
               setSeedString(e.target.value);
@@ -82,12 +82,12 @@ export function ColdOpen({
           />
           {seedError && (
             <p className="cold-open-seed-error">
-              {intl.formatMessage({ id: "coldOpen.importSeedInvalid" })}
+              {t("coldOpen.importSeedInvalid")}
             </p>
           )}
           <div className="cold-open-seed-actions">
             <Button onClick={handleSeedConfirm}>
-              {intl.formatMessage({ id: "coldOpen.importSeedConfirm" })}
+              {t("coldOpen.importSeedConfirm")}
             </Button>
             <Button variant="outline" onClick={handleSeedCancel}>
               Cancel

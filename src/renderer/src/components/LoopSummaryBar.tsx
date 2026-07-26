@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { LoopMeta, LoopStatus, FleetLoopRollup } from "../types";
 import { useNextRunCountdown } from "./useNextRunCountdown";
 import type { PipelineCounts } from "./usePipelineCounts";
@@ -28,7 +28,7 @@ const EXCEPTION_COLORS: Record<string, string> = {
 };
 
 export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode, fleetRollup, pipelineCounts }: LoopSummaryBarProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const isReachable = reachability === "connected" || reachability === undefined;
 
@@ -83,8 +83,8 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
     return (
       <div className="loop-summary-bar loop-summary-bar--unknown">
         <span className="loop-summary-unknown-text">
-          {intl.formatMessage(
-            { id: "loopSummary.unknownState" },
+          {t(
+            "loopSummary.unknownState",
             { count: loops.length },
           )}
         </span>
@@ -96,7 +96,7 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
     return (
       <div className="loop-summary-bar loop-summary-bar--empty">
         <span className="loop-summary-empty-text">
-          {intl.formatMessage({ id: "loopSummary.emptyState" })}
+          {t("loopSummary.emptyState")}
         </span>
       </div>
     );
@@ -110,12 +110,12 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
             className="loop-summary-segment loop-summary-healthy loop-summary-segment--clickable"
             role="button"
             tabIndex={0}
-            aria-label={intl.formatMessage({ id: "loopSummary.healthyCountAria" }, { count: healthyCount })}
+            aria-label={t("loopSummary.healthyCountAria", { count: healthyCount })}
             onClick={onSegmentClick ? () => onSegmentClick("healthy") : undefined}
             onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick("healthy"); } } : undefined}
           >
-            {intl.formatMessage(
-              { id: "loopSummary.healthyCount" },
+            {t(
+              "loopSummary.healthyCount",
               { count: healthyCount },
             )}
           </span>
@@ -130,12 +130,12 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
             style={{ color: EXCEPTION_COLORS[status] }}
             role="button"
             tabIndex={0}
-            aria-label={intl.formatMessage({ id: `loopSummary.${status}CountAria` }, { count: counts[status] })}
+            aria-label={t(`loopSummary.${status}CountAria`, { count: counts[status] })}
             onClick={onSegmentClick ? () => onSegmentClick(status as LoopSegmentKind) : undefined}
             onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick(status as LoopSegmentKind); } } : undefined}
           >
-            {intl.formatMessage(
-              { id: `loopSummary.${status}Count` },
+            {t(
+              `loopSummary.${status}Count`,
               { count: counts[status] },
             )}
           </span>
@@ -150,16 +150,16 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
                 className="loop-summary-segment loop-summary-pipeline loop-summary-segment--clickable"
                 role="button"
                 tabIndex={0}
-                aria-label={intl.formatMessage(
-                  { id: "loopSummary.pipelineCountAria" },
+                aria-label={t(
+                  "loopSummary.pipelineCountAria",
                   { count: count < 0 ? 0 : count, label },
                 )}
                 onClick={onSegmentClick ? () => onSegmentClick(`pipeline:${label}` as LoopSegmentKind) : undefined}
                 onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick(`pipeline:${label}` as LoopSegmentKind); } } : undefined}
               >
                 {count < 0
-                  ? intl.formatMessage({ id: "loopSummary.pipelineCountError" }, { label })
-                  : intl.formatMessage({ id: "loopSummary.pipelineCount" }, { count, label })}
+                  ? t("loopSummary.pipelineCountError", { label })
+                  : t("loopSummary.pipelineCount", { count, label })}
               </span>
             ))}
           </>
@@ -168,8 +168,8 @@ export function LoopSummaryBar({ loops, reachability, onSegmentClick, fleetMode,
 
       {nextRun && countdown ? (
         <span className="loop-summary-next-run">
-          {intl.formatMessage(
-            { id: "loopSummary.nextRun" },
+          {t(
+            "loopSummary.nextRun",
             { loop: nextRun.description, countdown },
           )}
         </span>
@@ -187,13 +187,13 @@ function FleetLoopSummaryBar({
   fleetRollup?: FleetLoopRollup;
   onSegmentClick?: (kind: LoopSegmentKind) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   if (!fleetRollup) {
     return (
       <div className="loop-summary-bar loop-summary-bar--empty loop-summary-bar--fleet">
         <span className="loop-summary-empty-text">
-          {intl.formatMessage({ id: "loopSummary.fleetEmptyState" })}
+          {t("loopSummary.fleetEmptyState")}
         </span>
       </div>
     );
@@ -206,7 +206,7 @@ function FleetLoopSummaryBar({
     return (
       <div className="loop-summary-bar loop-summary-bar--empty loop-summary-bar--fleet">
         <span className="loop-summary-empty-text">
-          {intl.formatMessage({ id: "loopSummary.fleetEmptyState" })}
+          {t("loopSummary.fleetEmptyState")}
         </span>
       </div>
     );
@@ -226,8 +226,8 @@ function FleetLoopSummaryBar({
     <div className="loop-summary-bar loop-summary-bar--fleet">
       <div className="loop-summary-segments">
         <span className="loop-summary-fleet-prefix">
-          {intl.formatMessage(
-            { id: "loopSummary.fleetAcrossProjects" },
+          {t(
+            "loopSummary.fleetAcrossProjects",
             { projectCount },
           )}
         </span>
@@ -237,12 +237,12 @@ function FleetLoopSummaryBar({
             className="loop-summary-segment loop-summary-healthy loop-summary-segment--clickable"
             role="button"
             tabIndex={0}
-            aria-label={intl.formatMessage({ id: "loopSummary.fleetRunningAria" }, { count: healthyCount })}
+            aria-label={t("loopSummary.fleetRunningAria", { count: healthyCount })}
             onClick={onSegmentClick ? () => onSegmentClick("healthy") : undefined}
             onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick("healthy"); } } : undefined}
           >
-            {intl.formatMessage(
-              { id: "loopSummary.fleetRunning" },
+            {t(
+              "loopSummary.fleetRunning",
               { count: healthyCount },
             )}
           </span>
@@ -259,12 +259,12 @@ function FleetLoopSummaryBar({
               style={{ color: EXCEPTION_COLORS[status] }}
               role="button"
               tabIndex={0}
-              aria-label={intl.formatMessage({ id: keys.aria }, { count: counts[status] })}
+              aria-label={t(keys.aria, { count: counts[status] })}
               onClick={onSegmentClick ? () => onSegmentClick(status as LoopSegmentKind) : undefined}
               onKeyDown={onSegmentClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSegmentClick(status as LoopSegmentKind); } } : undefined}
             >
-              {intl.formatMessage(
-                { id: keys.count },
+              {t(
+                keys.count,
                 { count: counts[status] },
               )}
             </span>

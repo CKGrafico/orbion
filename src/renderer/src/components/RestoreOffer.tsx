@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { translateMessage } from "../i18n";
 import type { RestoreAvailability, PullRestoreResult } from "../../../shared/ipc";
 import {
@@ -29,7 +29,7 @@ export function RestoreOffer({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ export function RestoreOffer({
     const result = await onRestore();
     if (!result.ok) {
       setRestoring(false);
-      setError(translateMessage(intl, result.error) ?? intl.formatMessage({ id: "restore.restoreFailed" }, { error: "Unknown error" }));
+      setError(translateMessage(result.error) ?? t("restore.restoreFailed", { error: "Unknown error" }));
     }
   }
 
@@ -47,10 +47,10 @@ export function RestoreOffer({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{intl.formatMessage({ id: "restore.availableTitle" })}</DialogTitle>
+          <DialogTitle>{t("restore.availableTitle")}</DialogTitle>
           <DialogDescription>
-            {intl.formatMessage(
-              { id: "restore.availableCopy" },
+            {t(
+              "restore.availableCopy",
               {
                 count: availability.environmentCount,
                 names: availability.environmentNames.join(", "),
@@ -64,15 +64,15 @@ export function RestoreOffer({
         <DialogFooter>
           {restoring ? (
             <span className="restore-offer-progress">
-              {intl.formatMessage({ id: "restore.restoringTitle" })}
+              {t("restore.restoringTitle")}
             </span>
           ) : (
             <>
               <Button onClick={() => void handleRestore()}>
-                {intl.formatMessage({ id: "restore.restoreAction" })}
+                {t("restore.restoreAction")}
               </Button>
               <Button variant="outline" onClick={onSkip}>
-                {intl.formatMessage({ id: "restore.skipAction" })}
+                {t("restore.skipAction")}
               </Button>
             </>
           )}

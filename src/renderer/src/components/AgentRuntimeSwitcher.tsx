@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { AgentRuntime, RuntimeState } from "../../../shared/ipc";
 import type { ReachabilityState } from "../types";
 
@@ -51,24 +51,19 @@ export function AgentRuntimeSwitcher({
   runtimeState,
   onChange,
 }: AgentRuntimeSwitcherProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const options = deriveOptions(instanceDefault, reachability, runtimeState);
 
   return (
-    <div className="segmented" role="radiogroup" aria-label={intl.formatMessage({ id: "agentSwitcher.label" })}>
+    <div className="segmented" role="radiogroup" aria-label={t("agentSwitcher.label")}>
       {options.map((opt) => {
-        const label = intl.formatMessage({
-          id: opt.runtime === "opencode" ? "agentSwitcher.opencode" : "agentSwitcher.claude",
-        });
+        const label = t(opt.runtime === "opencode" ? "agentSwitcher.opencode" : "agentSwitcher.claude");
         const isActive = value === opt.runtime;
         const isDisabled = !opt.available;
 
         const title = isDisabled
-          ? intl.formatMessage(
-              { id: "agentSwitcher.unavailableReason" },
-              { runtime: label, reason: opt.unavailableReason ?? "unavailable" },
-            )
+          ? t("agentSwitcher.unavailableReason", { runtime: label, reason: opt.unavailableReason ?? "unavailable" })
           : label;
 
         return (

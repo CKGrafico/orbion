@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { ApprovalRequest, ApprovalDecision } from "./types";
 
 interface ApprovalPanelProps {
@@ -15,7 +15,7 @@ const DECISION_CONFIG: Array<{ value: ApprovalDecision; labelKey: string; classN
 ];
 
 export function ApprovalPanel({ approval, onDecision }: ApprovalPanelProps) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const handleDecision = useCallback(
     (decision: ApprovalDecision) => {
       onDecision(approval.id, decision);
@@ -27,7 +27,7 @@ export function ApprovalPanel({ approval, onDecision }: ApprovalPanelProps) {
     <div className="approval-panel">
       <div className="approval-header">
         <span className="approval-icon">⚠</span>
-        <span className="approval-title">{intl.formatMessage({ id: "chat.approvalRequired" })}</span>
+        <span className="approval-title">{t("chat.approvalRequired")}</span>
       </div>
       <div className="approval-body">
         <span className="approval-description">{approval.description}</span>
@@ -45,7 +45,7 @@ export function ApprovalPanel({ approval, onDecision }: ApprovalPanelProps) {
             className={cfg.className}
             onClick={() => handleDecision(cfg.value)}
           >
-            {intl.formatMessage({ id: cfg.labelKey })}
+            {t(cfg.labelKey)}
           </button>
         ))}
       </div>

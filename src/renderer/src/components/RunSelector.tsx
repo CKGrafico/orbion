@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { RunRecord } from "../types";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
@@ -23,7 +23,7 @@ export function RunSelector({
   runHistory: RunRecord[];
   onSelectRun: (runNumber: number) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
 
   if (runHistory.length === 0) return null;
@@ -39,7 +39,7 @@ export function RunSelector({
         onClick={() => setCollapsed((c) => !c)}
       >
         <span className="run-selector-label">
-          {intl.formatMessage({ id: "runSelector.title" })}
+          {t("runSelector.title")}
         </span>
         <span className="run-selector-chevron">
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
@@ -55,7 +55,7 @@ export function RunSelector({
             ●
           </span>
           <span className="run-selector-run-label">
-            {intl.formatMessage({ id: "runSelector.runN" }, { number: latestRun.runNumber })}
+            {t("runSelector.runN", { number: latestRun.runNumber })}
           </span>
         </div>
       ) : (
@@ -73,7 +73,7 @@ export function RunSelector({
                 ●
               </span>
               <span className="run-selector-run-label">
-                {intl.formatMessage({ id: "runSelector.runN" }, { number: run.runNumber })}
+                {t("runSelector.runN", { number: run.runNumber })}
               </span>
               {run.exitCode !== null && (
                 <span className={`run-selector-exit ${run.exitCode === 0 ? "exit-ok" : "exit-bad"}`}>

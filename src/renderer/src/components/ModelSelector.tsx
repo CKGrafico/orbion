@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { ModelInfo, ReasoningEffort } from "../../../shared/ipc";
 import type { IAgentService } from "../services/interfaces";
 import { cid, useInject } from "inversify-hooks";
@@ -14,7 +14,7 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ environmentId, value, onChange }: ModelSelectorProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [agentService] = useInject<IAgentService>(cid.IAgentService);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [open, setOpen] = useState(false);
@@ -72,9 +72,9 @@ export function ModelSelector({ environmentId, value, onChange }: ModelSelectorP
       <button
         className="model-selector-trigger"
         onClick={() => setOpen((v) => !v)}
-        title={selectedModel?.label ?? intl.formatMessage({ id: "modelSelector.selectModel" })}
+        title={selectedModel?.label ?? t("modelSelector.selectModel")}
       >
-        {selectedModel?.label ?? intl.formatMessage({ id: "modelSelector.selectModel" })}
+        {selectedModel?.label ?? t("modelSelector.selectModel")}
         <span className="model-selector-arrow">{open ? "▲" : "▼"}</span>
       </button>
 
@@ -91,8 +91,8 @@ export function ModelSelector({ environmentId, value, onChange }: ModelSelectorP
                     key={model.id}
                     className={`model-selector-option${isSelected ? " selected" : ""}${isDisabled ? " disabled" : ""}`}
                     disabled={isDisabled}
-                    title={isDisabled ? intl.formatMessage(
-                      { id: "modelSelector.unavailableReason" },
+                    title={isDisabled ? t(
+                      "modelSelector.unavailableReason",
                       { model: model.label, reason: model.unavailableReason ?? "unavailable" },
                     ) : model.label}
                     onClick={() => handleSelect(model.id)}
@@ -100,7 +100,7 @@ export function ModelSelector({ environmentId, value, onChange }: ModelSelectorP
                     <span className="model-selector-option-label">{model.label}</span>
                     {isDisabled ? (
                       <span className="model-selector-option-reason">
-                        {model.unavailableReason ?? intl.formatMessage({ id: "modelSelector.unavailable" })}
+                        {model.unavailableReason ?? t("modelSelector.unavailable")}
                       </span>
                     ) : null}
                   </button>

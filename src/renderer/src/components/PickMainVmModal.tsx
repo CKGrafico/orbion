@@ -1,5 +1,5 @@
 import React from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { Environment } from "../types";
 import {
   Dialog,
@@ -20,14 +20,14 @@ interface PickMainVmModalProps {
 }
 
 export function PickMainVmModal({ candidates, onPick, onSkip, open = true, onOpenChange }: PickMainVmModalProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{intl.formatMessage({ id: "pickMainVm.title" })}</DialogTitle>
+          <DialogTitle>{t("pickMainVm.title")}</DialogTitle>
           <DialogDescription>
-            {intl.formatMessage({ id: "pickMainVm.description" })}
+            {t("pickMainVm.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="pick-main-vm-list">
@@ -39,13 +39,13 @@ export function PickMainVmModal({ candidates, onPick, onSkip, open = true, onOpe
             >
               <span className="name">{env.name}</span>
               <span className="stat" style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                {env.endpoints[0]?.url ?? intl.formatMessage({ id: "pickMainVm.noEndpoint" })}
+                {env.endpoints[0]?.url ?? t("pickMainVm.noEndpoint")}
               </span>
             </button>
           ))}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onSkip}>{intl.formatMessage({ id: "pickMainVm.skip" })}</Button>
+          <Button variant="outline" onClick={onSkip}>{t("pickMainVm.skip")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

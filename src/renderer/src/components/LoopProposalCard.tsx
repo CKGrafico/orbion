@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { LoopProposalRow, LoopProposalStatus } from "../chat/types";
 import type { SimilarLoopMatch } from "../fleet-similarity";
 import type { Environment } from "../types";
@@ -25,7 +25,7 @@ interface LoopProposalCardProps {
 }
 
 export function LoopProposalCard({ row, instance, onApproved, onRejected, onStatusChange, similarLoops, homeEnvironmentId, environments }: LoopProposalCardProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   const isPending = row.status === "pending";
   const isCreating = row.status === "creating";
@@ -82,13 +82,13 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
       } else {
         const errorMsg = typeof result.error === "string"
           ? result.error
-          : intl.formatMessage({ id: "loopProposal.createError" });
+          : t("loopProposal.createError");
         onStatusChange(row.proposalId, "error", errorMsg);
       }
     } catch {
-      onStatusChange(row.proposalId, "error", intl.formatMessage({ id: "loopProposal.createError" }));
+      onStatusChange(row.proposalId, "error", t("loopProposal.createError"));
     }
-  }, [instance, row, command, commandArgs, interval, maxRuns, runImmediately, onApproved, onStatusChange, intl]);
+  }, [instance, row, command, commandArgs, interval, maxRuns, runImmediately, onApproved, onStatusChange, t]);
 
   const handleReject = useCallback((): void => {
     onRejected(row.proposalId);
@@ -121,15 +121,15 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
       {/* Header */}
       <div className="loop-proposal-header">
         <span className="loop-proposal-icon">≔</span>
-        <span className="loop-proposal-title">{intl.formatMessage({ id: "loopProposal.title" })}</span>
+        <span className="loop-proposal-title">{t("loopProposal.title")}</span>
         {isCreated && (
           <span className="loop-proposal-status loop-proposal-status--created">
-            {intl.formatMessage({ id: "loopProposal.statusCreated" })}
+            {t("loopProposal.statusCreated")}
           </span>
         )}
         {isRejected && (
           <span className="loop-proposal-status loop-proposal-status--rejected">
-            {intl.formatMessage({ id: "loopProposal.statusRejected" })}
+            {t("loopProposal.statusRejected")}
           </span>
         )}
       </div>
@@ -137,7 +137,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
       {/* Cross-scope badge */}
       {isCrossScope && targetEnvName && (
         <div className="cross-scope-badge">
-          {intl.formatMessage({ id: "loopProposal.crossScopeBadge" }, { instance: targetEnvName })}
+          {t("loopProposal.crossScopeBadge", { instance: targetEnvName })}
         </div>
       )}
 
@@ -156,7 +156,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
         </div>
         {isLongCommand && !commandExpanded && (
           <button className="loop-proposal-command-expand" onClick={() => setCommandExpanded(true)}>
-            {intl.formatMessage({ id: "loopProposal.expandCommand" })}
+            {t("loopProposal.expandCommand")}
           </button>
         )}
       </div>
@@ -164,12 +164,12 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
       {/* Meta row */}
       <div className="loop-proposal-meta">
         <span className="loop-proposal-meta-item">
-          <span className="loop-proposal-meta-label">{intl.formatMessage({ id: "loopProposal.interval" })}</span>
+          <span className="loop-proposal-meta-label">{t("loopProposal.interval")}</span>
           <span className="loop-proposal-meta-value loop-proposal-meta-value--mono">{interval}</span>
         </span>
         <span className="loop-proposal-meta-sep" />
         <span className="loop-proposal-meta-item">
-          <span className="loop-proposal-meta-label">{intl.formatMessage({ id: "loopProposal.project" })}</span>
+          <span className="loop-proposal-meta-label">{t("loopProposal.project")}</span>
           <span className="loop-proposal-meta-value">{row.projectName}</span>
         </span>
       </div>
@@ -183,8 +183,8 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
           >
             <span className="similar-loops-header-icon">⚡</span>
             <span className="similar-loops-header-text">
-              {intl.formatMessage(
-                { id: "similarLoops.titleWithCount" },
+              {t(
+                "similarLoops.titleWithCount",
                 { count: similarLoops!.length },
               )}
             </span>
@@ -210,7 +210,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
                       <span className="similar-loop-reasons">
                         {match.matchReasons.map((reason) => (
                           <span key={reason} className="similar-loop-reason-tag">
-                            {intl.formatMessage({ id: reason })}
+                            {t(reason)}
                           </span>
                         ))}
                       </span>
@@ -220,7 +220,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
                     className="similar-loop-use-btn"
                     onClick={() => handleUseAsStartingPoint(match)}
                   >
-                    {intl.formatMessage({ id: "similarLoops.useAsStartingPoint" })}
+                    {t("similarLoops.useAsStartingPoint")}
                   </button>
                 </div>
               ))}
@@ -239,12 +239,12 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
               onChange={(e) => setRunImmediately(e.target.checked)}
               className="loop-proposal-checkbox"
             />
-            <span className="loop-proposal-option-label">{intl.formatMessage({ id: "loopProposal.runImmediately" })}</span>
+            <span className="loop-proposal-option-label">{t("loopProposal.runImmediately")}</span>
           </label>
 
           <div className="loop-proposal-max-runs">
             <label className="loop-proposal-option-label" htmlFor={`max-runs-${row.proposalId}`}>
-              {intl.formatMessage({ id: "loopProposal.maxRuns" })}
+              {t("loopProposal.maxRuns")}
             </label>
             <input
               id={`max-runs-${row.proposalId}`}
@@ -253,12 +253,12 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
               className="loop-proposal-max-runs-input"
               value={maxRuns ?? ""}
               onChange={handleMaxRunsChange}
-              placeholder={intl.formatMessage({ id: "loopProposal.maxRunsPlaceholder" })}
+              placeholder={t("loopProposal.maxRunsPlaceholder")}
             />
             {hasSuggestion && (
               <button className="loop-proposal-suggestion-badge" onClick={handleAcceptSuggestion}>
-                {intl.formatMessage(
-                  { id: "loopProposal.suggestedMaxRuns" },
+                {t(
+                  "loopProposal.suggestedMaxRuns",
                   { count: row.suggestedMaxRuns ?? SUGGESTED_MAX_RUNS },
                 )}
               </button>
@@ -280,7 +280,7 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
             onClick={handleReject}
             disabled={isCreating}
           >
-            {intl.formatMessage({ id: "loopProposal.reject" })}
+            {t("loopProposal.reject")}
           </button>
           <button
             className="loop-proposal-btn loop-proposal-btn--approve"
@@ -288,8 +288,8 @@ export function LoopProposalCard({ row, instance, onApproved, onRejected, onStat
             disabled={isCreating}
           >
             {isCreating
-              ? intl.formatMessage({ id: "loopProposal.creating" })
-              : intl.formatMessage({ id: "loopProposal.approve" })}
+              ? t("loopProposal.creating")
+              : t("loopProposal.approve")}
           </button>
         </div>
       )}

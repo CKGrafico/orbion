@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { translateMessage } from "../i18n";
 import type { StaleConfigResult, PullRestoreResult } from "../../../shared/ipc";
 import {
@@ -35,7 +35,7 @@ export function StaleConfigWarning({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [acting, setActing] = useState<"pull" | "overwrite" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ export function StaleConfigWarning({
     const result = await onPullRemote();
     if (!result.ok) {
       setActing(null);
-      setError(translateMessage(intl, result.error) ?? intl.formatMessage({ id: "staleConfig.pullFailed" }, { error: "Unknown error" }));
+      setError(translateMessage(result.error) ?? t("staleConfig.pullFailed", { error: "Unknown error" }));
     }
   }
 
@@ -64,9 +64,9 @@ export function StaleConfigWarning({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{intl.formatMessage({ id: "staleConfig.title" })}</AlertDialogTitle>
+          <AlertDialogTitle>{t("staleConfig.title")}</AlertDialogTitle>
           <AlertDialogDescription>
-            {intl.formatMessage({ id: "staleConfig.description" })}
+            {t("staleConfig.description")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
@@ -76,19 +76,19 @@ export function StaleConfigWarning({
           {acting ? (
             <span className="stale-config-progress">
               {acting === "pull"
-                ? intl.formatMessage({ id: "staleConfig.pulling" })
-                : intl.formatMessage({ id: "staleConfig.overwriteSucceeded" })}
+                ? t("staleConfig.pulling")
+                : t("staleConfig.overwriteSucceeded")}
             </span>
           ) : (
             <>
               <AlertDialogCancel onClick={onCancel}>
-                {intl.formatMessage({ id: "restore.skipAction" })}
+                {t("restore.skipAction")}
               </AlertDialogCancel>
               <Button variant="outline" onClick={() => void handleOverwriteAnyway()}>
-                {intl.formatMessage({ id: "staleConfig.overwriteAnyway" })}
+                {t("staleConfig.overwriteAnyway")}
               </Button>
               <AlertDialogAction onClick={() => void handlePullRemote()}>
-                {intl.formatMessage({ id: "staleConfig.pullRemote" })}
+                {t("staleConfig.pullRemote")}
               </AlertDialogAction>
             </>
           )}

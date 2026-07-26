@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import { cid, useInject } from "inversify-hooks";
 import type { IInfraService, IReviewModeService } from "../../services/interfaces";
 import type {
@@ -20,17 +20,17 @@ function fileRiskClass(path: string): string {
   return "pr-risk-chip pr-risk-chip-low";
 }
 
-function fileRiskLabel(path: string, intl: ReturnType<typeof useIntl>): string {
+function fileRiskLabel(path: string, t: (key: string) => string): string {
   const highRiskPatterns = /(^|[/])(auth|credential|secret|password|token|permission|security|crypto|ssl|tls)/i;
   const mediumRiskPatterns = /(^|[/])(config|\.env|docker-compose|Dockerfile|Makefile|package\.json|tsconfig)/i;
 
-  if (highRiskPatterns.test(path)) return intl.formatMessage({ id: "inbox.prRisk.high" });
-  if (mediumRiskPatterns.test(path)) return intl.formatMessage({ id: "inbox.prRisk.medium" });
-  return intl.formatMessage({ id: "inbox.prRisk.low" });
+  if (highRiskPatterns.test(path)) return t("inbox.prRisk.high");
+  if (mediumRiskPatterns.test(path)) return t("inbox.prRisk.medium");
+  return t("inbox.prRisk.low");
 }
 
 export function ReviewBriefingView(): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const [reviewModeService] = useInject<IReviewModeService>(cid.IReviewModeService);
   const [infraService] = useInject<IInfraService>(cid.IInfraService);
 
@@ -80,7 +80,7 @@ export function ReviewBriefingView(): React.ReactNode {
           setLoadError(
             typeof result.error === "string"
               ? result.error
-              : intl.formatMessage({ id: "reviewMode.briefing.loadError" }),
+              : t("reviewMode.briefing.loadError"),
           );
           return;
         }
@@ -90,13 +90,13 @@ export function ReviewBriefingView(): React.ReactNode {
       .catch(() => {
         if (cancelled) return;
         setLoading(false);
-        setLoadError(intl.formatMessage({ id: "reviewMode.briefing.loadError" }));
+        setLoadError(t("reviewMode.briefing.loadError"));
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeItem?.repo, activeItem?.number, infraService, intl]);
+  }, [activeItem?.repo, activeItem?.number, infraService]);
 
   // Fetch full diff for inline flagged hunks
   useEffect(() => {
@@ -187,7 +187,7 @@ export function ReviewBriefingView(): React.ReactNode {
       <div className="review-briefing-view">
         <div className="review-briefing-loader">
           <Loader2 size={16} className="spin" />
-          <span>{intl.formatMessage({ id: "reviewMode.briefing.loading" })}</span>
+          <span>{t("reviewMode.briefing.loading")}</span>
         </div>
       </div>
     );
@@ -222,7 +222,7 @@ export function ReviewBriefingView(): React.ReactNode {
         <div className="review-briefing-section review-briefing-flagged">
           <div className="review-briefing-section-header">
             <span className="review-briefing-section-title">
-              {intl.formatMessage({ id: "reviewMode.briefing.flaggedChanges" })}
+              {t("reviewMode.briefing.flaggedChanges")}
             </span>
             {totals && (
               <span className="review-briefing-section-stats">
@@ -237,7 +237,6 @@ export function ReviewBriefingView(): React.ReactNode {
                 file={file}
                 diffLines={flaggedDiffCache.get(file.path)}
                 overlapPrNumbers={overlapFileMap.get(file.path)}
-                intl={intl}
               />
             ))}
           </div>
@@ -247,7 +246,7 @@ export function ReviewBriefingView(): React.ReactNode {
       {!flaggedSection && (
         <div className="review-briefing-no-flagged">
           <FileCode2 size={20} style={{ opacity: 0.4 }} />
-          <span>{intl.formatMessage({ id: "reviewMode.briefing.noFlagged" })}</span>
+          <span>{t("reviewMode.briefing.noFlagged")}</span>
         </div>
       )}
 
@@ -268,7 +267,7 @@ export function ReviewBriefingView(): React.ReactNode {
             </span>
             {!expandedBoilerplate && (
               <span className="review-briefing-boilerplate-expand">
-                {intl.formatMessage({ id: "reviewMode.briefing.expand" })}
+                {t("reviewMode.briefing.expand")}
               </span>
             )}
           </button>
@@ -299,13 +298,12 @@ function FlaggedFileBlock({
   file,
   diffLines,
   overlapPrNumbers,
-  intl,
 }: {
   file: DiffFileEntry;
   diffLines: DiffLine[] | undefined;
   overlapPrNumbers: number[] | undefined;
-  intl: ReturnType<typeof useIntl>;
 }): React.ReactNode {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
 
   const toggleExpand = useCallback(() => {
@@ -322,7 +320,7 @@ function FlaggedFileBlock({
           {file.path}
         </span>
         <span className={fileRiskClass(file.path)}>
-          {fileRiskLabel(file.path, intl)}
+          {fileRiskLabel(file.path, t)}
         </span>
         <span className="review-briefing-flagged-file-stats">
           <span className="review-diff-file-item-additions">+{file.additions}</span>
@@ -333,12 +331,9 @@ function FlaggedFileBlock({
         <div className="review-briefing-file-overlap-note">
           <AlertTriangle size={11} className="review-briefing-file-overlap-icon" />
           <span>
-            {intl.formatMessage(
-              { id: "reviewMode.overlap.fileAlsoChangedBy" },
-              {
+            {t("reviewMode.overlap.fileAlsoChangedBy", {
                 prNumbers: overlapPrNumbers.map((n) => `#${n}`).join(", "),
-              },
-            )}
+              })}
           </span>
         </div>
       )}
@@ -355,7 +350,7 @@ function FlaggedFileBlock({
       )}
       {expanded && (!diffLines || diffLines.length === 0) && file.isBinary && (
         <div className="review-diff-binary-label">
-          {intl.formatMessage({ id: "reviewMode.diffView.binaryFile" })}
+          {t("reviewMode.diffView.binaryFile")}
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { FleetPlanRow, FleetPlanTarget, FleetPlanStatus } from "../chat/types";
 
 interface FleetPlanCardProps {
@@ -32,7 +32,7 @@ export function FleetPlanCard({
   onTargetCheckedChange,
   onTargetStatusChange,
 }: FleetPlanCardProps): React.ReactNode {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   // Local state for checkboxes, initialized from row.targets
   const [localTargets, setLocalTargets] = useState<Map<string, boolean>>(() => {
@@ -101,17 +101,17 @@ export function FleetPlanCard({
       {/* Header */}
       <div className="fleet-plan-header">
         <span className="fleet-plan-icon">⇶</span>
-        <span className="fleet-plan-title">{intl.formatMessage({ id: "fleetPlan.title" })}</span>
+        <span className="fleet-plan-title">{t("fleetPlan.title")}</span>
         {isApplied && (
           <span className={`fleet-plan-status${failedCount > 0 ? " fleet-plan-status--partial" : " fleet-plan-status--applied"}`}>
             {failedCount > 0
-              ? intl.formatMessage({ id: "fleetPlan.statusPartial" }, { ok: okCount, failed: failedCount })
-              : intl.formatMessage({ id: "fleetPlan.statusApplied" })}
+              ? t("fleetPlan.statusPartial", { ok: okCount, failed: failedCount })
+              : t("fleetPlan.statusApplied")}
           </span>
         )}
         {isCancelled && (
           <span className="fleet-plan-status fleet-plan-status--cancelled">
-            {intl.formatMessage({ id: "fleetPlan.statusCancelled" })}
+            {t("fleetPlan.statusCancelled")}
           </span>
         )}
       </div>
@@ -132,11 +132,11 @@ export function FleetPlanCard({
                 disabled={isApplying}
               />
               <span className="fleet-plan-toggle-all-label">
-                {intl.formatMessage({ id: "fleetPlan.selectAll" })}
+                {t("fleetPlan.selectAll")}
               </span>
             </label>
             <span className="fleet-plan-target-count">
-              {intl.formatMessage({ id: "fleetPlan.targetCount" }, { count: row.targets.length })}
+              {t("fleetPlan.targetCount", { count: row.targets.length })}
             </span>
           </div>
         )}
@@ -201,7 +201,7 @@ export function FleetPlanCard({
             disabled={isApplying}
             type="button"
           >
-            {intl.formatMessage({ id: "fleetPlan.cancel" })}
+            {t("fleetPlan.cancel")}
           </button>
           <button
             className="fleet-plan-btn fleet-plan-btn--apply"
@@ -210,8 +210,8 @@ export function FleetPlanCard({
             type="button"
           >
             {isApplying
-              ? intl.formatMessage({ id: "fleetPlan.applying" })
-              : intl.formatMessage({ id: "fleetPlan.applyToSelected" }, { count: checkedCount })}
+              ? t("fleetPlan.applying")
+              : t("fleetPlan.applyToSelected", { count: checkedCount })}
           </button>
         </div>
       )}

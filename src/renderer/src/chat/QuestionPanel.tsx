@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from "react";
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 import type { QuestionRequest } from "./types";
 
 interface QuestionPanelProps {
@@ -8,7 +8,7 @@ interface QuestionPanelProps {
 }
 
 export function QuestionPanel({ question, onAnswer }: QuestionPanelProps) {
-  const intl = useIntl();
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [freeText, setFreeText] = React.useState("");
 
@@ -51,7 +51,7 @@ export function QuestionPanel({ question, onAnswer }: QuestionPanelProps) {
             key={opt.key}
             className="question-option-btn"
             onClick={() => onAnswer(question.id, opt.key)}
-            title={intl.formatMessage({ id: "chat.pressNumber" }, { number: i + 1 })}
+            title={t("chat.pressNumber", { number: i + 1 })}
           >
             <span className="question-option-key">{i + 1}</span>
             <span className="question-option-label">{opt.label}</span>
@@ -62,7 +62,7 @@ export function QuestionPanel({ question, onAnswer }: QuestionPanelProps) {
         <div className="question-freetext">
           <input
             className="question-freetext-input"
-            placeholder={intl.formatMessage({ id: "chat.typeAnswer" })}
+            placeholder={t("chat.typeAnswer")}
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
             onKeyDown={(e) => {
@@ -77,7 +77,7 @@ export function QuestionPanel({ question, onAnswer }: QuestionPanelProps) {
             onClick={handleSubmitFreeText}
             disabled={!freeText.trim()}
           >
-            {intl.formatMessage({ id: "chat.send" })}
+            {t("chat.send")}
           </button>
         </div>
       )}

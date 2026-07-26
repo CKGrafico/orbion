@@ -1,4 +1,4 @@
-import { useIntl } from "react-intl";
+import { useTranslation } from "react-i18next";
 
 interface TurnFoldProps {
   toolCallCount: number;
@@ -7,16 +7,13 @@ interface TurnFoldProps {
 }
 
 export function TurnFold({ toolCallCount, durationSec, onClick }: TurnFoldProps) {
-  const intl = useIntl();
+  const { t } = useTranslation();
 
   return (
     <button className="transcript-turn-fold" onClick={onClick}>
       <span className="turn-fold-icon">▸</span>
       <span>
-        {intl.formatMessage(
-          { id: "chat.turnFold" },
-          { count: toolCallCount, seconds: durationSec },
-        )}
+        {t("chat.turnFold", { count: toolCallCount, seconds: durationSec })}
       </span>
     </button>
   );
