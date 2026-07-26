@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "Preload bridge fix — no user-visible UI or interaction change. Logging-only internal IPC error handling.",
+  "assets": [],
+  "prMarkdown": ""
+}
