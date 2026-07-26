@@ -1,0 +1,12 @@
+{
+  "changeId": "fix-extract-error-message-i18n",
+  "status": "blocked",
+  "reason": "Browser automation unavailable (no broker socket). Cannot capture screenshot of RuntimeHealthChip tooltip. Dev server running at localhost:5183 but browser MCP tools not connected.",
+  "assets": [],
+  "verification": {
+    "typecheck": "passed",
+    "test": "795/795 passed",
+    "build": "passed"
+  },
+  "prMarkdown": "## Fix: extractErrorMessage returns raw i18n key instead of translated message\n\n**Change:** `extractErrorMessage` in `runtime-health.ts` now calls `translateMessage(msg)` instead of `msg.key`, translating `I18nMessage` objects (key + params) into user-readable strings.\n\n**Files changed:** `src/renderer/src/runtime-health.ts`\n\n**Verification:** typecheck passed, 795/795 tests passed, build passed.\n\n**Evidence status:** blocked — browser automation not available for screenshot capture."
+}

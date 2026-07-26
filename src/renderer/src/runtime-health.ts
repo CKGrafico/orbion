@@ -1,6 +1,6 @@
 import type { Environment, EnvironmentHealth, ReachabilityState, AgentRuntime, RuntimeState } from "./types";
 import type { OpenCodeConnectionStatus } from "../../shared/ipc";
-import i18n from "./i18n";
+import i18n, { translateMessage } from "./i18n";
 
 export type RuntimeHealthState =
   | "ok"
@@ -137,8 +137,8 @@ function deriveFromRuntimeState(
 
 function extractErrorMessage(msg: string | import("../../shared/ipc").I18nMessage | null): string | null {
   if (!msg) return null;
-  if (typeof msg === "string") return msg;
-  return msg.key;
+  const result = translateMessage(msg);
+  return result || null;
 }
 
 export const RUNTIME_HEALTH_COLORS: Record<RuntimeHealthState, string> = {
