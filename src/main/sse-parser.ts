@@ -6,10 +6,11 @@ export interface SseEvent {
   text: string;
 }
 
-export async function parseSseStream(
-  body: ReadableStream<Uint8Array>,
-  onEvent: (event: SseEvent) => void,
-): Promise<void> {
+export interface SseParser {
+  feed(chunk: string): void;
+}
+
+export function createSseParser(onEvent: (event: SseEvent) => void): SseParser {
   const parser = createParser({
     onEvent(message: EventSourceMessage) {
       if (message.event !== undefined && message.event !== "message") {
@@ -18,6 +19,19 @@ export async function parseSseStream(
       onEvent({ kind: "data", text: message.data });
     },
   });
+
+  return {
+    feed(chunk: string): void {
+      parser.feed(chunk);
+    },
+  };
+}
+
+export async function parseSseStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (event: SseEvent) => void,
+): Promise<void> {
+  const parser = createSseParser(onEvent);
 
   const decoder = new TextDecoder();
 
