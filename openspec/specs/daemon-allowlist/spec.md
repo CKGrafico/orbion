@@ -1,5 +1,8 @@
-## MODIFIED Requirements
+# daemon-allowlist Specification
 
+## Purpose
+TBD - created by archiving change daemon-allowlist-encoded-slash. Update Purpose after archive.
+## Requirements
 ### Requirement: Encoded-slash rejection at allowlist level
 `isAllowedApiOperation` and `isAllowedStreamPath` SHALL reject any path containing a URL-encoded slash (`%2F` or `%2f`) in the path segment, regardless of whether an upstream validator has already checked for it.
 
@@ -18,3 +21,4 @@
 #### Scenario: Legitimate path without encoded slash still passes
 - **WHEN** `isAllowedApiOperation("GET", "/api/loops/abc-123")` is called
 - **THEN** the function SHALL return `true`
+
