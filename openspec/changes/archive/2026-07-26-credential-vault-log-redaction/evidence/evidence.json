@@ -1,0 +1,12 @@
+{
+  "changeId": "credential-vault-log-redaction",
+  "status": "skipped",
+  "reason": "Logging-only change in main process with no user-visible UI. No screenshot or visual evidence applicable.",
+  "assets": [],
+  "verification": {
+    "typecheck": "passed",
+    "tests": "795/795 passed",
+    "build": "passed"
+  },
+  "prMarkdown": "## Credential Vault Log Redaction\n\n**Change:** Removed credential reference UUIDs from three logger calls in `src/main/credential-vault.ts` (lines 87, 93, 124).\n\n- `logger.info` (migration): removed `reference` argument\n- `logger.error` (integrity failure): removed `reference` argument\n- `logger.warn` (orphan pruning): removed `orphans` array, kept count only\n\n**Verification:** typecheck ✓, 795/795 tests ✓, build ✓\n\n**Why no screenshot:** This is a main-process logging fix with no user-visible UI change."
+}
