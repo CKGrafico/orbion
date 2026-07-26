@@ -156,7 +156,7 @@ export class ReviewModeService implements IReviewModeService {
       this.overlapResult = {
         overlaps: [],
         suggestedOrder: [],
-        perPrNotes: new Map(),
+        perPrNotes: {},
       };
       for (const cb of this.overlapListeners) {
         cb(this.overlapResult);

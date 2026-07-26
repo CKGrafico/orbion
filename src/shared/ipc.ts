@@ -429,7 +429,7 @@ export interface ReviewOrderEntry {
 export interface BatchOverlapResult {
   overlaps: PrOverlap[];
   suggestedOrder: ReviewOrderEntry[];
-  perPrNotes: Map<string, string[]>;
+  perPrNotes: Record<string, string[]>;
 }
 
 export interface InfraActionArgs {
