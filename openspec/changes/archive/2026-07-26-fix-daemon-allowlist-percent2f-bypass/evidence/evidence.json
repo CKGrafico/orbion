@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "No user-visible UI changed. This is a backend security validation fix in isAllowedPath() — no screenshot evidence applicable.",
+  "assets": [],
+  "prMarkdown": "Change: fix-daemon-allowlist-%2F-bypass\nStatus: skipped (non-UI)\nVerification: typecheck ✓, test 784/784 ✓, build ✓\nCommit: 8cfc5f8"
+}
