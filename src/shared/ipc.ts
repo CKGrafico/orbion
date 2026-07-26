@@ -1,4 +1,5 @@
 import type { LogEntry } from "./log.js";
+import type { SiblingDeclineBridge } from "./sibling-offer-types.js";
 // All HTTP to loop-task environments runs in the MAIN process: the loop-task
 // daemon sends no CORS headers, so renderer fetch would be blocked.
 
@@ -1032,10 +1033,6 @@ export interface CredentialBridge {
   getSecurityAuditEvents: () => Promise<SecurityAuditEvent[]>;
 }
 
-export interface SiblingDeclineBridge {
-  isDeclined: (environmentId: string, loopId: string, fingerprint: string) => Promise<boolean>;
-  recordDecline: (record: { environmentId: string; loopId: string; fingerprint: string }) => Promise<void>;
-}
 
 export interface LogBridge {
   write: (entry: LogEntry) => void;

@@ -1,0 +1,7 @@
+{
+  "changeId": "fix-sibling-decline-bridge-dup",
+  "status": "skipped",
+  "reason": "Internal type refactor — no user-visible UI or behavior change",
+  "assets": [],
+  "prMarkdown": "Tasks: 2/2, typecheck passed, test 784/784 passed, build passed. Commits: propose 13cdccf, apply 4c248d8, archive 84729f5."
+}
