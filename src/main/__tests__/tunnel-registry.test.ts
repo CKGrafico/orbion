@@ -80,11 +80,10 @@ function makeDirectEndpoint(overrides: Partial<AccessEndpoint> = {}): AccessEndp
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   mockTunnelHandles.clear();
-  // Reset the registry by closing all tunnels between tests
-  closeAllRegistryTunnels();
+  await closeAllRegistryTunnels();
 });
 
 // ── resolveSshTarget ────────────────────────────────────────────────────
@@ -312,7 +311,7 @@ describe("closeAllRegistryTunnels", () => {
     await openTunnelForEndpoint("env-1", ep1);
     await openTunnelForEndpoint("env-2", ep2);
 
-    closeAllRegistryTunnels();
+    await closeAllRegistryTunnels();
 
     expect(getTunnelLocalPort("env-1", "ep-1")).toBeNull();
     expect(getTunnelLocalPort("env-2", "ep-2")).toBeNull();
