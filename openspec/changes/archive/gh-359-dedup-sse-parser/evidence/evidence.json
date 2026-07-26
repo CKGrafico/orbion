@@ -1,0 +1,8 @@
+{
+  "status": "skipped",
+  "reason": "Backend/main-process refactor only — no user-visible UI. Replaced inline SSE parsing in mcp-client.ts with createSseParser from sse-parser.ts.",
+  "tasks": "3/3",
+  "verification": "passed",
+  "commits": ["d36b6c8", "9f0ed15", "7e7abcc"],
+  "assets": []
+}

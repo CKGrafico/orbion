@@ -19,6 +19,7 @@ import { trimTrailingSlash } from "../shared/utils.js";
 import { resolveEffectiveUrl } from "./tunnel-registry.js";
 import { getEnvironments } from "./config-store.js";
 import { getMainWindow } from "./main-window.js";
+import { createSseParser } from "./sse-parser.js";
 
 const DEFAULT_MCP_PORT = 8846;
 
@@ -181,26 +182,6 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
         return;
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let currentEvent = "";
-
-      const processLine = (line: string): void => {
-        if (line.startsWith("event:")) {
-          currentEvent = line.slice(6).trim();
-        } else if (line.startsWith("data:") && currentEvent === "endpoint") {
-          const data = line.slice(5).trim();
-          transport.postEndpoint = data.startsWith("http")
-            ? data
-            : `${baseUrl}${data.startsWith("/") ? "" : "/"}${data}`;
-          clearTimeout(timeout);
-          resolve();
-        } else if (line === "") {
-          currentEvent = "";
-        }
-      };
-
       const processData = (data: string): void => {
         try {
           const parsed = JSON.parse(data) as JsonRpcResponse;
@@ -217,31 +198,39 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
         }
       };
 
-       (async () => {
+      let pendingEventType = "";
+
+      const parser = createSseParser((event) => {
+        if (event.kind === "event") {
+          pendingEventType = event.text;
+          return;
+        }
+        if (event.kind === "data") {
+          if (pendingEventType === "endpoint" && !transport.postEndpoint) {
+            const path = event.text.startsWith("http")
+              ? event.text
+              : `${baseUrl}${event.text.startsWith("/") ? "" : "/"}${event.text}`;
+            transport.postEndpoint = path;
+            clearTimeout(timeout);
+            resolve();
+          } else {
+            processData(event.text);
+          }
+          pendingEventType = "";
+        }
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      (async () => {
         try {
-          let dataBuffer = "";
           while (!transport.closed) {
             const { done, value } = await reader.read();
             if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-
-            for (const line of lines) {
-              if (line.startsWith("data:")) {
-                dataBuffer += line.slice(5).trim();
-              } else if (line === "" && dataBuffer) {
-                processData(dataBuffer);
-                dataBuffer = "";
-              }
-              processLine(line);
-            }
+            parser.feed(decoder.decode(value, { stream: true }));
           }
-          if (dataBuffer) {
-            processData(dataBuffer);
-          }
-        } catch (err) {
+        } catch {
           if (!transport.closed) {
             transport.closed = true;
             for (const [, pending] of transport.pending) {
