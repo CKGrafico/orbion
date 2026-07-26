@@ -56,7 +56,7 @@ export function ReviewQueueStrip(): React.ReactNode {
           const isActive = activeItem?.repo === item.repo && activeItem?.number === item.number;
           const isDisposed = disposedPrs.has(prKey(item.repo, item.number));
           const key = prKey(item.repo, item.number);
-          const overlapNotes = overlapResult?.perPrNotes.get(key);
+          const overlapNotes = overlapResult?.perPrNotes[key];
 
           return (
             <button

@@ -19,10 +19,10 @@ const RISK_ORDER: Record<PrRiskLevel, number> = {
 
 export function detectBatchOverlaps(prs: PrFileSet[]): BatchOverlapResult {
   const overlaps: PrOverlap[] = [];
-  const perPrNotes = new Map<string, string[]>();
+  const perPrNotes: Record<string, string[]> = {};
 
   for (const pr of prs) {
-    perPrNotes.set(pr.key, []);
+    perPrNotes[pr.key] = [];
   }
 
   for (let i = 0; i < prs.length; i++) {
@@ -47,8 +47,8 @@ export function detectBatchOverlaps(prs: PrFileSet[]): BatchOverlapResult {
 
       const aNote = formatPrNote(kind, b.number, sharedFiles);
       const bNote = formatPrNote(kind, a.number, sharedFiles);
-      perPrNotes.get(a.key)!.push(aNote);
-      perPrNotes.get(b.key)!.push(bNote);
+      perPrNotes[a.key]!.push(aNote);
+      perPrNotes[b.key]!.push(bNote);
     }
   }
 
