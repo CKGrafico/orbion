@@ -64,7 +64,7 @@
       "command": "sh",
       "commandArgs": [
         "-c",
-        "openspec list --json | python3 -c \"import json,sys; sys.exit(bool(json.load(sys.stdin).get('changes', [])))\" && pnpm typecheck && pnpm test && pnpm build"
+        "set +e; output=$( (openspec list --json | python3 -c \"import json,sys; sys.exit(bool(json.load(sys.stdin).get('changes', [])))\" && pnpm typecheck && pnpm test && pnpm build) 2>&1 ); status=$?; printf '%s' \"$output\" | python3 -c 'import json,sys; status=int(sys.argv[1]); output=sys.stdin.read(); output=output if len(output)<=12000 else output[:6000]+\"\\n...[truncated]...\\n\"+output[-6000:]; print(json.dumps({\"verifyOutput\":output,\"verifyExitCode\":status}))' \"$status\"; exit \"$status\""
       ],
       "onSuccessTaskId": "dev-commit",
       "onFailureTaskId": "dev-fix",
@@ -78,7 +78,7 @@
         "run",
         "--agent",
         "fullstack-engineer",
-        "First, load all skills available for your current agent. Verification failed on the current issue branch. Stay on the current feature branch and preserve all existing work. Inspect git status, the current diff, and the verification failures, then fix all unfinished or broken work. After each fix, rerun these exact verification commands through raw execution: rtk proxy pnpm typecheck, rtk proxy pnpm test, and rtk proxy pnpm build. Do not stop until all three commands exit 0; if any failure remains, keep diagnosing and fixing it. Do not reset, clean, switch branches, rebase, create another branch, push, perform GitHub actions, create a PR, or archive the change. Never ask for confirmation. Issue title: {{title}} Issue body: {{body}} Issue id: {{number}}"
+        "First, load all skills available for your current agent. Verification failed on the current issue branch. Use this verification report from the previous task: exit code={{verifyExitCode}}, output={{verifyOutput}}. And fix everything on the same branch, once fixed and verified commit the fixes. Do not push or perform any GitHub actions. Never ask for confirmation. Archive the completed change and generate visual evidence."
       ],
       "onSuccessTaskId": "dev-verify",
       "onFailureTaskId": "dev-fail",
