@@ -1,0 +1,21 @@
+{
+  "changeId": "gh-375-fix-diagnose-failure-i18n",
+  "status": "blocked",
+  "reason": "Visual evidence requires browser automation (Playwright/browser MCP). Browser broker not available in this environment. Change is archived so project harness cannot attach evidence. Verification passed: typecheck, 795 tests, build all green.",
+  "assets": [],
+  "verification": {
+    "typecheck": "passed",
+    "tests": "795 passed",
+    "build": "passed",
+    "commentRatio": "all files under 10%"
+  },
+  "tasks": {
+    "completed": 4,
+    "total": 4
+  },
+  "commits": [
+    "06e608a propose: fix diagnoseFailure mixed i18n keys and raw strings",
+    "d5afd99 fix: diagnoseFailure returns consistent i18n keys with interpolation params",
+    "bdb3726 archive: fix diagnoseFailure mixed i18n keys and raw strings"
+  ]
+}

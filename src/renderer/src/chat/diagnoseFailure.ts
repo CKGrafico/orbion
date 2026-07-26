@@ -13,6 +13,7 @@ export interface FailureDiagnosis {
   category: FailureCategory;
   summary: string;
   nextStep: string;
+  params?: Record<string, string | number>;
   confidence: "high" | "medium" | "low";
 }
 
@@ -103,29 +104,33 @@ function diagnoseFromExitCode(exitCode: number): FailureDiagnosis | null {
     case 127:
       return {
         category: "command-not-found",
-        summary: "The command or interpreter was not found (exit 127).",
-        nextStep: "Verify the command is installed and in the PATH on the target machine.",
+        summary: "diagnosis.summaryExit127",
+        nextStep: "diagnosis.nextStepExit127",
+        params: { exitCode },
         confidence: "high",
       };
     case 126:
       return {
         category: "permission-denied",
-        summary: "The command exists but is not executable (exit 126).",
-        nextStep: "Check file permissions on the command script or binary.",
+        summary: "diagnosis.summaryExit126",
+        nextStep: "diagnosis.nextStepExit126",
+        params: { exitCode },
         confidence: "high",
       };
     case 137:
       return {
         category: "timeout",
-        summary: "The process was killed (likely OOM or manual kill, exit 137).",
-        nextStep: "Check system memory usage; the process may have been killed by the OOM killer.",
+        summary: "diagnosis.summaryExit137",
+        nextStep: "diagnosis.nextStepExit137",
+        params: { exitCode },
         confidence: "medium",
       };
     case 124:
       return {
         category: "timeout",
-        summary: "The command timed out (exit 124, typical of the `timeout` command).",
-        nextStep: "Increase the timeout or investigate why the command is taking too long.",
+        summary: "diagnosis.summaryExit124",
+        nextStep: "diagnosis.nextStepExit124",
+        params: { exitCode },
         confidence: "medium",
       };
     default:
@@ -137,8 +142,8 @@ export function diagnoseFailure(loop: LoopMeta, logTail: string): FailureDiagnos
   if (loop.status !== "failed") {
     return {
       category: "unknown",
-      summary: "The loop is not in a failed state.",
-      nextStep: "No action needed.",
+      summary: "diagnosis.summaryNotFailed",
+      nextStep: "diagnosis.nextStepNotFailed",
       confidence: "high",
     };
   }
@@ -170,16 +175,18 @@ export function diagnoseFailure(loop: LoopMeta, logTail: string): FailureDiagnos
   if (exitCode !== 0 && lines.length === 0) {
     return {
       category: "command-broken",
-      summary: `The command exited with code ${exitCode} but produced no output.`,
-      nextStep: `Run \`${command}\` manually on the target machine to see the error.`,
+      summary: "diagnosis.summaryNoOutput",
+      nextStep: "diagnosis.nextStepNoOutput",
+      params: { exitCode, command },
       confidence: "low",
     };
   }
 
   return {
     category: "command-broken",
-    summary: `The command exited with code ${exitCode}.`,
-    nextStep: `Check the log output above or run \`${command}\` manually for details.`,
+    summary: "diagnosis.summaryGeneric",
+    nextStep: "diagnosis.nextStepGeneric",
+    params: { exitCode, command },
     confidence: "low",
   };
 }

@@ -465,6 +465,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             category: diagnosis.category,
             summary: diagnosis.summary,
             nextStep: diagnosis.nextStep,
+            params: diagnosis.params,
             confidence: diagnosis.confidence,
             summonTimestamp,
           });
@@ -476,6 +477,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
             category: diagnosis.category,
             summary: diagnosis.summary,
             nextStep: diagnosis.nextStep,
+            params: diagnosis.params,
             confidence: diagnosis.confidence,
             summonTimestamp,
           });

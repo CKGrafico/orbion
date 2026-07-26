@@ -13,21 +13,9 @@ export function FailureDiagnosisPanel({ row }: FailureDiagnosisPanelProps): Reac
   const isEnvDown = isEnvironmentDownCategory(row.category);
   const panelCls = `failure-diagnosis-panel${isEnvDown ? " failure-diagnosis-panel--env-down" : ""}`;
 
-  // May be i18n keys (containing dots) or plain text; try i18n first.
-  const formatText = (text: string): string => {
-    if (text.includes(".") && !text.includes(" ")) {
-      try {
-        return t(text);
-      } catch {
-        return text;
-      }
-    }
-    return text;
-  };
-
   const categoryLabel = t(categoryLabelKey(row.category));
-  const summaryText = formatText(row.summary);
-  const nextStepText = formatText(row.nextStep);
+  const summaryText = t(row.summary, row.params);
+  const nextStepText = t(row.nextStep, row.params);
 
   const confidenceLabel = row.confidence === "high"
     ? "●●●"

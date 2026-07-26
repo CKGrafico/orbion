@@ -976,7 +976,21 @@
     "summaryDependencyMissing": "A required dependency is missing from the environment.",
     "nextStepDependencyMissing": "Install the missing dependency and retry the command.",
     "summaryCommandError": "The command exited with an error.",
-    "nextStepCommandError": "Check the log output above for error details."
+    "nextStepCommandError": "Check the log output above for error details.",
+    "summaryExit127": "The command or interpreter was not found (exit {{exitCode}}).",
+    "nextStepExit127": "Verify the command is installed and in the PATH on the target machine.",
+    "summaryExit126": "The command exists but is not executable (exit {{exitCode}}).",
+    "nextStepExit126": "Check file permissions on the command script or binary.",
+    "summaryExit137": "The process was killed (likely OOM or manual kill, exit {{exitCode}}).",
+    "nextStepExit137": "Check system memory usage; the process may have been killed by the OOM killer.",
+    "summaryExit124": "The command timed out (exit {{exitCode}}, typical of the `timeout` command).",
+    "nextStepExit124": "Increase the timeout or investigate why the command is taking too long.",
+    "summaryNoOutput": "The command exited with code {{exitCode}} but produced no output.",
+    "nextStepNoOutput": "Run `{{command}}` manually on the target machine to see the error.",
+    "summaryGeneric": "The command exited with code {{exitCode}}.",
+    "nextStepGeneric": "Check the log output above or run `{{command}}` manually for details.",
+    "summaryNotFailed": "The loop is not in a failed state.",
+    "nextStepNotFailed": "No action needed."
   },
   "siblingOffer": {
     "title": "Apply to sibling loop?",
