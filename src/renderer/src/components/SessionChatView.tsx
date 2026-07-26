@@ -8,7 +8,7 @@ import type { LoopMeta, Environment, LoopWithOrigin, FleetLoopRollup } from "../
 import { useTranscript } from "../chat/useTranscript";
 import { diagnoseFailure } from "../chat/diagnoseFailure";
 import { computeSimilarLoops } from "../fleet-similarity";
-import { matchShapeToFleetIntent, adaptShapeForPlatform, buildProvenance } from "../fleet-shape-adapt";
+
 import { detectStructuralChanges, findSiblingLoops, computeStructuralDiff, extractTopology } from "../fleet-structural-diff";
 import { ChatComposer } from "../chat/ChatComposer";
 import { LoopSummaryBar, type LoopSegmentKind } from "./LoopSummaryBar";
@@ -904,9 +904,7 @@ export function SessionChatView({ sessionId, environmentId, environmentName, act
         <div className="unreachable-banner">
           <WifiOff size={13} />
           {t(
-            !isReachable && reachability === "reconnecting"
-              ? "unreachableBanner.reconnecting"
-              : "unreachableBanner.unreachable",
+            "unreachableBanner.unreachable",
             { instance: environmentName },
           )}
         </div>

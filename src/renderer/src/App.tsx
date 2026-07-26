@@ -100,7 +100,7 @@ function AppInner(): React.ReactNode {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [health, setHealth] = useState<Record<string, EnvironmentHealth>>({});
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionStatus>>({});
-  const [endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
+  const [_endpointHealth, setEndpointHealth] = useState<Record<string, EndpointHealth[]>>({});
   const [openCodeStatus, setOpenCodeStatus] = useState<Record<string, OpenCodeConnectionStatus>>({});
   const [loops, setLoops] = useState<LoopMeta[]>([]);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);

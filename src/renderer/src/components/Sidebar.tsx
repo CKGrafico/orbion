@@ -21,7 +21,6 @@ import {
 import { timeAgo, healthTooltip } from "../format";
 import { cid, useInject } from "inversify-hooks";
 import type { IConfigService } from "../services/interfaces";
-import i18n from "i18next";
 
 type View =
   | { kind: "inbox" }
@@ -490,7 +489,7 @@ export function Sidebar(props: {
                     onSelect(primaryInstance.envId);
                     onNavigate({ kind: "project", projectId: primaryInstance.projectId });
                   }}
-                  title={healthTooltip(i18n, h, cs)}
+                  title={healthTooltip(h, cs)}
                 >
                   <TreeNodeChevron
                     expanded={projectExpanded}

@@ -422,8 +422,8 @@ function DigestViewItemRow({
   buildParams,
   onClick,
   onDismiss,
-  onExecuteAction,
-  onOpenInChat,
+  onExecuteAction: _onExecuteAction,
+  onOpenInChat: _onOpenInChat,
 }: {
   item: InboxItem;
   projectLookup: Map<string, string>;
@@ -438,7 +438,7 @@ function DigestViewItemRow({
   const [inboxService] = useInject<IInboxService>(cid.IInboxService);
   const [expanded, setExpanded] = useState(false);
   const [childItems, setChildItems] = useState<InboxItem[]>([]);
-  const [executingAction, setExecutingAction] = useState<InboxAction | null>(null);
+  const [executingAction] = useState<InboxAction | null>(null);
 
   // Load child items when expanded
   useEffect(() => {
