@@ -35,13 +35,13 @@
     },
     {
       "id": "audit-audit",
-      "name": "AI: audit random area against guardrails, /plan-story for top issues",
+      "name": "AI: audit random area against guardrails, create issues for top findings",
       "command": "opencode",
       "commandArgs": [
         "run",
         "--agent",
         "fullstack-engineer",
-        "First, load all skills available for your current agent. Then audit a random area of the Orbion project (renderer at src/renderer/, main process at src/main/, preload at src/preload/, or shared at src/shared/). Load @ob-guardrails-project, @plain-engineering-conventions, and @ob-guardrails-generic. Find at least 6 problems, score each 1-10. For the top 3, create GitHub issues with labels 'bug' and 'code:pick' using /plan-story. Skip duplicates. Create a summary issue with label 'audit:report' listing all findings. Link each created issue as a sub-issue of the summary report. Do not modify code, push, or ask for confirmation. Never explore outside the repository root."
+        "First, load all skills available for your current agent. Then audit a random area of the Orbion project (renderer at src/renderer/, main process at src/main/, preload at src/preload/, or shared at src/shared/). Load @ob-guardrails-project, @plain-engineering-conventions, and @ob-guardrails-generic. Find at least 6 problems, score each 1-10. For the top 3, create GitHub issues with labels 'bug' and 'code:pick' using gh issue create (NOT /plan-story). Before creating each issue, search for existing open issues with the same topic using 'gh issue list' to skip duplicates. Create a summary issue with label 'audit:report' listing all findings. Link each created issue as a sub-issue of the summary report. Do not modify code, push, or ask for confirmation. Never explore outside the repository root."
       ],
       "onSuccessTaskId": "audit-verify",
       "onFailureTaskId": "audit-fail",
