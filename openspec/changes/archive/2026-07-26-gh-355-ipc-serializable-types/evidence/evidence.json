@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "Type constraints and IPC validation only — no user-visible UI changes",
+  "assets": [],
+  "prMarkdown": "## IPC Serializable Types (gh-355)\n\n- Tasks completed: 8/8\n- Verification: typecheck passed, 792 tests passed, build passed\n- Commits: propose, fix, fix (test), archive\n- Changes: SerializableValue type, McpToolInfo.inputSchema typed, log:write context validation, tests"
+}
