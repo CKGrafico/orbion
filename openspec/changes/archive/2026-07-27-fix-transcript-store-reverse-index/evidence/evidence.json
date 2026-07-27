@@ -1,0 +1,7 @@
+{
+  "status": "skipped",
+  "reason": "Backend/main-process-only change (in-memory reverse index in transcript-store.ts). No user-visible UI, components, styles, or interaction states affected.",
+  "assets": [],
+  "changeId": "fix-transcript-store-reverse-index",
+  "capturedAt": "2026-07-27T04:45:00.000Z"
+}
