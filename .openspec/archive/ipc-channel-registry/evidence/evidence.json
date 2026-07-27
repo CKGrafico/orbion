@@ -1,0 +1,12 @@
+{
+  "status": "skipped",
+  "reason": "Internal refactor — all IPC channel string literals replaced with IPC_CHANNELS constants. No user-visible UI or behavior change.",
+  "assets": [],
+  "tasks": "1/1",
+  "verification": "passed",
+  "commits": [
+    "8702b70 propose: centralized IPC channel registry (ipc-channel-registry)",
+    "165693d apply: centralize all IPC channel names in IPC_CHANNELS constant",
+    "d8b7860 archive: centralized IPC channel registry (ipc-channel-registry)"
+  ]
+}
