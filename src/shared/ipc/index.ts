@@ -1,8 +1,3 @@
-// Barrel re-export from domain-specific files.
-// Import from this module for backward compatibility.
-// For tree-shaking, import directly from the domain file:
-//   import { kindToNotificationType } from "./ipc/types-inbox.js";
-
 // Common types
 export type {
   I18nMessage,
@@ -16,7 +11,7 @@ export type {
   SweepEphemeralSessionsArgs,
   SweepEphemeralSessionsResult,
   LogBridge,
-} from "./ipc/types-common.js";
+} from "./types-common.js";
 
 // Config domain
 export type {
@@ -46,7 +41,7 @@ export type {
   StampCheckedWriteResult,
   GlobalSettings,
   ConfigBridge,
-} from "./ipc/types-config.js";
+} from "./types-config.js";
 
 // Infra domain
 export type {
@@ -94,7 +89,7 @@ export type {
   InfraActionArgs,
   InfraActionResult,
   InfraBridge,
-} from "./ipc/types-infra.js";
+} from "./types-infra.js";
 
 // Connection domain
 export type {
@@ -110,7 +105,7 @@ export type {
   OutageEscalation,
   OutageBridge,
   OpenCodeBridge,
-} from "./ipc/types-connection.js";
+} from "./types-connection.js";
 
 // Chat domain
 export type {
@@ -127,7 +122,7 @@ export type {
   McpConnectionState,
   McpConnectionStatus,
   McpBridge,
-} from "./ipc/types-chat.js";
+} from "./types-chat.js";
 
 // Inbox domain (includes runtime function)
 export type {
@@ -143,8 +138,8 @@ export type {
   DeepLinkTarget,
   NotificationSendArgs,
   NotificationBridge,
-} from "./ipc/types-inbox.js";
-export { kindToNotificationType } from "./ipc/types-inbox.js";
+} from "./types-inbox.js";
+export { kindToNotificationType } from "./types-inbox.js";
 
 // VM Wizard domain
 export type {
@@ -161,7 +156,7 @@ export type {
   VmWizardProgress,
   VmWizardResult,
   VmWizardBridge,
-} from "./ipc/types-vm-wizard.js";
+} from "./types-vm-wizard.js";
 
 // Budget domain
 export type {
@@ -173,23 +168,61 @@ export type {
   WatchCondition,
   ConditionWatch,
   ConditionWatchBridge,
-} from "./ipc/types-budget.js";
+} from "./types-budget.js";
 
 // Loop domain
 export type {
   ChainStep,
   LoopShape,
   LoopShapeCacheBridge,
-} from "./ipc/types-loop.js";
+} from "./types-loop.js";
 
 // Security domain
 export type {
   SecurityAuditEvent,
   CredentialBridge,
-} from "./ipc/types-security.js";
+} from "./types-security.js";
 
 // Settings domain
-export type { SettingsBridge } from "./ipc/types-settings.js";
+export type { SettingsBridge } from "./types-settings.js";
 
-// Composite bridge
-export type { LoopTaskBridge } from "./ipc/index.js";
+// Composite bridge — depends on all sub-bridges
+import type { ApiRequestArgs, ApiResponse, StreamSubscribeArgs, StreamEventPayload, LogBridge } from "./types-common.js";
+import type { ConfigBridge } from "./types-config.js";
+import type { InfraBridge } from "./types-infra.js";
+import type { ConnectionBridge, OpenCodeBridge, TailscalePeersResponse, ReachabilityBridge, OutageBridge } from "./types-connection.js";
+import type { AgentBridge, TranscriptBridge, McpBridge } from "./types-chat.js";
+import type { InboxBridge, NotificationBridge } from "./types-inbox.js";
+import type { VmWizardBridge } from "./types-vm-wizard.js";
+import type { BudgetBridge, ConditionWatchBridge } from "./types-budget.js";
+import type { LoopShapeCacheBridge } from "./types-loop.js";
+import type { CredentialBridge } from "./types-security.js";
+import type { SettingsBridge } from "./types-settings.js";
+import type { SiblingDeclineBridge } from "../sibling-offer-types.js";
+
+export interface LoopTaskBridge {
+  request: <T = unknown>(args: ApiRequestArgs) => Promise<ApiResponse<T>>;
+  subscribeStream: (args: StreamSubscribeArgs) => Promise<void>;
+  unsubscribeStream: (subId: string) => Promise<void>;
+  onStreamEvent: (cb: (payload: StreamEventPayload) => void) => () => void;
+  config: ConfigBridge;
+  connection: ConnectionBridge;
+  opencode: OpenCodeBridge;
+  tailscalePeers: () => Promise<TailscalePeersResponse>;
+  vmWizard: VmWizardBridge;
+  infra: InfraBridge;
+  budget: BudgetBridge;
+  inbox: InboxBridge;
+  watch: ConditionWatchBridge;
+  notification: NotificationBridge;
+  outage: OutageBridge;
+  reachability: ReachabilityBridge;
+  transcript: TranscriptBridge;
+  mcp: McpBridge;
+  agent: AgentBridge;
+  loopShapeCache: LoopShapeCacheBridge;
+  siblingDecline: SiblingDeclineBridge;
+  settings: SettingsBridge;
+  log: LogBridge;
+  credential: CredentialBridge;
+}
