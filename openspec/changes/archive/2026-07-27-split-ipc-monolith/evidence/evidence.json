@@ -1,0 +1,8 @@
+{
+  "status": "skipped",
+  "reason": "Internal refactor: no user-visible UI/interaction changes. ipc.ts split into domain files is a code-organization improvement with no behavioral change.",
+  "assets": [],
+  "tasks": "13/13",
+  "verification": "passed",
+  "commits": ["a1fcea3", "c2f26a7", "55ba02b"]
+}
