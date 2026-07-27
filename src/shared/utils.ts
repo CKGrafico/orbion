@@ -1,12 +1,16 @@
 import type { BootstrapSeed } from "./ipc.js";
 
 export function compareSemver(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(".").map(Number);
-  const pb = b.replace(/^v/, "").split(".").map(Number);
+  const strip = (v: string) =>
+    v.replace(/^v/, "").split("-")[0].split("+")[0].split(".").map(Number);
+  const pa = strip(a);
+  const pb = strip(b);
   for (let i = 0; i < 3; i++) {
     const na = pa[i] ?? 0;
     const nb = pb[i] ?? 0;
-    if (na !== nb) return na - nb;
+    const va = Number.isNaN(na) ? 0 : na;
+    const vb = Number.isNaN(nb) ? 0 : nb;
+    if (va !== vb) return va - vb;
   }
   return 0;
 }
