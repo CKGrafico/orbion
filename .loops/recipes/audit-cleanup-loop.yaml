@@ -3,7 +3,7 @@ version: 2
 loops:
   - taskId: audit-preflight
     intervalHuman: 1d
-    description: "Audit cleanup loop: closes audit:report issues when resolved, and prunes stale local and remote branches"
+    description: "Audit cleanup loop: closes audit reports with no pending bugs"
 
 tasks:
   - id: audit-preflight
@@ -20,20 +20,17 @@ tasks:
     onFailureTaskId: null
 
   - id: audit-select
-    name: "Select oldest open audit:report issue"
+    name: "Select all open audit:report issues"
     command: sh
     commandArgs:
       - -c
       - >
-        number=$(gh issue list --label "audit:report" --state open
-        --limit 1000 --json number
-        --jq 'sort_by(.number) | .[0].number');
-        test -n "$number" || exit 75;
-        body=$(gh issue view "$number" --json number,body
-        --jq '{number,body}');
-        printf '%s\n' "$body"
+        reports=$(gh issue list --label "audit:report" --state open
+        --limit 1000 --json number,body --jq 'sort_by(.number)');
+        test "$reports" != "[]" || exit 75;
+        printf '%s\n' "$reports"
     onSuccessTaskId: audit-ai
-    onFailureTaskId: audit-branches
+    onFailureTaskId: audit-nothing
 
   - id: audit-ai
     name: "AI: check referenced issues and close report if all resolved"
@@ -44,57 +41,46 @@ tasks:
       - fullstack-engineer
       - >
         First, load all skills available for your current agent. You are an
-        audit report cleanup agent. You receive an audit report issue with
-        number {{number}} and body {{body}}. The body references GitHub
-        issues with #NNN format. For each referenced issue number, check
-        if it is closed using gh issue view NUMBER --json state. If ALL
-        referenced issues are closed, close the report issue with gh issue
-        close {{number}} --reason completed and add the label audit:closed
-        using gh issue edit {{number}} --add-label audit:closed. If any
-        referenced issue is still open, do nothing. Never explore or read
-        files outside the current repository root. Do not ask for
-        confirmation.
-    onSuccessTaskId: audit-branches
-    onFailureTaskId: audit-branches
+        audit report cleanup agent. The previous task output is a JSON array
+        of open audit reports, each with number and body: {{output}}. Process
+        every report in that array. Extract every #NNN issue reference from
+        each report body and check its state using gh issue view NUMBER --json
+        state. If all referenced issues are closed, or the report has no
+        referenced issues, close that report with gh issue close REPORT_NUMBER
+        --reason completed and add audit:closed with gh issue edit REPORT_NUMBER
+        --add-label audit:closed. If any referenced issue is open or cannot be
+        checked, leave that report unchanged. Print a summary of closed and
+        skipped reports. Do not delete branches or perform any other GitHub
+        actions. Never explore or read files outside the current repository
+        root. Do not ask for confirmation.
+    onSuccessTaskId: null
+    onFailureTaskId: null
 
-  - id: audit-branches
-    name: "AI: delete stale local and remote branches"
-    command: opencode
+  - id: audit-nothing
+    name: "Idle: no open audit reports"
+    command: echo
     commandArgs:
-      - run
-      - --agent
-      - fullstack-engineer
-      - >
-        First, load all skills available for your current agent. You are a
-        branch cleanup agent. Delete all local and remote branches that are
-        NOT main or master and whose last commit is 1 day old or older. For
-        remote branches: skip any that have open PRs. Use git for-each-ref
-        to find stale branches, gh pr list to check for open PRs,
-        git branch -D for local, git push origin --delete for remote. Print
-        a summary of what was deleted and what was skipped. Never explore or
-        read files outside the current repository root. Do not ask for
-        confirmation.
+      - "Nothing to do, no open audit:report issues"
+    silentChain: true
     onSuccessTaskId: null
     onFailureTaskId: null
 
 diagram: |
   flowchart TD
       cleanupStart("Start<br/>Begin audit cleanup cycle") --> cleanupPreflight
-      cleanupPreflight["Preflight<br/>Clean tree + sync main"] -->|✓| cleanupSelect
-      cleanupPreflight -.->|✗| cleanupEnd
-      cleanupSelect["Select report<br/>Oldest open audit:report issue"] -->|✓| cleanupAi
-      cleanupSelect -.->|✗| branchCleanup
-      cleanupAi("AI: close resolved reports<br/>Check referenced issues") -->|✓| branchCleanup
-      cleanupAi -.->|✗| branchCleanup
-      branchCleanup("AI: prune stale branches<br/>Delete local + remote")
-      cleanupEnd(("End<br/>Preflight failed"))
+      cleanupPreflight("Preflight<br/>Clean tree + sync main") -->|✓| cleanupSelect
+      cleanupSelect["Select reports<br/>All open audit:report issues"] -->|✓| cleanupAi
+      cleanupSelect -.->|✗| cleanupNothing
+      cleanupAi(("Complete<br/>Close resolved audit reports"))
+      cleanupNothing(("Idle<br/>No open audit reports"))
       classDef start fill:#ffffff,stroke:#172033,stroke-width:2px,color:#172033
       classDef action fill:#eef0ff,stroke:#554cff,stroke-width:2px,color:#172033
       classDef decision fill:#fff8e8,stroke:#c75b00,stroke-width:2px,color:#172033
+      classDef idle fill:#202c40,stroke:#738198,stroke-width:2px,color:#ffffff
       classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
       classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
       class cleanupStart start
-      class cleanupAi,branchCleanup action
-      class cleanupPreflight,cleanupSelect decision
-      class cleanupEnd failure
-      class branchCleanup success
+      class cleanupPreflight action
+      class cleanupSelect decision
+      class cleanupAi success
+      class cleanupNothing idle

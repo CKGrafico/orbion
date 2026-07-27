@@ -77,20 +77,11 @@ tasks:
     commandArgs:
       - -c
       - >
-        set +e; output=$(
-        (openspec list --json | python3 -c
+        openspec list --json | python3 -c
         "import json,sys; sys.exit(bool(json.load(sys.stdin).get('changes', [])))"
         && rtk proxy pnpm typecheck
         && rtk proxy pnpm test
-        && rtk proxy pnpm build) 2>&1 );
-        status=$?;
-        printf '%s' "$output" | python3 -c
-        'import json,sys; status=int(sys.argv[1]);
-        output=sys.stdin.read();
-        output=output if len(output)<=12000
-        else output[:6000]+"\n...[truncated]...\n"+output[-6000:];
-        print(json.dumps({"verifyOutput":output,"verifyExitCode":status}))'
-        "$status"; exit "$status"
+        && rtk proxy pnpm build
     onSuccessTaskId: dev-commit
     onFailureTaskId: dev-fix
     maxRuns: 5
@@ -104,9 +95,8 @@ tasks:
       - fullstack-engineer
       - >
         First, load all skills available for your current agent.
-        Verification failed on the current issue branch. Use this verification
-        report from the previous task: exit code={{verifyExitCode}},
-        output={{verifyOutput}}. And fix everything on the same branch,
+        Verification failed on the current issue branch. Previous task output:
+        {{output}}. Fix everything on the same branch,
         once fixed and verified commit the fixes. Do not push or perform any
         GitHub actions. Never ask for confirmation. Archive the completed
         change and generate visual evidence.

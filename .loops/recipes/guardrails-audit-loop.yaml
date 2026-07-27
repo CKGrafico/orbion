@@ -46,11 +46,14 @@ tasks:
         a random area of the Orbion project (at src/renderer/, src/main/,
         src/preload/, or src/shared/). Load @ob-guardrails-project and
         @ob-guardrails-generic. Find at least 6 problems, score each 1-10.
-        For the top 3, create GitHub issues with labels 'bug' and 'code:pick'
-        using gh issue create (do NOT use /plan-story). Skip duplicates.
-        Create a summary issue with label 'audit:report' listing all findings.
-        Link each created issue as a sub-issue of the summary report.
-        Do not modify code, push, or ask for confirmation. Never explore
+         For the top 3, create GitHub issues with labels 'bug' and 'code:pick'
+         using gh issue create (do NOT use /plan-story). Skip duplicates.
+         Create a summary issue with label 'audit:report' listing all findings.
+         Link each created issue as a sub-issue of the summary report. When a
+         finding recommends a dependency change, state that implementation must
+         run pnpm install, commit the updated pnpm-lock.yaml, and verify with
+         pnpm install --frozen-lockfile.
+         Do not modify code, push, or ask for confirmation. Never explore
         outside the repository root.
     onSuccessTaskId: audit-verify
     onFailureTaskId: audit-fail
