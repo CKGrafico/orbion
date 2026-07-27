@@ -31,6 +31,7 @@ export const ALLOWED_STREAM_PATHS: readonly RegExp[] = [
 
 export function isAllowedApiOperation(method: string, path: string): boolean {
   const pathWithoutQuery = stripQueryString(path);
+  if (/%2[fF]/.test(pathWithoutQuery)) return false;
   return ALLOWED_API_OPERATIONS.some(
     (op) => op.method === method && op.pathPattern.test(pathWithoutQuery),
   );
@@ -38,6 +39,7 @@ export function isAllowedApiOperation(method: string, path: string): boolean {
 
 export function isAllowedStreamPath(path: string): boolean {
   const pathWithoutQuery = stripQueryString(path);
+  if (/%2[fF]/.test(pathWithoutQuery)) return false;
   return ALLOWED_STREAM_PATHS.some((pat) => pat.test(pathWithoutQuery));
 }
 

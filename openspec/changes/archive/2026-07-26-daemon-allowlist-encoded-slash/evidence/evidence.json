@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "Backend security fix with no user-visible UI. Changed files: src/shared/daemon-allowlist.ts (allowlist guard), src/shared/__tests__/daemon-allowlist.test.ts (test updates). No components, pages, styles, or user-facing interaction affected.",
+  "assets": [],
+  "prMarkdown": "**Daemon allowlist encoded-slash rejection**\n\n- Tasks: 4/4 complete\n- Verification: passed (typecheck, 799 tests, build)\n- Change: `isAllowedApiOperation` and `isAllowedStreamPath` now reject `%2F`/`%2f` at the allowlist level\n- Files: `src/shared/daemon-allowlist.ts`, `src/shared/__tests__/daemon-allowlist.test.ts`"
+}

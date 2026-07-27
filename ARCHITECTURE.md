@@ -444,7 +444,10 @@ loop-task daemons. Local persistence uses these mechanisms:
   transcript files stored as individual JSON arrays under
   `userData/transcripts/<sessionId>.json`. Each file holds an array of
   `TranscriptMessage` objects (user messages, assistant messages, tool calls).
-  Messages carry an optional `environmentId` field indicating which instance
+  An in-memory reverse index (`messageId → sessionId`) avoids scanning all
+  session files when `updateMessage` needs to locate a message; the index is
+  populated lazily on first lookup miss and maintained by append, update, and
+  delete operations. Messages carry an optional `environmentId` field indicating which instance
   produced them; legacy messages without this field are attributed implicitly
   from the session. Transcripts are instance-independent: they are keyed by
   `ChatSession.id`, not by any `environmentId`, so they survive instance removal

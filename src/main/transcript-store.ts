@@ -17,12 +17,12 @@ function getTranscriptDir(): string {
 }
 
 function sessionFilePath(sessionId: string): string {
-  // Sanitize sessionId to prevent path traversal
   const safeId = sessionId.replace(/[^a-zA-Z0-9\-_]/g, "_");
   return path.join(getTranscriptDir(), `${safeId}.json`);
 }
 
 const writeQueues = new Map<string, Promise<void>>();
+const messageIndex = new Map<string, string>();
 
 function serializeSession<T>(sessionId: string, fn: () => T): Promise<T> {
   const current = writeQueues.get(sessionId) ?? Promise.resolve();
@@ -94,6 +94,7 @@ export function appendMessage(message: Omit<TranscriptMessage, "createdAt">): Pr
     };
     messages.push(withTimestamp);
     writeSessionFile(message.sessionId, messages);
+    messageIndex.set(withTimestamp.id, message.sessionId);
     scheduleFlush(message.sessionId);
     return withTimestamp;
   });
@@ -112,6 +113,9 @@ export function appendMessages(batch: Array<Omit<TranscriptMessage, "createdAt">
     }));
     messages.push(...withTimestamps);
     writeSessionFile(sessionId, messages);
+    for (const m of withTimestamps) {
+      messageIndex.set(m.id, sessionId);
+    }
     scheduleFlush(sessionId);
     return withTimestamps;
   });
@@ -121,8 +125,6 @@ export function updateMessage(
   messageId: string,
   updates: Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>,
 ): Promise<void> {
-  // We need to find which session holds this message. The IPC bridge only
-  // passes messageId + updates, so we scan the transcript directory.
   return findSessionForMessage(messageId).then((sessionId) => {
     if (!sessionId) return;
 
@@ -147,6 +149,7 @@ export function updateMessageInSession(
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
     messages[idx] = { ...messages[idx], ...updates };
+    messageIndex.set(messageId, sessionId);
     writeSessionFile(sessionId, messages);
     scheduleFlush(sessionId);
   });
@@ -157,6 +160,10 @@ export function deleteSession(sessionId: string): Promise<void> {
     const filePath = sessionFilePath(sessionId);
     try {
       if (fs.existsSync(filePath)) {
+        const messages = readSessionFile(sessionId);
+        for (const m of messages) {
+          messageIndex.delete(m.id);
+        }
         fs.unlinkSync(filePath);
       }
     } catch {
@@ -165,6 +172,9 @@ export function deleteSession(sessionId: string): Promise<void> {
 }
 
 async function findSessionForMessage(messageId: string): Promise<string | null> {
+  const cached = messageIndex.get(messageId);
+  if (cached) return cached;
+
   const dir = getTranscriptDir();
   let files: string[];
   try {
@@ -178,6 +188,9 @@ async function findSessionForMessage(messageId: string): Promise<string | null> 
     const sessionId = file.slice(0, -".json".length);
     try {
       const messages = readSessionFile(sessionId);
+      for (const m of messages) {
+        messageIndex.set(m.id, sessionId);
+      }
       if (messages.some((m) => m.id === messageId)) {
         return sessionId;
       }

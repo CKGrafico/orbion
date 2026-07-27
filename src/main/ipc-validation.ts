@@ -13,6 +13,7 @@ import { isAllowedApiOperation, isAllowedStreamPath } from "../shared/daemon-all
 import type { InfraAction } from "../shared/ipc.js";
 import { createLogger } from "./logger.js";
 import { isAllowedBaseUrl as isCanonicalAllowedBaseUrl } from "./ssrf-allowlist.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 
 const logger = createLogger("ipc-validation");
 
@@ -165,7 +166,7 @@ export function checkLogRateLimit(senderId: number): void {
   refillBucket(bucket, now);
 
   if (bucket.tokens <= 0) {
-    throw new IpcValidationError("log:write", ["rate limit exceeded: max 120 log entries per 60 seconds"]);
+    throw new IpcValidationError(IPC_CHANNELS.LOG_WRITE, ["rate limit exceeded: max 120 log entries per 60 seconds"]);
   }
 
   bucket.tokens--;
@@ -243,7 +244,7 @@ const MAX_PASSPHRASE_LENGTH = 4096;
  */
 const validators: Record<string, Validator> = {
   // ── API / Stream ────────────────────────────────────────
-  "api:request": (args) => {
+  [IPC_CHANNELS.API_REQUEST]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("args[0] must be an object");
@@ -282,7 +283,7 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "stream:subscribe": (args) => {
+  [IPC_CHANNELS.STREAM_SUBSCRIBE]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("args[0] must be an object");
@@ -299,16 +300,16 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "stream:unsubscribe": (args) => {
+  [IPC_CHANNELS.STREAM_UNSUBSCRIBE]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("subId must be a non-empty string");
     return issues;
   },
 
   // ── Config ──────────────────────────────────────────────
-  "config:getEnvironments": () => [],
+  [IPC_CHANNELS.CONFIG_GET_ENVIRONMENTS]: () => [],
 
-  "config:addEnvironment": (args) => {
+  [IPC_CHANNELS.CONFIG_ADD_ENVIRONMENT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0]) || (args[0] as string).length > 256)
       issues.push("name must be a non-empty string (max 256 chars)");
@@ -319,7 +320,7 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:exchangePairingCode": (args) => {
+  [IPC_CHANNELS.CONFIG_EXCHANGE_PAIRING_CODE]: (args) => {
     const issues: string[] = [];
     if (!isValidHttpUrl(args[0])) issues.push("baseUrl must be a valid http/https URL");
     if (!isNonEmptyString(args[1])) issues.push("code must be a non-empty string");
@@ -328,19 +329,19 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:removeSessionToken": (args) => {
+  [IPC_CHANNELS.CONFIG_REMOVE_SESSION_TOKEN]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "config:removeEnvironment": (args) => {
+  [IPC_CHANNELS.CONFIG_REMOVE_ENVIRONMENT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("id must be a non-empty string");
     return issues;
   },
 
-  "config:updateEnvironment": (args) => {
+  [IPC_CHANNELS.CONFIG_UPDATE_ENVIRONMENT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("id must be a non-empty string");
     if (typeof args[1] !== "object" || args[1] === null) issues.push("updates must be an object");
@@ -353,7 +354,7 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:addEndpoint": (args) => {
+  [IPC_CHANNELS.CONFIG_ADD_ENDPOINT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isValidHttpUrl(args[1])) issues.push("url must be a valid http/https URL");
@@ -363,30 +364,30 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:removeEndpoint": (args) => {
+  [IPC_CHANNELS.CONFIG_REMOVE_ENDPOINT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isNonEmptyString(args[1])) issues.push("endpointId must be a non-empty string");
     return issues;
   },
 
-  "config:setActiveEndpoint": (args) => {
+  [IPC_CHANNELS.CONFIG_SET_ACTIVE_ENDPOINT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isNonEmptyString(args[1])) issues.push("endpointId must be a non-empty string");
     return issues;
   },
 
-  "config:getSelectedEnvironmentId": () => [],
+  [IPC_CHANNELS.CONFIG_GET_SELECTED_ENVIRONMENT_ID]: () => [],
 
-  "config:setSelectedEnvironmentId": (args) => {
+  [IPC_CHANNELS.CONFIG_SET_SELECTED_ENVIRONMENT_ID]: (args) => {
     const issues: string[] = [];
     if (args[0] !== null && !isNonEmptyString(args[0]))
       issues.push("id must be a non-empty string or null");
     return issues;
   },
 
-  "config:migrateFromLocalStorage": (args) => {
+  [IPC_CHANNELS.CONFIG_MIGRATE_FROM_LOCAL_STORAGE]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("rawInstances must be a non-empty string");
     if (args[1] !== null && !isNonEmptyString(args[1]))
@@ -395,37 +396,37 @@ const validators: Record<string, Validator> = {
   },
 
   // ── Connection ──────────────────────────────────────────
-  "connection:getStatus": (args) => {
+  [IPC_CHANNELS.CONNECTION_GET_STATUS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "connection:getEndpointHealth": (args) => {
+  [IPC_CHANNELS.CONNECTION_GET_ENDPOINT_HEALTH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "connection:retry": (args) => {
+  [IPC_CHANNELS.CONNECTION_RETRY]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "connection:networkChanged": (args) => {
+  [IPC_CHANNELS.CONNECTION_NETWORK_CHANGED]: (args) => {
     const issues: string[] = [];
     if (!isBoolean(args[0])) issues.push("online must be a boolean");
     return issues;
   },
 
   // ── Tailscale ───────────────────────────────────────────
-  "tailscale:peers": () => [],
+  [IPC_CHANNELS.TAILSCALE_PEERS]: () => [],
 
   // ── VM Wizard ───────────────────────────────────────────
-  "vmWizard:listSshHosts": () => [],
+  [IPC_CHANNELS.VM_WIZARD_LIST_SSH_HOSTS]: () => [],
 
-  "vmWizard:start": (args) => {
+  [IPC_CHANNELS.VM_WIZARD_START]: (args) => {
     const issues: string[] = [];
     if (args.length !== 1 || !isObject(args[0])) {
       issues.push("exactly one options object is required");
@@ -458,16 +459,16 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "vmWizard:cancel": () => [],
+  [IPC_CHANNELS.VM_WIZARD_CANCEL]: () => [],
 
-  "vmWizard:respondConsent": (args) => {
+  [IPC_CHANNELS.VM_WIZARD_RESPOND_CONSENT]: (args) => {
     const issues: string[] = [];
     if (!isEnum(args[0], CONSENT_DECISIONS))
       issues.push("decision must be 'install' or 'skip'");
     return issues;
   },
 
-  "vmWizard:respondServiceSelection": (args) => {
+  [IPC_CHANNELS.VM_WIZARD_RESPOND_SERVICE_SELECTION]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("selection must be an object");
@@ -487,14 +488,14 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "vmWizard:respondRuntimeConsent": (args) => {
+  [IPC_CHANNELS.VM_WIZARD_RESPOND_RUNTIME_CONSENT]: (args) => {
     const issues: string[] = [];
     if (!isEnum(args[0], CONSENT_DECISIONS))
       issues.push("decision must be 'install' or 'skip'");
     return issues;
   },
 
-  "vmWizard:respondHostKey": (args) => {
+  [IPC_CHANNELS.VM_WIZARD_RESPOND_HOST_KEY]: (args) => {
     const issues: string[] = [];
     if (!isBoolean(args[0]))
       issues.push("accepted must be a boolean");
@@ -502,36 +503,36 @@ const validators: Record<string, Validator> = {
   },
 
   // ── OpenCode ────────────────────────────────────────────
-  "opencode:getStatus": (args) => {
+  [IPC_CHANNELS.OPENCODE_GET_STATUS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "opencode:refreshStatus": (args) => {
+  [IPC_CHANNELS.OPENCODE_REFRESH_STATUS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "config:setOpenCodeEndpoint": makeOpenCodeEndpointValidator(),
-  "config:setInfraOpenCodeEndpoint": makeOpenCodeEndpointValidator(),
+  [IPC_CHANNELS.CONFIG_SET_OPENCODE_ENDPOINT]: makeOpenCodeEndpointValidator(),
+  [IPC_CHANNELS.CONFIG_SET_INFRA_OPENCODE_ENDPOINT]: makeOpenCodeEndpointValidator(),
 
-  "config:setMainVm": (args) => {
+  [IPC_CHANNELS.CONFIG_SET_MAIN_VM]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "config:getMainVmId": () => [],
+  [IPC_CHANNELS.CONFIG_GET_MAIN_VM_ID]: () => [],
 
-  "config:getProjectPickupLabels": (args) => {
+  [IPC_CHANNELS.CONFIG_GET_PROJECT_PICKUP_LABELS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("projectId must be a non-empty string");
     return issues;
   },
 
-  "config:setProjectPickupLabels": (args) => {
+  [IPC_CHANNELS.CONFIG_SET_PROJECT_PICKUP_LABELS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("projectId must be a non-empty string");
     if (!Array.isArray(args[1])) {
@@ -547,13 +548,13 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:getProjectPipelineLabels": (args) => {
+  [IPC_CHANNELS.CONFIG_GET_PROJECT_PIPELINE_LABELS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("projectId must be a non-empty string");
     return issues;
   },
 
-  "config:setProjectPipelineLabels": (args) => {
+  [IPC_CHANNELS.CONFIG_SET_PROJECT_PIPELINE_LABELS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("projectId must be a non-empty string");
     if (!Array.isArray(args[1])) {
@@ -569,9 +570,9 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:getChatSessions": () => [],
+  [IPC_CHANNELS.CONFIG_GET_CHAT_SESSIONS]: () => [],
 
-  "config:addChatSession": (args) => {
+  [IPC_CHANNELS.CONFIG_ADD_CHAT_SESSION]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("session must be an object");
@@ -587,13 +588,13 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:removeChatSession": (args) => {
+  [IPC_CHANNELS.CONFIG_REMOVE_CHAT_SESSION]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     return issues;
   },
 
-  "config:updateChatSession": (args) => {
+  [IPC_CHANNELS.CONFIG_UPDATE_CHAT_SESSION]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     if (!isObject(args[1])) issues.push("updates must be an object");
@@ -604,15 +605,15 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:getExpandedProjects": () => [],
+  [IPC_CHANNELS.CONFIG_GET_EXPANDED_PROJECTS]: () => [],
 
-  "config:setExpandedProjects": (args) => {
+  [IPC_CHANNELS.CONFIG_SET_EXPANDED_PROJECTS]: (args) => {
     const issues: string[] = [];
     if (!Array.isArray(args[0])) issues.push("expandedKeys must be an array");
     return issues;
   },
 
-  "config:sweepEphemeralSessions": (args) => {
+  [IPC_CHANNELS.CONFIG_SWEEP_EPHEMERAL_SESSIONS]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("args must be an object");
@@ -626,16 +627,16 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "config:exportBootstrapSeed": () => [],
+  [IPC_CHANNELS.CONFIG_EXPORT_BOOTSTRAP_SEED]: () => [],
 
-  "config:importBootstrapSeed": (args) => {
+  [IPC_CHANNELS.CONFIG_IMPORT_BOOTSTRAP_SEED]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("seedString must be a non-empty string");
     return issues;
   },
 
   // ── Infra ───────────────────────────────────────────────
-  "infra:executeAction": (args) => {
+  [IPC_CHANNELS.INFRA_EXECUTE_ACTION]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("args must be an object");
@@ -710,25 +711,25 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "infra:getStatus": () => [],
+  [IPC_CHANNELS.INFRA_GET_STATUS]: () => [],
 
   // ── Reachability ─────────────────────────────────────────
-  "reachability:getStatus": (args) => {
+  [IPC_CHANNELS.REACHABILITY_GET_STATUS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "reachability:getAll": () => [],
+  [IPC_CHANNELS.REACHABILITY_GET_ALL]: () => [],
 
   // ── Transcript ─────────────────────────────────────────────
-  "transcript:getMessages": (args) => {
+  [IPC_CHANNELS.TRANSCRIPT_GET_MESSAGES]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     return issues;
   },
 
-  "transcript:appendMessage": (args) => {
+  [IPC_CHANNELS.TRANSCRIPT_APPEND_MESSAGE]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("message must be an object");
@@ -743,7 +744,7 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "transcript:appendMessages": (args) => {
+  [IPC_CHANNELS.TRANSCRIPT_APPEND_MESSAGES]: (args) => {
     const issues: string[] = [];
     if (!Array.isArray(args[0])) {
       issues.push("messages must be an array");
@@ -764,39 +765,39 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "transcript:updateMessage": (args) => {
+  [IPC_CHANNELS.TRANSCRIPT_UPDATE_MESSAGE]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("messageId must be a non-empty string");
     if (!isObject(args[1])) issues.push("updates must be an object");
     return issues;
   },
 
-  "transcript:deleteSession": (args) => {
+  [IPC_CHANNELS.TRANSCRIPT_DELETE_SESSION]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     return issues;
   },
 
   // ── MCP ─────────────────────────────────────────────────────
-  "mcp:getStatus": (args) => {
+  [IPC_CHANNELS.MCP_GET_STATUS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "mcp:connect": (args) => {
+  [IPC_CHANNELS.MCP_CONNECT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "mcp:disconnect": (args) => {
+  [IPC_CHANNELS.MCP_DISCONNECT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
-  "mcp:callTool": (args) => {
+  [IPC_CHANNELS.MCP_CALL_TOOL]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isString(args[1])) {
@@ -811,7 +812,7 @@ const validators: Record<string, Validator> = {
   },
 
   // ── Agent streaming ──────────────────────────────────────────
-  "agent:sendPrompt": (args) => {
+  [IPC_CHANNELS.AGENT_SEND_PROMPT]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("args must be an object");
@@ -826,21 +827,21 @@ const validators: Record<string, Validator> = {
     return issues;
   },
 
-  "agent:interrupt": (args) => {
+  [IPC_CHANNELS.AGENT_INTERRUPT]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (args[1] !== undefined && !isString(args[1])) issues.push("sessionId must be a string if provided");
     return issues;
   },
 
-  "agent:listModels": (args) => {
+  [IPC_CHANNELS.AGENT_LIST_MODELS]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
   // ── Log ─────────────────────────────────────────────────────
-  "log:write": (args) => {
+  [IPC_CHANNELS.LOG_WRITE]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) {
       issues.push("entry must be an object");
@@ -870,156 +871,156 @@ const validators: Record<string, Validator> = {
   },
 
   // ── Budget ───────────────────────────────────────────────────
-  "budget:getWatches": () => [],
-  "budget:getBreaches": () => [],
-  "budget:addWatch": (args) => {
+  [IPC_CHANNELS.BUDGET_GET_WATCHES]: () => [],
+  [IPC_CHANNELS.BUDGET_GET_BREACHES]: () => [],
+  [IPC_CHANNELS.BUDGET_ADD_WATCH]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("watch must be an object");
     return issues;
   },
-  "budget:removeWatch": (args) => {
+  [IPC_CHANNELS.BUDGET_REMOVE_WATCH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
     return issues;
   },
-  "budget:updateWatch": (args) => {
+  [IPC_CHANNELS.BUDGET_UPDATE_WATCH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
     if (!isObject(args[1])) issues.push("updates must be an object");
     return issues;
   },
-  "budget:addBreach": (args) => {
+  [IPC_CHANNELS.BUDGET_ADD_BREACH]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("breach must be an object");
     return issues;
   },
-  "budget:dismissBreach": (args) => {
+  [IPC_CHANNELS.BUDGET_DISMISS_BREACH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("breachId must be a non-empty string");
     return issues;
   },
 
   // ── Inbox ────────────────────────────────────────────────────
-  "inbox:getItems": () => [],
-  "inbox:getDismissedIds": () => [],
-  "inbox:getResolvedItems": () => [],
-  "inbox:pruneResolvedItems": () => [],
-  "inbox:dismissItem": (args) => {
+  [IPC_CHANNELS.INBOX_GET_ITEMS]: () => [],
+  [IPC_CHANNELS.INBOX_GET_DISMISSED_IDS]: () => [],
+  [IPC_CHANNELS.INBOX_GET_RESOLVED_ITEMS]: () => [],
+  [IPC_CHANNELS.INBOX_PRUNE_RESOLVED_ITEMS]: () => [],
+  [IPC_CHANNELS.INBOX_DISMISS_ITEM]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("itemId must be a non-empty string");
     return issues;
   },
-  "inbox:queryFleet": () => [],
-  "inbox:resolveItem": (args) => {
+  [IPC_CHANNELS.INBOX_QUERY_FLEET]: () => [],
+  [IPC_CHANNELS.INBOX_RESOLVE_ITEM]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("resolved must be an object");
     return issues;
   },
 
   // ── Notifications ─────────────────────────────────────────────
-  "notification:send": (args) => {
+  [IPC_CHANNELS.NOTIFICATION_SEND]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("args must be an object");
     return issues;
   },
-  "notification:setMuted": (args) => {
+  [IPC_CHANNELS.NOTIFICATION_SET_MUTED]: (args) => {
     const issues: string[] = [];
     if (!isBoolean(args[0])) issues.push("muted must be a boolean");
     return issues;
   },
-  "notification:isMuted": () => [],
+  [IPC_CHANNELS.NOTIFICATION_IS_MUTED]: () => [],
 
   // ── Outage ───────────────────────────────────────────────────
-  "outage:getEscalations": () => [],
+  [IPC_CHANNELS.OUTAGE_GET_ESCALATIONS]: () => [],
 
   // ── Settings ─────────────────────────────────────────────────
-  "settings:get": () => [],
-  "settings:update": (args) => {
+  [IPC_CHANNELS.SETTINGS_GET]: () => [],
+  [IPC_CHANNELS.SETTINGS_UPDATE]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("updates must be an object");
     return issues;
   },
 
   // ── Condition watch ──────────────────────────────────────────
-  "watch:getWatches": () => [],
-  "watch:addWatch": (args) => {
+  [IPC_CHANNELS.WATCH_GET_WATCHES]: () => [],
+  [IPC_CHANNELS.WATCH_ADD_WATCH]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("watch must be an object");
     return issues;
   },
-  "watch:removeWatch": (args) => {
+  [IPC_CHANNELS.WATCH_REMOVE_WATCH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
     return issues;
   },
-  "watch:tripWatch": (args) => {
+  [IPC_CHANNELS.WATCH_TRIP_WATCH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("watchId must be a non-empty string");
     return issues;
   },
 
   // ── Loop shape cache ─────────────────────────────────────────
-  "loopShapeCache:getCached": (args) => {
+  [IPC_CHANNELS.LOOP_SHAPE_CACHE_GET_CACHED]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
-  "loopShapeCache:getAll": () => [],
-  "loopShapeCache:refresh": (args) => {
+  [IPC_CHANNELS.LOOP_SHAPE_CACHE_GET_ALL]: () => [],
+  [IPC_CHANNELS.LOOP_SHAPE_CACHE_REFRESH]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
 
   // ── Sibling decline ──────────────────────────────────────────
-  "siblingDecline:isDeclined": (args) => {
+  [IPC_CHANNELS.SIBLING_DECLINE_IS_DECLINED]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isNonEmptyString(args[1])) issues.push("loopId must be a non-empty string");
     if (!isNonEmptyString(args[2])) issues.push("fingerprint must be a non-empty string");
     return issues;
   },
-  "siblingDecline:recordDecline": (args) => {
+  [IPC_CHANNELS.SIBLING_DECLINE_RECORD_DECLINE]: (args) => {
     const issues: string[] = [];
     if (!isObject(args[0])) issues.push("record must be an object");
     return issues;
   },
 
   // ── Config restore / stamp ────────────────────────────────────
-  "config:checkRestoreAvailable": () => [],
-  "config:pullRestore": () => [],
-  "config:getConfigStamp": () => [],
-  "config:stampCheckedSetMainVm": (args) => {
+  [IPC_CHANNELS.CONFIG_CHECK_RESTORE_AVAILABLE]: () => [],
+  [IPC_CHANNELS.CONFIG_PULL_RESTORE]: () => [],
+  [IPC_CHANNELS.CONFIG_GET_STAMP]: () => [],
+  [IPC_CHANNELS.CONFIG_STAMP_CHECKED_SET_MAIN_VM]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isObject(args[1])) issues.push("knownStamp must be an object");
     return issues;
   },
-  "config:forceSetMainVm": (args) => {
+  [IPC_CHANNELS.CONFIG_FORCE_SET_MAIN_VM]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     return issues;
   },
-  "config:pinChatSession": (args) => {
+  [IPC_CHANNELS.CONFIG_PIN_CHAT_SESSION]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     if (!isBoolean(args[1])) issues.push("pinned must be a boolean");
     return issues;
   },
-  "config:renameChatSession": (args) => {
+  [IPC_CHANNELS.CONFIG_RENAME_CHAT_SESSION]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("sessionId must be a non-empty string");
     if (!isNonEmptyString(args[1])) issues.push("title must be a non-empty string");
     return issues;
   },
-  "config:reorderChatSessions": (args) => {
+  [IPC_CHANNELS.CONFIG_REORDER_CHAT_SESSIONS]: (args) => {
     const issues: string[] = [];
     if (!Array.isArray(args[0])) issues.push("orderedSessionIds must be an array of strings");
     return issues;
   },
 
   // ── Infra platform detection ─────────────────────────────────
-  "infra:getPlatform": (args) => {
+  [IPC_CHANNELS.INFRA_GET_PLATFORM]: (args) => {
     const issues: string[] = [];
     if (!isNonEmptyString(args[0])) issues.push("environmentId must be a non-empty string");
     if (!isNonEmptyString(args[1])) issues.push("projectId must be a non-empty string");

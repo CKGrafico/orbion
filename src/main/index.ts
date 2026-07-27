@@ -28,6 +28,7 @@ import type {
   LoopShape,
 } from "../shared/ipc.js";
 import type { AgentRuntime, Environment, SessionScope, NotificationSendArgs, ConfigStamp, StampCheckedWriteResult, GlobalSettings } from "../shared/ipc.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { fetchAndUnwrap } from "./http-utils.js";
 import { parseSseStream } from "./sse-parser.js";
@@ -166,7 +167,7 @@ const outageTracker = new OutageTracker(
   (event: OutageEscalation) => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send("outage:escalation", event);
+      win.webContents.send(IPC_CHANNELS.OUTAGE_ESCALATION, event);
     }
 
     // Send OS notification for prolonged outage
@@ -186,7 +187,7 @@ const outageTracker = new OutageTracker(
   (environmentId: string) => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send("outage:resolve", environmentId);
+      win.webContents.send(IPC_CHANNELS.OUTAGE_RESOLVE, environmentId);
     }
   },
 );
@@ -197,7 +198,7 @@ const reachabilityTracker = new ReachabilityTracker();
 onLoopShapeCacheUpdate((shapes: LoopShape[]) => {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
-    win.webContents.send("loopShapeCache:update", shapes);
+    win.webContents.send(IPC_CHANNELS.LOOP_SHAPE_CACHE_UPDATE, shapes);
   }
 });
 
@@ -234,7 +235,7 @@ function getOrCreateSupervisor(environmentId: string, baseUrl: string): Connecti
      (status: ConnectionStatus) => {
        const win = getMainWindow();
        if (win) {
-         win.webContents.send("connection:status", environmentId, status);
+          win.webContents.send(IPC_CHANNELS.CONNECTION_STATUS, environmentId, status);
        }
        // Feed status changes to the outage tracker
        outageTracker.handleStatusChange(environmentId, status);
@@ -243,7 +244,7 @@ function getOrCreateSupervisor(environmentId: string, baseUrl: string): Connecti
        // Forward reachability changes to the renderer
        const reachabilityStatus = reachabilityTracker.getStatus(environmentId);
        if (reachabilityStatus && win && !win.isDestroyed()) {
-         win.webContents.send("reachability:status", reachabilityStatus);
+          win.webContents.send(IPC_CHANNELS.REACHABILITY_STATUS, reachabilityStatus);
        }
      },
    );
@@ -264,7 +265,7 @@ function syncEndpointTracker(environmentId: string): void {
       (health) => {
         const win = getMainWindow();
         if (win) {
-          win.webContents.send("connection:endpointHealth", environmentId, health);
+          win.webContents.send(IPC_CHANNELS.CONNECTION_ENDPOINT_HEALTH, environmentId, health);
         }
       },
       // Resolve effective URLs through the tunnel registry for SSH endpoints
@@ -447,7 +448,7 @@ async function handleStreamSubscribe(
   if (!envId) {
     const send = (kind: "data" | "event" | "end" | "error", text: string): void => {
       if (!sender.isDestroyed()) {
-        sender.send("stream:event", { subId: args.subId, kind, text });
+        sender.send(IPC_CHANNELS.STREAM_EVENT, { subId: args.subId, kind, text });
       }
     };
     send("error", "Base URL not registered as an environment");
@@ -466,7 +467,7 @@ async function handleStreamSubscribe(
 
   const send = (kind: "data" | "event" | "end" | "error", text: string): void => {
     if (!sender.isDestroyed()) {
-      sender.send("stream:event", { subId: args.subId, kind, text });
+      sender.send(IPC_CHANNELS.STREAM_EVENT, { subId: args.subId, kind, text });
     }
   };
 
@@ -658,36 +659,36 @@ app.whenReady().then(() => {
     },
   ]));
 
-  safeHandle("log:write", (_event, ...rawArgs) => {
+  safeHandle(IPC_CHANNELS.LOG_WRITE, (_event, ...rawArgs) => {
     checkLogRateLimit(_event.sender.id);
-    const [entry] = validateIpc<[LogEntry]>("log:write", rawArgs);
+    const [entry] = validateIpc<[LogEntry]>(IPC_CHANNELS.LOG_WRITE, rawArgs);
     const scopedLogger = entry.module ? createLogger(entry.module.slice(0, 100)) : logger;
     scopedLogger[entry.level](`${entry.message.slice(0, 10_000)}${formatLogContext(entry.context)}`);
   });
 
-  safeHandle("api:request", (_event, ...rawArgs) => {
-    const [args] = validateIpc<[ApiRequestArgs]>("api:request", rawArgs);
+  safeHandle(IPC_CHANNELS.API_REQUEST, (_event, ...rawArgs) => {
+    const [args] = validateIpc<[ApiRequestArgs]>(IPC_CHANNELS.API_REQUEST, rawArgs);
     return handleApiRequest(args);
   });
 
-  safeHandle("stream:subscribe", (event, ...rawArgs) => {
-    const [args] = validateIpc<[StreamSubscribeArgs]>("stream:subscribe", rawArgs);
+  safeHandle(IPC_CHANNELS.STREAM_SUBSCRIBE, (event, ...rawArgs) => {
+    const [args] = validateIpc<[StreamSubscribeArgs]>(IPC_CHANNELS.STREAM_SUBSCRIBE, rawArgs);
     void handleStreamSubscribe(event.sender, args);
   });
 
-  safeHandle("stream:unsubscribe", (_event, ...rawArgs) => {
-    const [subId] = validateIpc<[string]>("stream:unsubscribe", rawArgs);
+  safeHandle(IPC_CHANNELS.STREAM_UNSUBSCRIBE, (_event, ...rawArgs) => {
+    const [subId] = validateIpc<[string]>(IPC_CHANNELS.STREAM_UNSUBSCRIBE, rawArgs);
     streams.get(subId)?.controller.abort();
     streams.delete(subId);
     streamEnvironments.delete(subId);
   });
 
-  safeHandle("config:getEnvironments", () => {
-    validateIpc("config:getEnvironments", []);
+  safeHandle(IPC_CHANNELS.CONFIG_GET_ENVIRONMENTS, () => {
+    validateIpc(IPC_CHANNELS.CONFIG_GET_ENVIRONMENTS, []);
     return getEnvironmentsForRenderer();
   });
-  safeHandle("config:addEnvironment", async (_event, ...rawArgs) => {
-    const [name, url, kind] = validateIpc<[string, string, string | undefined]>("config:addEnvironment", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_ADD_ENVIRONMENT, async (_event, ...rawArgs) => {
+    const [name, url, kind] = validateIpc<[string, string, string | undefined]>(IPC_CHANNELS.CONFIG_ADD_ENVIRONMENT, rawArgs);
     const endpointKind = (kind as "direct" | "ssh" | "tailscale") ?? "direct";
     const fingerprint = await fetchFingerprint(url);
     if (fingerprint) {
@@ -706,8 +707,8 @@ app.whenReady().then(() => {
     await seedEnvironmentInfrastructure(env.id);
     return env;
   });
-  safeHandle("config:exchangePairingCode", async (_event, ...rawArgs) => {
-    const [baseUrl, code, scope] = validateIpc<[string, string, string | undefined]>("config:exchangePairingCode", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_EXCHANGE_PAIRING_CODE, async (_event, ...rawArgs) => {
+    const [baseUrl, code, scope] = validateIpc<[string, string, string | undefined]>(IPC_CHANNELS.CONFIG_EXCHANGE_PAIRING_CODE, rawArgs);
     const sessionScope = (scope as SessionScope) ?? "read-only";
     const result = await exchangePairingCode(baseUrl, code, sessionScope);
     if (result.ok && result.token) {
@@ -718,12 +719,12 @@ app.whenReady().then(() => {
     }
     return result;
   });
-  safeHandle("config:removeSessionToken", async (_event, ...rawArgs) => {
-    const [environmentId] = validateIpc<[string]>("config:removeSessionToken", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_REMOVE_SESSION_TOKEN, async (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_REMOVE_SESSION_TOKEN, rawArgs);
     await removeSessionToken(environmentId);
   });
-  safeHandle("config:removeEnvironment", async (_event, ...rawArgs) => {
-    const [id] = validateIpc<[string]>("config:removeEnvironment", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_REMOVE_ENVIRONMENT, async (_event, ...rawArgs) => {
+    const [id] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_REMOVE_ENVIRONMENT, rawArgs);
     removeSupervisor(id);
     clearOpenCodeStatus(id);
     removeMcpSession(id);
@@ -731,12 +732,12 @@ app.whenReady().then(() => {
     abortStreamsForEnvironment(id);
     await removeEnvironment(id);
   });
-  safeHandle("config:updateEnvironment", async (_event, ...rawArgs) => {
-    const [id, updates] = validateIpc<[string, { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }]>("config:updateEnvironment", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_UPDATE_ENVIRONMENT, async (_event, ...rawArgs) => {
+    const [id, updates] = validateIpc<[string, { name?: string; agentRuntime?: AgentRuntime; sshControlTarget?: string | null }]>(IPC_CHANNELS.CONFIG_UPDATE_ENVIRONMENT, rawArgs);
     await updateEnvironment(id, updates);
   });
-  safeHandle("config:addEndpoint", async (_event, ...rawArgs) => {
-    const [environmentId, url, kind] = validateIpc<[string, string, string]>("config:addEndpoint", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_ADD_ENDPOINT, async (_event, ...rawArgs) => {
+    const [environmentId, url, kind] = validateIpc<[string, string, string]>(IPC_CHANNELS.CONFIG_ADD_ENDPOINT, rawArgs);
     const ep = await addEndpoint(environmentId, url, kind as "direct" | "ssh" | "tailscale");
     if (ep && ep.kind === "ssh") {
       await openTunnelForEndpoint(environmentId, ep);
@@ -744,8 +745,8 @@ app.whenReady().then(() => {
     syncEndpointTracker(environmentId);
     return ep;
   });
-  safeHandle("config:removeEndpoint", async (_event, ...rawArgs) => {
-    const [environmentId, endpointId] = validateIpc<[string, string]>("config:removeEndpoint", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_REMOVE_ENDPOINT, async (_event, ...rawArgs) => {
+    const [environmentId, endpointId] = validateIpc<[string, string]>(IPC_CHANNELS.CONFIG_REMOVE_ENDPOINT, rawArgs);
     // Close tunnel before removing endpoint (need the endpoint data still present)
     const envsBefore = getEnvironments();
     const envBefore = envsBefore.find((e: Environment) => e.id === environmentId);
@@ -756,35 +757,35 @@ app.whenReady().then(() => {
     await removeEndpoint(environmentId, endpointId);
     syncEndpointTracker(environmentId);
   });
-  safeHandle("config:setActiveEndpoint", async (_event, ...rawArgs) => {
-    const [environmentId, endpointId] = validateIpc<[string, string]>("config:setActiveEndpoint", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_ACTIVE_ENDPOINT, async (_event, ...rawArgs) => {
+    const [environmentId, endpointId] = validateIpc<[string, string]>(IPC_CHANNELS.CONFIG_SET_ACTIVE_ENDPOINT, rawArgs);
     await setActiveEndpoint(environmentId, endpointId);
     await seedEnvironmentInfrastructure(environmentId, { replaceSupervisor: true });
   });
-  safeHandle("config:getSelectedEnvironmentId", () => {
-    validateIpc("config:getSelectedEnvironmentId", []);
+  safeHandle(IPC_CHANNELS.CONFIG_GET_SELECTED_ENVIRONMENT_ID, () => {
+    validateIpc(IPC_CHANNELS.CONFIG_GET_SELECTED_ENVIRONMENT_ID, []);
     return getSelectedEnvironmentId();
   });
-  safeHandle("config:setSelectedEnvironmentId", async (_event, ...rawArgs) => {
-    const [id] = validateIpc<[string | null]>("config:setSelectedEnvironmentId", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_SELECTED_ENVIRONMENT_ID, async (_event, ...rawArgs) => {
+    const [id] = validateIpc<[string | null]>(IPC_CHANNELS.CONFIG_SET_SELECTED_ENVIRONMENT_ID, rawArgs);
     return setSelectedEnvironmentId(id);
   });
   safeHandle(
-    "config:migrateFromLocalStorage",
+    IPC_CHANNELS.CONFIG_MIGRATE_FROM_LOCAL_STORAGE,
     async (_event, ...rawArgs) => {
-      const [rawInstances, rawSelectedId] = validateIpc<[string, string | null]>("config:migrateFromLocalStorage", rawArgs);
+      const [rawInstances, rawSelectedId] = validateIpc<[string, string | null]>(IPC_CHANNELS.CONFIG_MIGRATE_FROM_LOCAL_STORAGE, rawArgs);
       return migrateFromLocalStorage(rawInstances, rawSelectedId);
     },
   );
 
-  safeHandle("connection:getStatus", (_event, ...rawArgs) => {
-    const [environmentId] = validateIpc<[string]>("connection:getStatus", rawArgs);
+  safeHandle(IPC_CHANNELS.CONNECTION_GET_STATUS, (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.CONNECTION_GET_STATUS, rawArgs);
     const supervisor = supervisors.get(environmentId);
     return supervisor ? supervisor.getStatus() : null;
   });
 
-  safeHandle("connection:getEndpointHealth", (_event, ...rawArgs): EndpointHealth[] => {
-    const [environmentId] = validateIpc<[string]>("connection:getEndpointHealth", rawArgs);
+  safeHandle(IPC_CHANNELS.CONNECTION_GET_ENDPOINT_HEALTH, (_event, ...rawArgs): EndpointHealth[] => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.CONNECTION_GET_ENDPOINT_HEALTH, rawArgs);
     const tracker = endpointTrackers.get(environmentId);
     if (tracker) return tracker.getHealth();
     const envs = getEnvironments();
@@ -798,15 +799,15 @@ app.whenReady().then(() => {
     }));
   });
 
-  safeHandle("connection:retry", (_event, ...rawArgs) => {
-    const [environmentId] = validateIpc<[string]>("connection:retry", rawArgs);
+  safeHandle(IPC_CHANNELS.CONNECTION_RETRY, (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.CONNECTION_RETRY, rawArgs);
     const supervisor = supervisors.get(environmentId);
     if (supervisor) supervisor.wakeup();
   });
 
-  ipcMain.on("connection:networkChanged", (_event, ...rawArgs) => {
+  ipcMain.on(IPC_CHANNELS.CONNECTION_NETWORK_CHANGED, (_event, ...rawArgs) => {
     try {
-      const [online] = validateIpc<[boolean]>("connection:networkChanged", rawArgs);
+      const [online] = validateIpc<[boolean]>(IPC_CHANNELS.CONNECTION_NETWORK_CHANGED, rawArgs);
       setOsOffline(!online);
     } catch (err) {
       if (err instanceof IpcValidationError) {
@@ -817,55 +818,55 @@ app.whenReady().then(() => {
     }
   });
 
-  safeHandle("tailscale:peers", () => {
-    validateIpc("tailscale:peers", []);
+  safeHandle(IPC_CHANNELS.TAILSCALE_PEERS, () => {
+    validateIpc(IPC_CHANNELS.TAILSCALE_PEERS, []);
     return fetchPeers();
   });
 
-  safeHandle("vmWizard:listSshHosts", () => {
-    validateIpc("vmWizard:listSshHosts", []);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_LIST_SSH_HOSTS, () => {
+    validateIpc(IPC_CHANNELS.VM_WIZARD_LIST_SSH_HOSTS, []);
     return vmListSshHosts();
   });
 
-  safeHandle("vmWizard:start", async (_event, ...rawArgs) => {
-    const [options] = validateIpc<[VmWizardStartOptions]>("vmWizard:start", rawArgs);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_START, async (_event, ...rawArgs) => {
+    const [options] = validateIpc<[VmWizardStartOptions]>(IPC_CHANNELS.VM_WIZARD_START, rawArgs);
     const result = await runWizard(options);
     await seedEnvironmentInfrastructure(result.environmentId);
     return result;
   });
 
-  safeHandle("vmWizard:cancel", () => {
-    validateIpc("vmWizard:cancel", []);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_CANCEL, () => {
+    validateIpc(IPC_CHANNELS.VM_WIZARD_CANCEL, []);
     cancelWizard();
   });
 
-  safeHandle("vmWizard:respondConsent", (_event, ...rawArgs) => {
-    const [decision] = validateIpc<["install" | "skip"]>("vmWizard:respondConsent", rawArgs);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_RESPOND_CONSENT, (_event, ...rawArgs) => {
+    const [decision] = validateIpc<["install" | "skip"]>(IPC_CHANNELS.VM_WIZARD_RESPOND_CONSENT, rawArgs);
     respondConsent(decision);
   });
 
-  safeHandle("vmWizard:respondServiceSelection", (_event, ...rawArgs) => {
-    const [selection] = validateIpc<[import("../shared/ipc.js").VmWizardServiceSelection]>("vmWizard:respondServiceSelection", rawArgs);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_RESPOND_SERVICE_SELECTION, (_event, ...rawArgs) => {
+    const [selection] = validateIpc<[import("../shared/ipc.js").VmWizardServiceSelection]>(IPC_CHANNELS.VM_WIZARD_RESPOND_SERVICE_SELECTION, rawArgs);
     respondServiceSelection(selection);
   });
 
-  safeHandle("vmWizard:respondRuntimeConsent", (_event, ...rawArgs) => {
-    const [decision] = validateIpc<["install" | "skip"]>("vmWizard:respondRuntimeConsent", rawArgs);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_RESPOND_RUNTIME_CONSENT, (_event, ...rawArgs) => {
+    const [decision] = validateIpc<["install" | "skip"]>(IPC_CHANNELS.VM_WIZARD_RESPOND_RUNTIME_CONSENT, rawArgs);
     respondRuntimeConsent(decision);
   });
 
-  safeHandle("vmWizard:respondHostKey", (_event, ...rawArgs) => {
-    const [accepted] = validateIpc<[boolean]>("vmWizard:respondHostKey", rawArgs);
+  safeHandle(IPC_CHANNELS.VM_WIZARD_RESPOND_HOST_KEY, (_event, ...rawArgs) => {
+    const [accepted] = validateIpc<[boolean]>(IPC_CHANNELS.VM_WIZARD_RESPOND_HOST_KEY, rawArgs);
     respondHostKey(accepted);
   });
 
-  safeHandle("opencode:getStatus", (_event, ...rawArgs): OpenCodeConnectionStatus => {
-    const [environmentId] = validateIpc<[string]>("opencode:getStatus", rawArgs);
+  safeHandle(IPC_CHANNELS.OPENCODE_GET_STATUS, (_event, ...rawArgs): OpenCodeConnectionStatus => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.OPENCODE_GET_STATUS, rawArgs);
     return getOpenCodeStatus(environmentId);
   });
 
-  safeHandle("opencode:refreshStatus", async (_event, ...rawArgs): Promise<OpenCodeConnectionStatus> => {
-    const [environmentId] = validateIpc<[string]>("opencode:refreshStatus", rawArgs);
+  safeHandle(IPC_CHANNELS.OPENCODE_REFRESH_STATUS, async (_event, ...rawArgs): Promise<OpenCodeConnectionStatus> => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.OPENCODE_REFRESH_STATUS, rawArgs);
     const envs = getEnvironments();
     const env = envs.find((e: Environment) => e.id === environmentId);
     if (!env?.opencode) {
@@ -874,8 +875,8 @@ app.whenReady().then(() => {
     return refreshOpenCodeStatus(environmentId, env.opencode);
   });
 
-  safeHandle("config:setOpenCodeEndpoint", async (_event, ...rawArgs) => {
-    const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setOpenCodeEndpoint", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_OPENCODE_ENDPOINT, async (_event, ...rawArgs) => {
+    const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>(IPC_CHANNELS.CONFIG_SET_OPENCODE_ENDPOINT, rawArgs);
     const result = await setOpenCodeEndpoint(environmentId, endpoint);
     if (!result.ok && result.reason === "encryption-unavailable") {
       showEncryptionWarning();
@@ -889,8 +890,8 @@ app.whenReady().then(() => {
     return result;
   });
 
-  safeHandle("config:setInfraOpenCodeEndpoint", async (_event, ...rawArgs) => {
-    const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>("config:setInfraOpenCodeEndpoint", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_INFRA_OPENCODE_ENDPOINT, async (_event, ...rawArgs) => {
+    const [environmentId, endpoint] = validateIpc<[string, OpenCodeEndpoint | null]>(IPC_CHANNELS.CONFIG_SET_INFRA_OPENCODE_ENDPOINT, rawArgs);
     const result = await setInfraOpenCodeEndpoint(environmentId, endpoint);
     if (!result.ok && result.reason === "encryption-unavailable") {
       showEncryptionWarning();
@@ -898,97 +899,97 @@ app.whenReady().then(() => {
     return result;
   });
 
-  safeHandle("config:setMainVm", async (_event, ...rawArgs) => {
-    const [environmentId] = validateIpc<[string]>("config:setMainVm", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_MAIN_VM, async (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_SET_MAIN_VM, rawArgs);
     await setMainVm(environmentId);
   });
 
-  safeHandle("config:getMainVmId", () => {
-    validateIpc("config:getMainVmId", []);
+  safeHandle(IPC_CHANNELS.CONFIG_GET_MAIN_VM_ID, () => {
+    validateIpc(IPC_CHANNELS.CONFIG_GET_MAIN_VM_ID, []);
     return getMainVmId();
   });
 
-  safeHandle("config:getProjectPickupLabels", (_event, ...rawArgs) => {
-    const [projectId] = validateIpc<[string]>("config:getProjectPickupLabels", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_GET_PROJECT_PICKUP_LABELS, (_event, ...rawArgs) => {
+    const [projectId] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_GET_PROJECT_PICKUP_LABELS, rawArgs);
     return getProjectPickupLabels(projectId);
   });
 
-  safeHandle("config:setProjectPickupLabels", async (_event, ...rawArgs) => {
-    const [projectId, labels] = validateIpc<[string, string[]]>("config:setProjectPickupLabels", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_PROJECT_PICKUP_LABELS, async (_event, ...rawArgs) => {
+    const [projectId, labels] = validateIpc<[string, string[]]>(IPC_CHANNELS.CONFIG_SET_PROJECT_PICKUP_LABELS, rawArgs);
     await setProjectPickupLabels(projectId, labels);
   });
 
-  safeHandle("config:getProjectPipelineLabels", (_event, ...rawArgs) => {
-    const [projectId] = validateIpc<[string]>("config:getProjectPipelineLabels", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_GET_PROJECT_PIPELINE_LABELS, (_event, ...rawArgs) => {
+    const [projectId] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_GET_PROJECT_PIPELINE_LABELS, rawArgs);
     return getProjectPipelineLabels(projectId);
   });
 
-  safeHandle("config:setProjectPipelineLabels", async (_event, ...rawArgs) => {
-    const [projectId, labels] = validateIpc<[string, string[]]>("config:setProjectPipelineLabels", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_PROJECT_PIPELINE_LABELS, async (_event, ...rawArgs) => {
+    const [projectId, labels] = validateIpc<[string, string[]]>(IPC_CHANNELS.CONFIG_SET_PROJECT_PIPELINE_LABELS, rawArgs);
     await setProjectPipelineLabels(projectId, labels);
   });
 
-  safeHandle("config:getChatSessions", () => {
+  safeHandle(IPC_CHANNELS.CONFIG_GET_CHAT_SESSIONS, () => {
     return getChatSessions();
   });
 
-  safeHandle("config:addChatSession", async (_event, ...rawArgs) => {
-    const [session] = validateIpc<[Omit<import("../shared/ipc").ChatSession, "id" | "createdAt">]>("config:addChatSession", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_ADD_CHAT_SESSION, async (_event, ...rawArgs) => {
+    const [session] = validateIpc<[Omit<import("../shared/ipc").ChatSession, "id" | "createdAt">]>(IPC_CHANNELS.CONFIG_ADD_CHAT_SESSION, rawArgs);
     return addChatSession(session);
   });
 
-  safeHandle("config:removeChatSession", async (_event, ...rawArgs) => {
-    const [sessionId] = validateIpc<[string]>("config:removeChatSession", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_REMOVE_CHAT_SESSION, async (_event, ...rawArgs) => {
+    const [sessionId] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_REMOVE_CHAT_SESSION, rawArgs);
     await removeChatSession(sessionId);
     await transcriptDeleteSession(sessionId);
   });
 
-  safeHandle("config:updateChatSession", async (_event, ...rawArgs) => {
-    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>]>("config:updateChatSession", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_UPDATE_CHAT_SESSION, async (_event, ...rawArgs) => {
+    const [sessionId, updates] = validateIpc<[string, Partial<Pick<import("../shared/ipc").ChatSession, "title" | "lastActiveAt" | "projectName" | "environmentId" | "workingDirectory" | "activeRuntime" | "activeModel" | "reasoningEffort" | "persisted" | "turnCount" | "declineAutoPersistUntil" | "pinned">>]>(IPC_CHANNELS.CONFIG_UPDATE_CHAT_SESSION, rawArgs);
     await updateChatSession(sessionId, updates);
   });
 
-  safeHandle("config:pinChatSession", async (_event, ...rawArgs) => {
-    const [sessionId, pinned] = validateIpc<[string, boolean]>("config:pinChatSession", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_PIN_CHAT_SESSION, async (_event, ...rawArgs) => {
+    const [sessionId, pinned] = validateIpc<[string, boolean]>(IPC_CHANNELS.CONFIG_PIN_CHAT_SESSION, rawArgs);
     await pinChatSession(sessionId, pinned);
   });
 
-  safeHandle("config:renameChatSession", async (_event, ...rawArgs) => {
-    const [sessionId, title] = validateIpc<[string, string]>("config:renameChatSession", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_RENAME_CHAT_SESSION, async (_event, ...rawArgs) => {
+    const [sessionId, title] = validateIpc<[string, string]>(IPC_CHANNELS.CONFIG_RENAME_CHAT_SESSION, rawArgs);
     await renameChatSession(sessionId, title);
   });
 
-  safeHandle("config:reorderChatSessions", async (_event, ...rawArgs) => {
-    const [orderedIds] = validateIpc<[string[]]>("config:reorderChatSessions", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_REORDER_CHAT_SESSIONS, async (_event, ...rawArgs) => {
+    const [orderedIds] = validateIpc<[string[]]>(IPC_CHANNELS.CONFIG_REORDER_CHAT_SESSIONS, rawArgs);
     await reorderChatSessions(orderedIds);
   });
 
-  safeHandle("config:getExpandedProjects", () => {
+  safeHandle(IPC_CHANNELS.CONFIG_GET_EXPANDED_PROJECTS, () => {
     return getExpandedProjects();
   });
 
-  safeHandle("config:setExpandedProjects", async (_event, ...rawArgs) => {
-    const [expandedKeys] = validateIpc<[string[]]>("config:setExpandedProjects", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SET_EXPANDED_PROJECTS, async (_event, ...rawArgs) => {
+    const [expandedKeys] = validateIpc<[string[]]>(IPC_CHANNELS.CONFIG_SET_EXPANDED_PROJECTS, rawArgs);
     await setExpandedProjects(expandedKeys);
   });
 
-  safeHandle("config:exportBootstrapSeed", () => {
-    validateIpc("config:exportBootstrapSeed", []);
+  safeHandle(IPC_CHANNELS.CONFIG_EXPORT_BOOTSTRAP_SEED, () => {
+    validateIpc(IPC_CHANNELS.CONFIG_EXPORT_BOOTSTRAP_SEED, []);
     return exportBootstrapSeed();
   });
 
-  safeHandle("config:importBootstrapSeed", (_event, ...rawArgs) => {
-    const [seedString] = validateIpc<[string]>("config:importBootstrapSeed", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_IMPORT_BOOTSTRAP_SEED, (_event, ...rawArgs) => {
+    const [seedString] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_IMPORT_BOOTSTRAP_SEED, rawArgs);
     return importBootstrapSeed(seedString);
   });
 
-  safeHandle("config:checkRestoreAvailable", () => {
-    validateIpc("config:checkRestoreAvailable", []);
+  safeHandle(IPC_CHANNELS.CONFIG_CHECK_RESTORE_AVAILABLE, () => {
+    validateIpc(IPC_CHANNELS.CONFIG_CHECK_RESTORE_AVAILABLE, []);
     return checkRestoreAvailable();
   });
 
-  safeHandle("config:pullRestore", async () => {
-    validateIpc("config:pullRestore", []);
+  safeHandle(IPC_CHANNELS.CONFIG_PULL_RESTORE, async () => {
+    validateIpc(IPC_CHANNELS.CONFIG_PULL_RESTORE, []);
     const result = await pullRestore();
 
     if (result.ok) {
@@ -1000,23 +1001,23 @@ app.whenReady().then(() => {
     return result;
   });
 
-  safeHandle("config:getConfigStamp", (): ConfigStamp => {
-    validateIpc("config:getConfigStamp", []);
+  safeHandle(IPC_CHANNELS.CONFIG_GET_STAMP, (): ConfigStamp => {
+    validateIpc(IPC_CHANNELS.CONFIG_GET_STAMP, []);
     return getConfigStamp();
   });
 
-  safeHandle("config:stampCheckedSetMainVm", async (_event, ...rawArgs): Promise<StampCheckedWriteResult> => {
-    const [environmentId, knownStamp] = validateIpc<[string, ConfigStamp]>("config:stampCheckedSetMainVm", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_STAMP_CHECKED_SET_MAIN_VM, async (_event, ...rawArgs): Promise<StampCheckedWriteResult> => {
+    const [environmentId, knownStamp] = validateIpc<[string, ConfigStamp]>(IPC_CHANNELS.CONFIG_STAMP_CHECKED_SET_MAIN_VM, rawArgs);
     return stampCheckedSetMainVm(environmentId, knownStamp);
   });
 
-  safeHandle("config:forceSetMainVm", async (_event, ...rawArgs): Promise<ConfigStamp> => {
-    const [environmentId] = validateIpc<[string]>("config:forceSetMainVm", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_FORCE_SET_MAIN_VM, async (_event, ...rawArgs): Promise<ConfigStamp> => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.CONFIG_FORCE_SET_MAIN_VM, rawArgs);
     return forceSetMainVm(environmentId);
   });
 
-  safeHandle("config:sweepEphemeralSessions", async (_event, ...rawArgs): Promise<import("../shared/ipc").SweepEphemeralSessionsResult> => {
-    const [args] = validateIpc<[import("../shared/ipc").SweepEphemeralSessionsArgs]>("config:sweepEphemeralSessions", rawArgs);
+  safeHandle(IPC_CHANNELS.CONFIG_SWEEP_EPHEMERAL_SESSIONS, async (_event, ...rawArgs): Promise<import("../shared/ipc").SweepEphemeralSessionsResult> => {
+    const [args] = validateIpc<[import("../shared/ipc").SweepEphemeralSessionsArgs]>(IPC_CHANNELS.CONFIG_SWEEP_EPHEMERAL_SESSIONS, rawArgs);
     // Also delete transcripts for swept sessions
     const result = await sweepEphemeralSessions(args);
     for (const sessionId of result.removedSessionIds) {
@@ -1028,8 +1029,8 @@ app.whenReady().then(() => {
 
   // ── Infra action handlers (delegated to infra-handlers.ts) ──────────
 
-  safeHandle("infra:executeAction", async (_event, ...rawArgs): Promise<InfraActionResult> => {
-    const [args] = validateIpc<[InfraActionArgs]>("infra:executeAction", rawArgs);
+  safeHandle(IPC_CHANNELS.INFRA_EXECUTE_ACTION, async (_event, ...rawArgs): Promise<InfraActionResult> => {
+    const [args] = validateIpc<[InfraActionArgs]>(IPC_CHANNELS.INFRA_EXECUTE_ACTION, rawArgs);
     const result = await handleInfraExecuteAction(args, {
       getMainVm: () => getMainVm(),
       getEnvironments: () => getEnvironments(),
@@ -1050,61 +1051,61 @@ app.whenReady().then(() => {
     return result;
   });
 
-  safeHandle("infra:getStatus", () => {
-    validateIpc("infra:getStatus", []);
+  safeHandle(IPC_CHANNELS.INFRA_GET_STATUS, () => {
+    validateIpc(IPC_CHANNELS.INFRA_GET_STATUS, []);
     const mainVmId = getMainVmId();
     const connected = mainVmId !== null && supervisors.has(mainVmId)
       && supervisors.get(mainVmId)!.getStatus().phase === "connected";
     return { mainVmId, connected };
   });
 
-  safeHandle("infra:getPlatform", (_event, ...rawArgs): PlatformType => {
-    const [environmentId, projectId] = validateIpc<[string, string]>("infra:getPlatform", rawArgs);
+  safeHandle(IPC_CHANNELS.INFRA_GET_PLATFORM, (_event, ...rawArgs): PlatformType => {
+    const [environmentId, projectId] = validateIpc<[string, string]>(IPC_CHANNELS.INFRA_GET_PLATFORM, rawArgs);
     const key = platformCacheKey(environmentId, projectId);
     return platformCache.get(key) ?? "unknown";
   });
 
   // ── Budget watch IPC handlers ───────────────────────────────────────
 
-  safeHandle("budget:getWatches", (): BudgetWatch[] => {
-    validateIpc("budget:getWatches", []);
+  safeHandle(IPC_CHANNELS.BUDGET_GET_WATCHES, (): BudgetWatch[] => {
+    validateIpc(IPC_CHANNELS.BUDGET_GET_WATCHES, []);
     return getBudgetWatches();
   });
 
-  safeHandle("budget:addWatch", async (_event, ...rawArgs): Promise<BudgetWatch> => {
-    const [watch] = validateIpc<[Omit<BudgetWatch, "id" | "createdAt">]>("budget:addWatch", rawArgs);
+  safeHandle(IPC_CHANNELS.BUDGET_ADD_WATCH, async (_event, ...rawArgs): Promise<BudgetWatch> => {
+    const [watch] = validateIpc<[Omit<BudgetWatch, "id" | "createdAt">]>(IPC_CHANNELS.BUDGET_ADD_WATCH, rawArgs);
     return addBudgetWatch(watch);
   });
 
-  safeHandle("budget:removeWatch", async (_event, ...rawArgs): Promise<void> => {
-    const [watchId] = validateIpc<[string]>("budget:removeWatch", rawArgs);
+  safeHandle(IPC_CHANNELS.BUDGET_REMOVE_WATCH, async (_event, ...rawArgs): Promise<void> => {
+    const [watchId] = validateIpc<[string]>(IPC_CHANNELS.BUDGET_REMOVE_WATCH, rawArgs);
     await removeBudgetWatch(watchId);
   });
 
-  safeHandle("budget:updateWatch", async (_event, ...rawArgs): Promise<void> => {
-    const [watchId, updates] = validateIpc<[string, Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>]>("budget:updateWatch", rawArgs);
+  safeHandle(IPC_CHANNELS.BUDGET_UPDATE_WATCH, async (_event, ...rawArgs): Promise<void> => {
+    const [watchId, updates] = validateIpc<[string, Partial<Pick<BudgetWatch, "threshold" | "autoPause" | "enabled">>]>(IPC_CHANNELS.BUDGET_UPDATE_WATCH, rawArgs);
     await updateBudgetWatch(watchId, updates);
   });
 
-  safeHandle("budget:getBreaches", (): BudgetBreach[] => {
-    validateIpc("budget:getBreaches", []);
+  safeHandle(IPC_CHANNELS.BUDGET_GET_BREACHES, (): BudgetBreach[] => {
+    validateIpc(IPC_CHANNELS.BUDGET_GET_BREACHES, []);
     return getBudgetBreaches();
   });
 
-  safeHandle("budget:addBreach", async (_event, ...rawArgs): Promise<BudgetBreach> => {
-    const [breach] = validateIpc<[Omit<BudgetBreach, "id">]>("budget:addBreach", rawArgs);
+  safeHandle(IPC_CHANNELS.BUDGET_ADD_BREACH, async (_event, ...rawArgs): Promise<BudgetBreach> => {
+    const [breach] = validateIpc<[Omit<BudgetBreach, "id">]>(IPC_CHANNELS.BUDGET_ADD_BREACH, rawArgs);
     return addBudgetBreach(breach);
   });
 
-  safeHandle("budget:dismissBreach", async (_event, ...rawArgs): Promise<void> => {
-    const [breachId] = validateIpc<[string]>("budget:dismissBreach", rawArgs);
+  safeHandle(IPC_CHANNELS.BUDGET_DISMISS_BREACH, async (_event, ...rawArgs): Promise<void> => {
+    const [breachId] = validateIpc<[string]>(IPC_CHANNELS.BUDGET_DISMISS_BREACH, rawArgs);
     await dismissBudgetBreach(breachId);
   });
 
   // ── Inbox ──────────────────────────────────────────────────────────
 
-  safeHandle("inbox:getItems", (): InboxItem[] => {
-    validateIpc("inbox:getItems", []);
+  safeHandle(IPC_CHANNELS.INBOX_GET_ITEMS, (): InboxItem[] => {
+    validateIpc(IPC_CHANNELS.INBOX_GET_ITEMS, []);
     // Inbox items are derived from existing data + dismissed state.
     // The renderer computes the actual item list from perEnvLoops/breaches;
     // the main process only tracks which items the user has dismissed.
@@ -1113,17 +1114,17 @@ app.whenReady().then(() => {
     return [];
   });
 
-  safeHandle("inbox:getDismissedIds", (): string[] => {
-    validateIpc("inbox:getDismissedIds", []);
+  safeHandle(IPC_CHANNELS.INBOX_GET_DISMISSED_IDS, (): string[] => {
+    validateIpc(IPC_CHANNELS.INBOX_GET_DISMISSED_IDS, []);
     return getInboxDismissedIds();
   });
 
-  safeHandle("inbox:dismissItem", async (_event, ...rawArgs): Promise<void> => {
-    const [itemId] = validateIpc<[string]>("inbox:dismissItem", rawArgs);
+  safeHandle(IPC_CHANNELS.INBOX_DISMISS_ITEM, async (_event, ...rawArgs): Promise<void> => {
+    const [itemId] = validateIpc<[string]>(IPC_CHANNELS.INBOX_DISMISS_ITEM, rawArgs);
     await dismissInboxItem(itemId);
   });
 
-  safeHandle("inbox:queryFleet", async (_event, ..._rawArgs): Promise<InboxQueryResult> => {
+  safeHandle(IPC_CHANNELS.INBOX_QUERY_FLEET, async (_event, ..._rawArgs): Promise<InboxQueryResult> => {
     // Fleet queries are computed entirely in the renderer from live data.
     // The main process provides the dismissed-IDs list so the renderer
     // can filter out acknowledged items.
@@ -1131,41 +1132,41 @@ app.whenReady().then(() => {
     return { answer: "", references: [] };
   });
 
-  safeHandle("inbox:resolveItem", async (_event, ...rawArgs): Promise<void> => {
-    const [resolved] = validateIpc<[ResolvedInboxItem]>("inbox:resolveItem", rawArgs);
+  safeHandle(IPC_CHANNELS.INBOX_RESOLVE_ITEM, async (_event, ...rawArgs): Promise<void> => {
+    const [resolved] = validateIpc<[ResolvedInboxItem]>(IPC_CHANNELS.INBOX_RESOLVE_ITEM, rawArgs);
     await addResolvedItem(resolved);
   });
 
-  safeHandle("inbox:getResolvedItems", (): ResolvedInboxItem[] => {
-    validateIpc("inbox:getResolvedItems", []);
+  safeHandle(IPC_CHANNELS.INBOX_GET_RESOLVED_ITEMS, (): ResolvedInboxItem[] => {
+    validateIpc(IPC_CHANNELS.INBOX_GET_RESOLVED_ITEMS, []);
     return getResolvedItems();
   });
 
-  safeHandle("inbox:pruneResolvedItems", async (): Promise<void> => {
+  safeHandle(IPC_CHANNELS.INBOX_PRUNE_RESOLVED_ITEMS, async (): Promise<void> => {
     await pruneResolvedItems();
   });
 
   // ── Native OS notifications ─────────────────────────────────────────
 
-  safeHandle("notification:send", (_event, ...rawArgs): void => {
-    const [args] = validateIpc<[NotificationSendArgs]>("notification:send", rawArgs);
+  safeHandle(IPC_CHANNELS.NOTIFICATION_SEND, (_event, ...rawArgs): void => {
+    const [args] = validateIpc<[NotificationSendArgs]>(IPC_CHANNELS.NOTIFICATION_SEND, rawArgs);
     notificationService.send(args);
   });
 
-  safeHandle("notification:setMuted", (_event, ...rawArgs): void => {
-    const [muted] = validateIpc<[boolean]>("notification:setMuted", rawArgs);
+  safeHandle(IPC_CHANNELS.NOTIFICATION_SET_MUTED, (_event, ...rawArgs): void => {
+    const [muted] = validateIpc<[boolean]>(IPC_CHANNELS.NOTIFICATION_SET_MUTED, rawArgs);
     notificationService.setMuted(muted);
   });
 
-  safeHandle("notification:isMuted", (): boolean => {
-    validateIpc("notification:isMuted", []);
+  safeHandle(IPC_CHANNELS.NOTIFICATION_IS_MUTED, (): boolean => {
+    validateIpc(IPC_CHANNELS.NOTIFICATION_IS_MUTED, []);
     return notificationService.isMuted();
   });
 
   // ── Outage escalation ────────────────────────────────────────────
 
-  safeHandle("outage:getEscalations", (): OutageEscalation[] => {
-    validateIpc("outage:getEscalations", []);
+  safeHandle(IPC_CHANNELS.OUTAGE_GET_ESCALATIONS, (): OutageEscalation[] => {
+    validateIpc(IPC_CHANNELS.OUTAGE_GET_ESCALATIONS, []);
     const envs = getEnvironments();
     const result: OutageEscalation[] = [];
     for (const env of envs) {
@@ -1185,116 +1186,116 @@ app.whenReady().then(() => {
 
   // ── Reachability (instance health layer, separate from loop status) ───
 
-  safeHandle("reachability:getStatus", (_event, ...rawArgs): ReachabilityStatus | null => {
-    const [environmentId] = validateIpc<[string]>("reachability:getStatus", rawArgs);
+  safeHandle(IPC_CHANNELS.REACHABILITY_GET_STATUS, (_event, ...rawArgs): ReachabilityStatus | null => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.REACHABILITY_GET_STATUS, rawArgs);
     return reachabilityTracker.getStatus(environmentId);
   });
 
-  safeHandle("reachability:getAll", (): ReachabilityStatus[] => {
-    validateIpc("reachability:getAll", []);
+  safeHandle(IPC_CHANNELS.REACHABILITY_GET_ALL, (): ReachabilityStatus[] => {
+    validateIpc(IPC_CHANNELS.REACHABILITY_GET_ALL, []);
     return reachabilityTracker.getAll();
   });
 
   // ── Transcript IPC handlers ──────────────────────────────────────────
 
-  safeHandle("transcript:getMessages", async (_event, ...rawArgs) => {
-    const [sessionId] = validateIpc<[string]>("transcript:getMessages", rawArgs);
+  safeHandle(IPC_CHANNELS.TRANSCRIPT_GET_MESSAGES, async (_event, ...rawArgs) => {
+    const [sessionId] = validateIpc<[string]>(IPC_CHANNELS.TRANSCRIPT_GET_MESSAGES, rawArgs);
     return transcriptGetMessages(sessionId);
   });
 
-  safeHandle("transcript:appendMessage", async (_event, ...rawArgs) => {
-    const [message] = validateIpc<[Omit<TranscriptMessage, "createdAt">]>("transcript:appendMessage", rawArgs);
+  safeHandle(IPC_CHANNELS.TRANSCRIPT_APPEND_MESSAGE, async (_event, ...rawArgs) => {
+    const [message] = validateIpc<[Omit<TranscriptMessage, "createdAt">]>(IPC_CHANNELS.TRANSCRIPT_APPEND_MESSAGE, rawArgs);
     return transcriptAppendMessage(message);
   });
 
-  safeHandle("transcript:appendMessages", async (_event, ...rawArgs) => {
-    const [messages] = validateIpc<[Array<Omit<TranscriptMessage, "createdAt">>]>("transcript:appendMessages", rawArgs);
+  safeHandle(IPC_CHANNELS.TRANSCRIPT_APPEND_MESSAGES, async (_event, ...rawArgs) => {
+    const [messages] = validateIpc<[Array<Omit<TranscriptMessage, "createdAt">>]>(IPC_CHANNELS.TRANSCRIPT_APPEND_MESSAGES, rawArgs);
     return transcriptAppendMessages(messages);
   });
 
-  safeHandle("transcript:updateMessage", async (_event, ...rawArgs) => {
-    const [messageId, updates] = validateIpc<[string, Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>  ]>("transcript:updateMessage", rawArgs);
+  safeHandle(IPC_CHANNELS.TRANSCRIPT_UPDATE_MESSAGE, async (_event, ...rawArgs) => {
+    const [messageId, updates] = validateIpc<[string, Partial<Pick<TranscriptMessage, "content" | "toolCalls" | "finishedAt">>  ]>(IPC_CHANNELS.TRANSCRIPT_UPDATE_MESSAGE, rawArgs);
     await transcriptUpdateMessage(messageId, updates);
   });
 
-  safeHandle("transcript:deleteSession", async (_event, ...rawArgs) => {
-    const [sessionId] = validateIpc<[string]>("transcript:deleteSession", rawArgs);
+  safeHandle(IPC_CHANNELS.TRANSCRIPT_DELETE_SESSION, async (_event, ...rawArgs) => {
+    const [sessionId] = validateIpc<[string]>(IPC_CHANNELS.TRANSCRIPT_DELETE_SESSION, rawArgs);
     await transcriptDeleteSession(sessionId);
   });
 
   // ── MCP (loop-task daemon MCP server) ────────────────────────────────
 
-  safeHandle("mcp:getStatus", (_event, ...rawArgs): McpConnectionStatus => {
-    const [environmentId] = validateIpc<[string]>("mcp:getStatus", rawArgs);
+  safeHandle(IPC_CHANNELS.MCP_GET_STATUS, (_event, ...rawArgs): McpConnectionStatus => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.MCP_GET_STATUS, rawArgs);
     return getMcpStatus(environmentId);
   });
 
-  safeHandle("mcp:connect", async (_event, ...rawArgs): Promise<McpConnectionStatus> => {
-    const [environmentId] = validateIpc<[string]>("mcp:connect", rawArgs);
+  safeHandle(IPC_CHANNELS.MCP_CONNECT, async (_event, ...rawArgs): Promise<McpConnectionStatus> => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.MCP_CONNECT, rawArgs);
     return connectMcp(environmentId);
   });
 
-  safeHandle("mcp:disconnect", async (_event, ...rawArgs): Promise<void> => {
-    const [environmentId] = validateIpc<[string]>("mcp:disconnect", rawArgs);
+  safeHandle(IPC_CHANNELS.MCP_DISCONNECT, async (_event, ...rawArgs): Promise<void> => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.MCP_DISCONNECT, rawArgs);
     await disconnectMcp(environmentId);
   });
 
-  safeHandle("mcp:callTool", async (_event, ...rawArgs): Promise<McpToolCallResult> => {
-    const [environmentId, toolName, args] = validateIpc<[string, string, Record<string, unknown>]>("mcp:callTool", rawArgs);
+  safeHandle(IPC_CHANNELS.MCP_CALL_TOOL, async (_event, ...rawArgs): Promise<McpToolCallResult> => {
+    const [environmentId, toolName, args] = validateIpc<[string, string, Record<string, unknown>]>(IPC_CHANNELS.MCP_CALL_TOOL, rawArgs);
      return callMcpTool(environmentId, toolName, args);
   });
 
   // ── Agent streaming (OpenCode runtime) ─────────────────────────────
-  safeHandle("agent:sendPrompt", async (_event, ...rawArgs) => {
-    const [args] = validateIpc<[AgentSendPromptArgs]>("agent:sendPrompt", rawArgs);
+  safeHandle(IPC_CHANNELS.AGENT_SEND_PROMPT, async (_event, ...rawArgs) => {
+    const [args] = validateIpc<[AgentSendPromptArgs]>(IPC_CHANNELS.AGENT_SEND_PROMPT, rawArgs);
     return sendPromptToAgent(args);
   });
 
-  safeHandle("agent:interrupt", async (_event, ...rawArgs) => {
-    const [environmentId, sessionId] = validateIpc<[string, string | undefined]>("agent:interrupt", rawArgs);
+  safeHandle(IPC_CHANNELS.AGENT_INTERRUPT, async (_event, ...rawArgs) => {
+    const [environmentId, sessionId] = validateIpc<[string, string | undefined]>(IPC_CHANNELS.AGENT_INTERRUPT, rawArgs);
     return interruptAgent(environmentId, sessionId);
   });
 
-  safeHandle("agent:listModels", async (_event, ...rawArgs) => {
-    const [environmentId] = validateIpc<[string]>("agent:listModels", rawArgs);
+  safeHandle(IPC_CHANNELS.AGENT_LIST_MODELS, async (_event, ...rawArgs) => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.AGENT_LIST_MODELS, rawArgs);
     return listModelsForEnvironment(environmentId);
   });
 
   // ── Loop shape cache IPC handlers ──────────────────────────────────
 
-  safeHandle("loopShapeCache:getCached", (_event, ...rawArgs): LoopShape[] => {
-    const [environmentId] = validateIpc<[string]>("loopShapeCache:getCached", rawArgs);
+  safeHandle(IPC_CHANNELS.LOOP_SHAPE_CACHE_GET_CACHED, (_event, ...rawArgs): LoopShape[] => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.LOOP_SHAPE_CACHE_GET_CACHED, rawArgs);
     return getLoopShapeCached(environmentId);
   });
 
-  safeHandle("loopShapeCache:getAll", (): LoopShape[] => {
-    validateIpc("loopShapeCache:getAll", []);
+  safeHandle(IPC_CHANNELS.LOOP_SHAPE_CACHE_GET_ALL, (): LoopShape[] => {
+    validateIpc(IPC_CHANNELS.LOOP_SHAPE_CACHE_GET_ALL, []);
     return getAllLoopShapeCached();
   });
 
-  safeHandle("loopShapeCache:refresh", async (_event, ...rawArgs): Promise<LoopShape[]> => {
-    const [environmentId] = validateIpc<[string]>("loopShapeCache:refresh", rawArgs);
+  safeHandle(IPC_CHANNELS.LOOP_SHAPE_CACHE_REFRESH, async (_event, ...rawArgs): Promise<LoopShape[]> => {
+    const [environmentId] = validateIpc<[string]>(IPC_CHANNELS.LOOP_SHAPE_CACHE_REFRESH, rawArgs);
     return refreshLoopShapesForEnvironment(environmentId);
   });
 
   // ── Sibling decline store ──────────────────────────────────────────
-  safeHandle("siblingDecline:isDeclined", (_event, ...rawArgs): boolean => {
-    const [environmentId, loopId, fingerprint] = validateIpc<[string, string, string]>("siblingDecline:isDeclined", rawArgs);
+  safeHandle(IPC_CHANNELS.SIBLING_DECLINE_IS_DECLINED, (_event, ...rawArgs): boolean => {
+    const [environmentId, loopId, fingerprint] = validateIpc<[string, string, string]>(IPC_CHANNELS.SIBLING_DECLINE_IS_DECLINED, rawArgs);
     return isSiblingDeclined(environmentId, loopId, fingerprint);
   });
 
-  safeHandle("siblingDecline:recordDecline", (_event, ...rawArgs): void => {
-    const [record] = validateIpc<[{ environmentId: string; loopId: string; fingerprint: string }]>("siblingDecline:recordDecline", rawArgs);
+  safeHandle(IPC_CHANNELS.SIBLING_DECLINE_RECORD_DECLINE, (_event, ...rawArgs): void => {
+    const [record] = validateIpc<[{ environmentId: string; loopId: string; fingerprint: string }]>(IPC_CHANNELS.SIBLING_DECLINE_RECORD_DECLINE, rawArgs);
     recordSiblingDecline(record.environmentId, record.loopId, record.fingerprint);
   });
 
   // ── Global settings ──
-  safeHandle("settings:get", (): GlobalSettings => {
+  safeHandle(IPC_CHANNELS.SETTINGS_GET, (): GlobalSettings => {
     return getGlobalSettings();
   });
 
-  safeHandle("settings:update", async (_event, ...rawArgs): Promise<void> => {
-    const [updates] = validateIpc<[Partial<GlobalSettings>]>("settings:update", rawArgs);
+  safeHandle(IPC_CHANNELS.SETTINGS_UPDATE, async (_event, ...rawArgs): Promise<void> => {
+    const [updates] = validateIpc<[Partial<GlobalSettings>]>(IPC_CHANNELS.SETTINGS_UPDATE, rawArgs);
     await updateGlobalSettings(updates);
   });
 
@@ -1324,11 +1325,11 @@ app.on("window-all-closed", () => {
   for (const tracker of endpointTrackers.values()) tracker.destroy();
   endpointTrackers.clear();
   destroyAllOpenCodeStatus();
-  closeAllRegistryTunnels();
+  void closeAllRegistryTunnels();
   if (process.platform !== "darwin") app.quit();
 });
-app.on("before-quit", () => {
-  closeAllRegistryTunnels();
+app.on("before-quit", async () => {
+  await closeAllRegistryTunnels();
 });
 
 process.on("exit", () => {

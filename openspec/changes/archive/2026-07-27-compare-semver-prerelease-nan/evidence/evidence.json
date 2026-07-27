@@ -1,0 +1,12 @@
+{
+  "status": "skipped",
+  "reason": "No user-visible UI change. Pure utility function fix in src/shared/utils.ts with no components, styles, or pages affected.",
+  "assets": [],
+  "tasks": "3/3",
+  "verification": "typecheck passed, 842 tests passed, build passed",
+  "commits": [
+    "propose: compareSemver prerelease NaN fix (compare-semver-prerelease-nan)",
+    "fix: compareSemver strip prerelease/build metadata, handle NaN",
+    "archive: compareSemver prerelease NaN fix (compare-semver-prerelease-nan)"
+  ]
+}

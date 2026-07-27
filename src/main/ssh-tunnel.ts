@@ -24,9 +24,8 @@ interface TunnelHandle {
   localPort: number;
   remotePort: number;
   host: SshHost;
-  /** True if closeTunnel() was called intentionally (not an unexpected exit). */
   intentionalClose: boolean;
-  /** Scheduled SIGKILL fallback if process doesn't exit after SIGTERM. */
+  killed: boolean;
   killTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -135,7 +134,7 @@ export function openTunnel(
           return;
         }
         resolved = true;
-        const handle: TunnelHandle = { process: proc, localPort, remotePort, host, intentionalClose: false, killTimer: null };
+        const handle: TunnelHandle = { process: proc, localPort, remotePort, host, intentionalClose: false, killed: false, killTimer: null };
         activeTunnels.set(tunnelId, handle);
         registered = true;
         resolve({
@@ -223,11 +222,12 @@ export function closeTunnel(tunnelId: string): void {
   const handle = activeTunnels.get(tunnelId);
   if (!handle) return;
   handle.intentionalClose = true;
+  handle.killed = true;
   if (handle.process.exitCode === null) {
     handle.process.kill();
     handle.killTimer = setTimeout(() => {
       handle.killTimer = null;
-      if (activeTunnels.has(tunnelId) && handle.process.exitCode === null) {
+      if (handle.process.exitCode === null) {
         handle.process.kill("SIGKILL");
       }
     }, SIGKILL_TIMEOUT_MS);
@@ -236,19 +236,43 @@ export function closeTunnel(tunnelId: string): void {
   }
 }
 
-export function closeAllTunnels(): void {
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+export async function closeAllTunnels(): Promise<void> {
+  const exitPromises: Promise<void>[] = [];
+
   for (const [id, handle] of activeTunnels) {
     handle.intentionalClose = true;
+    handle.killed = true;
     if (handle.process.exitCode === null) {
+      const exitPromise = new Promise<void>((resolve) => {
+        const onExit = () => resolve();
+        handle.process.once("exit", onExit);
+      });
+      exitPromises.push(exitPromise);
       handle.process.kill();
       handle.killTimer = setTimeout(() => {
         handle.killTimer = null;
-        if (activeTunnels.has(id) && handle.process.exitCode === null) {
+        if (handle.process.exitCode === null) {
           handle.process.kill("SIGKILL");
         }
       }, SIGKILL_TIMEOUT_MS);
     } else {
       activeTunnels.delete(id);
+    }
+  }
+
+  if (exitPromises.length > 0) {
+    await Promise.race([
+      Promise.all(exitPromises),
+      new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
+    ]);
+  }
+
+  for (const handle of activeTunnels.values()) {
+    if (handle.killTimer) {
+      clearTimeout(handle.killTimer);
+      handle.killTimer = null;
     }
   }
 }

@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "No user-visible UI changes. Bug fix is entirely in main-process SSH tunnel process management (ssh-tunnel.ts). No components, styles, or interactions affected.",
+  "assets": [],
+  "prMarkdown": "## Evidence: Skipped\n\nNo UI changes in this fix. All changes are main-process process management code.\n\n- Tasks: 3/3 completed\n- Verification: typecheck ✅, test ✅ (797/797), build ✅, check:comments ✅\n- Commits: e067e87 (propose), b47386a (fix), 33f1749 (archive)"
+}
