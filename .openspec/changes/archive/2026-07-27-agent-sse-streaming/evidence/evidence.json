@@ -1,0 +1,7 @@
+{
+  "changeId": "agent-sse-streaming",
+  "status": "skipped",
+  "reason": "Main-process bug fix: sendPromptToAgent now consumes SSE stream instead of synchronous response. No user-visible UI changes to screenshot.",
+  "assets": [],
+  "capturedAt": "2026-07-27T04:17:00Z"
+}
