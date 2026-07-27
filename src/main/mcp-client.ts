@@ -21,6 +21,7 @@ import { getEnvironments } from "./config-store.js";
 import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { getMainWindow } from "./main-window.js";
 import { createSseParser } from "./sse-parser.js";
+import { isUrlAllowedForFetch } from "./ssrf-allowlist.js";
 
 const DEFAULT_MCP_PORT = 8846;
 
@@ -211,6 +212,20 @@ async function connectSseTransport(transport: SseTransport, baseUrl: string): Pr
             const path = event.text.startsWith("http")
               ? event.text
               : `${baseUrl}${event.text.startsWith("/") ? "" : "/"}${event.text}`;
+            try {
+              const postUrl = new URL(path);
+              if (!isUrlAllowedForFetch(postUrl, { allowLoopback: true })) {
+                transport.controller?.abort();
+                clearTimeout(timeout);
+                reject(new Error(`MCP SSE endpoint rejected: SSRF-blocked host ${postUrl.hostname}`));
+                return;
+              }
+            } catch {
+              transport.controller?.abort();
+              clearTimeout(timeout);
+              reject(new Error("MCP SSE endpoint rejected: invalid URL"));
+              return;
+            }
             transport.postEndpoint = path;
             clearTimeout(timeout);
             resolve();
