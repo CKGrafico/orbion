@@ -657,18 +657,18 @@ export class MockInfraService implements IInfraService {
       return { ok: true, data: listResult };
     }
     if (args.action === "add-label") {
-      const params = args.params as { issueNumber?: number; labels?: string[] } | undefined;
+      const params = args.params;
       return {
         ok: true,
         data: {
-          issueNumber: params?.issueNumber ?? 42,
-          labels: params?.labels ?? [],
+          issueNumber: params.issueNumber,
+          labels: params.labels,
         },
       };
     }
     if (args.action === "bulk-relabel") {
-      const params = args.params as { issueNumbers?: number[]; addLabels?: string[]; removeLabels?: string[] } | undefined;
-      const issueNumbers = params?.issueNumbers ?? [42, 38, 31];
+      const params = args.params;
+      const issueNumbers = params.issueNumbers;
       const items = issueNumbers.map((issueNumber) => issueNumber === 38
         ? { issueNumber, ok: false as const, error: "Label is protected" }
         : { issueNumber, ok: true as const });
@@ -683,17 +683,17 @@ export class MockInfraService implements IInfraService {
       };
     }
     if (args.action === "edit-issue") {
-      const params = args.params as { issueNumber?: number; title?: string; body?: string; addLabels?: string[]; removeLabels?: string[] } | undefined;
+      const params = args.params;
       const changes: Record<string, unknown> = {};
-      if (params?.title) changes.title = true;
-      if (params?.body) changes.body = true;
-      if (params?.addLabels?.length) changes.labelsAdded = params.addLabels;
-      if (params?.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
+      if (params.title) changes.title = true;
+      if (params.body) changes.body = true;
+      if (params.addLabels?.length) changes.labelsAdded = params.addLabels;
+      if (params.removeLabels?.length) changes.labelsRemoved = params.removeLabels;
       return {
         ok: true,
         data: {
           platform: "github",
-          issueNumber: params?.issueNumber ?? 42,
+          issueNumber: params.issueNumber,
           changes,
         },
       };
@@ -740,8 +740,7 @@ export class MockInfraService implements IInfraService {
       return { ok: true, data: listResult };
     }
     if (args.action === "get-pr-verdict") {
-      const params = args.params as { repo?: string; number?: number } | undefined;
-      const prNumber = params?.number ?? 127;
+      const prNumber = args.params.number;
       const verdicts: Record<number, import("../../../../shared/ipc").PrVerdict> = {
         127: { verdict: "Touches security-sensitive files (src/middleware/auth.ts)", riskLevel: "high" },
         131: { verdict: "Small change (23 lines in 2 files)", riskLevel: "low" },
@@ -751,9 +750,8 @@ export class MockInfraService implements IInfraService {
       return { ok: true, data: { verdict } };
     }
     if (args.action === "get-pr-diff") {
-      const params = args.params as { repo?: string; number?: number; path?: string } | undefined;
-      const prNumber = params?.number ?? 127;
-      const filePath = params?.path;
+      const prNumber = args.params.number;
+      const filePath = args.params.path;
 
       // Per-PR mock diffs for overlap detection scenarios
       const MOCK_DIFFS: Record<number, string> = {
@@ -898,8 +896,7 @@ index ccc3333..ddd4444 100644
       return { ok: true, data: result };
     }
     if (args.action === "get-pr-briefing") {
-      const briefingParams = args.params as { repo?: string; number?: number } | undefined;
-      const briefingNumber = briefingParams?.number ?? 127;
+      const briefingNumber = args.params.number;
 
       // Per-PR briefing results
       const MOCK_BRIEFINGS: Record<number, GetPrBriefingResult> = {
@@ -984,21 +981,19 @@ index ccc3333..ddd4444 100644
       return { ok: true, data: MOCK_BRIEFINGS[briefingNumber] ?? MOCK_BRIEFINGS[127] };
     }
     if (args.action === "submit-pr-review") {
-      const params = args.params as { repo?: string; number?: number; event?: string; body?: string } | undefined;
+      const params = args.params;
       return {
         ok: true,
         data: {
           platform: "github" as const,
-          number: params?.number ?? 127,
-          event: params?.event ?? "APPROVE",
+          number: params.number,
+          event: params.event,
         },
       };
     }
     if (args.action === "open-pr-in-browser") {
-      // In browser dev mode, we can still open a new tab
-      const params = args.params as { url?: string } | undefined;
-      if (params?.url) {
-        window.open(params.url, "_blank");
+      if (args.params.url) {
+        window.open(args.params.url, "_blank");
       }
       return { ok: true, data: undefined };
     }
