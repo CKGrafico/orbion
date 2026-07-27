@@ -1,5 +1,6 @@
 import { Notification } from "electron";
 import type { DeepLinkTarget, NotificationSendArgs } from "../shared/ipc.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { getMainWindow } from "./main-window.js";
 import Store from "electron-store";
 
@@ -40,7 +41,7 @@ export class NotificationService {
         if (win && !win.isDestroyed()) {
           if (win.isMinimized()) win.restore();
           win.focus();
-          win.webContents.send("notification:navigate", args.deepLink);
+          win.webContents.send(IPC_CHANNELS.NOTIFICATION_NAVIGATE, args.deepLink);
         } else {
           this.setPendingDeepLink(args.deepLink);
         }
@@ -76,7 +77,7 @@ export class NotificationService {
     if (!link) return;
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send("notification:navigate", link);
+      win.webContents.send(IPC_CHANNELS.NOTIFICATION_NAVIGATE, link);
     }
   }
 }

@@ -17,6 +17,7 @@ import type {
   AgentStreamEvent,
   OpenCodeEndpoint,
 } from "../shared/ipc.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { msg } from "./i18n.js";
 import { getEnvironments } from "./config-store.js";
 import { getMainWindow } from "./main-window.js";
@@ -48,7 +49,7 @@ function inFlightKey(chatSessionId: string, turnId: string): string {
 function forwardEvent(event: AgentStreamEvent): void {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
-    win.webContents.send("agent:streamEvent", event);
+    win.webContents.send(IPC_CHANNELS.AGENT_STREAM_EVENT, event);
   }
 }
 

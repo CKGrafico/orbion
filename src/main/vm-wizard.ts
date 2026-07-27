@@ -4,6 +4,7 @@ import { listSshHosts, parseTarget, isHostInKnownHosts, fetchHostKey, appendToKn
 import { probeVm, installNodeViaMise } from "./ssh-probe.js";
 import { launchOnVm, createPairingCodeOnRemote } from "./ssh-launch.js";
 import { getEnvironments, addEnvironment, removeEnvironment, exchangePairingCode, storeSessionToken, storeSshKeyPassphrase, setOpenCodeEndpoint, autoPromoteFirstEnvIfNeeded, setEnvironmentRuntimeState } from "./config-store.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { getMainWindow } from "./main-window.js";
 import { msg } from "./i18n.js";
 import { fetchAndUnwrap } from "./http-utils.js";
@@ -65,7 +66,7 @@ export { listSshHosts };
 function emitProgress(progress: VmWizardProgress): void {
   const win = getMainWindow();
   if (win) {
-    win.webContents.send("vmWizard:progress", progress);
+    win.webContents.send(IPC_CHANNELS.VM_WIZARD_PROGRESS, progress);
   }
 }
 
