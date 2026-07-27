@@ -203,11 +203,17 @@ export interface PlatformDetectionResult {
 
 export type InfraAction = "machine-status" | "clone-repo" | "create-issue" | "detect-platform" | "list-issues" | "add-label" | "edit-issue" | "bulk-relabel" | "list-prs-awaiting-review" | "get-pr-verdict" | "get-pr-diff" | "get-pr-briefing" | "submit-pr-review" | "open-pr-in-browser";
 
+export interface CloneRepoParams {
+  repoUrl: string;
+  targetVmId?: string;
+}
+
 export interface CreateIssueParams {
   title: string;
   body: string;
   labels?: string[];
   repo?: string;
+  projectId?: string;
 }
 
 export interface CreateIssueResult {
@@ -265,6 +271,7 @@ export interface EditIssueParams {
   addLabels?: string[];
   removeLabels?: string[];
   repo?: string;
+  projectId?: string;
 }
 
 export interface EditIssueResult {
@@ -433,10 +440,21 @@ export interface BatchOverlapResult {
   perPrNotes: Record<string, string[]>;
 }
 
-export interface InfraActionArgs {
-  action: InfraAction;
-  params?: Record<string, unknown>;
-}
+export type InfraActionArgs =
+  | { action: "machine-status" }
+  | { action: "clone-repo"; params: CloneRepoParams }
+  | { action: "create-issue"; params: CreateIssueParams }
+  | { action: "detect-platform"; params: DetectPlatformParams }
+  | { action: "list-issues"; params?: ListIssuesParams }
+  | { action: "add-label"; params: AddLabelParams }
+  | { action: "edit-issue"; params: EditIssueParams }
+  | { action: "bulk-relabel"; params: BulkRelabelParams }
+  | { action: "list-prs-awaiting-review"; params?: ListPrsAwaitingReviewParams }
+  | { action: "get-pr-verdict"; params: GetPrVerdictParams }
+  | { action: "get-pr-diff"; params: GetPrDiffParams }
+  | { action: "get-pr-briefing"; params: GetPrBriefingParams }
+  | { action: "submit-pr-review"; params: SubmitPrReviewParams }
+  | { action: "open-pr-in-browser"; params: OpenPrInBrowserParams };
 
 export interface InfraActionResult {
   ok: boolean;

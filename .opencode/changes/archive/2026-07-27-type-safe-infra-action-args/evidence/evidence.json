@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "reason": "Internal type-system refactoring. No user-visible UI or interaction changes. Replaced Record<string, unknown> with discriminated union; eliminated 11 unsafe type assertions in infra-handlers.ts and 5 in MockInfraService.ts. Typecheck, 842 tests, and build all pass.",
+  "assets": [],
+  "prMarkdown": "## Type-safe InfraActionArgs\n\n- Eliminated 11 `as SomeParams` casts in infra-handlers.ts\n- Eliminated 5 `as {...}` casts in MockInfraService.ts\n- Added `CloneRepoParams` interface\n- Added `projectId` to `CreateIssueParams` and `EditIssueParams`\n- Converted `InfraActionArgs` to discriminated union keyed on `action`\n- Typecheck: passed | Tests: 842/842 | Build: passed"
+}

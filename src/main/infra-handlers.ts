@@ -2,17 +2,13 @@ import { execFile } from "node:child_process";
 import type {
   InfraActionArgs,
   InfraActionResult,
-  CreateIssueParams,
   CreateIssueResult,
   ListIssuesParams,
   ListIssuesResult,
   IssueCard,
   PlatformDetectionResult,
-  AddLabelParams,
   AddLabelResult,
-  EditIssueParams,
   EditIssueResult,
-  BulkRelabelParams,
   BulkRelabelResult,
   BulkRelabelItemResult,
   ListPrsAwaitingReviewParams,
@@ -74,8 +70,7 @@ interface GhPrJson {
 
 // ── Individual handlers ──────────────────────────────────────────────
 
-function handleListIssues(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as ListIssuesParams | undefined;
+function handleListIssues(params: ListIssuesParams | undefined): Promise<InfraActionResult> {
   const labels = params?.labels;
   const state = params?.state ?? "open";
   const repo = params?.repo;
@@ -123,8 +118,7 @@ function handleListIssues(args: InfraActionArgs): Promise<InfraActionResult> {
   });
 }
 
-async function handleListPrsAwaitingReview(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as ListPrsAwaitingReviewParams | undefined;
+async function handleListPrsAwaitingReview(params: ListPrsAwaitingReviewParams | undefined): Promise<InfraActionResult> {
   const repo = params?.repo;
   const limit = Math.min(params?.limit ?? 30, 100);
 
@@ -189,10 +183,9 @@ async function handleListPrsAwaitingReview(args: InfraActionArgs): Promise<Infra
   });
 }
 
-async function handleGetPrVerdict(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as GetPrVerdictParams | undefined;
-  const repo = params?.repo;
-  const prNumber = params?.number;
+async function handleGetPrVerdict(params: GetPrVerdictParams): Promise<InfraActionResult> {
+  const repo = params.repo;
+  const prNumber = params.number;
 
   if (!repo || !prNumber) {
     return { ok: false, error: msg("issues.listFailed", { detail: "repo and number are required" }) };
@@ -232,11 +225,10 @@ async function handleGetPrVerdict(args: InfraActionArgs): Promise<InfraActionRes
   });
 }
 
-async function handleGetPrDiff(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as GetPrDiffParams | undefined;
-  const repo = params?.repo;
-  const prNumber = params?.number;
-  const filePath = params?.path;
+async function handleGetPrDiff(params: GetPrDiffParams): Promise<InfraActionResult> {
+  const repo = params.repo;
+  const prNumber = params.number;
+  const filePath = params.path;
 
   if (!repo || !prNumber) {
     return { ok: false, error: msg("issues.listFailed", { detail: "repo and number are required" }) };
@@ -282,10 +274,9 @@ async function handleGetPrDiff(args: InfraActionArgs): Promise<InfraActionResult
   });
 }
 
-async function handleGetPrBriefing(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as GetPrBriefingParams | undefined;
-  const repo = params?.repo;
-  const prNumber = params?.number;
+async function handleGetPrBriefing(params: GetPrBriefingParams): Promise<InfraActionResult> {
+  const repo = params.repo;
+  const prNumber = params.number;
 
   if (!repo || !prNumber) {
     return { ok: false, error: msg("issues.listFailed", { detail: "repo and number are required" }) };
@@ -331,12 +322,11 @@ async function handleGetPrBriefing(args: InfraActionArgs): Promise<InfraActionRe
   });
 }
 
-async function handleSubmitPrReview(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as SubmitPrReviewParams | undefined;
-  const repo = params?.repo;
-  const prNumber = params?.number;
-  const event = params?.event;
-  const body = params?.body;
+async function handleSubmitPrReview(params: SubmitPrReviewParams): Promise<InfraActionResult> {
+  const repo = params.repo;
+  const prNumber = params.number;
+  const event = params.event;
+  const body = params.body;
 
   if (!repo || !prNumber || !event) {
     return { ok: false, error: msg("review.submitMissingParams") };
@@ -432,9 +422,8 @@ async function handleSubmitPrReview(args: InfraActionArgs): Promise<InfraActionR
   return { ok: false, error: msg("review.unsupportedPlatform") };
 }
 
-function handleOpenPrInBrowser(args: InfraActionArgs): Promise<InfraActionResult> {
-  const params = args.params as OpenPrInBrowserParams | undefined;
-  const url = params?.url;
+function handleOpenPrInBrowser(params: OpenPrInBrowserParams): Promise<InfraActionResult> {
+  const url = params.url;
 
   if (!url) {
     return Promise.resolve({ ok: false, error: msg("review.openOnWebMissingUrl") });
@@ -486,8 +475,8 @@ export async function handleInfraExecuteAction(
       return { ok: true, data: results };
     }
     case "clone-repo": {
-      const repoUrl = args.params?.repoUrl as string | undefined;
-      const targetVmId = args.params?.targetVmId as string | undefined;
+      const repoUrl = args.params.repoUrl;
+      const targetVmId = args.params.targetVmId;
       if (!repoUrl) {
         return { ok: false, error: msg("vmWizard.mainRepoUrlRequired") };
       }
@@ -513,10 +502,10 @@ export async function handleInfraExecuteAction(
       return { ok: true, data: { vm: targetEnv.name, repoUrl, result: cloneResult.data } };
     }
     case "detect-platform": {
-      const envId = args.params?.environmentId as string | undefined;
-      const projectId = (args.params?.projectId as string | undefined) ?? "";
-      const directory = args.params?.directory as string | undefined;
-      const force = (args.params?.force as boolean | undefined) ?? false;
+      const envId = args.params.environmentId;
+      const projectId = args.params.projectId ?? "";
+      const directory = args.params.directory;
+      const force = args.params.force ?? false;
 
       if (!envId) {
         return { ok: false, error: msg("platformDetect.envIdRequired") };
@@ -553,13 +542,13 @@ export async function handleInfraExecuteAction(
       return { ok: true, data: result };
     }
     case "create-issue": {
-      const params = args.params as CreateIssueParams | undefined;
-      if (!params?.title) {
+      const params = args.params;
+      if (!params.title) {
         return { ok: false, error: msg("issues.titleRequired") };
       }
 
-      const cachedPlatform = args.params?.projectId
-        ? platformCache.get(platformCacheKey(mainVmEnv.id, args.params.projectId as string))
+      const cachedPlatform = params.projectId
+        ? platformCache.get(platformCacheKey(mainVmEnv.id, params.projectId))
         : undefined;
 
       let preferredCli: "gh" | "az" | null = null;
@@ -640,11 +629,11 @@ export async function handleInfraExecuteAction(
       });
     }
     case "list-issues": {
-      return handleListIssues(args);
+      return handleListIssues(args.params);
     }
     case "add-label": {
-      const params = args.params as AddLabelParams | undefined;
-      if (!params?.issueNumber || !params.labels?.length) {
+      const params = args.params;
+      if (!params.issueNumber || !params.labels?.length) {
         return { ok: false, error: msg("labels.issueNumberAndLabelsRequired") };
       }
 
@@ -685,16 +674,16 @@ export async function handleInfraExecuteAction(
       });
     }
     case "edit-issue": {
-      const params = args.params as EditIssueParams | undefined;
-      if (!params?.issueNumber) {
+      const params = args.params;
+      if (!params.issueNumber) {
         return { ok: false, error: msg("editIssue.issueNumberRequired") };
       }
       if (!params.title && !params.body && !params.addLabels?.length && !params.removeLabels?.length) {
         return { ok: false, error: msg("editIssue.noChanges") };
       }
 
-      const cachedPlatform = args.params?.projectId
-        ? platformCache.get(platformCacheKey(mainVmEnv.id, args.params.projectId as string))
+      const cachedPlatform = params.projectId
+        ? platformCache.get(platformCacheKey(mainVmEnv.id, params.projectId))
         : undefined;
 
       let preferredCli: "gh" | "az" | null = null;
@@ -805,11 +794,11 @@ export async function handleInfraExecuteAction(
       });
     }
     case "bulk-relabel": {
-      const params = args.params as BulkRelabelParams | undefined;
-      if (!params?.issueNumbers?.length) {
+      const params = args.params;
+      if (!params.issueNumbers.length) {
         return { ok: false, error: msg("bulkRelabel.issueNumbersRequired") };
       }
-      if (!params.addLabels?.length && !params.removeLabels?.length) {
+      if (!params.addLabels.length && !params.removeLabels?.length) {
         return { ok: false, error: msg("bulkRelabel.noLabels") };
       }
 
@@ -868,24 +857,27 @@ export async function handleInfraExecuteAction(
       return { ok: true, data: result };
     }
     case "list-prs-awaiting-review": {
-      return handleListPrsAwaitingReview(args);
+      return handleListPrsAwaitingReview(args.params);
     }
     case "get-pr-verdict": {
-      return handleGetPrVerdict(args);
+      return handleGetPrVerdict(args.params);
     }
     case "get-pr-diff": {
-      return handleGetPrDiff(args);
+      return handleGetPrDiff(args.params);
     }
     case "get-pr-briefing": {
-      return handleGetPrBriefing(args);
+      return handleGetPrBriefing(args.params);
     }
     case "submit-pr-review": {
-      return handleSubmitPrReview(args);
+      return handleSubmitPrReview(args.params);
     }
     case "open-pr-in-browser": {
-      return handleOpenPrInBrowser(args);
+      return handleOpenPrInBrowser(args.params);
     }
-    default:
-      return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: args.action }) };
+    default: {
+      const _exhaustive: never = args;
+      void _exhaustive;
+      return { ok: false, error: msg("vmWizard.mainUnknownAction", { action: "unknown" }) };
+    }
   }
 }
