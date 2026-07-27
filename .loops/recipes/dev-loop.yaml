@@ -62,8 +62,8 @@ tasks:
       - >
         /plan-goal Issue title: {{title}} Issue body: {{body}}
         Issue id: {{number}}. Create a feature branch on git and work on this.
-        Before finishing run rtk proxy pnpm typecheck,
-        rtk proxy pnpm test, and rtk proxy pnpm build.
+        Before finishing, run /repo-verify to derive, run, and repair every
+        applicable current-branch check.
         Archive the completed change and generate visual evidence,
         then stop on the feature branch. Do not merge the feature branch
         into main, switch to main, push, or perform any GitHub actions.

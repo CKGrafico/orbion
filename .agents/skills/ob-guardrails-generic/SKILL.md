@@ -19,7 +19,7 @@ The marker sections below may contain instructions for selected optimization ski
 - Run tests before marking done.
 - Run lint/build before pushing.
 - Keep changes small and focused.
-- **Comment ratio must stay under 10%.** Definition: `(comment_lines / non_blank_lines) * 100` per file. What counts as a comment line: lines starting with `//`, `/*`, `*/`, or `* ` (JSDoc inner lines). All comment types count — no exemptions for JSDoc/TSDoc. Enforcement: `pnpm check:comments` fails the build when any file exceeds 10%; this is a hard gate. Scope: all `src/**/*.ts` and `src/**/*.tsx` files; test files (`tests/**/*.test.ts`) are exempt. Preserve only "why" comments (workarounds, platform quirks, references to issues/specs, non-obvious constraints). Remove comments that restate what the code does, JSDoc that restates type information from signatures, section dividers, and step-number comments.
+- Comments are for WHY, not WHAT. Use them only when the code does something non-obvious or the reason cannot be inferred from context. Keep comment ratio under 10%. If more than 10% of lines in a file are comments, refactor for clarity instead.
 - Each file should have one clear responsibility. Split by domain or feature (e.g. `user-constants.ts`, `order-types.ts`, `auth-config.ts`) rather than creating catch-all files like `constants.js`, `types.ts`, `config.js`, or `utils.ts` that collect unrelated things. A file that imports from many unrelated modules is a sign it should be split.
 
 ## Temporary files

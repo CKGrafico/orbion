@@ -4,8 +4,8 @@ loops:
   - taskId: audit-preflight
     intervalHuman: 12h
     description: >
-      Guardrails audit loop: preflight, lock, audit random area of the Orbion
-      project, verify issues created, cleanup on failure
+      Guardrails audit loop: preflight, lock, /repo-audit, publish findings,
+      verify issues created, cleanup on failure
     maxRuns: null
 
 tasks:
@@ -35,29 +35,34 @@ tasks:
     onFailureTaskId: audit-nothing
 
   - id: audit-audit
-    name: "AI: audit random area against guardrails"
+    name: "AI: /repo-audit"
+    command: opencode
+    commandArgs:
+      - run
+      - --agent
+      - fullstack-engineer
+      - /repo-audit
+    onSuccessTaskId: audit-publish
+    onFailureTaskId: audit-fail
+    maxRuns: 3
+
+  - id: audit-publish
+    name: "AI: publish actionable audit findings"
     command: opencode
     commandArgs:
       - run
       - --agent
       - fullstack-engineer
       - >
-        First, load all skills available for your current agent. Then audit
-        a random area of the Orbion project (at src/renderer/, src/main/,
-        src/preload/, or src/shared/). Load @ob-guardrails-project and
-        @ob-guardrails-generic. Find at least 6 problems, score each 1-10.
-         For the top 3, create GitHub issues with labels 'bug' and 'code:pick'
-         using gh issue create (do NOT use /plan-story). Skip duplicates.
-         Create a summary issue with label 'audit:report' listing all findings.
-         Link each created issue as a sub-issue of the summary report. When a
-         finding recommends a dependency change, state that implementation must
-         run pnpm install, commit the updated pnpm-lock.yaml, and verify with
-         pnpm install --frozen-lockfile.
-         Do not modify code, push, or ask for confirmation. Never explore
-        outside the repository root.
+        Use this read-only /repo-audit report from the previous task:
+        {{output}}. Create GitHub issues with labels bug and code:pick for
+        the three highest-severity actionable findings, skipping duplicates.
+        Use gh issue create, not /plan-story. Create one audit:report summary
+        issue, link each created issue as a sub-issue, and preserve every
+        dependency install or immutable lockfile verification command from the
+        report. Do not modify repository files, push, or ask for confirmation.
     onSuccessTaskId: audit-verify
     onFailureTaskId: audit-fail
-    maxRuns: 3
 
   - id: audit-verify
     name: "Verify: at least 1 new bug issue created"
@@ -103,8 +108,10 @@ diagram: |
       auditPreflight -.->|✗| auditFail
       auditLock["Check lock<br/>No audit already running"] -->|✓| auditAudit
       auditLock -.->|✗| auditNothing
-      auditAudit("AI: audit area<br/>Audit against guardrails + create issues<br/>↻3") -->|✓| auditVerify
+      auditAudit("AI: /repo-audit<br/>Read-only repository audit<br/>↻3") -->|✓| auditPublish
       auditAudit -.->|✗| auditFail
+      auditPublish("AI: publish findings<br/>Create issues and audit report") -->|✓| auditVerify
+      auditPublish -.->|✗| auditFail
       auditVerify["Verify<br/>At least 1 new bug issue created"] -->|✓| auditComplete
       auditVerify -.->|✗| auditAudit
       auditComplete(("Complete<br/>Audit finished successfully"))
@@ -117,7 +124,7 @@ diagram: |
       classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
       classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
       class auditStart start
-      class auditAudit action
+      class auditAudit,auditPublish action
       class auditPreflight,auditLock,auditVerify decision
       class auditNothing idle
       class auditFail failure
