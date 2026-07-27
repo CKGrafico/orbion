@@ -18,6 +18,7 @@ import { msg } from "./i18n.js";
 import { trimTrailingSlash } from "../shared/utils.js";
 import { resolveEffectiveUrl } from "./tunnel-registry.js";
 import { getEnvironments } from "./config-store.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { getMainWindow } from "./main-window.js";
 import { createSseParser } from "./sse-parser.js";
 
@@ -51,7 +52,7 @@ function updateSession(environmentId: string, patch: Partial<McpSession>): void 
 function broadcastStatus(session: McpSession): void {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
-    win.webContents.send("mcp:status", statusFromSession(session));
+    win.webContents.send(IPC_CHANNELS.MCP_STATUS, statusFromSession(session));
   }
 }
 

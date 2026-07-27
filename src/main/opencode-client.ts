@@ -4,6 +4,7 @@ import type {
 } from "../shared/ipc.js";
 import type { InternalOpenCodeEndpoint } from "./config-store.js";
 import { compareSemver, trimTrailingSlash } from "../shared/utils.js";
+import { IPC_CHANNELS } from "../shared/ipc-channels.js";
 import { getMainWindow } from "./main-window.js";
 import { msg } from "./i18n.js";
 import { decryptValue } from "./config-store.js";
@@ -188,7 +189,7 @@ export async function refreshOpenCodeStatus(
 
   const win = getMainWindow();
   if (win) {
-    win.webContents.send("opencode:status", { environmentId, status });
+    win.webContents.send(IPC_CHANNELS.OPENCODE_STATUS, { environmentId, status });
   }
 
   return status;
