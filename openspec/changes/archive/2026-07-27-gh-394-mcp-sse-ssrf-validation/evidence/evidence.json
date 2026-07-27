@@ -1,0 +1,9 @@
+{
+  "status": "skipped",
+  "reason": "Main-process SSRF validation fix — no user-visible UI. Binary impact is request-level blocking of malicious MCP endpoint URLs.",
+  "assets": [],
+  "changeId": "gh-394-mcp-sse-ssrf-validation",
+  "tasks": { "completed": 2, "total": 2 },
+  "verification": "typecheck passed, 808 tests passed, build succeeded",
+  "commits": ["0160929", "6e77465", "19bddc1"]
+}
