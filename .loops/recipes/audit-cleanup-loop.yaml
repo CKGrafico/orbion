@@ -1,12 +1,12 @@
 version: 2
 
 loops:
-  - taskId: audit-preflight
+  - taskId: cleanup-preflight
     intervalHuman: 1d
-    description: "Audit cleanup loop: closes audit reports with no pending bugs"
+    description: "Cleanup loop: closes audit reports with no pending bugs"
 
 tasks:
-  - id: audit-preflight
+  - id: cleanup-preflight
     name: "Preflight: clean tree + sync main"
     command: sh
     commandArgs:
@@ -16,10 +16,10 @@ tasks:
         && git switch main
         && git fetch origin
         && git rebase origin/main
-    onSuccessTaskId: audit-select
+    onSuccessTaskId: cleanup-select
     onFailureTaskId: null
 
-  - id: audit-select
+  - id: cleanup-select
     name: "Select all open audit:report issues"
     command: sh
     commandArgs:
@@ -29,10 +29,10 @@ tasks:
         --limit 1000 --json number,body --jq 'sort_by(.number)');
         test "$reports" != "[]" || exit 75;
         printf '%s\n' "$reports"
-    onSuccessTaskId: audit-ai
-    onFailureTaskId: audit-nothing
+    onSuccessTaskId: cleanup-ai
+    onFailureTaskId: cleanup-nothing
 
-  - id: audit-ai
+  - id: cleanup-ai
     name: "AI: check referenced issues and close report if all resolved"
     command: opencode
     commandArgs:
@@ -56,7 +56,7 @@ tasks:
     onSuccessTaskId: null
     onFailureTaskId: null
 
-  - id: audit-nothing
+  - id: cleanup-nothing
     name: "Idle: no open audit reports"
     command: echo
     commandArgs:

@@ -4,8 +4,10 @@ loops:
   - taskId: dev-preflight
     intervalHuman: 20m
     description: >
-      Main dev loop: preflight → pick issue → implement → verify → commit → PR.
-      Bug issues auto-approve and merge; everything else waits for human review.
+      Main dev loop: preflight → pick issue → implement → verify.
+      Verification and PR CI failures get dedicated repair passes. All PRs
+      squash-merge only after every required PR check passes; otherwise they
+      wait for human review.
 
 tasks:
   - id: dev-preflight
@@ -72,7 +74,7 @@ tasks:
     onFailureTaskId: dev-fail
 
   - id: dev-verify
-    name: "Verify: typecheck + tests + build"
+    name: "Verify: lint + typecheck + tests + build"
     command: sh
     commandArgs:
       - -c
@@ -95,11 +97,15 @@ tasks:
       - fullstack-engineer
       - >
         First, load all skills available for your current agent.
-        Verification failed on the current issue branch. Previous task output:
-        {{output}}. Fix everything on the same branch,
-        once fixed and verified commit the fixes. Do not push or perform any
-        GitHub actions. Never ask for confirmation. Archive the completed
-        change and generate visual evidence.
+        Verification failed on the current issue branch.
+        Previous task output: {{output}}.
+        Fix everything on the same branch.
+        After each fix, rerun openspec list --json (must report no pending
+        changes), rtk proxy pnpm typecheck,
+        rtk proxy pnpm test, and rtk proxy pnpm build.
+        Do not stop until all commands exit 0. Commit the fixes once verified.
+        Do not push or perform any GitHub actions. Never ask for confirmation.
+        Archive the completed change and generate visual evidence.
     onSuccessTaskId: dev-verify
     onFailureTaskId: dev-fail
 
@@ -113,24 +119,74 @@ tasks:
     onFailureTaskId: null
 
   - id: dev-pr
-    name: "Create PR; auto-merge bugs only"
+    name: "Create PR; wait for CI before merge"
     command: sh
     commandArgs:
       - -c
       - >
         BRANCH=$(git branch --show-current)
-        && IS_BUG=$(gh issue view {{number}} --json labels
-        --jq '[.labels[].name] | index("bug") != null')
         && git push -u origin "$BRANCH" >/dev/null
-        && if [ "$IS_BUG" = "true" ]; then
-        PR_URL=$(gh pr create --title "Resolve #{{number}}: {{title}}"
+        && PR_URL=$(gh pr create --title "Resolve #{{number}}: {{title}}"
         --body "Closes #{{number}}" --label code:done)
-        && gh pr merge "$PR_URL" --squash --delete-branch --admin;
-        else PR_URL=$(gh pr create --title "Resolve #{{number}}: {{title}}"
-        --body "Closes #{{number}}" --label code:review); fi
-        && printf '{"prUrl":"%s","isBug":%s}\n' "$PR_URL" "$IS_BUG"
+        && printf '{"prUrl":"%s"}\n' "$PR_URL"
+    onSuccessTaskId: dev-await-ci
+    onFailureTaskId: dev-fail-merge
+
+  - id: dev-await-ci
+    name: "Wait for every required PR check"
+    command: sh
+    commandArgs:
+      - -c
+      - 'gh pr checks "{{prUrl}}" --required --watch --fail-fast'
+    onSuccessTaskId: dev-ci-ready
+    onFailureTaskId: dev-ci-fix
+    maxRuns: 3
+
+  - id: dev-ci-fix
+    name: "Fix: resolve failed PR CI checks"
+    command: opencode
+    commandArgs:
+      - run
+      - --agent
+      - fullstack-engineer
+      - >
+        First, load all skills available for your current agent. Required PR
+        checks failed for {{prUrl}} on the current issue branch. Check output:
+        {{output}}. Inspect every failed check and its GitHub Actions logs with
+        gh pr checks and gh run view. Fix only actionable repository defects.
+        Never disable, weaken, bypass, or lower CI, coverage, security, lint,
+        test, or build gates to make a check pass. Do not change GitHub Actions
+        merely to hide a failure. Run the relevant local checks and then the
+        full repository verification required by /repo-verify. Commit and push
+        every verified fix to the existing PR branch. After a successful push,
+        post one concise PR comment naming failed checks, the fixes made, and
+        local verification run. Do not merge the PR, close the issue, or change
+        issue labels. If the failure is transient,
+        external, or cannot be fixed safely in this repository, exit non-zero
+        without pushing speculative changes. Never ask for confirmation.
+    onSuccessTaskId: dev-await-ci
+    onFailureTaskId: dev-ci-blocked
+
+  - id: dev-ci-ready
+    name: "Merge PR after CI passes"
+    command: sh
+    commandArgs:
+      - -c
+      - 'gh pr merge "{{prUrl}}" --squash --delete-branch --admin'
     onSuccessTaskId: dev-complete
     onFailureTaskId: dev-fail-merge
+
+  - id: dev-ci-blocked
+    name: "Recovery: leave CI-blocked PR for review"
+    command: sh
+    commandArgs:
+      - -c
+      - >
+        gh issue edit {{number}} --add-label code:review
+        --remove-label code:doing
+        && git checkout -- . && git clean -fd && git switch main
+    onSuccessTaskId: null
+    onFailureTaskId: null
 
   - id: dev-complete
     name: "Finalize issue and return to main"
@@ -138,29 +194,21 @@ tasks:
     commandArgs:
       - -c
       - >
-        IS_BUG=$(gh issue view {{number}} --json labels
-        --jq '[.labels[].name] | index("bug") != null')
-        && if [ "$IS_BUG" = "true" ]; then
         gh issue edit {{number}} --add-label code:done
         --remove-label code:doing --remove-label code:review
-        && gh issue close {{number}};
-        else gh issue edit {{number}} --add-label code:review
-        --remove-label code:doing; fi
+        && gh issue close {{number}}
         && git checkout -- . && git clean -fd && git switch main
     onSuccessTaskId: null
     onFailureTaskId: null
 
   - id: dev-fail-merge
-    name: "Recovery: retry bug merge, otherwise leave for review"
+    name: "Recovery: retry merge, otherwise leave for review"
     command: sh
     commandArgs:
       - -c
       - >
-        IS_BUG=$(gh issue view {{number}} --json labels
-        --jq '[.labels[].name] | index("bug") != null');
         BRANCH=$(git branch --show-current 2>/dev/null);
-        if [ "$IS_BUG" = "true" ] && [ -n "$BRANCH" ]
-        && [ "$BRANCH" != "main" ]; then
+        if [ -n "$BRANCH" ] && [ "$BRANCH" != "main" ]; then
         PR_URL=$(gh pr list --head "$BRANCH" --state open
         --json url --jq ".[0].url" 2>/dev/null);
         if [ -n "$PR_URL" ]; then
@@ -208,11 +256,18 @@ diagram: |
       devFix("Fix<br/>Resolve verification failures") -->|✓| devVerify
       devFix -.->|✗| devFail
       devCommit("Commit<br/>Stage and commit changes") -->|✓| devPr
-      devPr["PR<br/>Push + squash merge"] -->|✓| devComplete
+      devPr["PR<br/>Push + create pull request"] -->|✓| devAwaitCi
       devPr -.->|✗| devFailMerge
+      devAwaitCi["Check CI<br/>Wait for every required check<br/>↻3"] -->|✓| devCiReady
+      devAwaitCi -.->|✗| devCiFix
+      devCiFix("Fix CI<br/>Push fix and post PR note") -->|✓| devAwaitCi
+      devCiFix -.->|✗| devCiBlocked
+      devCiReady["Merge PR<br/>Squash and delete branch"] -->|✓| devComplete
+      devCiReady -.->|✗| devFailMerge
       devComplete(("Complete<br/>Close issue + return to main"))
       devFailMerge(("Merge Fail<br/>Admin merge or leave for review"))
       devFail(("Fail<br/>Reset + relabel for review"))
+      devCiBlocked(("CI Blocked<br/>Leave PR for human review"))
       devNothing(("Idle<br/>No issues to pick"))
       classDef start fill:#ffffff,stroke:#172033,stroke-width:2px,color:#172033
       classDef action fill:#eef0ff,stroke:#554cff,stroke-width:2px,color:#172033
@@ -221,8 +276,8 @@ diagram: |
       classDef failure fill:#fff0f0,stroke:#ef2929,stroke-width:2px,color:#8b1a1a
       classDef success fill:#e8f8ec,stroke:#18883c,stroke-width:2px,color:#145a32
       class devStart start
-      class devCleanDirty,devImplement,devFix,devCommit action
-      class devPreflight,devPick,devVerify,devPr decision
+      class devCleanDirty,devImplement,devFix,devCommit,devCiFix action
+      class devPreflight,devPick,devVerify,devPr,devAwaitCi,devCiReady decision
       class devNothing idle
-      class devFail,devFailMerge failure
+      class devFail,devFailMerge,devCiBlocked failure
       class devComplete success

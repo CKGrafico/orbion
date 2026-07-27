@@ -57,9 +57,9 @@ tasks:
         Use this read-only /repo-audit report from the previous task:
         {{output}}. Create GitHub issues with labels bug and code:pick for
         the three highest-severity actionable findings, skipping duplicates.
-        Use gh issue create, not /plan-story. Create one audit:report summary
+        Use /plan-story for each issue. Create one audit:report summary
         issue, link each created issue as a sub-issue, and preserve every
-        dependency install or immutable lockfile verification command from the
+        dependency restore or immutable lockfile verification command from the
         report. Do not modify repository files, push, or ask for confirmation.
     onSuccessTaskId: audit-verify
     onFailureTaskId: audit-fail
