@@ -25,6 +25,7 @@ import { trimTrailingSlash } from "../shared/utils.js";
 import { decryptValue } from "./config-store.js";
 import { ensureOpenCodeReady } from "./agent-runtime-recovery.js";
 import { createLogger } from "./logger.js";
+import { parseSseStream } from "./sse-parser.js";
 
 const logger = createLogger("agent-client");
 
@@ -81,13 +82,101 @@ function buildAuthHeaders(password: string | null): Record<string, string> {
   return { Authorization: `Basic ${encoded}` };
 }
 
-function responseText(parts: unknown): string {
-  if (!Array.isArray(parts)) return "";
-  return parts
-    .filter((part): part is Record<string, unknown> => typeof part === "object" && part !== null)
-    .filter((part) => part.type === "text")
-    .map((part) => String(part.text ?? part.content ?? ""))
-    .join("");
+const STREAM_TIMEOUT_MS = 10 * 60_000;
+
+type SseConsumeResult = "completed" | "aborted";
+
+export function mapSseEvent(
+  raw: Record<string, unknown>,
+  chatSessionId: string,
+  turnId: string,
+): AgentStreamEvent | null {
+  const type = String(raw.type ?? "");
+
+  switch (type) {
+    case "text-delta":
+      return { kind: "text-delta", chatSessionId, turnId, text: String(raw.text ?? "") };
+    case "tool-call-start":
+      return {
+        kind: "tool-call-start",
+        chatSessionId,
+        turnId,
+        toolCallId: String(raw.toolCallId ?? raw.id ?? ""),
+        toolName: String(raw.toolName ?? raw.name ?? ""),
+        title: String(raw.title ?? ""),
+      };
+    case "tool-call-output":
+      return {
+        kind: "tool-call-output",
+        chatSessionId,
+        turnId,
+        toolCallId: String(raw.toolCallId ?? raw.id ?? ""),
+        output: String(raw.output ?? ""),
+        status: raw.status === "error" ? "error" : "completed",
+      };
+    case "turn-finished":
+      return { kind: "turn-finished", chatSessionId, turnId };
+    case "turn-error":
+      return { kind: "turn-error", chatSessionId, turnId, error: String(raw.error ?? "Unknown error") };
+    default:
+      return null;
+  }
+}
+
+export async function consumeSseStream(
+  body: ReadableStream<Uint8Array>,
+  chatSessionId: string,
+  turnId: string,
+  signal: AbortSignal,
+): Promise<SseConsumeResult> {
+  let streamTimeout: ReturnType<typeof setTimeout> | undefined;
+  const onStreamTimeout = (): void => { signal.dispatchEvent(new Event("abort")); };
+  streamTimeout = setTimeout(onStreamTimeout, STREAM_TIMEOUT_MS);
+  signal.addEventListener("abort", () => { if (streamTimeout) clearTimeout(streamTimeout); }, { once: true });
+
+  try {
+    let turnFinished = false;
+
+    await parseSseStream(body, (event) => {
+      if (event.kind !== "data") return;
+
+      let raw: Record<string, unknown>;
+      try {
+        raw = JSON.parse(event.text) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+
+      const mapped = mapSseEvent(raw, chatSessionId, turnId);
+      if (mapped) {
+        forwardEvent(mapped);
+        if (mapped.kind === "turn-finished" || mapped.kind === "turn-error") {
+          turnFinished = true;
+        }
+      }
+    });
+
+    if (signal.aborted) {
+      forwardEvent({ kind: "turn-interrupted", chatSessionId, turnId });
+      return "aborted";
+    }
+
+    if (!turnFinished) {
+      forwardEvent({ kind: "turn-finished", chatSessionId, turnId });
+    }
+
+    return "completed";
+  } catch (err) {
+    if (signal.aborted) {
+      forwardEvent({ kind: "turn-interrupted", chatSessionId, turnId });
+      return "aborted";
+    }
+
+    forwardEvent({ kind: "turn-error", chatSessionId, turnId, error: err instanceof Error ? err.message : String(err) });
+    return "completed";
+  } finally {
+    if (streamTimeout) clearTimeout(streamTimeout);
+  }
 }
 
 /**
@@ -160,8 +249,6 @@ export async function sendPromptToAgent(
       };
     }
 
-    const promptData = await promptRes.json() as Record<string, unknown>;
-
     const entry: InFlightPrompt = {
       environmentId: args.environmentId,
       chatSessionId: args.chatSessionId,
@@ -171,13 +258,36 @@ export async function sendPromptToAgent(
     };
     inFlight.set(key, entry);
 
-    const text = responseText(promptData.parts);
-    if (text) forwardEvent({ kind: "text-delta", chatSessionId: args.chatSessionId, turnId: args.turnId, text });
-    forwardEvent({ kind: "turn-finished", chatSessionId: args.chatSessionId, turnId: args.turnId });
+    const eventsRes = await fetch(`${baseUrl}/v2/session/${encodeURIComponent(opencodeSessionId)}/events`, {
+      headers: {
+        ...buildAuthHeaders(endpointInfo.password),
+        Accept: "text/event-stream",
+      },
+      signal: controller.signal,
+    });
+
+    if (!eventsRes.ok || !eventsRes.body) {
+      const detail = await eventsRes.text().catch(() => "");
+      inFlight.delete(key);
+      logger.error(`OpenCode SSE stream failed for ${args.environmentId}: HTTP ${eventsRes.status}`);
+      return { ok: false, error: msg("agent.promptFailed", { status: String(eventsRes.status), detail: detail.slice(0, 200) }) };
+    }
+
+    const result = await consumeSseStream(
+      eventsRes.body,
+      args.chatSessionId,
+      args.turnId,
+      controller.signal,
+    );
     inFlight.delete(key);
+
+    if (result === "aborted") {
+      return { ok: false, error: msg("agent.promptTimedOut") };
+    }
 
     return { ok: true, sessionId: opencodeSessionId };
   } catch (err) {
+    inFlight.delete(key);
     if (err instanceof Error && err.name === "AbortError") {
       forwardEvent({ kind: "turn-interrupted", chatSessionId: args.chatSessionId, turnId: args.turnId });
       return { ok: false, error: msg("agent.promptTimedOut") };
