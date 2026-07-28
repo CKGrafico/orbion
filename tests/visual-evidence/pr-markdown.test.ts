@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generatePrMarkdown, rawImageUrl, resolveRef } from "../../src/visual-evidence/pr-markdown.js";
 import type { EvidenceResult, RepoCoordinates } from "../../src/visual-evidence/types.js";
 
-const repo: RepoCoordinates = { owner: "CKGrafico", name: "orbion" };
+const repo: RepoCoordinates = { owner: "PlainConceptsPlatform", name: "orbion" };
 
 describe("generatePrMarkdown", () => {
   it("anchored to headSha, not branch, for passed results", () => {
@@ -27,8 +27,8 @@ describe("generatePrMarkdown", () => {
       prMarkdown: "",
     } as any;
     const md = generatePrMarkdown(r, repo, "abc123");
-    expect(md).toContain("raw.githubusercontent.com/CKGrafico/orbion/abc123/openspec/changes/gh-x/evidence/final.webp");
-    expect(md).not.toContain("raw.githubusercontent.com/CKGrafico/orbion/feature/");
+    expect(md).toContain("raw.githubusercontent.com/PlainConceptsPlatform/orbion/abc123/openspec/changes/gh-x/evidence/final.webp");
+    expect(md).not.toContain("raw.githubusercontent.com/PlainConceptsPlatform/orbion/feature/");
   });
 
   it("uses raw.githubusercontent.com host, not github.com/blob", () => {
@@ -55,8 +55,8 @@ describe("generatePrMarkdown", () => {
       prMarkdown: "",
     } as any;
     const md = generatePrMarkdown(r, repo, "sha-x");
-    expect(md).toContain("raw.githubusercontent.com/CKGrafico/orbion/sha-x/");
-    expect(md).not.toContain("github.com/CKGrafico/orbion/blob/");
+    expect(md).toContain("raw.githubusercontent.com/PlainConceptsPlatform/orbion/sha-x/");
+    expect(md).not.toContain("github.com/PlainConceptsPlatform/orbion/blob/");
   });
 
   it("contains collapsible details with the scenario steps", () => {
@@ -143,7 +143,7 @@ describe("generatePrMarkdown", () => {
 describe("rawImageUrl", () => {
   it("builds a url from repo + sha + path", () => {
     const u = rawImageUrl(repo, "abc", "openspec/changes/x/evidence/final.webp");
-    expect(u).toBe("https://raw.githubusercontent.com/CKGrafico/orbion/abc/openspec/changes/x/evidence/final.webp");
+    expect(u).toBe("https://raw.githubusercontent.com/PlainConceptsPlatform/orbion/abc/openspec/changes/x/evidence/final.webp");
   });
 });
 

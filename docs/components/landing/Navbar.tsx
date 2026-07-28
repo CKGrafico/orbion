@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { GithubLogoIcon, ListIcon, XIcon } from '@phosphor-icons/react/dist/ssr'
+import { ThemeToggle } from 'fumadocs-ui/components/layout/theme-toggle'
+import Link from 'next/link'
 import { OrbionMark } from './OrbionMark'
 
 export interface NavbarLabels {
@@ -45,16 +47,16 @@ export function Navbar({ labels, docsHref }: NavbarProps) {
 
           <div className="flex items-center gap-1 max-sm:hidden">
             {links.map((l) => (
-              <a
+              <Link
                 key={l.href}
                 href={l.href}
                 className="rounded-full px-3 py-1.5 text-sm text-text-sec transition-colors duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-hover hover:text-text"
               >
                 {l.label}
-              </a>
+              </Link>
             ))}
             <a
-              href="https://github.com/CKGrafico/orbion"
+              href="https://github.com/PlainConceptsPlatform/orbion"
               target="_blank"
               rel="noopener noreferrer"
               aria-label={labels.github}
@@ -62,12 +64,13 @@ export function Navbar({ labels, docsHref }: NavbarProps) {
             >
               <GithubLogoIcon size={17} />
             </a>
-            <a
+            <ThemeToggle mode="light-dark" className="rounded-full border-0 bg-transparent p-2" />
+            <Link
               href={`${docsHref}/quickstart`}
               className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-accent-ink transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent-soft active:scale-[0.98]"
             >
               {labels.getStarted}
-            </a>
+            </Link>
           </div>
 
           <button
@@ -91,37 +94,48 @@ export function Navbar({ labels, docsHref }: NavbarProps) {
                 orbion
               </span>
             </span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label={labels.closeMenu}
-              className="rounded-full border border-line-subtle p-2.5 text-text-sec transition-colors hover:text-text"
-            >
-              <XIcon size={20} />
-            </button>
+            <span className="flex items-center gap-2">
+              <ThemeToggle mode="light-dark" className="rounded-full border-0 bg-transparent p-2" />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={labels.closeMenu}
+                className="rounded-full border border-line-subtle p-2.5 text-text-sec transition-colors hover:text-text"
+              >
+                <XIcon size={20} />
+              </button>
+            </span>
           </div>
           <div className="flex flex-1 flex-col justify-center gap-2 px-8">
-            {[...links, { href: 'https://github.com/CKGrafico/orbion', label: 'GitHub' }].map(
-              (l, i) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setOpen(false)}
-                  className="animate-rise rounded-2xl px-4 py-4 text-3xl font-semibold tracking-tight text-text transition-colors hover:bg-hover"
-                  style={{ animationDelay: `${100 + i * 60}ms` }}
-                >
-                  {l.label}
-                </a>
-              ),
-            )}
+            {links.map((l, i) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setOpen(false)}
+                className="animate-rise rounded-2xl px-4 py-4 text-3xl font-semibold tracking-tight text-text transition-colors hover:bg-hover"
+                style={{ animationDelay: `${100 + i * 60}ms` }}
+              >
+                {l.label}
+              </Link>
+            ))}
             <a
+              href="https://github.com/PlainConceptsPlatform/orbion"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="animate-rise rounded-2xl px-4 py-4 text-3xl font-semibold tracking-tight text-text transition-colors hover:bg-hover"
+              style={{ animationDelay: `${100 + links.length * 60}ms` }}
+            >
+              GitHub
+            </a>
+            <Link
               href={`${docsHref}/quickstart`}
               onClick={() => setOpen(false)}
               className="animate-rise mt-6 rounded-full bg-accent px-6 py-4 text-center text-lg font-semibold text-accent-ink active:scale-[0.98]"
               style={{ animationDelay: '340ms' }}
             >
               {labels.getStarted}
-            </a>
+            </Link>
           </div>
         </div>
       )}

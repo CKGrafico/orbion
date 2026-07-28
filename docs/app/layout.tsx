@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Outfit } from 'next/font/google'
 import './global.css'
 
-const geistSans = Geist({
+/* Outfit is the Platform Foundations typeface; it feeds --font-sans, which the
+   ui-theme base layer applies to <body>. Mono stays Geist for code and logs. */
+const outfit = Outfit({
   subsets: ['latin'],
-  variable: '--font-geist-sans',
+  variable: '--font-sans',
 })
 
 const geistMono = Geist_Mono({
@@ -13,7 +15,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://orbion.ckgrafico.com'),
+  metadataBase: new URL('https://plainconceptsplatform.github.io/orbion'),
   title: {
     default: 'Orbion: the open-source control plane for Loop Engineering',
     template: '%s | Orbion',
@@ -25,9 +27,6 @@ export const metadata: Metadata = {
     type: 'website',
     images: ['/og.png'],
   },
-  icons: {
-    icon: '/favicon.svg',
-  },
 }
 
 export default function RootLayout({
@@ -38,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${geistSans.variable} ${geistMono.variable}`}
+      className={`${outfit.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
       <body className="font-sans antialiased">{children}</body>

@@ -19,7 +19,7 @@ export default async function DocsLayoutWrapper({
   return (
     <DocsLayout
       tree={source.pageTree[locale]}
-      githubUrl="https://github.com/CKGrafico/orbion"
+      githubUrl="https://github.com/PlainConceptsPlatform/orbion"
       nav={{
         title: (
           <span className="flex items-center gap-2">

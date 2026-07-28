@@ -6,7 +6,7 @@ import {
   publishVerifiedEvidence,
 } from "./github-evidence-publisher.js";
 
-const repo = { owner: "CKGrafico", name: "orbion" } as const;
+const repo = { owner: "PlainConceptsPlatform", name: "orbion" } as const;
 
 function main(): number {
   const { values } = parseArgs({

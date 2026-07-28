@@ -19,7 +19,7 @@ export function ChatVignette() {
           <div className="max-w-[92%] rounded-2xl rounded-bl-md border-l-2 border-infra bg-elevated px-4 py-3 text-sm text-text-sec">
             build-box is reachable over SSH. I need to run two commands there:
             <div className="mt-2 rounded-lg bg-log px-3 py-2 font-mono text-xs leading-relaxed text-text-sec">
-              git clone https://github.com/CKGrafico/orbion
+              git clone https://github.com/PlainConceptsPlatform/orbion
               <br />
               loop-task start
             </div>

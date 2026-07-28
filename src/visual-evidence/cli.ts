@@ -81,13 +81,13 @@ function resolveRepo(): RepoCoordinates {
   try {
     const out = execFileSync(
       "gh",
-      ["repo", "view", "CKGrafico/orbion", "--json", "owner,name"],
+      ["repo", "view", "PlainConceptsPlatform/orbion", "--json", "owner,name"],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
     const parsed = JSON.parse(out) as { owner: { login: string }; name: string };
     return { owner: parsed.owner.login, name: parsed.name };
   } catch {
-    return { owner: "CKGrafico", name: "orbion" };
+    return { owner: "PlainConceptsPlatform", name: "orbion" };
   }
 }
 
@@ -219,7 +219,7 @@ process.on("unhandledRejection", async (reason) => {
       required: true,
       status: "failed",
     }, {
-      repo: { owner: "CKGrafico", name: "orbion" },
+      repo: { owner: "PlainConceptsPlatform", name: "orbion" },
       sha: process.env.ORBION_VISUAL_EVIDENCE_SHA ?? resolveHeadSha(root),
       failedStep: "launch",
       error: msg,

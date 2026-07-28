@@ -1,4 +1,5 @@
 import { ArrowRightIcon, GithubLogoIcon } from '@phosphor-icons/react/dist/ssr'
+import Link from 'next/link'
 import { OrbitDiagram } from './OrbitDiagram'
 
 export interface HeroLabels {
@@ -41,7 +42,7 @@ export function Hero({ labels, docsHref }: { labels: HeroLabels; docsHref: strin
             className="animate-rise mt-10 flex flex-wrap items-center gap-3"
             style={{ animationDelay: '240ms' }}
           >
-            <a
+            <Link
               href={`${docsHref}/quickstart`}
               className="group inline-flex items-center gap-3 rounded-full bg-accent py-2 pl-6 pr-2 text-sm font-semibold text-accent-ink transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent-soft active:scale-[0.98]"
             >
@@ -49,9 +50,9 @@ export function Hero({ labels, docsHref }: { labels: HeroLabels; docsHref: strin
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-ink/10 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:scale-105">
                 <ArrowRightIcon size={15} weight="bold" />
               </span>
-            </a>
+            </Link>
             <a
-              href="https://github.com/CKGrafico/orbion"
+              href="https://github.com/PlainConceptsPlatform/orbion"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full border border-line bg-panel px-6 py-2.5 text-sm font-medium text-text-sec transition-colors duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:text-text active:scale-[0.98]"

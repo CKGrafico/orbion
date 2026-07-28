@@ -9,7 +9,7 @@ import {
   type CommandRunner,
 } from "../../src/visual-evidence/github-evidence-publisher.js";
 
-const repo = { owner: "CKGrafico", name: "orbion" } as const;
+const repo = { owner: "PlainConceptsPlatform", name: "orbion" } as const;
 
 describe("GitHub evidence publisher", () => {
   it("derives the issue number from the change id", () => {
@@ -46,7 +46,7 @@ describe("GitHub evidence publisher", () => {
       return "";
     };
     const publication = createVerifiedPublication(root, "gh-142-x", repo, runner);
-    expect(calls[1]).toContain("gh api repos/CKGrafico/orbion/contents/");
+    expect(calls[1]).toContain("gh api repos/PlainConceptsPlatform/orbion/contents/");
     expect(publication.markdown).toContain("/asset-sha/");
     expect(publication.markdown).not.toContain("stale");
   });

@@ -91,7 +91,7 @@ const en = {
     "copied": "Copied"
   },
   "footer": {
-    "line": "Orbion. MIT licensed. Built in the open by Quique Fdez Guerra.",
+    "line": "Orbion. MIT licensed. Built in the open by Plain Concepts.",
     "docs": "Docs",
     "github": "GitHub",
     "loopTask": "loop-task"

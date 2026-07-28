@@ -7,6 +7,7 @@ import {
   CopyIcon,
   GithubLogoIcon,
 } from '@phosphor-icons/react/dist/ssr'
+import Link from 'next/link'
 
 export interface QuickstartLabels {
   heading: string
@@ -20,7 +21,7 @@ export interface QuickstartLabels {
 }
 
 const COMMANDS = [
-  'git clone https://github.com/CKGrafico/orbion',
+  'git clone https://github.com/PlainConceptsPlatform/orbion',
   'cd orbion',
   'pnpm install',
   'pnpm dev',
@@ -71,7 +72,7 @@ export function Quickstart({ labels, docsHref }: { labels: QuickstartLabels; doc
         <p className="mt-5 text-sm text-text-muted">{labels.outro}</p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <a
+          <Link
             href={`${docsHref}/quickstart`}
             className="group inline-flex items-center gap-3 rounded-full bg-accent py-2 pl-6 pr-2 text-sm font-semibold text-accent-ink transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent-soft active:scale-[0.98]"
           >
@@ -79,9 +80,9 @@ export function Quickstart({ labels, docsHref }: { labels: QuickstartLabels; doc
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-ink/10 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:scale-105">
               <ArrowRightIcon size={15} weight="bold" />
             </span>
-          </a>
+          </Link>
           <a
-            href="https://github.com/CKGrafico/orbion"
+            href="https://github.com/PlainConceptsPlatform/orbion"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-line bg-panel px-6 py-2.5 text-sm font-medium text-text-sec transition-colors duration-500 hover:text-text active:scale-[0.98]"

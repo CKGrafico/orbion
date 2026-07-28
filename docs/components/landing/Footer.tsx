@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { OrbionMark } from './OrbionMark'
 
 export interface FooterLabels {
@@ -17,11 +18,11 @@ export function Footer({ labels, docsHref }: { labels: FooterLabels; docsHref: s
         </div>
 
         <nav className="flex items-center gap-5 text-xs text-text-sec">
-          <a href={docsHref} className="transition-colors hover:text-text">
+          <Link href={docsHref} className="transition-colors hover:text-text">
             {labels.docs}
-          </a>
+          </Link>
           <a
-            href="https://github.com/CKGrafico/orbion"
+            href="https://github.com/PlainConceptsPlatform/orbion"
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-text"
@@ -29,7 +30,7 @@ export function Footer({ labels, docsHref }: { labels: FooterLabels; docsHref: s
             {labels.github}
           </a>
           <a
-            href="https://github.com/CKGrafico/loop-task"
+            href="https://github.com/PlainConceptsPlatform/loop-task"
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-text"

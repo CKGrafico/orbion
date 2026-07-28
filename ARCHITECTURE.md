@@ -4,7 +4,7 @@
 
 **Orbion** — the open-source control plane for Loop Engineering — is a
 cross-platform **desktop application** (Electron) that acts
-as a monitoring dashboard for one or more [loop-task](https://github.com/CKGrafico/loop-task)
+as a monitoring dashboard for one or more [loop-task](https://github.com/PlainConceptsPlatform/loop-task)
 daemons. Each daemon exposes an HTTP + SSE API; the app registers daemons by
 their base URL and shows their loops, tasks, projects, and live logs from a
 single window.
@@ -694,7 +694,7 @@ and screenshots without a daemon. This is a notable gap (see §15).
 - **Runtime:** Electron 37 / Node >= 20
 - **Package manager:** pnpm
 - **License:** MIT
-- **Maintainer:** Quique Fdez Guerra
+- **Maintainer:** Plain Concepts
 - **Date of review:** 2026-07-04
 
 ## 18. Glossary / Acronyms

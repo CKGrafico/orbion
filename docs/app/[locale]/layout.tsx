@@ -27,8 +27,7 @@ export default async function LocaleLayout({
       <RootProvider
         theme={{
           enabled: true,
-          defaultTheme: 'dark',
-          forcedTheme: 'dark',
+          defaultTheme: 'system',
         }}
       >
         {children}

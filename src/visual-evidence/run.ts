@@ -440,5 +440,5 @@ async function resolveHeadSha(repoRoot: string): Promise<string> {
 async function resolveRepo(repoRoot: string): Promise<RepoCoordinates> {
   void repoRoot;
   // Default to the canonical repo per AGENTS.md
-  return { owner: "CKGrafico", name: "orbion" };
+  return { owner: "PlainConceptsPlatform", name: "orbion" };
 }

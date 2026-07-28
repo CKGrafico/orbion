@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildManifest } from "../../src/visual-evidence/manifest.js";
 import type { RepoCoordinates, EvidenceAsset, AssertionResult, Scenario } from "../../src/visual-evidence/types.js";
 
-const repo: RepoCoordinates = { owner: "CKGrafico", name: "orbion" };
+const repo: RepoCoordinates = { owner: "PlainConceptsPlatform", name: "orbion" };
 const sha = "abc123sha";
 const scenario: Scenario = { title: "Scenario A", steps: ["one", "two"] };
 const assertions: AssertionResult[] = [
@@ -46,7 +46,7 @@ describe("buildManifest", () => {
     expect(m.scenario.title).toBe("Scenario A");
     expect(typeof m.prMarkdown).toBe("string");
     expect(m.prMarkdown).toContain("## Visual Evidence");
-    expect(m.prMarkdown).toContain("raw.githubusercontent.com/CKGrafico/orbion/abc123sha/openspec/changes/gh-x/evidence/final.webp");
+    expect(m.prMarkdown).toContain("raw.githubusercontent.com/PlainConceptsPlatform/orbion/abc123sha/openspec/changes/gh-x/evidence/final.webp");
   });
 
   it("skipped: empty assets and empty prMarkdown-equivalent body", () => {
